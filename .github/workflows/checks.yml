@@ -92,6 +92,7 @@ jobs:
           DB_USER: ozcoding
           DB_PASSWORD: pw1234
           DB_NAME: ai_health
+          PGDATABASE: postgres
         run: |
           uv run coverage run -m pytest app
           uv run coverage report -m

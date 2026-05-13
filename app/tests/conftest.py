@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import Mock, patch
@@ -15,6 +16,8 @@ from app.core.db.databases import TORTOISE_APP_MODELS
 TEST_BASE_URL = "http://test"
 TEST_DB_LABEL = "models"
 TEST_DB_TZ = "Asia/Seoul"
+
+os.environ.setdefault("PGDATABASE", "postgres")
 
 
 def get_test_db_config() -> dict[str, Any]:
