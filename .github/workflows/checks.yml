@@ -33,7 +33,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --group dev --frozen
 
       - name: Run Ruff Check (Linting)
         run: uv run ruff check .
@@ -44,13 +44,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: pgvector/pgvector:pg16
         env:
-          MYSQL_ROOT_PASSWORD: pw1234
-          MYSQL_DATABASE: ai_health
+          POSTGRES_DB: ai_health
+          POSTGRES_USER: ozcoding
+          POSTGRES_PASSWORD: pw1234
         ports:
-          - 3306:3306
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ozcoding -d ai_health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,7 +72,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: uv sync --group app --frozen
+        run: uv sync --group app --group dev --frozen
 
       - name: Check if tests exist
         id: check_tests
@@ -80,6 +86,12 @@ jobs:
 
       - name: Run Tests with Coverage
         if: steps.check_tests.outputs.has_tests == 'true'
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: ozcoding
+          DB_PASSWORD: pw1234
+          DB_NAME: ai_health
         run: |
           uv run coverage run -m pytest app
           uv run coverage report -m
