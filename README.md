@@ -11,7 +11,7 @@
 - **AI Worker**: 모델 추론 및 학습 작업을 API 서버와 분리하여 처리.
 - **UV Package Manager**: 매우 빠른 의존성 설치 및 가상환경 관리.
 - **Tortoise ORM**: 비동기 방식의 데이터베이스 모델링 및 쿼리 관리.
-- **Docker-Compose**: MySQL, Redis, Nginx를 포함한 전체 서비스 스택을 한 번에 실행.
+- **Docker-Compose**: PostgreSQL(pgvector), Redis, Nginx를 포함한 전체 서비스 스택을 한 번에 실행.
 - **CI/CD Scripts**: 코드 포맷팅(Ruff), 타입 체크(Mypy), 테스트(Pytest)를 위한 자동화 스크립트 제공.
 
 ---
@@ -79,6 +79,7 @@ uv sync --group ai   # AI 워커용
     ```
 
 생성된 `env` 파일 내의 환경변수들은 프로젝트 상황에 맞게 수정하세요.
+Docker Compose 내부에서 API 서버를 실행하는 경우 `DB_HOST=postgres`를 사용하고, FastAPI를 로컬에서 직접 실행하면서 DB만 Docker로 띄우는 경우 `DB_HOST=localhost`를 사용하세요.
 
 ---
 
@@ -97,6 +98,8 @@ docker-compose up -d --build
 실행 후 다음 주소로 접속 가능합니다:
 - **API 서버**: [http://localhost/api/docs](http://localhost/api/docs) (Swagger UI)
 - **Nginx**: 80 포트를 통해 API 서버로 요청을 전달합니다.
+
+DB는 PostgreSQL(pgvector) 컨테이너로 실행됩니다. 기존 MySQL 기준 Aerich migration을 사용하던 경우에는 migration 파일을 임의로 삭제하지 말고, 팀에서 PostgreSQL 기준으로 재초기화할지 먼저 결정한 뒤 `aerich init-db` 또는 신규 migration 생성 절차를 진행하세요.
 
 #### 로컬에서 개별 실행 (개발용)
 
