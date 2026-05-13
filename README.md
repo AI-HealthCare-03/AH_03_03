@@ -178,3 +178,16 @@ chmod +x scripts/certbot.sh
 - **API 추가**: `app/apis/v1/` 아래에 새로운 라우터 파일을 생성하고 `app/apis/v1/__init__.py`에 등록하세요.
 - **DB 모델 추가**: `app/models/`에 Tortoise 모델을 정의하고 `app/db/databases.py`의 `MODELS` 리스트에 추가하세요.
 - **AI 로직 추가**: `ai_worker/tasks/`에 새로운 처리 로직을 작성하고 `ai_worker/main.py`에서 호출하도록 구성하세요.
+
+## 개발 작업 영역 분리 기준
+
+- 백엔드 API 담당자는 `app/` 하위에서 작업합니다.
+- ML 담당자는 `ai_worker/ml/` 하위에서 작업합니다.
+- CV 담당자는 `ai_worker/cv/` 하위에서 작업합니다.
+- LLM 담당자는 `ai_worker/llm/` 하위에서 작업합니다.
+- RAG 담당자는 `ai_worker/rag/` 하위에서 작업합니다.
+- 여러 AI 처리 흐름을 묶는 파이프라인은 `ai_worker/pipelines/`에서 관리합니다.
+- ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않습니다.
+- 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않습니다.
+- API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정합니다.
+- `pyproject.toml`, `uv.lock`, `docker-compose.yml`, env example, `app/core` 같은 공용 설정 파일은 팀장 승인 없이 수정하지 않습니다.
