@@ -35,6 +35,7 @@ router = APIRouter(prefix="/api/v1/cv", tags=["Vision - GPT 이미지 분석"])
 
 # ── 의존성 ────────────────────────────────────────────────────────────────────
 
+
 @lru_cache
 def get_settings() -> VisionSettings:
     return VisionSettings()
@@ -92,6 +93,7 @@ async def validate_image(file: UploadFile) -> bytes:
 
 # ── 공통 Vision 호출 ──────────────────────────────────────────────────────────
 
+
 async def call_vision(
     analysis_type: str,
     file: UploadFile,
@@ -130,6 +132,7 @@ async def call_vision(
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/diet",
     response_model=DietAnalysisResponse,
@@ -151,7 +154,6 @@ async def analyze_diet(
     file: UploadFile = File(..., description="식단 이미지 (JPG/PNG/WEBP, 최대 10MB)"),
     client: VisionClient = Depends(get_vision_client),
 ) -> DietAnalysisResponse:
-
     raw = await call_vision(AnalysisType.DIET, file, client)
     status = raw.get("analysis_status", "failed")
 
@@ -185,7 +187,6 @@ async def analyze_prescription(
     file: UploadFile = File(..., description="처방전 또는 약봉투 이미지"),
     client: VisionClient = Depends(get_vision_client),
 ) -> PrescriptionAnalysisResponse:
-
     raw = await call_vision(AnalysisType.PRESCRIPTION, file, client)
     status = raw.get("analysis_status", "failed")
 
@@ -220,7 +221,6 @@ async def analyze_checkup(
     file: UploadFile = File(..., description="건강검진 결과지 이미지"),
     client: VisionClient = Depends(get_vision_client),
 ) -> CheckupAnalysisResponse:
-
     raw = await call_vision(AnalysisType.CHECKUP, file, client)
     status = raw.get("analysis_status", "failed")
 

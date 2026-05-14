@@ -18,17 +18,17 @@ logger = logging.getLogger(__name__)
 
 # ── 분석 유형 ─────────────────────────────────────────────────────────────────
 
+
 class AnalysisType:
-    DIET         = "diet"
+    DIET = "diet"
     PRESCRIPTION = "prescription"
-    CHECKUP      = "checkup"
+    CHECKUP = "checkup"
 
 
 # ── 프롬프트 ──────────────────────────────────────────────────────────────────
 # TODO: 추후 프롬프트 튜닝 예정
 
 PROMPTS: dict[str, str] = {
-
     AnalysisType.DIET: """
     이 식단 이미지를 분석하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
     {
@@ -97,7 +97,6 @@ PROMPTS: dict[str, str] = {
       소스/양념에 덮여 불분명      → 0.40~0.60
       거의 식별 불가               → 0.40 이하
     """,
-
     AnalysisType.PRESCRIPTION: """
 이 약 봉투 또는 처방전 이미지에서 약물 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {
@@ -121,7 +120,6 @@ PROMPTS: dict[str, str] = {
 - 처방전이 아닌 이미지면 failed로 반환하고 fail_reason 작성
 - 의료 진단 및 처방 변경 권고 금지
 """,
-
     AnalysisType.CHECKUP: """
 이 건강검진 결과지에서 아래 항목의 수치만 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {
@@ -155,6 +153,7 @@ PROMPTS: dict[str, str] = {
 
 
 # ── Vision 클라이언트 ─────────────────────────────────────────────────────────
+
 
 class VisionClient:
     """GPT Vision API 호출 클라이언트 (gpt-4o-mini)."""
