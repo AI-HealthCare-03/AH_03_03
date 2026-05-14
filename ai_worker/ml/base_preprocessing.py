@@ -4,8 +4,9 @@ Python 3.13 | pandas>=2.2 | numpy>=2.0 | scikit-learn>=1.4
 """
 
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -135,7 +136,7 @@ df['근력운동일수'] = df['근력운동일수'].astype(int)
 
 df = df.drop(columns=['음주빈도', '음주량'])
 
-print(f"[7] Ordinal Encoding 완료")
+print("[7] Ordinal Encoding 완료")
 print(f"    음주빈도_enc: {df['음주빈도_enc'].value_counts().sort_index().to_dict()}")
 print(f"    음주량_enc:  {df['음주량_enc'].value_counts(dropna=False).sort_index().to_dict()}")
 
@@ -165,7 +166,7 @@ if n_sm > 0:
     df['현재흡연'] = df['현재흡연'].fillna(0)
     print(f"[9] 현재흡연 결측 {n_sm}건 → 0(비흡연) 대체")
 else:
-    print(f"[9] 현재흡연 결측 없음")
+    print("[9] 현재흡연 결측 없음")
 
 
 # ──────────────────────────────────────────────
@@ -173,7 +174,7 @@ else:
 # ──────────────────────────────────────────────
 remaining = df.isnull().sum()
 remaining = remaining[remaining > 0]
-print(f"\n[10] 잔여 결측치:")
+print("\n[10] 잔여 결측치:")
 if remaining.empty:
     print("  → 없음 ✓  (음주량_enc NaN 은 의도적 유지)")
 else:
@@ -198,7 +199,7 @@ for y in y_cols:
     y_clean = df[y].dropna()
     classes = np.sort(y_clean.unique())
     cw      = compute_class_weight(class_weight='balanced', classes=classes, y=y_clean)
-    cw_dict = dict(zip(classes.astype(int), cw.round(4)))
+    cw_dict = dict(zip(classes.astype(int), cw.round(4), strict=False))
     class_weights[y] = cw_dict
     print(f"  {y}: {cw_dict}")
 

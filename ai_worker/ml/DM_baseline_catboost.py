@@ -7,14 +7,18 @@ Python 3.9 | catboost>=1.2 | scikit-learn>=1.4 | pandas>=2.2
 
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import (
-    roc_auc_score, f1_score, recall_score,
-    classification_report, confusion_matrix,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    recall_score,
+    roc_auc_score,
 )
+from sklearn.model_selection import StratifiedKFold
 
 warnings.filterwarnings('ignore')
 
@@ -106,21 +110,21 @@ oof_f1     = f1_score(y, oof_pred_label)
 oof_recall = recall_score(y, oof_pred_label)
 
 scores_df = pd.DataFrame(fold_scores)
-print(f"\n[4] OOF 전체 성능")
+print("\n[4] OOF 전체 성능")
 print(f"    AUC-ROC : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
 print(f"    F1      : {oof_f1:.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
 print(f"    Recall  : {oof_recall:.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
 
-print(f"\n[5] Classification Report (OOF)")
+print("\n[5] Classification Report (OOF)")
 print(classification_report(y, oof_pred_label, target_names=['정상(0)', '당뇨(1)']))
 
-print(f"[6] Confusion Matrix (OOF)")
+print("[6] Confusion Matrix (OOF)")
 cm = confusion_matrix(y, oof_pred_label)
 print(f"    TN={cm[0,0]} FP={cm[0,1]}")
 print(f"    FN={cm[1,0]} TP={cm[1,1]}")
 
 # ── Feature Importance (마지막 fold 기준) ─────────────────────
-print(f"\n[7] Feature Importance Top 15 (마지막 fold)")
+print("\n[7] Feature Importance Top 15 (마지막 fold)")
 fi = pd.DataFrame({
     'feature':    X.columns,
     'importance': model.get_feature_importance(),
