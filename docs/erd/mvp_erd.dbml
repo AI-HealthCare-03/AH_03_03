@@ -1,0 +1,281 @@
+// AI Healthcare MVP ERD
+//
+// 범위:
+// - AUTH / USER
+// - MAIN / MYPAGE
+// - HEALTH
+// - ANALYSIS + SHAP
+// - CHALLENGE
+// - DASHBOARD 조회/집계
+// - NOTIFICATION 최소기능
+//
+// 제외:
+// - DIET 실서비스 DB
+// - LLM 실서비스 DB
+// - FAMILY
+// - QNA
+// - MEDICATION
+// - ADMIN
+// - 운영 로그 상세
+// - 외부 알림 SMS/Email/Push/Kakao
+
+Project ai_health_mvp {
+  database_type: "PostgreSQL"
+  Note: "FastAPI + AI Worker MVP schema. Dashboard는 별도 테이블 없이 관련 테이블을 조회/집계한다."
+}
+
+Enum gender {
+  MALE
+  FEMALE
+}
+
+Enum async_job_type {
+  HEALTH_ANALYSIS
+}
+
+Enum async_job_status {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELED
+}
+
+Enum analysis_type {
+  DIABETES
+  HYPERTENSION
+}
+
+Enum risk_level {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+Enum factor_direction {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+}
+
+Enum challenge_category {
+  EXERCISE
+  DIET
+  SLEEP
+  BLOOD_PRESSURE
+  BLOOD_GLUCOSE
+  WEIGHT
+  HABIT
+}
+
+Enum challenge_status {
+  ACTIVE
+  INACTIVE
+}
+
+Enum user_challenge_status {
+  JOINED
+  COMPLETED
+  CANCELED
+}
+
+Enum notification_type {
+  ANALYSIS_COMPLETED
+  CHALLENGE_RECOMMENDED
+  CHALLENGE_REMINDER
+}
+
+Table users {
+  id bigint [pk, increment]
+  email varchar(40) [not null, unique]
+  hashed_password varchar(128) [not null]
+  name varchar(20) [not null]
+  gender gender [not null]
+  birthday date [not null]
+  phone_number varchar(11) [not null, unique]
+  is_active boolean [not null, default: true]
+  is_admin boolean [not null, default: false]
+  last_login timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: "AUTH / USER 기준 테이블. 현재 MVP에서는 일반 사용자 기능 중심으로 사용한다."
+}
+
+Table health_records {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  height_cm decimal(5,2)
+  weight_kg decimal(5,2)
+  bmi decimal(5,2)
+  systolic_bp int
+  diastolic_bp int
+  fasting_glucose int
+  hba1c decimal(4,2)
+  has_diabetes boolean
+  has_hypertension boolean
+  is_smoker boolean
+  drinks_alcohol boolean
+  exercise_days_per_week int
+  sleep_hours decimal(4,2)
+  measured_at timestamptz [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, measured_at)
+  }
+
+  Note: "사용자의 건강정보 입력 이력. Main/Mypage와 분석 입력 기준으로 사용한다."
+}
+
+Table async_jobs {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  job_type async_job_type [not null]
+  status async_job_status [not null, default: 'PENDING']
+  target_table varchar(50)
+  target_id bigint
+  error_message text
+  requested_at timestamptz [not null]
+  started_at timestamptz
+  finished_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, status)
+    (job_type, status)
+  }
+
+  Note: "Backend가 생성하고 AI Worker가 처리 상태를 갱신하는 비동기 작업 테이블."
+}
+
+Table analysis_results {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  health_record_id bigint [not null, ref: > health_records.id]
+  async_job_id bigint [ref: > async_jobs.id]
+  analysis_type analysis_type [not null]
+  risk_score decimal(6,5) [not null]
+  risk_level risk_level [not null]
+  summary varchar(255)
+  model_name varchar(100)
+  model_version varchar(50)
+  analyzed_at timestamptz [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, analyzed_at)
+    (health_record_id, analysis_type)
+  }
+
+  Note: "당뇨/고혈압 위험도 분석 최종 결과."
+}
+
+Table analysis_result_factors {
+  id bigint [pk, increment]
+  analysis_result_id bigint [not null, ref: > analysis_results.id]
+  factor_key varchar(100) [not null]
+  factor_name varchar(100) [not null]
+  factor_value varchar(100)
+  contribution_score decimal(10,6)
+  direction factor_direction [not null]
+  display_order int [not null, default: 0]
+  created_at timestamptz [not null]
+
+  indexes {
+    (analysis_result_id, display_order)
+  }
+
+  Note: "SHAP 또는 feature contribution 기반 주요 위험요인. factor_value는 float가 아니라 varchar로 유지한다."
+}
+
+Table analysis_snapshots {
+  id bigint [pk, increment]
+  analysis_result_id bigint [not null, ref: > analysis_results.id]
+  input_payload jsonb [not null]
+  output_payload jsonb [not null]
+  shap_payload jsonb
+  model_payload jsonb
+  created_at timestamptz [not null]
+
+  Note: "분석 재현과 디버깅을 위한 입력/출력/SHAP 원본 스냅샷."
+}
+
+Table challenges {
+  id bigint [pk, increment]
+  title varchar(100) [not null]
+  description text
+  category challenge_category [not null]
+  target_metric varchar(100)
+  target_value varchar(100)
+  duration_days int [not null]
+  status challenge_status [not null, default: 'ACTIVE']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (category, status)
+  }
+
+  Note: "MVP 챌린지 마스터 데이터."
+}
+
+Table user_challenges {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  challenge_id bigint [not null, ref: > challenges.id]
+  status user_challenge_status [not null, default: 'JOINED']
+  started_at timestamptz [not null]
+  completed_at timestamptz
+  canceled_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, status)
+    (challenge_id)
+  }
+
+  Note: "사용자 챌린지 참여/완료 상태."
+}
+
+Table challenge_recommendations {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  analysis_result_id bigint [ref: > analysis_results.id]
+  challenge_id bigint [not null, ref: > challenges.id]
+  reason varchar(255)
+  priority int [not null, default: 0]
+  is_selected boolean [not null, default: false]
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+    (analysis_result_id, priority)
+  }
+
+  Note: "분석 결과와 주요 위험요인 기반 추천 챌린지."
+}
+
+Table notifications {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  notification_type notification_type [not null]
+  title varchar(100) [not null]
+  message varchar(255) [not null]
+  target_table varchar(50)
+  target_id bigint
+  is_read boolean [not null, default: false]
+  read_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, is_read)
+    (user_id, created_at)
+  }
+
+  Note: "웹 내부 알림 최소 기능. SMS/Email/Push/Kakao는 MVP 제외."
+}
