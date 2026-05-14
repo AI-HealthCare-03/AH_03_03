@@ -13,8 +13,6 @@ import logging
 
 from openai import AsyncOpenAI
 
-from .schemas import AnalysisStatus, STATUS_MESSAGE
-
 logger = logging.getLogger(__name__)
 
 
@@ -93,7 +91,6 @@ PROMPTS: dict[str, str] = {
     - 추후 식약처 영양성분 DB와 매칭 예정이므로 수치는 표준 단위(g, mg, kcal) 사용
     - 음식이 아닌 이미지면 analysis_status를 failed로, fail_reason에 한글로 사유 작성
     - 의료 진단 및 영양 처방 금지
-    
     - confidence는 음식 인식 확실성 기준으로 유동적으로 설정
       이미지에서 명확히 식별 가능  → 0.85~0.95
       대략적으로 식별 가능         → 0.65~0.80

@@ -8,8 +8,8 @@ MVP 기준 GPT Vision 응답 스키마.
 
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # ── 분석 상태 ─────────────────────────────────────────────────────────────────
 

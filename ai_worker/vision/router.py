@@ -12,7 +12,7 @@ MVP 기준 3개 엔드포인트 제공 (식단 / 처방전 / 건강검진표).
 import logging
 from functools import lru_cache
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from .client import AnalysisType, VisionClient
 from .schemas import (
@@ -107,7 +107,7 @@ async def call_vision(
             image_bytes=image_bytes,
             media_type=file.content_type or "image/jpeg",
         )
-    except ValueError:
+    except ValueError as e:
         err = ERROR_MAP["parse_error"]
         raise HTTPException(
             status_code=err["status_code"],
@@ -115,8 +115,8 @@ async def call_vision(
                 error_code="parse_error",
                 message=err["message"],
             ).model_dump(),
-        )
-    except Exception:
+        ) from e
+    except Exception as e:
         logger.exception("GPT Vision 호출 실패 | type=%s", analysis_type)
         err = ERROR_MAP["vision_api_error"]
         raise HTTPException(
@@ -125,7 +125,7 @@ async def call_vision(
                 error_code="vision_api_error",
                 message=err["message"],
             ).model_dump(),
-        )
+        ) from e
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────

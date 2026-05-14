@@ -88,6 +88,8 @@ ignore = ["UP046", "E501"]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "db/migrations/*" = ["ALL"]
+"ai_worker/vision/router.py" = ["B008"]
+"ai_worker/vision/evaluate.py" = ["C901", "E402"]
 
 [tool.ruff.format]
 # 포매터 설정

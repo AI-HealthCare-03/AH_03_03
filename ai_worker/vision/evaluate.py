@@ -14,15 +14,9 @@ GPT Vision 평가 스크립트 (방법 2 + 방법 4).
 """
 
 import asyncio
-import base64
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-
-from dotenv import load_dotenv
-
-load_dotenv(".env")
 
 from .client import AnalysisType, VisionClient
 from .settings import VisionSettings
@@ -80,7 +74,6 @@ async def evaluate():
 
     results      = []
     total        = len(image_files)
-    auto_correct = 0  # 유사도 기반 자동 정답
     human_correct= 0  # 사람 검수 정답
     human_wrong  = 0  # 사람 검수 오답
     skipped      = 0  # 분석 실패
@@ -117,7 +110,7 @@ async def evaluate():
 
         # GPT 결과 출력
         foods = raw.get("foods", [])
-        print(f"\n  📊 GPT Vision 결과:")
+        print("\n  📊 GPT Vision 결과:")
         print(f"  {'─'*40}")
 
         if not foods:
@@ -145,11 +138,11 @@ async def evaluate():
                 print()
 
         # 사람 검수
-        print(f"  ✅ 이 결과가 맞나요?")
-        print(f"     1 → 정확함")
-        print(f"     2 → 대략 맞음 (음식명은 맞지만 세부사항 다름)")
-        print(f"     3 → 틀림")
-        print(f"     s → 건너뜀")
+        print("  ✅ 이 결과가 맞나요?")
+        print("     1 → 정확함")
+        print("     2 → 대략 맞음 (음식명은 맞지만 세부사항 다름)")
+        print("     3 → 틀림")
+        print("     s → 건너뜀")
 
         while True:
             choice = input("  선택: ").strip().lower()
@@ -193,7 +186,7 @@ async def evaluate():
     accuracy  = round((human_correct / evaluated * 100), 1) if evaluated > 0 else 0
 
     print(f"\n{'='*60}")
-    print(f"  📈 평가 완료")
+    print("  📈 평가 완료")
     print(f"{'='*60}")
     print(f"  전체 이미지  : {total}장")
     print(f"  분석 성공    : {evaluated}장")
@@ -224,7 +217,7 @@ async def evaluate():
         json.dump(summary, f, ensure_ascii=False, indent=2)
 
     print(f"  💾 결과 저장 완료: {result_path.name}")
-    print(f"  📂 위치: data/results/\n")
+    print("  📂 위치: data/results/\n")
 
 
 if __name__ == "__main__":
