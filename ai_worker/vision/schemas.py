@@ -6,7 +6,7 @@ MVP 기준 GPT Vision 응답 스키마.
 추후 식약처 영양성분 DB 매칭 시 NutritionInfo 필드 기준으로 연동 예정.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 # ── 분석 상태 ─────────────────────────────────────────────────────────────────
 
 
-class AnalysisStatus(str, Enum):
+class AnalysisStatus(str, StrEnum):
     SUCCESS = "success"  # 분석 성공
     LOW_CONFIDENCE = "low_confidence"  # 신뢰도 낮음 → 사용자 확인 필요
     PARTIAL = "partial"  # 일부만 인식
