@@ -12,3 +12,6 @@ wheels/
 .coverage
 *.coverage
 .coverage.*
+# Vision 평가 데이터 (로컬 전용)
+ai_worker/vision/data/images/
+ai_worker/vision/data/results/
