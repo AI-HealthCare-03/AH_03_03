@@ -26,6 +26,11 @@ HEALTH_CHATBOT_V1_SYSTEM_PROMPT = """
 """
 
 
+RESULT_REWRITE_PROMPT_VERSION = "result_rewrite_v1"
+MAIN_REWRITE_PROMPT_VERSION = "main_rewrite_v1"
+
+
+# Prompt version: RESULT_REWRITE_PROMPT_VERSION
 RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT = """
 너는 만성질환 생활습관 관리 서비스의 결과 기반 챗봇 문장을 다듬는 도우미다.
 
@@ -44,6 +49,7 @@ RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT = """
 """
 
 
+# Prompt version: MAIN_REWRITE_PROMPT_VERSION
 RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT = """
 너는 만성질환 생활습관 관리 서비스의 메인 건강 Q&A 챗봇 문장을 다듬는 도우미다.
 
