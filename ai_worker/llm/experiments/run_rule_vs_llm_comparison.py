@@ -12,6 +12,8 @@ from ai_worker.llm.health_chatbot import (
 from ai_worker.llm.llm_generator import (
     generate_main_health_chatbot_llm_response,
     generate_result_chatbot_llm_response,
+    rewrite_main_health_chatbot_response_with_llm,
+    rewrite_result_chatbot_response_with_llm,
 )
 from ai_worker.llm.schemas import MainHealthChatbotInput, ResultChatbotInput
 
@@ -23,9 +25,7 @@ class ComparisonCase(NamedTuple):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Compare rule engine chatbot responses with LLM responses."
-    )
+    parser = argparse.ArgumentParser(description="Compare rule engine chatbot responses with LLM responses.")
     parser.add_argument(
         "--all",
         action="store_true",
@@ -105,6 +105,11 @@ def run_comparison_case(
             input_data,
             use_real_llm=use_real_llm,
         )
+        rewrite_response = rewrite_result_chatbot_response_with_llm(
+            input_data,
+            rule_engine_output=rule_response,
+            use_real_llm=use_real_llm,
+        )
     else:
         input_data = case.input_data
         if not isinstance(input_data, MainHealthChatbotInput):
@@ -115,9 +120,14 @@ def run_comparison_case(
             input_data,
             use_real_llm=use_real_llm,
         )
+        rewrite_response = rewrite_main_health_chatbot_response_with_llm(
+            input_data,
+            rule_engine_output=rule_response,
+            use_real_llm=use_real_llm,
+        )
 
     print(f"\n--- Case: {case.case_id} ---")
-    print(f"response_type={case.response_type}")
+    print(f"chatbot_type={case.response_type}")
     print(f"user_message={input_data.user_message}")
 
     print("\n[Rule Engine]")
@@ -132,6 +142,13 @@ def run_comparison_case(
     print(f"is_safe={llm_response.is_safe}")
     print(f"answer={llm_response.answer}")
     print(f"safety_result={llm_response.safety_result}")
+
+    print("\n[LLM Rewrite]")
+    print(f"source={rewrite_response.source}")
+    print(f"intent={rewrite_response.intent}")
+    print(f"is_safe={rewrite_response.is_safe}")
+    print(f"answer={rewrite_response.answer}")
+    print(f"safety_result={rewrite_response.safety_result}")
 
 
 def main() -> None:
