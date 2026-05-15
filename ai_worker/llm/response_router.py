@@ -24,11 +24,17 @@ def route_result_chatbot_response(
 ) -> ResultChatbotOutput:
     rule_result = generate_result_chatbot_response(input_data)
     if use_llm_rewrite:
-        return rewrite_result_chatbot_response_with_llm(
+        if rule_result.intent == "medical_consult_required":
+            return rule_result
+
+        rewrite_result = rewrite_result_chatbot_response_with_llm(
             input_data,
             rule_engine_output=rule_result,
             use_real_llm=use_real_llm,
         )
+        if rewrite_result.is_safe:
+            return rewrite_result
+        return with_fallback_metadata(rule_result, rewrite_result)
 
     if rule_result.source == "rule_engine":
         return rule_result
@@ -50,11 +56,17 @@ def route_main_health_chatbot_response(
 ) -> MainHealthChatbotOutput:
     rule_result = generate_main_health_chatbot_response(input_data)
     if use_llm_rewrite:
-        return rewrite_main_health_chatbot_response_with_llm(
+        if rule_result.intent == "medical_consult_required":
+            return rule_result
+
+        rewrite_result = rewrite_main_health_chatbot_response_with_llm(
             input_data,
             rule_engine_output=rule_result,
             use_real_llm=use_real_llm,
         )
+        if rewrite_result.is_safe:
+            return rewrite_result
+        return with_fallback_metadata(rule_result, rewrite_result)
 
     if rule_result.source == "rule_engine":
         return rule_result
@@ -66,3 +78,19 @@ def route_main_health_chatbot_response(
         input_data,
         use_real_llm=use_real_llm,
     )
+
+
+def with_fallback_metadata(rule_response, failed_rewrite_response):
+    rule_response.safety_result = {
+        **rule_response.safety_result,
+        "fallback_used": True,
+        "fallback_reason": "llm_rewrite_failed_safety_or_grounding",
+        "failed_rewrite": {
+            "source": failed_rewrite_response.source,
+            "intent": failed_rewrite_response.intent,
+            "is_safe": failed_rewrite_response.is_safe,
+            "safety_result": failed_rewrite_response.safety_result,
+        },
+    }
+    rule_response.is_safe = rule_response.safety_result["is_safe"]
+    return rule_response

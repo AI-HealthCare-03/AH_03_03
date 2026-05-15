@@ -1,8 +1,10 @@
 import json
 
 from ai_worker.llm.grounding import check_result_chatbot_grounding
-from ai_worker.llm.llm_client import call_llm, call_llm_json
+from ai_worker.llm.llm_client import call_llm, call_llm_json, get_openai_model
 from ai_worker.llm.prompt_templates import (
+    MAIN_REWRITE_PROMPT_VERSION,
+    RESULT_REWRITE_PROMPT_VERSION,
     RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT,
     RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT,
 )
@@ -42,6 +44,11 @@ def generate_result_chatbot_llm_response(
         allow_numeric_values=False,
     )
     safety_result = merge_grounding_result(safety_result, grounding_result)
+    safety_result = add_llm_metadata(
+        safety_result,
+        prompt_version=None,
+        model=get_openai_model() if use_real_llm else None,
+    )
 
     return ResultChatbotOutput(
         answer=final_answer,
@@ -70,6 +77,11 @@ def generate_main_health_chatbot_llm_response(
         intent = infer_main_llm_stub_intent(input_data.user_message)
 
     final_answer, safety_result = ensure_safe_answer(answer)
+    safety_result = add_llm_metadata(
+        safety_result,
+        prompt_version=None,
+        model=get_openai_model() if use_real_llm else None,
+    )
 
     return MainHealthChatbotOutput(
         answer=final_answer,
@@ -112,6 +124,11 @@ def rewrite_result_chatbot_response_with_llm(
         allow_numeric_values=False,
     )
     safety_result = merge_grounding_result(safety_result, grounding_result)
+    safety_result = add_llm_metadata(
+        safety_result,
+        prompt_version=RESULT_REWRITE_PROMPT_VERSION,
+        model=get_openai_model() if use_real_llm else None,
+    )
 
     return ResultChatbotOutput(
         answer=final_answer,
@@ -145,6 +162,11 @@ def rewrite_main_health_chatbot_response_with_llm(
         source = "llm_rewrite_stub"
 
     final_answer, safety_result = ensure_safe_answer(answer)
+    safety_result = add_llm_metadata(
+        safety_result,
+        prompt_version=MAIN_REWRITE_PROMPT_VERSION,
+        model=get_openai_model() if use_real_llm else None,
+    )
 
     return MainHealthChatbotOutput(
         answer=final_answer,
@@ -389,6 +411,22 @@ def merge_grounding_result(safety_result: dict, grounding_result: dict) -> dict:
     }
     merged["is_safe"] = bool(safety_result["is_safe"] and grounding_result["is_grounded"])
     return merged
+
+
+def add_llm_metadata(
+    safety_result: dict,
+    prompt_version: str | None,
+    model: str | None,
+) -> dict:
+    metadata = {
+        **safety_result.get("metadata", {}),
+        "prompt_version": prompt_version,
+        "model": model,
+    }
+    return {
+        **safety_result,
+        "metadata": metadata,
+    }
 
 
 def call_llm_with_rewrite_fallback(prompt: str, fallback_answer: str) -> str:

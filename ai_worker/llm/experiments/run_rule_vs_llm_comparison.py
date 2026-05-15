@@ -15,6 +15,10 @@ from ai_worker.llm.llm_generator import (
     rewrite_main_health_chatbot_response_with_llm,
     rewrite_result_chatbot_response_with_llm,
 )
+from ai_worker.llm.response_router import (
+    route_main_health_chatbot_response,
+    route_result_chatbot_response,
+)
 from ai_worker.llm.schemas import MainHealthChatbotInput, ResultChatbotInput
 
 
@@ -110,6 +114,11 @@ def run_comparison_case(
             rule_engine_output=rule_response,
             use_real_llm=use_real_llm,
         )
+        routed_response = route_result_chatbot_response(
+            input_data,
+            use_llm_rewrite=True,
+            use_real_llm=use_real_llm,
+        )
     else:
         input_data = case.input_data
         if not isinstance(input_data, MainHealthChatbotInput):
@@ -123,6 +132,11 @@ def run_comparison_case(
         rewrite_response = rewrite_main_health_chatbot_response_with_llm(
             input_data,
             rule_engine_output=rule_response,
+            use_real_llm=use_real_llm,
+        )
+        routed_response = route_main_health_chatbot_response(
+            input_data,
+            use_llm_rewrite=True,
             use_real_llm=use_real_llm,
         )
 
@@ -151,6 +165,14 @@ def run_comparison_case(
     print(f"answer={rewrite_response.answer}")
     print(f"safety_result={rewrite_response.safety_result}")
     print(f"grounding_result={rewrite_response.safety_result.get('grounding_result')}")
+    print(f"prompt_version={rewrite_response.safety_result.get('metadata', {}).get('prompt_version')}")
+
+    print("\n[Router Result]")
+    print(f"source={routed_response.source}")
+    print(f"intent={routed_response.intent}")
+    print(f"is_safe={routed_response.is_safe}")
+    print(f"fallback_used={routed_response.safety_result.get('fallback_used', False)}")
+    print(f"fallback_reason={routed_response.safety_result.get('fallback_reason')}")
 
 
 def main() -> None:
