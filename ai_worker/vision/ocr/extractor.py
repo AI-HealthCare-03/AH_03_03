@@ -122,10 +122,34 @@ def parse_height_weight(text_lines):
     return None, None
 
 
+def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
+    """일반 필드 파싱 (혈압/키몸무게 제외)."""
+    for i, (text, confidence) in enumerate(text_lines):
+        for field, keywords in FIELD_KEYWORDS.items():
+            if field in skip_fields or extracted[field] is not None:
+                continue
+            if not is_keyword_match(text, keywords):
+                continue
+            value = extract_first_number(text)
+            if value is None:
+                for j in range(i + 1, min(i + 3, len(text_lines))):
+                    value = extract_first_number(text_lines[j][0])
+                    if value is not None:
+                        confidence = text_lines[j][1]
+                        break
+            if value is not None and validate_value(field, value):
+                extracted[field] = value
+                if confidence < CONFIDENCE_THRESHOLD:
+                    low_conf.append(field)
+                logger.info(
+                    "필드 추출 | %s = %s (신뢰도: %.2f)", field, value, confidence
+                )
+
+
 def parse_from_text_lines(text_lines):
-    raw_texts  = [t for t, _ in text_lines]
-    extracted  = {f: None for f in FIELD_KEYWORDS}
-    low_conf   = []
+    raw_texts = [t for t, _ in text_lines]
+    extracted = {f: None for f in FIELD_KEYWORDS}
+    low_conf  = []
 
     systolic, diastolic = parse_blood_pressure(text_lines)
     if systolic and validate_value("systolic_bp", systolic):
@@ -140,27 +164,7 @@ def parse_from_text_lines(text_lines):
         extracted["weight_kg"] = weight
 
     skip_fields = {"systolic_bp", "diastolic_bp", "height_cm", "weight_kg"}
-
-    for i, (text, confidence) in enumerate(text_lines):
-        for field, keywords in FIELD_KEYWORDS.items():
-            if field in skip_fields or extracted[field] is not None:
-                continue
-            if not is_keyword_match(text, keywords):
-                continue
-
-            value = extract_first_number(text)
-            if value is None:
-                for j in range(i + 1, min(i + 3, len(text_lines))):
-                    value = extract_first_number(text_lines[j][0])
-                    if value is not None:
-                        confidence = text_lines[j][1]
-                        break
-
-            if value is not None and validate_value(field, value):
-                extracted[field] = value
-                if confidence < CONFIDENCE_THRESHOLD:
-                    low_conf.append(field)
-                logger.info("필드 추출 | %s = %s (신뢰도: %.2f)", field, value, confidence)
+    _parse_general_fields(text_lines, extracted, skip_fields, low_conf)
 
     return CheckupOcrData(**extracted), low_conf, raw_texts
 
