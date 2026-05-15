@@ -1,4 +1,10 @@
+import json
+
 from ai_worker.llm.llm_client import call_llm
+from ai_worker.llm.prompt_templates import (
+    RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT,
+    RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT,
+)
 from ai_worker.llm.rule_engine import has_medical_consult_keyword
 from ai_worker.llm.safety import check_medical_safety
 from ai_worker.llm.schemas import (
@@ -8,10 +14,7 @@ from ai_worker.llm.schemas import (
     ResultChatbotOutput,
 )
 
-
-CAUTION_MESSAGE = (
-    "이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다."
-)
+CAUTION_MESSAGE = "이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다."
 
 
 def generate_result_chatbot_llm_response(
@@ -70,14 +73,78 @@ def generate_main_health_chatbot_llm_response(
     )
 
 
+def rewrite_result_chatbot_response_with_llm(
+    input_data: ResultChatbotInput,
+    rule_engine_output: ResultChatbotOutput,
+    use_real_llm: bool = False,
+) -> ResultChatbotOutput:
+    if rule_engine_output.intent == "medical_consult_required":
+        answer = rule_engine_output.answer
+        source = "llm_rewrite_stub" if not use_real_llm else "llm_rewrite"
+    elif use_real_llm:
+        answer = call_llm_with_rewrite_fallback(
+            prompt=build_result_chatbot_rewrite_prompt(input_data, rule_engine_output),
+            fallback_answer=rule_engine_output.answer,
+        )
+        source = "llm_rewrite"
+    else:
+        answer = rewrite_answer_stub(rule_engine_output.answer)
+        source = "llm_rewrite_stub"
+
+    final_answer, safety_result = ensure_safe_answer(answer)
+
+    # TODO: If grounding.py is added, call grounding checks here to verify the
+    # rewritten answer did not add unsupported risk factors or challenges.
+    return ResultChatbotOutput(
+        answer=final_answer,
+        intent=rule_engine_output.intent,
+        source=source,
+        referenced_health_factors=rule_engine_output.referenced_health_factors,
+        recommended_challenges=rule_engine_output.recommended_challenges,
+        caution_message=rule_engine_output.caution_message,
+        tone=rule_engine_output.tone,
+        is_safe=safety_result["is_safe"],
+        safety_result=safety_result,
+    )
+
+
+def rewrite_main_health_chatbot_response_with_llm(
+    input_data: MainHealthChatbotInput,
+    rule_engine_output: MainHealthChatbotOutput,
+    use_real_llm: bool = False,
+) -> MainHealthChatbotOutput:
+    if rule_engine_output.intent == "medical_consult_required":
+        answer = rule_engine_output.answer
+        source = "llm_rewrite_stub" if not use_real_llm else "llm_rewrite"
+    elif use_real_llm:
+        answer = call_llm_with_rewrite_fallback(
+            prompt=build_main_health_chatbot_rewrite_prompt(input_data, rule_engine_output),
+            fallback_answer=rule_engine_output.answer,
+        )
+        source = "llm_rewrite"
+    else:
+        answer = rewrite_answer_stub(rule_engine_output.answer)
+        source = "llm_rewrite_stub"
+
+    final_answer, safety_result = ensure_safe_answer(answer)
+
+    return MainHealthChatbotOutput(
+        answer=final_answer,
+        intent=rule_engine_output.intent,
+        source=source,
+        caution_message=rule_engine_output.caution_message,
+        tone=rule_engine_output.tone,
+        is_safe=safety_result["is_safe"],
+        safety_result=safety_result,
+    )
+
+
 def build_result_chatbot_prompt(input_data: ResultChatbotInput) -> str:
     factor_text = "\n".join(
-        f"- {factor.name}: value={factor.value}, reason={factor.reason}"
-        for factor in input_data.risk_factors
+        f"- {factor.name}: value={factor.value}, reason={factor.reason}" for factor in input_data.risk_factors
     )
     challenge_text = "\n".join(
-        f"- {challenge.name}: reason={challenge.reason}"
-        for challenge in input_data.recommended_challenges
+        f"- {challenge.name}: reason={challenge.reason}" for challenge in input_data.recommended_challenges
     )
 
     return f"""
@@ -101,6 +168,37 @@ def build_result_chatbot_prompt(input_data: ResultChatbotInput) -> str:
 """.strip()
 
 
+def build_result_chatbot_rewrite_prompt(
+    input_data: ResultChatbotInput,
+    rule_engine_output: ResultChatbotOutput,
+) -> str:
+    factor_text = "\n".join(
+        f"- {factor.name}: value={factor.value}, reason={factor.reason}" for factor in input_data.risk_factors
+    )
+    challenge_text = "\n".join(
+        f"- {challenge.name}: reason={challenge.reason}" for challenge in input_data.recommended_challenges
+    )
+
+    return f"""
+{RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT}
+
+사용자 질문:
+{input_data.user_message}
+
+허용된 위험요인:
+{factor_text or "- 없음"}
+
+허용된 추천 챌린지:
+{challenge_text or "- 없음"}
+
+rule_engine_intent:
+{rule_engine_output.intent}
+
+rule_engine_answer:
+{rule_engine_output.answer}
+""".strip()
+
+
 def build_main_health_chatbot_prompt(input_data: MainHealthChatbotInput) -> str:
     return f"""
 너는 만성질환 생활습관 관리 서비스의 메인 건강 Q&A 챗봇이다.
@@ -113,6 +211,24 @@ def build_main_health_chatbot_prompt(input_data: MainHealthChatbotInput) -> str:
 
 사용자 질문:
 {input_data.user_message}
+""".strip()
+
+
+def build_main_health_chatbot_rewrite_prompt(
+    input_data: MainHealthChatbotInput,
+    rule_engine_output: MainHealthChatbotOutput,
+) -> str:
+    return f"""
+{RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT}
+
+사용자 질문:
+{input_data.user_message}
+
+rule_engine_intent:
+{rule_engine_output.intent}
+
+rule_engine_answer:
+{rule_engine_output.answer}
 """.strip()
 
 
@@ -180,6 +296,26 @@ def infer_main_llm_stub_intent(user_message: str) -> str:
     if any(keyword in user_message for keyword in ["고혈압", "혈압"]):
         return "hypertension_guidance"
     return "llm_stub_main_guidance"
+
+
+def rewrite_answer_stub(rule_engine_answer: str) -> str:
+    return rule_engine_answer.strip()
+
+
+def call_llm_with_rewrite_fallback(prompt: str, fallback_answer: str) -> str:
+    try:
+        raw_response = call_llm(prompt)
+        return extract_answer_from_json_response(raw_response)
+    except Exception:
+        return fallback_answer
+
+
+def extract_answer_from_json_response(raw_response: str) -> str:
+    parsed = json.loads(raw_response)
+    answer = parsed.get("answer")
+    if not isinstance(answer, str) or not answer.strip():
+        raise ValueError("LLM rewrite response must include a non-empty answer field.")
+    return answer
 
 
 def ensure_safe_answer(answer: str) -> tuple[str, dict]:
