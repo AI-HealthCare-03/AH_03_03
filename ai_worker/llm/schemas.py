@@ -12,6 +12,25 @@ class ChallengeRecommendation(BaseModel):
     reason: str | None = Field(default=None, description="추천 이유")
 
 
+class DiseasePrediction(BaseModel):
+    disease_name: str = Field(..., description="질환 이름")
+    pred: int = Field(..., description="질환 위험 예측값")
+    probability: float | None = Field(default=None, description="질환 위험 예측 확률")
+
+
+class DiseasePredictionSet(BaseModel):
+    hypertension: DiseasePrediction
+    diabetes: DiseasePrediction
+    dyslipidemia: DiseasePrediction
+    obesity: DiseasePrediction
+
+
+class RiskMappingResult(BaseModel):
+    risk_group: str
+    risk_factors: list[HealthRiskFactor] = Field(default_factory=list)
+    recommended_challenges: list[ChallengeRecommendation] = Field(default_factory=list)
+
+
 class RecommendationMessageInput(BaseModel):
     risk_factors: list[HealthRiskFactor]
     recommended_challenges: list[ChallengeRecommendation]
