@@ -20,8 +20,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 
-from .router import router as vision_router
 from .ocr.router import router as ocr_router
+from .router import router as vision_router
 
 app = FastAPI(
     title="건강 AI 분석 데모",

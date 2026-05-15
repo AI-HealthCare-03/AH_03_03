@@ -5,6 +5,7 @@ ai_worker/vision/ocr/router.py
 """
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
@@ -84,7 +85,7 @@ async def validate_pdf(file):
     """,
 )
 async def analyze_checkup_image(
-    file: UploadFile = File(..., description="건강검진표 이미지 (JPG/PNG/WEBP, 최대 20MB)"),
+    file: Annotated[UploadFile, File(description="건강검진표 이미지 (JPG/PNG/WEBP, 최대 20MB)")],
 ):
     image_bytes    = await validate_image(file)
     quality_report = assess_quality(image_bytes)
@@ -104,7 +105,7 @@ async def analyze_checkup_image(
         raise HTTPException(
             status_code=err["status_code"],
             detail=ErrorResponse(error_code="ocr_error", message=err["message"]).model_dump(),
-        )
+        ) from None
 
     return CheckupOcrResponse(
         ocr_status=ocr_status,
@@ -128,7 +129,7 @@ async def analyze_checkup_image(
     """,
 )
 async def analyze_checkup_pdf(
-    file: UploadFile = File(..., description="건강검진표 PDF (최대 20MB)"),
+    file: Annotated[UploadFile, File(description="건강검진표 PDF (최대 20MB)")],
 ):
     pdf_bytes = await validate_pdf(file)
 
@@ -140,7 +141,8 @@ async def analyze_checkup_pdf(
         raise HTTPException(
             status_code=err["status_code"],
             detail=ErrorResponse(error_code="ocr_error", message=err["message"]).model_dump(),
-        )
+        ) from None
+
 
     quality_report = ImageQualityReport(
         status=ImageQualityStatus.GOOD,
