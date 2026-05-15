@@ -142,6 +142,7 @@ def run_comparison_case(
     print(f"is_safe={llm_response.is_safe}")
     print(f"answer={llm_response.answer}")
     print(f"safety_result={llm_response.safety_result}")
+    print(f"grounding_result={llm_response.safety_result.get('grounding_result')}")
 
     print("\n[LLM Rewrite]")
     print(f"source={rewrite_response.source}")
@@ -149,6 +150,7 @@ def run_comparison_case(
     print(f"is_safe={rewrite_response.is_safe}")
     print(f"answer={rewrite_response.answer}")
     print(f"safety_result={rewrite_response.safety_result}")
+    print(f"grounding_result={rewrite_response.safety_result.get('grounding_result')}")
 
 
 def main() -> None:
