@@ -88,7 +88,10 @@ def rewrite_result_chatbot_response_with_llm(
         )
         source = "llm_rewrite"
     else:
-        answer = rewrite_answer_stub(rule_engine_output.answer)
+        answer = rewrite_result_chatbot_answer_stub(
+            input_data,
+            rule_engine_output,
+        )
         source = "llm_rewrite_stub"
 
     final_answer, safety_result = ensure_safe_answer(answer)
@@ -123,7 +126,7 @@ def rewrite_main_health_chatbot_response_with_llm(
         )
         source = "llm_rewrite"
     else:
-        answer = rewrite_answer_stub(rule_engine_output.answer)
+        answer = rewrite_main_health_chatbot_answer_stub(rule_engine_output)
         source = "llm_rewrite_stub"
 
     final_answer, safety_result = ensure_safe_answer(answer)
@@ -298,8 +301,62 @@ def infer_main_llm_stub_intent(user_message: str) -> str:
     return "llm_stub_main_guidance"
 
 
-def rewrite_answer_stub(rule_engine_answer: str) -> str:
-    return rule_engine_answer.strip()
+def rewrite_result_chatbot_answer_stub(
+    input_data: ResultChatbotInput,
+    rule_engine_output: ResultChatbotOutput,
+) -> str:
+    factor_names = [factor.name for factor in input_data.risk_factors]
+    challenge_names = [challenge.name for challenge in input_data.recommended_challenges]
+
+    factor_text = ", ".join(factor_names) if factor_names else "입력된 건강정보"
+    challenge_text = ", ".join(challenge_names) if challenge_names else "생활습관 관리"
+
+    if rule_engine_output.intent == "diabetes_result_guidance":
+        return (
+            f"입력된 건강정보 기준으로 {factor_text} 항목이 혈당 관리와 관련될 수 있습니다. "
+            f"추천된 {challenge_text} 챌린지는 혈당 변동을 줄이는 생활습관 관리에 도움이 될 수 있습니다. "
+            "처음에는 실천 가능한 작은 목표부터 꾸준히 이어가도 좋습니다."
+        )
+
+    if rule_engine_output.intent == "hypertension_result_guidance":
+        return (
+            f"입력된 건강정보 기준으로 {factor_text} 항목이 혈압 관리와 관련될 수 있습니다. "
+            f"추천된 {challenge_text} 챌린지는 혈압 관리에 도움이 될 수 있는 생활습관입니다. "
+            "처음에는 실천 가능한 작은 목표부터 꾸준히 이어가도 좋습니다."
+        )
+
+    return (
+        f"입력된 건강정보 기준으로 {factor_text} 항목을 함께 살펴볼 수 있습니다. "
+        f"추천된 {challenge_text} 챌린지는 건강 관리를 시작하는 데 도움이 될 수 있습니다. "
+        "처음에는 실천 가능한 작은 목표부터 꾸준히 이어가도 좋습니다."
+    )
+
+
+def rewrite_main_health_chatbot_answer_stub(
+    rule_engine_output: MainHealthChatbotOutput,
+) -> str:
+    answer = remove_caution_message(rule_engine_output.answer)
+
+    if rule_engine_output.intent == "diabetes_guidance":
+        return (
+            "당뇨와 관련된 생활습관은 한 번에 크게 바꾸기보다 꾸준히 이어갈 수 있는 방식으로 관리하는 것이 좋습니다. "
+            f"{answer}"
+        )
+
+    if rule_engine_output.intent == "hypertension_guidance":
+        return f"혈압 관리는 일상에서 반복되는 식사와 활동 습관을 조금씩 조정하는 것부터 시작할 수 있습니다. {answer}"
+
+    if rule_engine_output.intent == "dyslipidemia_guidance":
+        return f"지질 관리는 식사 구성과 신체활동을 함께 살펴보는 것이 도움이 될 수 있습니다. {answer}"
+
+    if rule_engine_output.intent == "obesity_guidance":
+        return f"체중 관리는 단기간의 변화보다 지속 가능한 습관을 만드는 방향으로 접근하는 것이 좋습니다. {answer}"
+
+    return f"건강 관리는 작은 생활습관을 꾸준히 이어가는 것에서 시작할 수 있습니다. {answer}"
+
+
+def remove_caution_message(answer: str) -> str:
+    return answer.replace(CAUTION_MESSAGE, "").strip()
 
 
 def call_llm_with_rewrite_fallback(prompt: str, fallback_answer: str) -> str:
