@@ -1,5 +1,6 @@
 import json
 
+from ai_worker.llm.grounding import check_result_chatbot_grounding
 from ai_worker.llm.llm_client import call_llm, call_llm_json
 from ai_worker.llm.prompt_templates import (
     RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT,
@@ -33,6 +34,14 @@ def generate_result_chatbot_llm_response(
         intent = infer_result_llm_stub_intent(input_data.user_message)
 
     final_answer, safety_result = ensure_safe_answer(answer)
+    grounding_result = check_result_chatbot_grounding(
+        answer=final_answer,
+        allowed_factors=factor_names,
+        allowed_challenges=[challenge.name for challenge in input_data.recommended_challenges],
+        allowed_numbers=build_allowed_numbers_from_result_input(input_data),
+        allow_numeric_values=False,
+    )
+    safety_result = merge_grounding_result(safety_result, grounding_result)
 
     return ResultChatbotOutput(
         answer=final_answer,
@@ -95,9 +104,15 @@ def rewrite_result_chatbot_response_with_llm(
         source = "llm_rewrite_stub"
 
     final_answer, safety_result = ensure_safe_answer(answer)
+    grounding_result = check_result_chatbot_grounding(
+        answer=final_answer,
+        allowed_factors=rule_engine_output.referenced_health_factors,
+        allowed_challenges=[challenge.name for challenge in rule_engine_output.recommended_challenges],
+        allowed_numbers=build_allowed_numbers_from_result_input(input_data),
+        allow_numeric_values=False,
+    )
+    safety_result = merge_grounding_result(safety_result, grounding_result)
 
-    # TODO: If grounding.py is added, call grounding checks here to verify the
-    # rewritten answer did not add unsupported risk factors or challenges.
     return ResultChatbotOutput(
         answer=final_answer,
         intent=rule_engine_output.intent,
@@ -357,6 +372,23 @@ def rewrite_main_health_chatbot_answer_stub(
 
 def remove_caution_message(answer: str) -> str:
     return answer.replace(CAUTION_MESSAGE, "").strip()
+
+
+def build_allowed_numbers_from_result_input(input_data: ResultChatbotInput) -> list[str]:
+    numbers: list[str] = []
+    for factor in input_data.risk_factors:
+        if factor.value is not None:
+            numbers.append(str(factor.value))
+    return numbers
+
+
+def merge_grounding_result(safety_result: dict, grounding_result: dict) -> dict:
+    merged = {
+        **safety_result,
+        "grounding_result": grounding_result,
+    }
+    merged["is_safe"] = bool(safety_result["is_safe"] and grounding_result["is_grounded"])
+    return merged
 
 
 def call_llm_with_rewrite_fallback(prompt: str, fallback_answer: str) -> str:
