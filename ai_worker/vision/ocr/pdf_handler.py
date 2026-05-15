@@ -15,7 +15,7 @@ import pdfplumber
 logger = logging.getLogger(__name__)
 
 MIN_TEXT_LENGTH = 50
-MAX_PAGES       = 5
+MAX_PAGES = 5
 
 
 class PdfType(str, Enum):
@@ -55,8 +55,10 @@ def pdf_to_images(pdf_bytes, dpi=200):
     image_bytes_list = []
     try:
         images = pdf2image.convert_from_bytes(
-            pdf_bytes, dpi=dpi,
-            first_page=1, last_page=MAX_PAGES,
+            pdf_bytes,
+            dpi=dpi,
+            first_page=1,
+            last_page=MAX_PAGES,
         )
         for i, img in enumerate(images):
             buf = io.BytesIO()

@@ -35,22 +35,22 @@ def get_ocr_engine():
 # ── 키워드 매핑 ───────────────────────────────────────────────────────────────
 
 FIELD_KEYWORDS = {
-    "systolic_bp":       ["수축기", "고혈압", "혈압", "mmHg", "SBP"],
-    "diastolic_bp":      ["이완기", "DBP"],
-    "fasting_glucose":   ["공복혈당", "혈당", "공복", "GLU", "Glucose"],
-    "hba1c":             ["당화혈색소", "HbA1c", "A1C", "HBA1C"],
+    "systolic_bp": ["수축기", "고혈압", "혈압", "mmHg", "SBP"],
+    "diastolic_bp": ["이완기", "DBP"],
+    "fasting_glucose": ["공복혈당", "혈당", "공복", "GLU", "Glucose"],
+    "hba1c": ["당화혈색소", "HbA1c", "A1C", "HBA1C"],
     "total_cholesterol": ["총콜레스테롤", "콜레스테롤", "TC", "T-CHO", "CHOL"],
-    "triglyceride":      ["중성지방", "TG", "Triglyceride"],
-    "hdl":               ["고밀도", "HDL"],
-    "ldl":               ["저밀도", "LDL"],
-    "height_cm":         ["신장", "키", "Height", "HT"],
-    "weight_kg":         ["체중", "몸무게", "Weight", "WT"],
-    "bmi":               ["BMI", "체질량", "비만도", "체질량지수"],
-    "waist_cm":          ["허리둘레", "허리", "복부둘레", "Waist"],
+    "triglyceride": ["중성지방", "TG", "Triglyceride"],
+    "hdl": ["고밀도", "HDL"],
+    "ldl": ["저밀도", "LDL"],
+    "height_cm": ["신장", "키", "Height", "HT"],
+    "weight_kg": ["체중", "몸무게", "Weight", "WT"],
+    "bmi": ["BMI", "체질량", "비만도", "체질량지수"],
+    "waist_cm": ["허리둘레", "허리", "복부둘레", "Waist"],
 }
 
 CONFIDENCE_THRESHOLD = 0.7
-CHECKBOX_PATTERN     = re.compile(r"[■□▣▪●○◆◇]")
+CHECKBOX_PATTERN = re.compile(r"[■□▣▪●○◆◇]")
 
 
 def clean_text(text):
@@ -81,18 +81,18 @@ def is_keyword_match(text, keywords):
 
 def validate_value(field, value):
     ranges = {
-        "systolic_bp":       (60, 250),
-        "diastolic_bp":      (40, 150),
-        "fasting_glucose":   (40, 600),
-        "hba1c":             (3, 20),
+        "systolic_bp": (60, 250),
+        "diastolic_bp": (40, 150),
+        "fasting_glucose": (40, 600),
+        "hba1c": (3, 20),
         "total_cholesterol": (50, 600),
-        "triglyceride":      (20, 2000),
-        "hdl":               (10, 200),
-        "ldl":               (20, 500),
-        "height_cm":         (100, 250),
-        "weight_kg":         (20, 300),
-        "bmi":               (10, 70),
-        "waist_cm":          (40, 200),
+        "triglyceride": (20, 2000),
+        "hdl": (10, 200),
+        "ldl": (20, 500),
+        "height_cm": (100, 250),
+        "weight_kg": (20, 300),
+        "bmi": (10, 70),
+        "waist_cm": (40, 200),
     }
     if field not in ranges:
         return True
@@ -141,15 +141,13 @@ def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
                 extracted[field] = value
                 if confidence < CONFIDENCE_THRESHOLD:
                     low_conf.append(field)
-                logger.info(
-                    "필드 추출 | %s = %s (신뢰도: %.2f)", field, value, confidence
-                )
+                logger.info("필드 추출 | %s = %s (신뢰도: %.2f)", field, value, confidence)
 
 
 def parse_from_text_lines(text_lines):
     raw_texts = [t for t, _ in text_lines]
     extracted = {f: None for f in FIELD_KEYWORDS}
-    low_conf  = []
+    low_conf = []
 
     systolic, diastolic = parse_blood_pressure(text_lines)
     if systolic and validate_value("systolic_bp", systolic):
@@ -171,14 +169,14 @@ def parse_from_text_lines(text_lines):
 
 def run_ocr_on_image(image_bytes):
     processed = preprocess_for_ocr(image_bytes)
-    engine    = get_ocr_engine()
-    results   = engine.ocr(processed, cls=True)
+    engine = get_ocr_engine()
+    results = engine.ocr(processed, cls=True)
 
     text_lines = []
     if results and results[0]:
         for line in results[0]:
             if line and len(line) >= 2:
-                text       = line[1][0].strip()
+                text = line[1][0].strip()
                 confidence = float(line[1][1])
                 text_lines.append((text, confidence))
 
@@ -196,14 +194,14 @@ def determine_status(data, low_conf):
 
 
 async def run_ocr(image_bytes):
-    text_lines          = run_ocr_on_image(image_bytes)
+    text_lines = run_ocr_on_image(image_bytes)
     data, low_conf, raw = parse_from_text_lines(text_lines)
-    status              = determine_status(data, low_conf)
+    status = determine_status(data, low_conf)
     return data, low_conf, raw, status
 
 
 async def run_ocr_on_pdf(pdf_bytes):
-    pdf_type       = detect_pdf_type(pdf_bytes)
+    pdf_type = detect_pdf_type(pdf_bytes)
     all_text_lines = []
 
     if pdf_type == PdfType.TEXT:
@@ -223,5 +221,5 @@ async def run_ocr_on_pdf(pdf_bytes):
             all_text_lines.extend(page_lines)
 
     data, low_conf, raw = parse_from_text_lines(all_text_lines)
-    status              = determine_status(data, low_conf)
+    status = determine_status(data, low_conf)
     return data, low_conf, raw, status

@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/ocr", tags=["OCR - 건강검진표 수치 추출"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
-ALLOWED_PDF_TYPES   = {"application/pdf"}
-MAX_SIZE_BYTES      = 20 * 1024 * 1024  # 20MB
+ALLOWED_PDF_TYPES = {"application/pdf"}
+MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20MB
 
 
 async def validate_image(file):
@@ -56,18 +56,24 @@ async def validate_pdf(file):
     if file.content_type not in ALLOWED_PDF_TYPES:
         raise HTTPException(
             status_code=415,
-            detail=ErrorResponse(error_code="unsupported_type", message="PDF 파일만 업로드할 수 있습니다.").model_dump(),
+            detail=ErrorResponse(
+                error_code="unsupported_type", message="PDF 파일만 업로드할 수 있습니다."
+            ).model_dump(),
         )
     pdf_bytes = await file.read()
     if len(pdf_bytes) > MAX_SIZE_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=ErrorResponse(error_code="image_too_large", message="파일 크기가 너무 큽니다. 20MB 이하로 다시 시도해주세요.").model_dump(),
+            detail=ErrorResponse(
+                error_code="image_too_large", message="파일 크기가 너무 큽니다. 20MB 이하로 다시 시도해주세요."
+            ).model_dump(),
         )
     if len(pdf_bytes) < 1024:
         raise HTTPException(
             status_code=422,
-            detail=ErrorResponse(error_code="image_too_small", message="PDF 파일이 손상되었거나 너무 작습니다.").model_dump(),
+            detail=ErrorResponse(
+                error_code="image_too_small", message="PDF 파일이 손상되었거나 너무 작습니다."
+            ).model_dump(),
         )
     return pdf_bytes
 
@@ -87,7 +93,7 @@ async def validate_pdf(file):
 async def analyze_checkup_image(
     file: Annotated[UploadFile, File(description="건강검진표 이미지 (JPG/PNG/WEBP, 최대 20MB)")],
 ):
-    image_bytes    = await validate_image(file)
+    image_bytes = await validate_image(file)
     quality_report = assess_quality(image_bytes)
 
     if quality_report.status == ImageQualityStatus.SMALL:
@@ -142,7 +148,6 @@ async def analyze_checkup_pdf(
             status_code=err["status_code"],
             detail=ErrorResponse(error_code="ocr_error", message=err["message"]).model_dump(),
         ) from None
-
 
     quality_report = ImageQualityReport(
         status=ImageQualityStatus.GOOD,
