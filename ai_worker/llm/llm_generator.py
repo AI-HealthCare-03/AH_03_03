@@ -1,6 +1,6 @@
 import json
 
-from ai_worker.llm.llm_client import call_llm
+from ai_worker.llm.llm_client import call_llm, call_llm_json
 from ai_worker.llm.prompt_templates import (
     RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT,
     RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT,
@@ -361,7 +361,10 @@ def remove_caution_message(answer: str) -> str:
 
 def call_llm_with_rewrite_fallback(prompt: str, fallback_answer: str) -> str:
     try:
-        raw_response = call_llm(prompt)
+        raw_response = call_llm_json(
+            prompt,
+            schema_name="health_chatbot_rewrite",
+        )
         return extract_answer_from_json_response(raw_response)
     except Exception:
         return fallback_answer
