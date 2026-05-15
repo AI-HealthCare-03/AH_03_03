@@ -60,8 +60,8 @@ def try_result_chatbot_rule_engine(
             is_matched=True,
             intent="diabetes_result_guidance",
             response=(
-                f"입력된 건강정보 기준으로 {factor_text}이/가 혈당 관리와 관련될 수 있습니다. "
-                f"{challenge_text}은/는 혈당 변동을 줄이는 생활습관 관리에 도움이 될 수 있습니다."
+                f"입력된 건강정보 기준으로 {factor_text} 항목이 혈당 관리와 관련될 수 있습니다. "
+                f"{challenge_text} 챌린지는 혈당 변동을 줄이는 생활습관 관리에 도움이 될 수 있습니다."
             ),
         )
 
@@ -70,8 +70,8 @@ def try_result_chatbot_rule_engine(
             is_matched=True,
             intent="hypertension_result_guidance",
             response=(
-                f"입력된 건강정보 기준으로 {factor_text}이/가 혈압 관리와 관련될 수 있습니다. "
-                f"{challenge_text}은/는 혈압 관리에 도움이 될 수 있는 생활습관입니다."
+                f"입력된 건강정보 기준으로 {factor_text} 항목이 혈압 관리와 관련될 수 있습니다. "
+                f"{challenge_text} 챌린지는 혈압 관리에 도움이 될 수 있는 생활습관입니다."
             ),
         )
 
@@ -80,7 +80,7 @@ def try_result_chatbot_rule_engine(
             is_matched=True,
             intent="challenge_recommendation",
             response=(
-                f"입력된 건강정보 기준으로 {factor_text}이/가 건강 관리에 영향을 줄 수 있습니다. "
+                f"입력된 건강정보 기준으로 {factor_text} 항목이 건강 관리에 영향을 줄 수 있습니다. "
                 f"현재는 {challenge_text}부터 실천해 보는 것이 도움이 될 수 있습니다."
             ),
         )

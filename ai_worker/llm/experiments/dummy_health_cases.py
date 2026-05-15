@@ -1,5 +1,7 @@
 from ai_worker.llm.schemas import (
     ChallengeRecommendation,
+    DiseasePrediction,
+    DiseasePredictionSet,
     HealthRiskFactor,
     MainHealthChatbotInput,
     ResultChatbotInput,
@@ -54,5 +56,98 @@ def get_main_health_chatbot_dummy_cases() -> list[MainHealthChatbotInput]:
         MainHealthChatbotInput(
             user_message="혈압약 끊어도 되나요?",
             tone="friendly",
+        ),
+    ]
+
+
+def get_disease_prediction_dummy_cases() -> list[DiseasePredictionSet]:
+    return [
+        DiseasePredictionSet(
+            hypertension=DiseasePrediction(
+                disease_name="hypertension",
+                pred=0,
+                probability=0.21,
+            ),
+            diabetes=DiseasePrediction(
+                disease_name="diabetes",
+                pred=0,
+                probability=0.18,
+            ),
+            dyslipidemia=DiseasePrediction(
+                disease_name="dyslipidemia",
+                pred=0,
+                probability=0.25,
+            ),
+            obesity=DiseasePrediction(
+                disease_name="obesity",
+                pred=0,
+                probability=0.22,
+            ),
+        ),
+        DiseasePredictionSet(
+            hypertension=DiseasePrediction(
+                disease_name="hypertension",
+                pred=1,
+                probability=0.81,
+            ),
+            diabetes=DiseasePrediction(
+                disease_name="diabetes",
+                pred=0,
+                probability=0.34,
+            ),
+            dyslipidemia=DiseasePrediction(
+                disease_name="dyslipidemia",
+                pred=0,
+                probability=0.28,
+            ),
+            obesity=DiseasePrediction(
+                disease_name="obesity",
+                pred=0,
+                probability=0.39,
+            ),
+        ),
+        DiseasePredictionSet(
+            hypertension=DiseasePrediction(
+                disease_name="hypertension",
+                pred=0,
+                probability=0.37,
+            ),
+            diabetes=DiseasePrediction(
+                disease_name="diabetes",
+                pred=1,
+                probability=0.78,
+            ),
+            dyslipidemia=DiseasePrediction(
+                disease_name="dyslipidemia",
+                pred=0,
+                probability=0.42,
+            ),
+            obesity=DiseasePrediction(
+                disease_name="obesity",
+                pred=1,
+                probability=0.72,
+            ),
+        ),
+        DiseasePredictionSet(
+            hypertension=DiseasePrediction(
+                disease_name="hypertension",
+                pred=1,
+                probability=0.86,
+            ),
+            diabetes=DiseasePrediction(
+                disease_name="diabetes",
+                pred=1,
+                probability=0.79,
+            ),
+            dyslipidemia=DiseasePrediction(
+                disease_name="dyslipidemia",
+                pred=1,
+                probability=0.74,
+            ),
+            obesity=DiseasePrediction(
+                disease_name="obesity",
+                pred=1,
+                probability=0.83,
+            ),
         ),
     ]
