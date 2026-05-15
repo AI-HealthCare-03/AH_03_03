@@ -52,7 +52,7 @@ def check_result_chatbot_grounding(
         allowed_factors=allowed_factors,
         allowed_challenges=allowed_challenges,
     )
-    ungrounded_numbers = [number for number in extract_numbers(answer) if number not in allowed_numbers_set]
+    ungrounded_numbers = [number for number in _extract_candidate_numbers(answer) if number not in allowed_numbers_set]
     notes = build_grounding_notes(answer)
 
     return {
@@ -91,6 +91,17 @@ def is_allowed_keyword(keyword: str, allowed_terms: list[str]) -> bool:
 
 def extract_numbers(text: str) -> list[str]:
     return re.findall(r"\d+(?:\.\d+)?", text)
+
+
+def _extract_candidate_numbers(answer: str) -> list[str]:
+    numbers: list[str] = []
+    for line in answer.splitlines():
+        numbers.extend(extract_numbers(_remove_list_marker(line)))
+    return numbers
+
+
+def _remove_list_marker(line: str) -> str:
+    return re.sub(r"^\s*(?:[-*]\s*)?\d+(?:[.)])\s+", "", line)
 
 
 def build_allowed_numbers_set(
