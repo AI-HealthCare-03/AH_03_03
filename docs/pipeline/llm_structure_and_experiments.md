@@ -143,6 +143,61 @@
 - `grounding.py`에서 입력에 없는 위험요인, 챌린지, 숫자를 답변에 추가하지 않도록 확인한다.
 - LLM rewrite가 안전성 또는 grounding 검사를 통과하지 못하면 룰엔진 답변으로 fallback한다.
 
+### 1.4 메인 건강 챗봇 RAG 준비 구조
+
+메인 건강 챗봇에는 향후 RAG를 붙일 수 있도록 별도 모듈 뼈대를 추가했다. 현재 단계에서는 실제 크롤링, 임베딩, 벡터DB, 검색은 구현하지 않고, 이미 검색된 context를 입력받아 안전하게 답변을 생성할 수 있는 구조만 준비한다.
+
+관련 파일:
+
+- `ai_worker/llm/prompt_templates.py`
+- `ai_worker/llm/rag_sources.py`
+- `ai_worker/llm/rag_generator.py`
+- `ai_worker/llm/schemas.py`
+
+현재 역할:
+
+- `prompt_templates.py`: `MAIN_HEALTH_RAG_PROMPT_VERSION`, `MAIN_HEALTH_RAG_PROMPT` 정의
+- `rag_sources.py`: 허용 출처와 허용 도메인 whitelist 관리
+- `rag_generator.py`: retrieved context를 받아 메인 건강 챗봇 RAG 응답 생성
+- `schemas.py`: `RagContextSource` 최소 스키마 정의
+
+RAG 응답 생성 흐름:
+
+1. `generate_main_health_rag_response()`가 사용자 질문, retrieved context, context sources를 입력받는다.
+2. retrieved context가 비어 있으면 안전한 fallback 답변을 반환한다.
+3. context sources가 있으면 `is_allowed_rag_source()`로 허용 출처인지 검사한다.
+4. 허용되지 않은 출처가 포함되면 context를 사용하지 않고 fallback 답변을 반환한다.
+5. `use_real_llm=False`이면 stub 응답을 반환한다.
+6. `use_real_llm=True`이면 `call_llm(metadata=...)`를 통해 실제 LLM 호출이 가능하다.
+7. 최종 답변에는 `check_medical_safety()`를 적용하고, safety metadata에 prompt version, source, context source count를 남긴다.
+
+허용 출처:
+
+- 질병관리청 국가건강정보포털
+- 국민건강보험공단
+- 대한고혈압학회
+- 대한당뇨병학회
+- 대한비만학회
+- 대한지질·동맥경화학회
+
+허용 도메인:
+
+- `health.kdca.go.kr`
+- `nhis.or.kr`
+- `diabetes.or.kr`
+- `koreanhypertension.org`
+
+비만학회와 대한지질·동맥경화학회 도메인은 현재 확실하지 않아 TODO로 남겨두었다. 도메인은 추측해서 추가하지 않는 것을 원칙으로 한다.
+
+RAG 프롬프트 원칙:
+
+- 제공된 RAG context 안의 내용만 근거로 답변한다.
+- context에 없는 질환, 수치, 약물, 치료법, 검사 기준을 임의로 추가하지 않는다.
+- 진단, 확진, 치료, 처방, 약물 복용/중단 판단을 하지 않는다.
+- 약물, 치료, 응급 증상, 진단 확정이 필요한 질문은 의료진 상담을 권고한다.
+- 답변은 생활습관 관리, 예방, 검진 상담 권고 중심으로 제한한다.
+- 출력은 JSON 형식으로 작성한다.
+
 ## 2. 지금까지 진행한 LLM 실험
 
 ### 2.1 추천 문구 생성 실험
@@ -312,7 +367,45 @@
 - 실제 LLM 호출 시 `result_chatbot_llm`, `result_chatbot_llm_rewrite`, `main_health_chatbot_llm` trace가 생성된다.
 - 추후 운영 단계에서는 `is_safe`, `grounding_result`, `fallback_used`, `fallback_reason`까지 metadata로 확장할 수 있다.
 
-### 2.6 전체 정리
+### 2.6 메인 건강 챗봇 RAG 준비 실험
+
+실험 위치:
+
+- `ai_worker/llm/prompt_templates.py`
+- `ai_worker/llm/rag_sources.py`
+- `ai_worker/llm/rag_generator.py`
+- `ai_worker/llm/schemas.py`
+
+실험 목적:
+
+- 메인 건강 챗봇에 향후 RAG를 붙일 수 있도록 프롬프트와 생성 모듈의 기본 구조를 준비한다.
+- 공신력 있는 출처 기반 context만 사용하도록 출처 whitelist를 둔다.
+- RAG context가 없거나 출처가 허용되지 않으면 안전한 fallback 답변을 반환한다.
+- 실제 검색/벡터DB 구현 없이 LLM 호출 연결부와 safety metadata 구조만 먼저 만든다.
+
+현재 구현 범위:
+
+- 실제 크롤링은 구현하지 않았다.
+- 임베딩 생성은 구현하지 않았다.
+- 벡터DB, FAISS, Chroma, pgvector 검색은 구현하지 않았다.
+- 기존 `response_router.py` 운영 경로에는 연결하지 않았다.
+- 결과 기반 챗봇에는 RAG를 붙이지 않았다.
+
+현재 기록되는 metadata 예시:
+
+- `prompt_version = main_health_rag_v1`
+- `source = rag_llm`
+- `chatbot_type = main_health_chatbot`
+- `use_real_llm = True`
+- `context_source_count`
+
+현재 판단:
+
+- RAG는 메인 건강 챗봇의 일반 건강정보 답변 품질을 높이기 위한 준비 단계다.
+- MVP 운영 경로는 기존 룰엔진/fallback/rewrite 구조를 유지한다.
+- 향후 운영 단계에서는 신뢰 가능한 문서 수집, chunking, embedding, retrieval, context grounding 검증을 추가해야 한다.
+
+### 2.7 전체 정리
 
 현재까지의 LLM 실험은 "LLM이 건강 위험을 새로 판단하는 구조"가 아니라, "ML 모델과 룰 기반 판단 결과를 사용자 친화적으로 설명하는 구조"로 설계되었다.
 
