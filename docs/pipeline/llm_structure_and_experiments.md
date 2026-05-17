@@ -278,7 +278,41 @@
 - 실제 LLM을 사용할 때는 safety check와 grounding check 결과를 함께 기록해야 한다.
 - LLM rewrite 실패 시 룰엔진 답변으로 되돌리는 fallback 구조가 이미 잡혀 있다.
 
-### 2.5 전체 정리
+### 2.5 Langfuse 관측 실험
+
+실험 위치:
+
+- `ai_worker/llm/llm_client.py`
+- `ai_worker/llm/llm_generator.py`
+- Langfuse JP Cloud
+
+실험 목적:
+
+- 실제 OpenAI API 호출이 발생했을 때 입력, 출력, 모델, metadata를 추적한다.
+- LLM 직접 응답과 LLM rewrite 응답을 구분해 관측한다.
+- prompt version, chatbot_type, source, use_real_llm 여부를 metadata로 남긴다.
+
+현재 연동 방식:
+
+- `.env`에 Langfuse 키가 있을 때만 trace를 생성한다.
+- Langfuse 키가 없거나 연동 실패 시에도 기존 OpenAI 호출은 유지된다.
+- `call_llm(prompt, metadata=None)` 구조로 metadata를 선택적으로 전달한다.
+
+현재 기록되는 metadata 예시:
+
+- `prompt_version`
+- `source`
+- `chatbot_type`
+- `use_real_llm`
+- `model`
+
+현재 판단:
+
+- Langfuse trace 연동은 성공했다.
+- 실제 LLM 호출 시 `result_chatbot_llm`, `result_chatbot_llm_rewrite`, `main_health_chatbot_llm` trace가 생성된다.
+- 추후 운영 단계에서는 `is_safe`, `grounding_result`, `fallback_used`, `fallback_reason`까지 metadata로 확장할 수 있다.
+
+### 2.6 전체 정리
 
 현재까지의 LLM 실험은 "LLM이 건강 위험을 새로 판단하는 구조"가 아니라, "ML 모델과 룰 기반 판단 결과를 사용자 친화적으로 설명하는 구조"로 설계되었다.
 
