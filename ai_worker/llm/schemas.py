@@ -69,6 +69,12 @@ class MainHealthChatbotInput(BaseModel):
     tone: str = "friendly"
 
 
+class RagContextSource(BaseModel):
+    source_name: str | None = None
+    url: str | None = None
+    title: str | None = None
+
+
 class MainHealthChatbotOutput(BaseModel):
     answer: str
     intent: str
