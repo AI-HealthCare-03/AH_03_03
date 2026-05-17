@@ -27,7 +27,15 @@ def generate_result_chatbot_llm_response(
     factor_names = [factor.name for factor in input_data.risk_factors]
 
     if use_real_llm:
-        answer = call_llm(build_result_chatbot_prompt(input_data))
+        answer = call_llm(
+            build_result_chatbot_prompt(input_data),
+            metadata={
+                "prompt_version": None,
+                "source": "llm",
+                "chatbot_type": "result_chatbot",
+                "use_real_llm": True,
+            },
+        )
         source = "llm"
         intent = "llm_result_chatbot_response"
     else:
@@ -68,7 +76,15 @@ def generate_main_health_chatbot_llm_response(
     use_real_llm: bool = False,
 ) -> MainHealthChatbotOutput:
     if use_real_llm:
-        answer = call_llm(build_main_health_chatbot_prompt(input_data))
+        answer = call_llm(
+            build_main_health_chatbot_prompt(input_data),
+            metadata={
+                "prompt_version": None,
+                "source": "llm",
+                "chatbot_type": "main_health_chatbot",
+                "use_real_llm": True,
+            },
+        )
         source = "llm"
         intent = "llm_main_health_chatbot_response"
     else:
@@ -106,6 +122,12 @@ def rewrite_result_chatbot_response_with_llm(
         answer = call_llm_with_rewrite_fallback(
             prompt=build_result_chatbot_rewrite_prompt(input_data, rule_engine_output),
             fallback_answer=rule_engine_output.answer,
+            metadata={
+                "prompt_version": RESULT_REWRITE_PROMPT_VERSION,
+                "source": "llm_rewrite",
+                "chatbot_type": "result_chatbot",
+                "use_real_llm": True,
+            },
         )
         source = "llm_rewrite"
     else:
@@ -155,6 +177,12 @@ def rewrite_main_health_chatbot_response_with_llm(
         answer = call_llm_with_rewrite_fallback(
             prompt=build_main_health_chatbot_rewrite_prompt(input_data, rule_engine_output),
             fallback_answer=rule_engine_output.answer,
+            metadata={
+                "prompt_version": MAIN_REWRITE_PROMPT_VERSION,
+                "source": "llm_rewrite",
+                "chatbot_type": "main_health_chatbot",
+                "use_real_llm": True,
+            },
         )
         source = "llm_rewrite"
     else:
@@ -429,11 +457,16 @@ def add_llm_metadata(
     }
 
 
-def call_llm_with_rewrite_fallback(prompt: str, fallback_answer: str) -> str:
+def call_llm_with_rewrite_fallback(
+    prompt: str,
+    fallback_answer: str,
+    metadata: dict | None = None,
+) -> str:
     try:
         raw_response = call_llm_json(
             prompt,
             schema_name="health_chatbot_rewrite",
+            metadata=metadata,
         )
         return extract_answer_from_json_response(raw_response)
     except Exception:
