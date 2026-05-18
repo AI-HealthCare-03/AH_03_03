@@ -14,61 +14,72 @@ from catboost import CatBoostClassifier, Pool
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
-BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH  = os.path.join(BASE_DIR, 'data', 'hn24_file1_preprocessed.csv')
-MODEL_DIR  = os.path.join(BASE_DIR, 'outputs', 'ablation_dm_12feat')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(BASE_DIR, "data", "hn24_file1_preprocessed.csv")
+MODEL_DIR = os.path.join(BASE_DIR, "outputs", "ablation_dm_12feat")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-TARGET   = '당뇨유병'
+TARGET = "당뇨유병"
 N_SPLITS = 5
-SEED     = 42
+SEED = 42
 
 # Optuna 튜닝 파라미터
 BEST_PARAMS = dict(
-    iterations            = 899,
-    learning_rate         = 0.07751106059121869,
-    depth                 = 4,
-    l2_leaf_reg           = 4.326173555866765,
-    bagging_temperature   = 0.6424222998382222,
-    random_strength       = 0.017824706823968917,
-    border_count          = 69,
-    loss_function         = 'Logloss',
-    eval_metric           = 'AUC',
-    early_stopping_rounds = 50,
-    random_seed           = SEED,
-    verbose               = False,
-    allow_writing_files   = False,
+    iterations=899,
+    learning_rate=0.07751106059121869,
+    depth=4,
+    l2_leaf_reg=4.326173555866765,
+    bagging_temperature=0.6424222998382222,
+    random_strength=0.017824706823968917,
+    border_count=69,
+    loss_function="Logloss",
+    eval_metric="AUC",
+    early_stopping_rounds=50,
+    random_seed=SEED,
+    verbose=False,
+    allow_writing_files=False,
 )
 
 df = pd.read_csv(DATA_PATH)
 df = df.dropna(subset=[TARGET]).reset_index(drop=True)
-X  = df.drop(columns=['고혈압유병', '당뇨유병', '이상지질혈증유병', '비만단계'])
-y  = df[TARGET].astype(int)
+X = df.drop(columns=["고혈압유병", "당뇨유병", "이상지질혈증유병", "비만단계"])
+y = df[TARGET].astype(int)
 
 remove_cols = [
     # 직업 OHE (8개)
-    '직업_관리전문', '직업_기능노무', '직업_농림어업', '직업_무직',
-    '직업_사무', '직업_서비스판매', '직업_작업미상', '직업_주부학생',
+    "직업_관리전문",
+    "직업_기능노무",
+    "직업_농림어업",
+    "직업_무직",
+    "직업_사무",
+    "직업_서비스판매",
+    "직업_작업미상",
+    "직업_주부학생",
     # 타질환 가족력 (6개)
-    '고혈압가족력_부', '고혈압가족력_모', '고혈압가족력_형제',
-    '고지혈증가족력_부', '고지혈증가족력_모', '고지혈증가족력_형제',
+    "고혈압가족력_부",
+    "고혈압가족력_모",
+    "고혈압가족력_형제",
+    "고지혈증가족력_부",
+    "고지혈증가족력_모",
+    "고지혈증가족력_형제",
     # importance 낮음 (2개)
-    '현재흡연', '과거음주_현재금주',
+    "현재흡연",
+    "과거음주_현재금주",
 ]
 
 X_slim = X.drop(columns=remove_cols)
 neg, pos = (y == 0).sum(), (y == 1).sum()
-BEST_PARAMS['class_weights'] = {0: 1.0, 1: neg / pos}
+BEST_PARAMS["class_weights"] = {0: 1.0, 1: neg / pos}
 
 print(f"[0] 피처 수: {X.shape[1]}개 → {X_slim.shape[1]}개")
 print(f"[0] 사용 피처: {list(X_slim.columns)}")
 
-skf            = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=SEED)
+skf = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=SEED)
 oof_pred_proba = np.zeros(len(y))
 oof_pred_label = np.zeros(len(y))
-fold_scores    = []
+fold_scores = []
 
 print(f"\n[1] {N_SPLITS}-Fold CV")
 print("=" * 55)
@@ -86,21 +97,19 @@ for fold, (tr_idx, val_idx) in enumerate(skf.split(X_slim, y), 1):
     oof_pred_proba[val_idx] = val_proba
     oof_pred_label[val_idx] = val_label
 
-    auc    = roc_auc_score(y_val, val_proba)
-    f1     = f1_score(y_val, val_label)
+    auc = roc_auc_score(y_val, val_proba)
+    f1 = f1_score(y_val, val_label)
     recall = recall_score(y_val, val_label)
 
-    fold_scores.append({'fold': fold, 'auc': auc, 'f1': f1, 'recall': recall,
-                        'best_iter': model.best_iteration_})
-    print(f"  Fold {fold} | AUC: {auc:.4f} | F1: {f1:.4f} | Recall: {recall:.4f} "
-          f"| best_iter: {model.best_iteration_}")
+    fold_scores.append({"fold": fold, "auc": auc, "f1": f1, "recall": recall, "best_iter": model.best_iteration_})
+    print(f"  Fold {fold} | AUC: {auc:.4f} | F1: {f1:.4f} | Recall: {recall:.4f} | best_iter: {model.best_iteration_}")
 
 print("=" * 55)
-scores_df  = pd.DataFrame(fold_scores)
-oof_auc    = roc_auc_score(y, oof_pred_proba)
-oof_f1     = f1_score(y, oof_pred_label)
+scores_df = pd.DataFrame(fold_scores)
+oof_auc = roc_auc_score(y, oof_pred_proba)
+oof_f1 = f1_score(y, oof_pred_label)
 oof_recall = recall_score(y, oof_pred_label)
-cm         = confusion_matrix(y, oof_pred_label)
+cm = confusion_matrix(y, oof_pred_label)
 
 print(f"\n[2] OOF 성능 (피처 {X_slim.shape[1]}개 + threshold=0.45)")
 print(f"    AUC-ROC : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
@@ -108,10 +117,10 @@ print(f"    F1      : {oof_f1:.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {
 print(f"    Recall  : {oof_recall:.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
 
 print("\n[3] Classification Report")
-print(classification_report(y, oof_pred_label, target_names=['정상(0)', '당뇨(1)']))
+print(classification_report(y, oof_pred_label, target_names=["정상(0)", "당뇨(1)"]))
 
 print("[4] Confusion Matrix")
-print(f"    TN={cm[0,0]} FP={cm[0,1]} FN={cm[1,0]} TP={cm[1,1]}")
+print(f"    TN={cm[0, 0]} FP={cm[0, 1]} FN={cm[1, 0]} TP={cm[1, 1]}")
 
 # ── 단계별 비교 ───────────────────────────────────────────────
 print("\n[5] 단계별 비교 (threshold=0.45)")
@@ -120,21 +129,25 @@ print("    " + "-" * 54)
 print(f"    {'베이스라인':<20} {28:>5} {0.8055:>8.4f} {0.8644:>8.4f} {'N/A':>8} {'N/A':>6}")
 print(f"    {'피처정리':<20} {14:>5} {0.8055:>8.4f} {0.8644:>8.4f} {'N/A':>8} {'N/A':>6}")
 print(f"    {'튜닝+threshold':<20} {14:>5} {0.8087:>8.4f} {0.8644:>8.4f} {0.3796:>8.4f} {110:>6}")
-print(f"    {'흡연/음주 제거':<20} {X_slim.shape[1]:>5} {oof_auc:>8.4f} {oof_recall:>8.4f} {oof_f1:>8.4f} {cm[1,0]:>6}")
+print(
+    f"    {'흡연/음주 제거':<20} {X_slim.shape[1]:>5} {oof_auc:>8.4f} {oof_recall:>8.4f} {oof_f1:>8.4f} {cm[1, 0]:>6}"
+)
 
 # ── Feature Importance ────────────────────────────────────────
 print("\n[6] Feature Importance")
-fi = pd.DataFrame({
-    'feature':    X_slim.columns,
-    'importance': model.get_feature_importance(),
-}).sort_values('importance', ascending=False)
+fi = pd.DataFrame(
+    {
+        "feature": X_slim.columns,
+        "importance": model.get_feature_importance(),
+    }
+).sort_values("importance", ascending=False)
 print(fi.to_string(index=False))
 
 # ── 저장 ──────────────────────────────────────────────────────
-scores_df.to_csv(os.path.join(MODEL_DIR, 'fold_scores.csv'), index=False)
-fi.to_csv(os.path.join(MODEL_DIR, 'feature_importance.csv'), index=False)
-np.save(os.path.join(MODEL_DIR, 'oof_y_true.npy'),  y.values)
-np.save(os.path.join(MODEL_DIR, 'oof_proba.npy'),   oof_pred_proba)
-np.save(os.path.join(MODEL_DIR, 'oof_label.npy'),   oof_pred_label)
+scores_df.to_csv(os.path.join(MODEL_DIR, "fold_scores.csv"), index=False)
+fi.to_csv(os.path.join(MODEL_DIR, "feature_importance.csv"), index=False)
+np.save(os.path.join(MODEL_DIR, "oof_y_true.npy"), y.values)
+np.save(os.path.join(MODEL_DIR, "oof_proba.npy"), oof_pred_proba)
+np.save(os.path.join(MODEL_DIR, "oof_label.npy"), oof_pred_label)
 
 print(f"\n[7] 저장 완료 → {MODEL_DIR}")

@@ -27,20 +27,20 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(BASE_DIR, 'data', 'hn24_file1_preprocessed.csv')
-MODEL_DIR = os.path.join(BASE_DIR, 'outputs', 'baseline_lgbm_DM')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(BASE_DIR, "data", "hn24_file1_preprocessed.csv")
+MODEL_DIR = os.path.join(BASE_DIR, "outputs", "baseline_lgbm_DM")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
-TARGET   = '당뇨유병'
+TARGET = "당뇨유병"
 N_SPLITS = 5
-SEED     = 42
+SEED = 42
 THRESHOLD_RANGE = np.arange(0.30, 0.71, 0.01)
-RECALL_MIN      = 0.85
+RECALL_MIN = 0.85
 
 # ── 데이터 로드 ───────────────────────────────────────────────
 df = pd.read_csv(DATA_PATH)
@@ -51,7 +51,7 @@ print(f"[0] {TARGET} 결측 제거 후 | shape: {df.shape}")
 print(f"[0] 클래스 분포:\n{df[TARGET].value_counts().to_string()}")
 
 # ── X / Y 분리 ────────────────────────────────────────────────
-drop_cols = ['고혈압유병', '당뇨유병', '이상지질혈증유병', '비만단계']
+drop_cols = ["고혈압유병", "당뇨유병", "이상지질혈증유병", "비만단계"]
 X = df.drop(columns=drop_cols)
 y = df[TARGET].astype(int)
 
@@ -59,15 +59,13 @@ print(f"\n[1] Feature 수: {X.shape[1]}")
 print(f"    Feature 목록: {list(X.columns)}")
 
 # ── Train / Test split (Hold-out) ────────────────────────────
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=SEED, stratify=y
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=SEED, stratify=y)
 print(f"\n[2] Train: {X_train.shape} | Test: {X_test.shape}")
 print(f"    Train 양성 비율: {y_train.mean():.4f} | Test 양성 비율: {y_test.mean():.4f}")
 
 # ── Stratified 5-Fold OOF CV (Train 내부) ─────────────────────
-skf         = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=SEED)
-oof_proba   = np.zeros(len(y_train))
+skf = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=SEED)
+oof_proba = np.zeros(len(y_train))
 fold_models = []
 fold_scores = []
 
@@ -79,32 +77,32 @@ for fold, (tr_idx, val_idx) in enumerate(skf.split(X_train, y_train), 1):
     y_tr, y_val = y_train.iloc[tr_idx], y_train.iloc[val_idx]
 
     # fold마다 train 기준 scale_pos_weight 계산
-    cw  = compute_class_weight('balanced', classes=np.array([0, 1]), y=y_tr)
+    cw = compute_class_weight("balanced", classes=np.array([0, 1]), y=y_tr)
     spw = cw[1] / cw[0]
 
     params = {
-        'objective':         'binary',
-        'metric':            'auc',
-        'boosting_type':     'gbdt',
-        'n_estimators':      500,
-        'learning_rate':     0.05,
-        'num_leaves':        31,
-        'max_depth':         -1,
-        'min_child_samples': 20,
-        'subsample':         0.8,
-        'colsample_bytree':  0.8,
-        'scale_pos_weight':  spw,
-        'random_state':      SEED,
-        'n_jobs':            -1,
-        'verbose':           -1,
+        "objective": "binary",
+        "metric": "auc",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "max_depth": -1,
+        "min_child_samples": 20,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "scale_pos_weight": spw,
+        "random_state": SEED,
+        "n_jobs": -1,
+        "verbose": -1,
     }
 
     model = lgb.LGBMClassifier(**params)
     model.fit(
-        X_tr, y_tr,
+        X_tr,
+        y_tr,
         eval_set=[(X_val, y_val)],
-        callbacks=[lgb.early_stopping(100, verbose=False),
-                   lgb.log_evaluation(period=-1)],
+        callbacks=[lgb.early_stopping(100, verbose=False), lgb.log_evaluation(period=-1)],
     )
 
     val_proba = model.predict_proba(X_val)[:, 1]
@@ -113,31 +111,43 @@ for fold, (tr_idx, val_idx) in enumerate(skf.split(X_train, y_train), 1):
     oof_proba[val_idx] = val_proba
     fold_models.append(model)
 
-    auc    = roc_auc_score(y_val, val_proba)
+    auc = roc_auc_score(y_val, val_proba)
     recall = recall_score(y_val, val_label)
-    prec   = precision_score(y_val, val_label, zero_division=0)
-    f1     = f1_score(y_val, val_label)
+    prec = precision_score(y_val, val_label, zero_division=0)
+    f1 = f1_score(y_val, val_label)
 
-    fold_scores.append({'fold': fold, 'auc': auc, 'recall': recall,
-                        'precision': prec, 'f1': f1,
-                        'best_iter': model.best_iteration_,
-                        'scale_pos_weight': round(spw, 4)})
-    print(f"  Fold {fold} | AUC: {auc:.4f} | Recall: {recall:.4f} | "
-          f"Prec: {prec:.4f} | F1: {f1:.4f} | iter: {model.best_iteration_}")
+    fold_scores.append(
+        {
+            "fold": fold,
+            "auc": auc,
+            "recall": recall,
+            "precision": prec,
+            "f1": f1,
+            "best_iter": model.best_iteration_,
+            "scale_pos_weight": round(spw, 4),
+        }
+    )
+    print(
+        f"  Fold {fold} | AUC: {auc:.4f} | Recall: {recall:.4f} | "
+        f"Prec: {prec:.4f} | F1: {f1:.4f} | iter: {model.best_iteration_}"
+    )
 
 # ── OOF 전체 성능 (threshold=0.5 기준) ───────────────────────
 print("=" * 60)
 oof_label_05 = (oof_proba >= 0.5).astype(int)
-oof_auc      = roc_auc_score(y_train, oof_proba)
-scores_df    = pd.DataFrame(fold_scores)
+oof_auc = roc_auc_score(y_train, oof_proba)
+scores_df = pd.DataFrame(fold_scores)
 
 print("\n[4] OOF 전체 성능 (threshold=0.5)")
-print(f"    AUC    : {oof_auc:.4f}  "
-      f"(fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
-print(f"    Recall : {recall_score(y_train, oof_label_05):.4f}  "
-      f"(fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
-print(f"    F1     : {f1_score(y_train, oof_label_05):.4f}  "
-      f"(fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
+print(f"    AUC    : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
+print(
+    f"    Recall : {recall_score(y_train, oof_label_05):.4f}  "
+    f"(fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})"
+)
+print(
+    f"    F1     : {f1_score(y_train, oof_label_05):.4f}  "
+    f"(fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})"
+)
 
 # ── OOF 기반 Threshold Tuning ─────────────────────────────────
 print("\n[5] OOF Threshold Tuning (범위: 0.30~0.70, step=0.01)")
@@ -147,82 +157,85 @@ print("-" * 60)
 tuning_rows = []
 for thr in THRESHOLD_RANGE:
     pred = (oof_proba >= thr).astype(int)
-    r    = recall_score(y_train, pred)
-    p    = precision_score(y_train, pred, zero_division=0)
-    f    = f1_score(y_train, pred, zero_division=0)
-    tuning_rows.append({'threshold': round(thr, 2), 'recall': r, 'precision': p, 'f1': f})
+    r = recall_score(y_train, pred)
+    p = precision_score(y_train, pred, zero_division=0)
+    f = f1_score(y_train, pred, zero_division=0)
+    tuning_rows.append({"threshold": round(thr, 2), "recall": r, "precision": p, "f1": f})
 
-tuning_df  = pd.DataFrame(tuning_rows)
-candidates = tuning_df[tuning_df['recall'] >= RECALL_MIN]
+tuning_df = pd.DataFrame(tuning_rows)
+candidates = tuning_df[tuning_df["recall"] >= RECALL_MIN]
 
 if len(candidates) > 0:
-    best_row = candidates.loc[candidates['precision'].idxmax()]
-    best_thr = best_row['threshold']
+    best_row = candidates.loc[candidates["precision"].idxmax()]
+    best_thr = best_row["threshold"]
     print(f"    ✅ 선택된 threshold: {best_thr:.2f}")
-    print(f"       Recall: {best_row['recall']:.4f} | Precision: {best_row['precision']:.4f} | F1: {best_row['f1']:.4f}")
+    print(
+        f"       Recall: {best_row['recall']:.4f} | Precision: {best_row['precision']:.4f} | F1: {best_row['f1']:.4f}"
+    )
 else:
-    best_row = tuning_df.loc[tuning_df['recall'].idxmax()]
-    best_thr = best_row['threshold']
+    best_row = tuning_df.loc[tuning_df["recall"].idxmax()]
+    best_thr = best_row["threshold"]
     print(f"    ⚠️  Recall >= {RECALL_MIN} 만족 threshold 없음 → Recall 최대 threshold 사용: {best_thr:.2f}")
-    print(f"       Recall: {best_row['recall']:.4f} | Precision: {best_row['precision']:.4f} | F1: {best_row['f1']:.4f}")
+    print(
+        f"       Recall: {best_row['recall']:.4f} | Precision: {best_row['precision']:.4f} | F1: {best_row['f1']:.4f}"
+    )
 
 # ── 최종 Hold-out Test 평가 (1회) ─────────────────────────────
 print(f"\n[6] 최종 Hold-out Test 평가 (threshold={best_thr:.2f}, 1회 평가)")
 print("=" * 60)
 
-test_probas = np.column_stack([
-    m.predict_proba(X_test)[:, 1] for m in fold_models
-])
+test_probas = np.column_stack([m.predict_proba(X_test)[:, 1] for m in fold_models])
 test_proba_ensemble = test_probas.mean(axis=1)
-test_label          = (test_proba_ensemble >= best_thr).astype(int)
+test_label = (test_proba_ensemble >= best_thr).astype(int)
 
-test_auc    = roc_auc_score(y_test, test_proba_ensemble)
+test_auc = roc_auc_score(y_test, test_proba_ensemble)
 test_recall = recall_score(y_test, test_label)
-test_prec   = precision_score(y_test, test_label, zero_division=0)
-test_f1     = f1_score(y_test, test_label)
-cm          = confusion_matrix(y_test, test_label)
+test_prec = precision_score(y_test, test_label, zero_division=0)
+test_f1 = f1_score(y_test, test_label)
+cm = confusion_matrix(y_test, test_label)
 
 print(f"    AUC       : {test_auc:.4f}")
 print(f"    Recall    : {test_recall:.4f}")
 print(f"    Precision : {test_prec:.4f}")
 print(f"    F1        : {test_f1:.4f}")
-print(f"    TN={cm[0,0]}  FP={cm[0,1]}")
-print(f"    FN={cm[1,0]}  TP={cm[1,1]}")
+print(f"    TN={cm[0, 0]}  FP={cm[0, 1]}")
+print(f"    FN={cm[1, 0]}  TP={cm[1, 1]}")
 print("\n[6] Classification Report")
-print(classification_report(y_test, test_label, target_names=['정상(0)', '당뇨(1)']))
+print(classification_report(y_test, test_label, target_names=["정상(0)", "당뇨(1)"]))
 
 # ── Feature Importance (fold 평균) ────────────────────────────
 print("[7] Feature Importance Top 15 (gain 평균, 5-fold)")
 fi_matrix = np.column_stack([m.feature_importances_ for m in fold_models])
-fi_mean   = fi_matrix.mean(axis=1)
-fi_df = pd.DataFrame({'feature': X.columns, 'importance': fi_mean}
-                     ).sort_values('importance', ascending=False)
+fi_mean = fi_matrix.mean(axis=1)
+fi_df = pd.DataFrame({"feature": X.columns, "importance": fi_mean}).sort_values("importance", ascending=False)
 print(fi_df.head(15).to_string(index=False))
 
 # ── 저장 ─────────────────────────────────────────────────────
-scores_df.to_csv(os.path.join(MODEL_DIR, 'fold_scores.csv'), index=False)
-fi_df.to_csv(os.path.join(MODEL_DIR, 'feature_importance.csv'), index=False)
-tuning_df.to_csv(os.path.join(MODEL_DIR, 'threshold_tuning.csv'), index=False)
+scores_df.to_csv(os.path.join(MODEL_DIR, "fold_scores.csv"), index=False)
+fi_df.to_csv(os.path.join(MODEL_DIR, "feature_importance.csv"), index=False)
+tuning_df.to_csv(os.path.join(MODEL_DIR, "threshold_tuning.csv"), index=False)
 
-np.save(os.path.join(MODEL_DIR, 'oof_y_true.npy'),      y_train.values)
-np.save(os.path.join(MODEL_DIR, 'oof_proba.npy'),        oof_proba)
-np.save(os.path.join(MODEL_DIR, 'best_threshold.npy'),   np.array([best_thr]))
+np.save(os.path.join(MODEL_DIR, "oof_y_true.npy"), y_train.values)
+np.save(os.path.join(MODEL_DIR, "oof_proba.npy"), oof_proba)
+np.save(os.path.join(MODEL_DIR, "best_threshold.npy"), np.array([best_thr]))
 
 # 실험 로그
 try:
     import sys
+
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from db_logger import log_experiment
+
     log_experiment(
-        model_name      = 'diabetes_model',
-        version         = 'v1.0-baseline-lgbm',
-        feature_columns = list(X.columns),
-        oof_auc         = oof_auc,
-        oof_f1          = f1_score(y_train, oof_label_05),
-        oof_recall      = recall_score(y_train, oof_label_05),
-        fold_scores     = scores_df.to_dict('records'),
-        best_params     = params,
-        file_path       = MODEL_DIR,
+        model_name="diabetes_model",
+        version="v1.0-baseline-lgbm",
+        feature_columns=list(X.columns),
+        oof_auc=oof_auc,
+        oof_f1=f1_score(y_train, oof_label_05),
+        oof_recall=recall_score(y_train, oof_label_05),
+        fold_scores=scores_df.to_dict("records"),
+        best_params=params,
+        file_path=MODEL_DIR,
     )
 except Exception as e:
     print(f"[주의] DB 로그 저장 실패 (실험 결과에 영향 없음): {e}")
