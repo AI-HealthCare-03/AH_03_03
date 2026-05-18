@@ -24,3 +24,4 @@ ai_worker/vision/data/results/
 .venv-ocr2/
 ai_worker/ml/outputs/
 ai_worker/ml/LGB18~24/outputs/
+**/outputs/
