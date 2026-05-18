@@ -13,8 +13,9 @@ DI1_pr / DE1_pr / DI2_pr:
 """
 
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import pyreadstat
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.utils.class_weight import compute_class_weight
@@ -188,7 +189,7 @@ for col in ['고혈압유병','당뇨유병','이상지질혈증유병']:
 # ══════════════════════════════════════════════
 remaining = df_all.isnull().sum()
 remaining = remaining[remaining > 0]
-print(f"\n[잔여 결측치]")
+print("\n[잔여 결측치]")
 print("  → 없음 ✓" if remaining.empty else remaining)
 print(f"\n[최종 컬럼 목록]\n  {list(df_all.columns)}")
 

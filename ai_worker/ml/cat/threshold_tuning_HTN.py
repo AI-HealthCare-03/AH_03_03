@@ -6,16 +6,22 @@ OOF 확률값 기준으로 최적 threshold 탐색
 """
 
 import os
+
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
-    roc_auc_score, f1_score, recall_score, precision_score,
-    classification_report, confusion_matrix,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
-import matplotlib.font_manager as fm
+
 plt.rcParams['font.family'] = 'AppleGothic'  # Mac 한글 폰트
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -52,7 +58,7 @@ for thr in thresholds:
 
 results_df = pd.DataFrame(results)
 
-print(f"\n[1] Threshold별 성능 요약")
+print("\n[1] Threshold별 성능 요약")
 print(results_df[['threshold', 'recall', 'precision', 'f1', 'fn', 'fp']].to_string(index=False))
 
 # ── 최적 Threshold 선정 ───────────────────────────────────────
@@ -61,11 +67,11 @@ recall_condition = results_df[results_df['recall'] >= 0.85]
 
 if len(recall_condition) > 0:
     best_row = recall_condition.loc[recall_condition['f1'].idxmax()]
-    print(f"\n[2] 최적 Threshold (Recall >= 0.85 조건에서 F1 최대)")
+    print("\n[2] 최적 Threshold (Recall >= 0.85 조건에서 F1 최대)")
 else:
     # 조건 완화: Recall 최대
     best_row = results_df.loc[results_df['recall'].idxmax()]
-    print(f"\n[2] 최적 Threshold (Recall 최대 기준)")
+    print("\n[2] 최적 Threshold (Recall 최대 기준)")
 
 print(f"    Threshold : {best_row['threshold']}")
 print(f"    Recall    : {best_row['recall']:.4f}")
@@ -75,7 +81,7 @@ print(f"    AUC-ROC   : {best_row['auc']:.4f}")
 print(f"    TN={best_row['tn']:.0f} FP={best_row['fp']:.0f} FN={best_row['fn']:.0f} TP={best_row['tp']:.0f}")
 
 # ── 베이스라인(0.5) vs 튜닝 후(0.5) vs 최적 threshold 비교 ──
-print(f"\n[3] 전체 비교")
+print("\n[3] 전체 비교")
 print(f"    {'구분':<20} {'Threshold':>10} {'Recall':>8} {'Precision':>10} {'F1':>8} {'FN':>6} {'FP':>6}")
 print("    " + "-" * 68)
 
@@ -129,7 +135,7 @@ axes[1].grid(alpha=0.3)
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_DIR, 'threshold_tuning.png'), dpi=150, bbox_inches='tight')
 plt.close()
-print(f"\n[5] 그래프 저장 완료")
+print("\n[5] 그래프 저장 완료")
 
 # ── 결과 저장 ─────────────────────────────────────────────────
 results_df.to_csv(os.path.join(OUTPUT_DIR, 'threshold_results.csv'), index=False)

@@ -6,12 +6,13 @@ Python 3.9 | catboost>=1.2 | optuna>=3.0 | scikit-learn>=1.4
 
 import os
 import warnings
+
 import numpy as np
-import pandas as pd
 import optuna
+import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score
 
 warnings.filterwarnings('ignore')
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -112,7 +113,7 @@ for disease, cfg in CONFIGS.items():
     study.optimize(objective, n_trials=N_TRIALS, show_progress_bar=True)
 
     print(f"\n[{disease}] 튜닝 완료 | Best AUC: {study.best_value:.4f}")
-    print(f"Best params:")
+    print("Best params:")
     for k, v in study.best_params.items():
         print(f"  {k}: {v}")
 
@@ -133,7 +134,7 @@ for disease, cfg in CONFIGS.items():
     oof_pred_label = np.zeros(len(y))
     fold_scores    = []
 
-    print(f"\n최적 파라미터로 최종 5-Fold CV")
+    print("\n최적 파라미터로 최종 5-Fold CV")
     print("-" * 55)
 
     for fold, (tr_idx, val_idx) in enumerate(skf.split(X, y), 1):
@@ -180,7 +181,7 @@ for disease, cfg in CONFIGS.items():
 
 # ── 전체 요약 ─────────────────────────────────────────────────
 print(f"\n{'='*60}")
-print(f"전체 요약 (threshold=0.5 기준)")
+print("전체 요약 (threshold=0.5 기준)")
 print(f"{'질환':<15} {'AUC':>8} {'Recall':>8} {'F1':>8}")
 print("-" * 42)
 for disease, res in all_results.items():

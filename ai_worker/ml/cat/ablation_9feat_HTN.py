@@ -5,11 +5,12 @@
 
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score
 
 warnings.filterwarnings('ignore')
 
@@ -78,7 +79,7 @@ oof_auc    = roc_auc_score(y, oof_pred_proba)
 oof_f1     = f1_score(y, oof_label)
 oof_recall = recall_score(y, oof_label)
 
-print(f"\n[2] 전체 단계별 비교 (threshold=0.48)")
+print("\n[2] 전체 단계별 비교 (threshold=0.48)")
 print(f"    {'구분':<20} {'피처':>5} {'AUC':>8} {'Recall':>8} {'F1':>8}")
 print("    " + "-" * 48)
 print(f"    {'베이스라인':<20} {28:>5} {0.8596:>8.4f} {0.8524:>8.4f} {0.6459:>8.4f}")

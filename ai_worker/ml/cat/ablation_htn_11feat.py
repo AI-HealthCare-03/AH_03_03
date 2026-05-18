@@ -5,11 +5,12 @@
 
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import confusion_matrix, f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, confusion_matrix
 
 warnings.filterwarnings('ignore')
 
@@ -77,14 +78,14 @@ oof_f1     = f1_score(y, oof_pred_label)
 oof_recall = recall_score(y, oof_pred_label)
 cm         = confusion_matrix(y, oof_pred_label)
 
-print(f"\n[2] 비교 (threshold=0.48)")
+print("\n[2] 비교 (threshold=0.48)")
 print(f"    {'구분':<20} {'피처':>5} {'AUC':>8} {'Recall':>8} {'F1':>8} {'FN':>6}")
 print("    " + "-" * 54)
 print(f"    {'확정 (9개)':<20} {9:>5} {0.8580:>8.4f} {0.8571:>8.4f} {0.6459:>8.4f} {249:>6}")
 print(f"    {'걷기+근력 추가 (11개)':<20} {len(features):>5} {oof_auc:>8.4f} {oof_recall:>8.4f} {oof_f1:>8.4f} {cm[1,0]:>6}")
 print(f"    변화                 {'':>5} {oof_auc-0.8580:>+8.4f} {oof_recall-0.8571:>+8.4f} {oof_f1-0.6459:>+8.4f} {cm[1,0]-249:>+6}")
 
-print(f"\n[3] Feature Importance")
+print("\n[3] Feature Importance")
 fi = pd.DataFrame({
     'feature':    features,
     'importance': model.get_feature_importance(),

@@ -6,11 +6,12 @@ Python 3.9 | catboost>=1.2 | scikit-learn>=1.4
 
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import confusion_matrix, f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, classification_report, confusion_matrix
 
 warnings.filterwarnings('ignore')
 
@@ -85,14 +86,14 @@ oof_f1     = f1_score(y, oof_pred_label)
 oof_recall = recall_score(y, oof_pred_label)
 cm         = confusion_matrix(y, oof_pred_label)
 
-print(f"\n[2] 단계별 비교 (threshold=0.45)")
+print("\n[2] 단계별 비교 (threshold=0.45)")
 print(f"    {'구분':<20} {'피처':>5} {'AUC':>8} {'Recall':>8} {'F1':>8} {'FN':>6}")
 print("    " + "-" * 54)
 print(f"    {'튜닝+threshold':<20} {14:>5} {0.8087:>8.4f} {0.8644:>8.4f} {0.3796:>8.4f} {110:>6}")
 print(f"    {'흡연/음주 제거':<20} {12:>5} {0.8082:>8.4f} {0.8705:>8.4f} {0.3857:>8.4f} {105:>6}")
 print(f"    {'근력운동 제거':<20} {X_slim.shape[1]:>5} {oof_auc:>8.4f} {oof_recall:>8.4f} {oof_f1:>8.4f} {cm[1,0]:>6}")
 
-print(f"\n[3] Feature Importance")
+print("\n[3] Feature Importance")
 fi = pd.DataFrame({
     'feature':    X_slim.columns,
     'importance': model.get_feature_importance(),

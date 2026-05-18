@@ -10,19 +10,24 @@ Trial 수           : 100 (Fold 불안정 이슈로 HTN/DL보다 많이)
 검증 구조          : Train/Test 8:2 Hold-out → Train 내부 5-Fold OOF
 """
 
-import os
 import json
+import os
 import warnings
-import numpy as np
-import pandas as pd
+
 import lightgbm as lgb
+import numpy as np
 import optuna
+import pandas as pd
 from optuna.pruners import MedianPruner
-from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import (
-    roc_auc_score, f1_score, recall_score, precision_score,
-    classification_report, confusion_matrix,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 
 warnings.filterwarnings('ignore')
@@ -152,12 +157,12 @@ print(f"    OOF AUC       : {best.user_attrs.get('oof_auc', '-')}")
 print(f"    OOF F1        : {best.user_attrs.get('oof_f1', '-')}")
 print(f"    Best Threshold: {best.user_attrs.get('best_thr', '-')}")
 print(f"    Fold Recall std: {best.user_attrs.get('fold_recall_std', '-')}")
-print(f"\n    Best Params:")
+print("\n    Best Params:")
 for k, v in best.params.items():
     print(f"      {k}: {v}")
 
 # ── Best 파라미터로 최종 OOF 재학습 ──────────────────────────
-print(f"\n[4] Best 파라미터로 최종 OOF 재학습")
+print("\n[4] Best 파라미터로 최종 OOF 재학습")
 print("=" * 60)
 
 best_params = best.params.copy()
@@ -217,7 +222,7 @@ oof_label_05 = (oof_proba >= 0.5).astype(int)
 oof_auc      = roc_auc_score(y_train, oof_proba)
 scores_df    = pd.DataFrame(fold_scores)
 
-print(f"\n[5] OOF 전체 성능 (threshold=0.5)")
+print("\n[5] OOF 전체 성능 (threshold=0.5)")
 print(f"    AUC    : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
 print(f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
 print(f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
@@ -258,11 +263,11 @@ print(f"    Precision : {test_prec:.4f}")
 print(f"    F1        : {test_f1:.4f}")
 print(f"    TN={cm[0,0]}  FP={cm[0,1]}")
 print(f"    FN={cm[1,0]}  TP={cm[1,1]}")
-print(f"\n[7] Classification Report")
+print("\n[7] Classification Report")
 print(classification_report(y_test, test_label, target_names=['정상(0)', '당뇨(1)']))
 
 # ── Feature Importance (fold 평균) ────────────────────────────
-print(f"[8] Feature Importance Top 15 (gain 평균, 5-fold)")
+print("[8] Feature Importance Top 15 (gain 평균, 5-fold)")
 fi_matrix = np.column_stack([m.feature_importances_ for m in fold_models])
 fi_mean   = fi_matrix.mean(axis=1)
 fi_df = pd.DataFrame({'feature': X.columns, 'importance': fi_mean}
