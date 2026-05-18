@@ -52,8 +52,8 @@ THRESHOLD_RANGE: NDArray[np.float64] = np.arange(0.30, 0.71, 0.01)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 피처 엔지니어링 ON/OFF 스위치 (True=사용 / False=미사용)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-USE_AGE_BIN: bool = True    # 나이 구간화 (19~39/40대/50대/60대/70대/80+)
-USE_BMI_BIN: bool = False   # BMI 구간화 (한국인 기준)
+USE_AGE_BIN: bool = True  # 나이 구간화 (19~39/40대/50대/60대/70대/80+)
+USE_BMI_BIN: bool = False  # BMI 구간화 (한국인 기준)
 USE_WEIGHT_BIN: bool = False  # 체중 구간화
 USE_ALCOHOL_RISK: bool = True  # 음주위험군 (비음주/저위험/고위험)
 USE_WALK_LEVEL: bool = True  # 걷기 활동량
@@ -81,9 +81,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     # 2. BMI 구간화
     if USE_BMI_BIN:
-        df["BMI_구간"] = pd.cut(
-            df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False
-        ).astype(float)
+        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
         added += ["BMI_구간"]
         print("  [ON] BMI 구간화: 0=정상/1=과체중/2=비만1/3=비만2")
 
@@ -100,44 +98,32 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     # 4. 음주위험군
     if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(
-            df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True
-        ).astype(float)
+        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
         added += ["음주위험군"]
         print("  [ON] 음주위험군: 0=비음주/1=저위험(월1회이하)/2=고위험(월2회이상)")
 
     # 5. 걷기 활동량
     if USE_WALK_LEVEL:
-        df["걷기활동량"] = pd.cut(
-            df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True
-        ).astype(float)
+        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
         added += ["걷기활동량"]
         print("  [ON] 걷기활동량: 0=비활동/1=저활동(1~3일)/2=활동(4일이상)")
 
     # 6. 근력운동 활동량
     if USE_STRENGTH:
-        df["근력활동량"] = pd.cut(
-            df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True
-        ).astype(float)
+        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
         added += ["근력활동량"]
         print("  [ON] 근력활동량: 0=비활동/1=저활동(1~2일)/2=활동(3일이상)")
 
     # 7. 가족력 합산
     if USE_FAMILY_SUM:
         df["고혈압가족력_합산"] = (
-            df["고혈압가족력_부"].fillna(0)
-            + df["고혈압가족력_모"].fillna(0)
-            + df["고혈압가족력_형제"].fillna(0)
+            df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)
         ).clip(0, 3)
         df["당뇨가족력_합산"] = (
-            df["당뇨가족력_부"].fillna(0)
-            + df["당뇨가족력_모"].fillna(0)
-            + df["당뇨가족력_형제"].fillna(0)
+            df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)
         ).clip(0, 3)
         df["고지혈증가족력_합산"] = (
-            df["고지혈증가족력_부"].fillna(0)
-            + df["고지혈증가족력_모"].fillna(0)
-            + df["고지혈증가족력_형제"].fillna(0)
+            df["고지혈증가족력_부"].fillna(0) + df["고지혈증가족력_모"].fillna(0) + df["고지혈증가족력_형제"].fillna(0)
         ).clip(0, 3)
         added += ["고혈압가족력_합산", "당뇨가족력_합산", "고지혈증가족력_합산"]
         print("  [ON] 가족력 합산 스코어 (0~3)")
@@ -291,15 +277,17 @@ def retrain_with_best_params(
         oof_proba[val_idx] = val_proba
         fold_models.append(model)
 
-        fold_scores.append({
-            "fold": fold,
-            "auc": round(float(roc_auc_score(y_val, val_proba)), 4),
-            "recall": round(float(recall_score(y_val, val_label)), 4),
-            "precision": round(float(precision_score(y_val, val_label, zero_division=0)), 4),
-            "f1": round(float(f1_score(y_val, val_label)), 4),
-            "best_iter": model.best_iteration_,
-            "scale_pos_weight": round(spw, 4),
-        })
+        fold_scores.append(
+            {
+                "fold": fold,
+                "auc": round(float(roc_auc_score(y_val, val_proba)), 4),
+                "recall": round(float(recall_score(y_val, val_label)), 4),
+                "precision": round(float(precision_score(y_val, val_label, zero_division=0)), 4),
+                "f1": round(float(f1_score(y_val, val_label)), 4),
+                "best_iter": model.best_iteration_,
+                "scale_pos_weight": round(spw, 4),
+            }
+        )
 
         print(
             f"  Fold {fold} | AUC: {fold_scores[-1]['auc']:.4f} | "
@@ -331,9 +319,7 @@ def main() -> None:
     print(f"\n[1] Feature 수: {X.shape[1]}")
 
     # ── Train / Test split ────────────────────────────────────
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=SEED, stratify=y
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=SEED, stratify=y)
     print(f"\n[2] Train: {X_train.shape} | Test: {X_test.shape}")
     print(f"    Train 양성 비율: {y_train.mean():.4f} | Test 양성 비율: {y_test.mean():.4f}")
 
@@ -382,8 +368,12 @@ def main() -> None:
 
     print("\n[6] OOF 전체 성능 (threshold=0.5)")
     print(f"    AUC    : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
-    print(f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
-    print(f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
+    print(
+        f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})"
+    )
+    print(
+        f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})"
+    )
 
     # ── OOF Threshold 재확인 ──────────────────────────────────
     print(f"\n[7] OOF Threshold 재확인 (best_thr={best_thr:.2f})")
@@ -397,7 +387,9 @@ def main() -> None:
     tuning_df = pd.DataFrame(tuning_rows)
 
     final_row = tuning_df[tuning_df["threshold"] == best_thr].iloc[0]
-    print(f"    Recall: {final_row['recall']:.4f} | Precision: {final_row['precision']:.4f} | F1: {final_row['f1']:.4f}")
+    print(
+        f"    Recall: {final_row['recall']:.4f} | Precision: {final_row['precision']:.4f} | F1: {final_row['f1']:.4f}"
+    )
 
     # ── 최종 Hold-out Test 평가 ───────────────────────────────
     print(f"\n[8] 최종 Hold-out Test 평가 (threshold={best_thr:.2f}, 1회 평가)")
@@ -426,9 +418,7 @@ def main() -> None:
     print("[9] Feature Importance Top 20 (gain 평균, 5-fold)")
     fi_matrix = np.column_stack([m.feature_importances_ for m in fold_models])
     fi_mean: NDArray[np.float64] = fi_matrix.mean(axis=1)
-    fi_df = pd.DataFrame({"feature": X.columns, "importance": fi_mean}).sort_values(
-        "importance", ascending=False
-    )
+    fi_df = pd.DataFrame({"feature": X.columns, "importance": fi_mean}).sort_values("importance", ascending=False)
     print(fi_df.head(20).to_string(index=False))
 
     # ── 저장 ─────────────────────────────────────────────────
