@@ -7,11 +7,12 @@ Python 3.9 | catboost>=1.2 | scikit-learn>=1.4
 
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, classification_report, confusion_matrix
 
 warnings.filterwarnings('ignore')
 
@@ -102,20 +103,20 @@ print(f"    AUC-ROC : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ±
 print(f"    F1      : {oof_f1:.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
 print(f"    Recall  : {oof_recall:.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
 
-print(f"\n[3] Classification Report")
+print("\n[3] Classification Report")
 print(classification_report(y, oof_pred_label, target_names=['정상(0)', '이상지질혈증(1)']))
 
-print(f"[4] Confusion Matrix")
+print("[4] Confusion Matrix")
 print(f"    TN={cm[0,0]} FP={cm[0,1]} FN={cm[1,0]} TP={cm[1,1]}")
 
-print(f"\n[5] 단계별 비교 (threshold=0.48)")
+print("\n[5] 단계별 비교 (threshold=0.48)")
 print(f"    {'구분':<22} {'피처':>5} {'AUC':>8} {'Recall':>8} {'F1':>8} {'FN':>6}")
 print("    " + "-" * 56)
 print(f"    {'베이스라인':<22} {28:>5} {0.8026:>8.4f} {0.8588:>8.4f} {'N/A':>8} {'N/A':>6}")
 print(f"    {'튜닝+threshold':<22} {14:>5} {0.8035:>8.4f} {0.8588:>8.4f} {0.5705:>8.4f} {220:>6}")
 print(f"    {'흡연/음주 제거':<22} {X_slim.shape[1]:>5} {oof_auc:>8.4f} {oof_recall:>8.4f} {oof_f1:>8.4f} {cm[1,0]:>6}")
 
-print(f"\n[6] Feature Importance")
+print("\n[6] Feature Importance")
 fi = pd.DataFrame({
     'feature':    X_slim.columns,
     'importance': model.get_feature_importance(),

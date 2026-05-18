@@ -4,13 +4,14 @@ Python 3.9 | sqlalchemy>=2.0 | psycopg2-binary
 ERD 기준: model_versions, analysis_snapshots
 """
 
-import os
-import json
 import datetime
+import json
+import os
+
 import numpy as np
-import pandas as pd
-from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
+
 load_dotenv()
 
 # ── DB 연결 설정 (환경변수로 관리) ───────────────────────────

@@ -11,8 +11,9 @@ DI1_pr / DE1_pr / DI2_pr:
 """
 
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -128,7 +129,7 @@ df['걷기일수']     = df['걷기일수'].astype(int)
 df['근력운동일수'] = df['근력운동일수'].astype(int)
 df = df.drop(columns=['음주빈도', '음주량'])
 
-print(f"[7] Ordinal Encoding 완료")
+print("[7] Ordinal Encoding 완료")
 
 
 # ──────────────────────────────────────────────
@@ -153,7 +154,7 @@ if n_sm > 0:
     df['현재흡연'] = df['현재흡연'].fillna(0)
     print(f"[9] 현재흡연 결측 {n_sm}건 → 0(비흡연) 대체")
 else:
-    print(f"[9] 현재흡연 결측 없음")
+    print("[9] 현재흡연 결측 없음")
 
 
 # ──────────────────────────────────────────────
@@ -178,7 +179,7 @@ for col in ['고혈압유병', '당뇨유병', '이상지질혈증유병']:
 # ──────────────────────────────────────────────
 remaining = df.isnull().sum()
 remaining = remaining[remaining > 0]
-print(f"\n[11] 잔여 결측치:")
+print("\n[11] 잔여 결측치:")
 if remaining.empty:
     print("  → 없음 ✓")
 else:

@@ -7,12 +7,13 @@ Python 3.9 | catboost>=1.2 | optuna>=3.0 | scikit-learn>=1.4
 
 import os
 import warnings
+
 import numpy as np
-import pandas as pd
 import optuna
+import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score
 
 warnings.filterwarnings('ignore')
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -94,15 +95,15 @@ sampler = optuna.samplers.TPESampler(seed=SEED)
 study   = optuna.create_study(direction='maximize', sampler=sampler)
 study.optimize(objective, n_trials=N_TRIALS, show_progress_bar=True)
 
-print(f"\n[2] 튜닝 완료")
+print("\n[2] 튜닝 완료")
 print(f"    Best AUC : {study.best_value:.4f}")
-print(f"    Best params:")
+print("    Best params:")
 for k, v in study.best_params.items():
     print(f"      {k}: {v}")
 
 
 # ── 최적 파라미터로 최종 5-Fold CV ────────────────────────────
-print(f"\n[3] 최적 파라미터로 최종 5-Fold CV")
+print("\n[3] 최적 파라미터로 최종 5-Fold CV")
 print("=" * 55)
 
 best_params = study.best_params.copy()
@@ -150,13 +151,13 @@ oof_auc    = roc_auc_score(y, oof_pred_proba)
 oof_f1     = f1_score(y, oof_pred_label)
 oof_recall = recall_score(y, oof_pred_label)
 
-print(f"\n[4] OOF 최종 성능 (튜닝 후)")
+print("\n[4] OOF 최종 성능 (튜닝 후)")
 print(f"    AUC-ROC : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
 print(f"    F1      : {oof_f1:.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
 print(f"    Recall  : {oof_recall:.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
 
 # ── 베이스라인 대비 비교 ──────────────────────────────────────
-print(f"\n[5] 베이스라인 vs 피처정리 vs 튜닝 후")
+print("\n[5] 베이스라인 vs 피처정리 vs 튜닝 후")
 print(f"    {'구분':<20} {'AUC':>8} {'Recall':>8} {'F1':>8} {'FN':>6}")
 print("    " + "-" * 52)
 print(f"    {'베이스라인 (28개)':<20} {0.8055:>8.4f} {0.8027:>8.4f} {0.4014:>8.4f} {160:>6}")

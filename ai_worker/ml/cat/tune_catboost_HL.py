@@ -7,12 +7,13 @@ Python 3.9 | catboost>=1.2 | optuna>=3.0 | scikit-learn>=1.4
 
 import os
 import warnings
+
 import numpy as np
-import pandas as pd
 import optuna
+import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import confusion_matrix, f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, confusion_matrix
 
 warnings.filterwarnings('ignore')
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -94,15 +95,15 @@ sampler = optuna.samplers.TPESampler(seed=SEED)
 study   = optuna.create_study(direction='maximize', sampler=sampler)
 study.optimize(objective, n_trials=N_TRIALS, show_progress_bar=True)
 
-print(f"\n[2] 튜닝 완료")
+print("\n[2] 튜닝 완료")
 print(f"    Best AUC : {study.best_value:.4f}")
-print(f"    Best params:")
+print("    Best params:")
 for k, v in study.best_params.items():
     print(f"      {k}: {v}")
 
 
 # ── 최적 파라미터로 최종 5-Fold CV ────────────────────────────
-print(f"\n[3] 최적 파라미터로 최종 5-Fold CV")
+print("\n[3] 최적 파라미터로 최종 5-Fold CV")
 print("=" * 55)
 
 best_params = study.best_params.copy()
@@ -151,13 +152,13 @@ oof_f1     = f1_score(y, oof_pred_label)
 oof_recall = recall_score(y, oof_pred_label)
 cm = confusion_matrix(y, oof_pred_label)
 
-print(f"\n[4] OOF 최종 성능 (튜닝 후)")
+print("\n[4] OOF 최종 성능 (튜닝 후)")
 print(f"    AUC-ROC : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
 print(f"    F1      : {oof_f1:.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
 print(f"    Recall  : {oof_recall:.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
 
 # ── 베이스라인 대비 비교 ──────────────────────────────────────
-print(f"\n[5] 단계별 비교")
+print("\n[5] 단계별 비교")
 print(f"    {'구분':<20} {'AUC':>8} {'Recall':>8} {'F1':>8} {'FN':>6}")
 print("    " + "-" * 50)
 print(f"    {'베이스라인 (28개)':<20} {0.8026:>8.4f} {0.8261:>8.4f} {0.5709:>8.4f} {271:>6}")
@@ -165,7 +166,7 @@ print(f"    {'피처정리 (14개)':<20} {0.7893:>8.4f} {0.8395:>8.4f} {0.5689:>
 print(f"    {'튜닝 후 (14개)':<20} {oof_auc:>8.4f} {oof_recall:>8.4f} {oof_f1:>8.4f} {cm[1,0]:>6}")
 
 # ── Feature Importance ────────────────────────────────────────
-print(f"\n[6] Feature Importance (마지막 fold)")
+print("\n[6] Feature Importance (마지막 fold)")
 fi = pd.DataFrame({
     'feature':    X.columns,
     'importance': model.get_feature_importance(),

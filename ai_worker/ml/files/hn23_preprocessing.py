@@ -13,8 +13,9 @@ DI1_pr / DE1_pr / DI2_pr:
 """
 
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import pyreadstat
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.utils.class_weight import compute_class_weight
@@ -53,7 +54,8 @@ int_cols = [
     '고지혈증가족력_부','고지혈증가족력_모','고지혈증가족력_형제',
 ]
 for c in int_cols:
-    if c in df.columns: df[c] = pd.to_numeric(df[c], errors='coerce')
+    if c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors='coerce')
 df = df[df['나이'] >= 19].reset_index(drop=True)
 df = df.drop(columns=['ID'])
 print(f"[0] 로드 완료 | shape: {df.shape}")
@@ -72,8 +74,10 @@ df['직업'] = df['직업'].fillna(8)
 print(f"[2] 직업 결측 → 8(작업미상) | 잔여 결측: {df['직업'].isnull().sum()}")
 
 # 3. 키·체중 중앙값 대체
-ht_median = df['키'].median(); wt_median = df['체중'].median()
-df['키'] = df['키'].fillna(ht_median); df['체중'] = df['체중'].fillna(wt_median)
+ht_median = df['키'].median()
+wt_median = df['체중'].median()
+df['키'] = df['키'].fillna(ht_median)
+df['체중'] = df['체중'].fillna(wt_median)
 print(f"[3] 키 중앙값={ht_median} / 체중 중앙값={wt_median} 대체 완료")
 
 # 4. BMI 재계산
@@ -82,7 +86,8 @@ df.loc[bmi_mask, 'BMI'] = (df.loc[bmi_mask,'체중'] / (df.loc[bmi_mask,'키']/1
 print(f"[4] BMI {bmi_mask.sum()}건 재계산 완료 | 잔여 결측: {df['BMI'].isnull().sum()}")
 
 # 5. 음주빈도 특수값 처리
-n_bd_8=(df['음주빈도']==8).sum(); n_bd_9=(df['음주빈도']==9).sum()
+n_bd_8=(df['음주빈도']==8).sum()
+n_bd_9=(df['음주빈도']==9).sum()
 df['과거음주_현재금주'] = (df['음주빈도']==6).astype(int)
 df['음주빈도'] = df['음주빈도'].replace({6:0, 8:0, 9:np.nan})
 n_bd_nan = df['음주빈도'].isnull().sum()
@@ -93,7 +98,8 @@ if n_bd_nan > 0:
 print(f"[5] 음주빈도 처리 | 6→0(과거금주): {df['과거음주_현재금주'].sum()}명 / 8→0: {n_bd_8}건 / 9→중앙값: {n_bd_9}건")
 
 # 6. 음주량 특수값 처리
-n_8=(df['음주량']==8).sum(); n_9=(df['음주량']==9).sum()
+n_8=(df['음주량']==8).sum()
+n_9=(df['음주량']==9).sum()
 df['음주량'] = df['음주량'].replace({8:0, 9:np.nan})
 print(f"[6] 음주량 특수값 | 8(모름)→0: {n_8}건 / 9(무응답)→NaN: {n_9}건")
 
@@ -112,9 +118,10 @@ df['음주빈도_enc'] = oe_freq.fit_transform(df[['음주빈도']]).astype(int)
 oe_amt = OrdinalEncoder(categories=[[0,1,2,3,4,5]], handle_unknown='use_encoded_value',
                         unknown_value=-1, encoded_missing_value=np.nan)
 df['음주량_enc'] = oe_amt.fit_transform(df[['음주량']])
-df['걷기일수'] = df['걷기일수'].astype(int); df['근력운동일수'] = df['근력운동일수'].astype(int)
+df['걷기일수'] = df['걷기일수'].astype(int)
+df['근력운동일수'] = df['근력운동일수'].astype(int)
 df = df.drop(columns=['음주빈도','음주량'])
-print(f"[7] Ordinal Encoding 완료")
+print("[7] Ordinal Encoding 완료")
 
 # 8. 직업 OHE
 job_label = {1:'관리전문',2:'사무',3:'서비스판매',4:'농림어업',5:'기능노무',6:'주부학생',7:'무직',8:'작업미상'}
@@ -130,7 +137,7 @@ if n_sm > 0:
     df['현재흡연'] = df['현재흡연'].fillna(0)
     print(f"[9] 현재흡연 결측 {n_sm}건 → 0(비흡연) 대체")
 else:
-    print(f"[9] 현재흡연 결측 없음")
+    print("[9] 현재흡연 결측 없음")
 
 # 10. 타겟 이진화
 #     1=유병 / 8(해당없음)→0=정상 / 0·9→NaN(제외)
@@ -146,8 +153,9 @@ for col in ['고혈압유병','당뇨유병','이상지질혈증유병']:
     print(f"  {col}: {df[col].value_counts(dropna=False).sort_index().to_dict()}")
 
 # 11. 잔여 결측
-remaining = df.isnull().sum(); remaining = remaining[remaining > 0]
-print(f"\n[11] 잔여 결측치:")
+remaining = df.isnull().sum()
+remaining = remaining[remaining > 0]
+print("\n[11] 잔여 결측치:")
 print("  → 없음 ✓" if remaining.empty else remaining)
 
 print(f"\n[12] 최종 shape: {df.shape}")

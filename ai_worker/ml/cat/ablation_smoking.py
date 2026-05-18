@@ -6,11 +6,12 @@ Python 3.9 | catboost>=1.2 | scikit-learn>=1.4
 
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.metrics import confusion_matrix, f1_score, recall_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, confusion_matrix
 
 warnings.filterwarnings('ignore')
 

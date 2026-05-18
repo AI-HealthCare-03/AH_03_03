@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "cryptography>=46.0.3",
+    "ipykernel>=7.2.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "python-dateutil>=2.9.0.post0",
@@ -65,6 +66,7 @@ asyncio_default_fixture_loop_scope = "session"
 # 기본 라인 길이 설정
 line-length = 120
 target-version = "py312"
+exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 # 사용할 린트 규칙들 선택
