@@ -11,9 +11,9 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.utils.class_weight import compute_class_weight
 
 # ── 경로 설정 (여기만 수정) ───────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # models/ 한 단계 위 → chronic-health/
-INPUT_PATH = os.path.join(BASE_DIR, "data", "hn24_file1_survey.csv")
-OUTPUT_PATH = os.path.join(BASE_DIR, "data", "hn24_file1_preprocessed.csv")
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+INPUT_PATH  = '/Users/admin/PycharmProjects/chronic-health/data/hn24_file1_survey.csv'
+OUTPUT_PATH = '/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn24_file1_preprocessed.csv'
 
 
 # ──────────────────────────────────────────────
