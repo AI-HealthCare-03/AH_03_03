@@ -1,0 +1,2 @@
+iterations,learning_rate,depth,l2_leaf_reg,bagging_temperature,random_strength,border_count
+377,0.1994122918885323,5,0.5597665968281862,0.9986409325592858,3.5011899197220484,59
