@@ -12,3 +12,8 @@ wheels/
 .coverage
 *.coverage
 .coverage.*
+*.sas7bdat
+.DS_Store
+**/.DS_Store
+ai_worker/outputs/
+ai_worker/data/
