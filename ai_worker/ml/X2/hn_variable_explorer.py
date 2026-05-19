@@ -107,10 +107,10 @@ def create_targets(df: pd.DataFrame) -> pd.DataFrame:
     df["_hdl"] = pd.to_numeric(df.get("HE_HDL_st2"), errors="coerce")
 
     def classify_dl(row):
-        l, c, t, h = row["_ldl"], row["_chol"], row["_tg"], row["_hdl"]
+        ldl, c, t, h = row["_ldl"], row["_chol"], row["_tg"], row["_hdl"]
         stages = []
-        if not pd.isna(l):
-            stages.append(3 if l >= 160 else 2 if l >= 130 else 1 if l >= 100 else 0)
+        if not pd.isna(ldl):
+            stages.append(3 if ldl >= 160 else 2 if ldl >= 130 else 1 if ldl >= 100 else 0)
         if not pd.isna(c):
             stages.append(3 if c >= 260 else 2 if c >= 240 else 1 if c >= 200 else 0)
         if not pd.isna(t):
