@@ -32,6 +32,10 @@ async def create_exam_measurement(exam_report_id: int, data: dict[str, Any]) -> 
     return await ExamMeasurement.create(exam_report_id=exam_report_id, **data)
 
 
+async def get_exam_measurement_by_id(measurement_id: int) -> ExamMeasurement | None:
+    return await ExamMeasurement.get_or_none(id=measurement_id)
+
+
 async def create_exam_measurements(exam_report_id: int, measurements: list[dict[str, Any]]) -> list[ExamMeasurement]:
     objects = [ExamMeasurement(exam_report_id=exam_report_id, **measurement) for measurement in measurements]
     if not objects:
@@ -45,7 +49,7 @@ async def list_exam_measurements(exam_report_id: int) -> list[ExamMeasurement]:
 
 
 async def update_exam_measurement(measurement_id: int, data: dict[str, Any]) -> ExamMeasurement | None:
-    measurement = await ExamMeasurement.get_or_none(id=measurement_id)
+    measurement = await get_exam_measurement_by_id(measurement_id)
     if measurement is None:
         return None
 

@@ -46,6 +46,10 @@ async def create_medication_record(
     return await medication_repository.create_medication_record(medication_id, user_id, request.model_dump())
 
 
+async def get_medication_record(record_id: int) -> MedicationRecord | None:
+    return await medication_repository.get_medication_record_by_id(record_id)
+
+
 async def list_medication_records(
     user_id: int | None = None,
     medication_id: int | None = None,
