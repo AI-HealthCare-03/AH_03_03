@@ -30,6 +30,10 @@ async def create_exam_measurement(exam_report_id: int, request: ExamMeasurementC
     return await exam_repository.create_exam_measurement(exam_report_id, request.model_dump())
 
 
+async def get_exam_measurement(measurement_id: int) -> ExamMeasurement | None:
+    return await exam_repository.get_exam_measurement_by_id(measurement_id)
+
+
 async def create_exam_measurements(
     exam_report_id: int, measurements: list[ExamMeasurementCreateRequest]
 ) -> list[ExamMeasurement]:

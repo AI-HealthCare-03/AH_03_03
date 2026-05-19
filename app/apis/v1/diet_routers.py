@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from app.apis.v1.dependencies import ensure_found, ensure_owner
 from app.dependencies.security import get_request_user
 from app.dtos.diets import (
     DietPhotoResultCreateRequest,
@@ -36,18 +37,29 @@ async def list_diet_records(
     )
 
 
-@diet_router.get("/{diet_record_id}", response_model=DietRecordResponse | None)
-async def get_diet_record(diet_record_id: int):
-    return await diet_service.get_diet_record(diet_record_id)
+@diet_router.get("/{diet_record_id}", response_model=DietRecordResponse)
+async def get_diet_record(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    return record
 
 
-@diet_router.patch("/{diet_record_id}", response_model=DietRecordResponse | None)
-async def update_diet_record(diet_record_id: int, request: DietRecordUpdateRequest):
-    return await diet_service.update_diet_record(diet_record_id, request)
+@diet_router.patch("/{diet_record_id}", response_model=DietRecordResponse)
+async def update_diet_record(
+    diet_record_id: int,
+    request: DietRecordUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    updated = await diet_service.update_diet_record(diet_record_id, request)
+    return ensure_found(updated, "식단 기록을 찾을 수 없습니다.")
 
 
 @diet_router.delete("/{diet_record_id}")
-async def delete_diet_record(diet_record_id: int):
+async def delete_diet_record(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
     deleted_count = await diet_service.delete_diet_record(diet_record_id)
     return {"deleted_count": deleted_count}
 
@@ -55,10 +67,23 @@ async def delete_diet_record(diet_record_id: int):
 @diet_router.post(
     "/{diet_record_id}/photo-result", response_model=DietPhotoResultResponse, status_code=status.HTTP_201_CREATED
 )
-async def create_diet_photo_result(diet_record_id: int, request: DietPhotoResultCreateRequest):
+async def create_diet_photo_result(
+    diet_record_id: int,
+    request: DietPhotoResultCreateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
     return await diet_service.create_diet_photo_result(diet_record_id, request)
 
 
 @diet_router.get("/{diet_record_id}/photo-result", response_model=list[DietPhotoResultResponse])
-async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: int = 0):
+async def list_diet_photo_results(
+    diet_record_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    limit: int = 20,
+    offset: int = 0,
+):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
     return await diet_service.list_diet_photo_results(diet_record_id, limit=limit, offset=offset)

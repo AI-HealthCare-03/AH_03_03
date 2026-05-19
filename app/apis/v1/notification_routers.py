@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from app.apis.v1.dependencies import ensure_found, ensure_owner
 from app.dependencies.security import get_request_user
 from app.dtos.notifications import NotificationCreateRequest, NotificationResponse
 from app.models.users import User
@@ -30,9 +31,15 @@ async def list_unread_notifications(user: Annotated[User, Depends(get_request_us
     return await notification_service.list_unread_notifications(user.id, limit=limit, offset=offset)
 
 
-@notification_router.patch("/{notification_id}/read", response_model=NotificationResponse | None)
-async def mark_notification_as_read(notification_id: int):
-    return await notification_service.mark_notification_as_read(notification_id)
+@notification_router.patch("/{notification_id}/read", response_model=NotificationResponse)
+async def mark_notification_as_read(notification_id: int, user: Annotated[User, Depends(get_request_user)]):
+    notification = ensure_found(
+        await notification_service.get_notification(notification_id),
+        "알림을 찾을 수 없습니다.",
+    )
+    ensure_owner(notification.user_id, user)
+    marked = await notification_service.mark_notification_as_read(notification_id)
+    return ensure_found(marked, "알림을 찾을 수 없습니다.")
 
 
 @notification_router.patch("/read-all", response_model=list[NotificationResponse])
@@ -41,6 +48,11 @@ async def mark_all_notifications_as_read(user: Annotated[User, Depends(get_reque
 
 
 @notification_router.delete("/{notification_id}")
-async def delete_notification(notification_id: int):
+async def delete_notification(notification_id: int, user: Annotated[User, Depends(get_request_user)]):
+    notification = ensure_found(
+        await notification_service.get_notification(notification_id),
+        "알림을 찾을 수 없습니다.",
+    )
+    ensure_owner(notification.user_id, user)
     deleted_count = await notification_service.delete_notification(notification_id)
     return {"deleted_count": deleted_count}
