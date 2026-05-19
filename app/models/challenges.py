@@ -69,3 +69,19 @@ class ChallengeLog(models.Model):
     class Meta:
         table = "challenge_logs"
         indexes = (("user_challenge_id", "log_date"),)
+
+
+class ChallengeRecommendation(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="challenge_recommendations")
+    analysis_result = fields.ForeignKeyField("models.AnalysisResult", related_name="challenge_recommendations")
+    challenge = fields.ForeignKeyField("models.Challenge", related_name="recommendations")
+    reason = fields.TextField(null=True)
+    priority = fields.IntField(default=0)
+    is_selected = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "challenge_recommendations"
+        indexes = (("user_id",), ("analysis_result_id",), ("challenge_id",), ("user_id", "is_selected"))

@@ -335,16 +335,19 @@ Table challenge_logs {
 Table challenge_recommendations {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
-  analysis_result_id bigint [ref: > analysis_results.id]
+  analysis_result_id bigint [not null, ref: > analysis_results.id]
   challenge_id bigint [not null, ref: > challenges.id]
-  reason varchar(255)
-  priority int [not null, default: 0]
+  reason text
+  priority int
   is_selected boolean [not null, default: false]
   created_at timestamptz [not null]
+  updated_at timestamptz [not null]
 
   indexes {
-    (user_id, created_at)
-    (analysis_result_id, priority)
+    (user_id)
+    (analysis_result_id)
+    (challenge_id)
+    (user_id, is_selected)
   }
 
   Note: "분석 결과와 주요 위험요인 기반 추천 챌린지."

@@ -167,12 +167,33 @@ CREATE TABLE IF NOT EXISTS "challenge_logs" (
 );
 CREATE INDEX IF NOT EXISTS "idx_challenge_logs_challenge_date"
     ON "challenge_logs" ("user_challenge_id", "log_date");
+
+CREATE TABLE IF NOT EXISTS "challenge_recommendations" (
+    "id" BIGSERIAL NOT NULL PRIMARY KEY,
+    "user_id" BIGINT NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "analysis_result_id" BIGINT NOT NULL REFERENCES "analysis_results" ("id") ON DELETE CASCADE,
+    "challenge_id" BIGINT NOT NULL REFERENCES "challenges" ("id") ON DELETE CASCADE,
+    "reason" TEXT,
+    "priority" INT,
+    "is_selected" BOOL NOT NULL DEFAULT FALSE,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "idx_challenge_recommendations_user"
+    ON "challenge_recommendations" ("user_id");
+CREATE INDEX IF NOT EXISTS "idx_challenge_recommendations_analysis"
+    ON "challenge_recommendations" ("analysis_result_id");
+CREATE INDEX IF NOT EXISTS "idx_challenge_recommendations_challenge"
+    ON "challenge_recommendations" ("challenge_id");
+CREATE INDEX IF NOT EXISTS "idx_challenge_recommendations_user_selected"
+    ON "challenge_recommendations" ("user_id", "is_selected");
 """
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:
     return """
-        DROP TABLE IF EXISTS "challenge_logs";
+        DROP TABLE IF EXISTS "challenge_recommendations";
+DROP TABLE IF EXISTS "challenge_logs";
 DROP TABLE IF EXISTS "user_challenges";
 DROP TABLE IF EXISTS "challenges";
 DROP TABLE IF EXISTS "exam_measurements";
