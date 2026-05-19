@@ -25,3 +25,25 @@ ai_worker/vision/data/results/
 ai_worker/ml/outputs/
 ai_worker/ml/LGB18~24/outputs/
 **/outputs/
+
+# Local data / generated outputs
+/data/
+/output/
+/outputs/
+/results/
+/logs/
+/models/
+/checkpoints/
+
+# Dataset / model artifacts
+*.csv
+*.parquet
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# OS files
+.DS_Store
