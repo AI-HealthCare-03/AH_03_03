@@ -59,25 +59,25 @@ THRESHOLD_RANGE: NDArray[np.float64] = np.arange(0.30, 0.71, 0.01)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # FE 플래그 — 기존 (v3 확정 조합, 건드리지 말 것)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-USE_AGE_BIN: bool = True       # 나이 6구간 원핫
-USE_BMI_BIN: bool = True       # BMI 구간화
+USE_AGE_BIN: bool = True  # 나이 6구간 원핫
+USE_BMI_BIN: bool = True  # BMI 구간화
 USE_WEIGHT_BIN: bool = False
 USE_ALCOHOL_RISK: bool = False
 USE_WALK_LEVEL: bool = False
 USE_STRENGTH: bool = False
-USE_FAMILY_SUM: bool = True    # 가족력 합산
-USE_BMI_X_AGE: bool = True     # BMI × 나이
+USE_FAMILY_SUM: bool = True  # 가족력 합산
+USE_BMI_X_AGE: bool = True  # BMI × 나이
 USE_OBESITY_FLAG: bool = False
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # FE 플래그 — 신규 상호작용 피처 (ablation 대상)
 # 하나씩 True로 바꿔가며 실험할 것
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-USE_FAMILY_X_BMI: bool = False   # 당뇨가족력_합산 × BMI
-USE_FAMILY_X_AGE: bool = True   # 당뇨가족력_합산 × 나이
+USE_FAMILY_X_BMI: bool = False  # 당뇨가족력_합산 × BMI
+USE_FAMILY_X_AGE: bool = True  # 당뇨가족력_합산 × 나이
 USE_ALCOHOL_X_BMI: bool = False  # 음주량 × BMI
 USE_ALCOHOL_COMBO: bool = False  # 음주빈도 × 음주량
-USE_ACTIVITY_TOTAL: bool = False # 근력운동일수 + 걷기일수
+USE_ACTIVITY_TOTAL: bool = False  # 근력운동일수 + 걷기일수
 
 
 def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
@@ -121,9 +121,15 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         added += ["근력활동량"]
 
     if USE_FAMILY_SUM:
-        df["고혈압가족력_합산"] = (df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)).clip(0, 3)
-        df["당뇨가족력_합산"] = (df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)).clip(0, 3)
-        df["고지혈증가족력_합산"] = (df["고지혈증가족력_부"].fillna(0) + df["고지혈증가족력_모"].fillna(0) + df["고지혈증가족력_형제"].fillna(0)).clip(0, 3)
+        df["고혈압가족력_합산"] = (
+            df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)
+        ).clip(0, 3)
+        df["당뇨가족력_합산"] = (
+            df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)
+        ).clip(0, 3)
+        df["고지혈증가족력_합산"] = (
+            df["고지혈증가족력_부"].fillna(0) + df["고지혈증가족력_모"].fillna(0) + df["고지혈증가족력_형제"].fillna(0)
+        ).clip(0, 3)
         added += ["고혈압가족력_합산", "당뇨가족력_합산", "고지혈증가족력_합산"]
         print("  [ON] 가족력 합산")
 
@@ -282,14 +288,16 @@ def retrain_with_best_params(
         oof_proba[val_idx] = val_proba
         fold_models.append(model)
 
-        fold_scores.append({
-            "fold": fold,
-            "auc": round(float(roc_auc_score(y_val, val_proba)), 4),
-            "recall": round(float(recall_score(y_val, val_label)), 4),
-            "precision": round(float(precision_score(y_val, val_label, zero_division=0)), 4),
-            "f1": round(float(f1_score(y_val, val_label)), 4),
-            "best_iter": model.best_iteration_,
-        })
+        fold_scores.append(
+            {
+                "fold": fold,
+                "auc": round(float(roc_auc_score(y_val, val_proba)), 4),
+                "recall": round(float(recall_score(y_val, val_label)), 4),
+                "precision": round(float(precision_score(y_val, val_label, zero_division=0)), 4),
+                "f1": round(float(f1_score(y_val, val_label)), 4),
+                "best_iter": model.best_iteration_,
+            }
+        )
         print(
             f"  Fold {fold} | AUC: {fold_scores[-1]['auc']:.4f} | "
             f"Recall: {fold_scores[-1]['recall']:.4f} | "
@@ -365,8 +373,12 @@ def main() -> None:
 
     print("\n[6] OOF 전체 성능 (threshold=0.5)")
     print(f"    AUC    : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
-    print(f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
-    print(f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
+    print(
+        f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})"
+    )
+    print(
+        f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})"
+    )
 
     print(f"\n[7] OOF Threshold 재확인 (best_thr={best_thr:.2f})")
     tuning_rows: list[dict[str, float]] = []
@@ -378,7 +390,9 @@ def main() -> None:
         tuning_rows.append({"threshold": round(float(thr), 2), "recall": r, "precision": p, "f1": f})
     tuning_df = pd.DataFrame(tuning_rows)
     final_row = tuning_df[tuning_df["threshold"] == best_thr].iloc[0]
-    print(f"    Recall: {final_row['recall']:.4f} | Precision: {final_row['precision']:.4f} | F1: {final_row['f1']:.4f}")
+    print(
+        f"    Recall: {final_row['recall']:.4f} | Precision: {final_row['precision']:.4f} | F1: {final_row['f1']:.4f}"
+    )
 
     print(f"\n[8] 최종 Hold-out Test 평가 (threshold={best_thr:.2f})")
     print("=" * 60)
@@ -397,16 +411,18 @@ def main() -> None:
     print(f"    Recall    : {test_recall:.4f}")
     print(f"    Precision : {test_prec:.4f}")
     print(f"    F1        : {test_f1:.4f}")
-    print(f"    TN={cm[0,0]}  FP={cm[0,1]}")
-    print(f"    FN={cm[1,0]}  TP={cm[1,1]}")
+    print(f"    TN={cm[0, 0]}  FP={cm[0, 1]}")
+    print(f"    FN={cm[1, 0]}  TP={cm[1, 1]}")
     print("\n[8] Classification Report")
     print(classification_report(y_test, test_label, target_names=["정상(0)", "당뇨(1)"]))
 
     print("[9] Feature Importance Top 20 (마지막 fold)")
-    fi_df = pd.DataFrame({
-        "feature": X_train.columns,
-        "importance": fold_models[-1].get_feature_importance(),
-    }).sort_values("importance", ascending=False)
+    fi_df = pd.DataFrame(
+        {
+            "feature": X_train.columns,
+            "importance": fold_models[-1].get_feature_importance(),
+        }
+    ).sort_values("importance", ascending=False)
     print(fi_df.head(20).to_string(index=False))
 
     scores_df.to_csv(os.path.join(MODEL_DIR, "fold_scores.csv"), index=False)

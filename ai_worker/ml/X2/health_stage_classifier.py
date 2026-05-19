@@ -20,8 +20,8 @@
 # ================================================================
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 # ================================================================
@@ -29,10 +29,10 @@ from typing import Optional
 # ================================================================
 @dataclass
 class StageResult:
-    disease: str           # 질환명 (HTN / DM / DL / OBE / ANEM)
-    stage: Optional[int]   # 단계 (0부터 시작, None = 판정 불가)
-    label: str             # 단계 레이블 (예: "고혈압 전단계")
-    detail: str            # 판정 근거 설명
+    disease: str  # 질환명 (HTN / DM / DL / OBE / ANEM)
+    stage: int | None  # 단계 (0부터 시작, None = 판정 불가)
+    label: str  # 단계 레이블 (예: "고혈압 전단계")
+    detail: str  # 판정 근거 설명
     missing: list[str] = field(default_factory=list)  # 누락 수치 목록
 
     def is_normal(self) -> bool:
@@ -43,11 +43,11 @@ class StageResult:
 
     def to_dict(self) -> dict:
         return {
-            "disease":  self.disease,
-            "stage":    self.stage,
-            "label":    self.label,
-            "detail":   self.detail,
-            "missing":  self.missing,
+            "disease": self.disease,
+            "stage": self.stage,
+            "label": self.label,
+            "detail": self.detail,
+            "missing": self.missing,
         }
 
 
@@ -71,19 +71,28 @@ HTN_LABELS = {
     4: "고혈압 2단계",
 }
 
+
 def _htn_stage_single(sbp: float, dbp: float) -> tuple[int, str]:
     """sbp/dbp 각각 단계 → 높은 쪽 반환"""
+
     def sbp_stage(s: float) -> int:
-        if s >= 160: return 4
-        if s >= 140: return 3
-        if s >= 130: return 2
-        if s >= 120: return 1
+        if s >= 160:
+            return 4
+        if s >= 140:
+            return 3
+        if s >= 130:
+            return 2
+        if s >= 120:
+            return 1
         return 0
 
     def dbp_stage(d: float) -> int:
-        if d >= 100: return 4
-        if d >= 90:  return 3
-        if d >= 80:  return 2
+        if d >= 100:
+            return 4
+        if d >= 90:
+            return 3
+        if d >= 80:
+            return 2
         return 0
 
     ss, ds = sbp_stage(sbp), dbp_stage(dbp)
@@ -100,13 +109,16 @@ def _htn_stage_single(sbp: float, dbp: float) -> tuple[int, str]:
         detail = f"수축기 {sbp} mmHg / 이완기 {dbp} mmHg → 정상"
     return stage, detail
 
+
 def classify_htn(
-    sbp: Optional[float] = None,
-    dbp: Optional[float] = None,
+    sbp: float | None = None,
+    dbp: float | None = None,
 ) -> StageResult:
     missing = []
-    if sbp is None: missing.append("수축기혈압(sbp)")
-    if dbp is None: missing.append("이완기혈압(dbp)")
+    if sbp is None:
+        missing.append("수축기혈압(sbp)")
+    if dbp is None:
+        missing.append("이완기혈압(dbp)")
 
     if missing:
         return StageResult("HTN", None, "판정 불가", "필수 수치 누락", missing)
@@ -132,13 +144,16 @@ DM_LABELS = {
     2: "당뇨병 의심",
 }
 
+
 def classify_dm(
-    glu:   Optional[float] = None,
-    hba1c: Optional[float] = None,
+    glu: float | None = None,
+    hba1c: float | None = None,
 ) -> StageResult:
     missing = []
-    if glu   is None: missing.append("공복혈당(glu)")
-    if hba1c is None: missing.append("당화혈색소(HbA1c)")
+    if glu is None:
+        missing.append("공복혈당(glu)")
+    if hba1c is None:
+        missing.append("당화혈색소(HbA1c)")
 
     if glu is None and hba1c is None:
         return StageResult("DM", None, "판정 불가", "필수 수치 누락", missing)
@@ -147,19 +162,25 @@ def classify_dm(
 
     if glu is not None:
         if glu >= 126:
-            stages.append(2); details.append(f"공복혈당 {glu} mg/dL (≥126 당뇨 범위)")
+            stages.append(2)
+            details.append(f"공복혈당 {glu} mg/dL (≥126 당뇨 범위)")
         elif glu >= 100:
-            stages.append(1); details.append(f"공복혈당 {glu} mg/dL (100~125 장애 범위)")
+            stages.append(1)
+            details.append(f"공복혈당 {glu} mg/dL (100~125 장애 범위)")
         else:
-            stages.append(0); details.append(f"공복혈당 {glu} mg/dL (정상)")
+            stages.append(0)
+            details.append(f"공복혈당 {glu} mg/dL (정상)")
 
     if hba1c is not None:
         if hba1c >= 6.5:
-            stages.append(2); details.append(f"HbA1c {hba1c}% (≥6.5 당뇨 범위)")
+            stages.append(2)
+            details.append(f"HbA1c {hba1c}% (≥6.5 당뇨 범위)")
         elif hba1c >= 5.7:
-            stages.append(1); details.append(f"HbA1c {hba1c}% (5.7~6.4 전단계)")
+            stages.append(1)
+            details.append(f"HbA1c {hba1c}% (5.7~6.4 전단계)")
         else:
-            stages.append(0); details.append(f"HbA1c {hba1c}% (정상)")
+            stages.append(0)
+            details.append(f"HbA1c {hba1c}% (정상)")
 
     stage = max(stages)
     detail = " / ".join(details)
@@ -188,17 +209,22 @@ DL_LABELS = {
     3: "고위험",
 }
 
+
 def classify_dl(
-    chol: Optional[float] = None,
-    ldl:  Optional[float] = None,
-    tg:   Optional[float] = None,
-    hdl:  Optional[float] = None,
+    chol: float | None = None,
+    ldl: float | None = None,
+    tg: float | None = None,
+    hdl: float | None = None,
 ) -> StageResult:
     missing = []
-    if chol is None: missing.append("총콜레스테롤(chol)")
-    if ldl  is None: missing.append("LDL콜레스테롤(ldl)")
-    if tg   is None: missing.append("중성지방(tg)")
-    if hdl  is None: missing.append("HDL콜레스테롤(hdl)")
+    if chol is None:
+        missing.append("총콜레스테롤(chol)")
+    if ldl is None:
+        missing.append("LDL콜레스테롤(ldl)")
+    if tg is None:
+        missing.append("중성지방(tg)")
+    if hdl is None:
+        missing.append("HDL콜레스테롤(hdl)")
 
     if all(v is None for v in [chol, ldl, tg, hdl]):
         return StageResult("DL", None, "판정 불가", "필수 수치 누락", missing)
@@ -207,41 +233,56 @@ def classify_dl(
 
     if ldl is not None:
         if ldl >= 160:
-            stages.append(3); details.append(f"LDL {ldl} mg/dL (고위험)")
+            stages.append(3)
+            details.append(f"LDL {ldl} mg/dL (고위험)")
         elif ldl >= 130:
-            stages.append(2); details.append(f"LDL {ldl} mg/dL (위험)")
+            stages.append(2)
+            details.append(f"LDL {ldl} mg/dL (위험)")
         elif ldl >= 100:
-            stages.append(1); details.append(f"LDL {ldl} mg/dL (경계)")
+            stages.append(1)
+            details.append(f"LDL {ldl} mg/dL (경계)")
         else:
-            stages.append(0); details.append(f"LDL {ldl} mg/dL (정상)")
+            stages.append(0)
+            details.append(f"LDL {ldl} mg/dL (정상)")
 
     if chol is not None:
         if chol >= 260:
-            stages.append(3); details.append(f"총콜레스테롤 {chol} mg/dL (고위험)")
+            stages.append(3)
+            details.append(f"총콜레스테롤 {chol} mg/dL (고위험)")
         elif chol >= 240:
-            stages.append(2); details.append(f"총콜레스테롤 {chol} mg/dL (위험)")
+            stages.append(2)
+            details.append(f"총콜레스테롤 {chol} mg/dL (위험)")
         elif chol >= 200:
-            stages.append(1); details.append(f"총콜레스테롤 {chol} mg/dL (경계)")
+            stages.append(1)
+            details.append(f"총콜레스테롤 {chol} mg/dL (경계)")
         else:
-            stages.append(0); details.append(f"총콜레스테롤 {chol} mg/dL (정상)")
+            stages.append(0)
+            details.append(f"총콜레스테롤 {chol} mg/dL (정상)")
 
     if tg is not None:
         if tg >= 500:
-            stages.append(3); details.append(f"중성지방 {tg} mg/dL (고위험)")
+            stages.append(3)
+            details.append(f"중성지방 {tg} mg/dL (고위험)")
         elif tg >= 200:
-            stages.append(2); details.append(f"중성지방 {tg} mg/dL (위험)")
+            stages.append(2)
+            details.append(f"중성지방 {tg} mg/dL (위험)")
         elif tg >= 150:
-            stages.append(1); details.append(f"중성지방 {tg} mg/dL (경계)")
+            stages.append(1)
+            details.append(f"중성지방 {tg} mg/dL (경계)")
         else:
-            stages.append(0); details.append(f"중성지방 {tg} mg/dL (정상)")
+            stages.append(0)
+            details.append(f"중성지방 {tg} mg/dL (정상)")
 
     if hdl is not None:
         if hdl < 40:
-            stages.append(2); details.append(f"HDL {hdl} mg/dL (위험 — 낮음)")
+            stages.append(2)
+            details.append(f"HDL {hdl} mg/dL (위험 — 낮음)")
         elif hdl < 60:
-            stages.append(1); details.append(f"HDL {hdl} mg/dL (경계)")
+            stages.append(1)
+            details.append(f"HDL {hdl} mg/dL (경계)")
         else:
-            stages.append(0); details.append(f"HDL {hdl} mg/dL (정상)")
+            stages.append(0)
+            details.append(f"HDL {hdl} mg/dL (정상)")
 
     stage = max(stages)
     detail = " / ".join(details)
@@ -272,10 +313,11 @@ OBE_LABELS = {
     5: "비만 3단계 (고도비만)",
 }
 
+
 def classify_obe(
-    bmi: Optional[float] = None,
-    height_cm: Optional[float] = None,
-    weight_kg: Optional[float] = None,
+    bmi: float | None = None,
+    height_cm: float | None = None,
+    weight_kg: float | None = None,
 ) -> StageResult:
     # BMI 없으면 키/몸무게로 계산
     if bmi is None and height_cm is not None and weight_kg is not None:
@@ -322,13 +364,16 @@ ANEM_LABELS = {
     3: "중증 빈혈",
 }
 
+
 def classify_anem(
-    hb:  Optional[float] = None,
-    sex: Optional[str]   = None,   # 'M' 또는 'F'
+    hb: float | None = None,
+    sex: str | None = None,  # 'M' 또는 'F'
 ) -> StageResult:
     missing = []
-    if hb  is None: missing.append("헤모글로빈(hb)")
-    if sex is None: missing.append("성별(sex: M/F)")
+    if hb is None:
+        missing.append("헤모글로빈(hb)")
+    if sex is None:
+        missing.append("성별(sex: M/F)")
 
     if hb is None:
         return StageResult("ANEM", None, "판정 불가", "헤모글로빈 수치 필요", missing)
@@ -363,23 +408,23 @@ def classify_anem(
 # ================================================================
 def classify_all(
     # HTN
-    sbp:       Optional[float] = None,
-    dbp:       Optional[float] = None,
+    sbp: float | None = None,
+    dbp: float | None = None,
     # DM
-    glu:       Optional[float] = None,
-    hba1c:     Optional[float] = None,
+    glu: float | None = None,
+    hba1c: float | None = None,
     # DL
-    chol:      Optional[float] = None,
-    ldl:       Optional[float] = None,
-    tg:        Optional[float] = None,
-    hdl:       Optional[float] = None,
+    chol: float | None = None,
+    ldl: float | None = None,
+    tg: float | None = None,
+    hdl: float | None = None,
     # OBE
-    bmi:       Optional[float] = None,
-    height_cm: Optional[float] = None,
-    weight_kg: Optional[float] = None,
+    bmi: float | None = None,
+    height_cm: float | None = None,
+    weight_kg: float | None = None,
     # ANEM
-    hb:        Optional[float] = None,
-    sex:       Optional[str]   = None,   # 'M' or 'F'
+    hb: float | None = None,
+    sex: str | None = None,  # 'M' or 'F'
 ) -> dict[str, StageResult]:
     """
     5개 질환 전체 판정.
@@ -389,10 +434,10 @@ def classify_all(
         dict: {"HTN": StageResult, "DM": ..., "DL": ..., "OBE": ..., "ANEM": ...}
     """
     return {
-        "HTN":  classify_htn(sbp=sbp, dbp=dbp),
-        "DM":   classify_dm(glu=glu, hba1c=hba1c),
-        "DL":   classify_dl(chol=chol, ldl=ldl, tg=tg, hdl=hdl),
-        "OBE":  classify_obe(bmi=bmi, height_cm=height_cm, weight_kg=weight_kg),
+        "HTN": classify_htn(sbp=sbp, dbp=dbp),
+        "DM": classify_dm(glu=glu, hba1c=hba1c),
+        "DL": classify_dl(chol=chol, ldl=ldl, tg=tg, hdl=hdl),
+        "OBE": classify_obe(bmi=bmi, height_cm=height_cm, weight_kg=weight_kg),
         "ANEM": classify_anem(hb=hb, sex=sex),
     }
 
@@ -402,10 +447,7 @@ def print_results(results: dict[str, StageResult]):
     print("=" * 60)
     print("건강 단계 판정 결과")
     print("=" * 60)
-    DISEASE_KO = {
-        "HTN": "고혈압", "DM": "당뇨병",
-        "DL": "이상지질혈증", "OBE": "비만", "ANEM": "빈혈"
-    }
+    DISEASE_KO = {"HTN": "고혈압", "DM": "당뇨병", "DL": "이상지질혈증", "OBE": "비만", "ANEM": "빈혈"}
     for key, r in results.items():
         status = f"[{r.stage}단계]" if r.stage is not None else "[판정불가]"
         print(f"\n  {DISEASE_KO.get(key, key):10s} {status} {r.label}")
@@ -422,27 +464,33 @@ if __name__ == "__main__":
     # 예시 1: 전체 수치 입력
     print("\n[예시 1] 전체 수치 입력")
     results = classify_all(
-        sbp=135, dbp=85,
-        glu=108, hba1c=5.9,
-        chol=225, ldl=140, tg=180, hdl=48,
+        sbp=135,
+        dbp=85,
+        glu=108,
+        hba1c=5.9,
+        chol=225,
+        ldl=140,
+        tg=180,
+        hdl=48,
         bmi=26.5,
-        hb=11.8, sex="F",
+        hb=11.8,
+        sex="F",
     )
     print_results(results)
 
     # 예시 2: 일부 수치만 입력
     print("\n[예시 2] 혈압 + BMI만 있는 경우")
     results2 = classify_all(
-        sbp=155, dbp=95,
-        height_cm=170, weight_kg=85,
+        sbp=155,
+        dbp=95,
+        height_cm=170,
+        weight_kg=85,
         sex="M",
     )
     print_results(results2)
 
     # 예시 3: dict 형태로 결과 활용
     print("\n[예시 3] dict 활용")
-    r = classify_all(sbp=118, dbp=76, glu=95, hba1c=5.4,
-                     chol=185, ldl=95, tg=130, hdl=62,
-                     bmi=22.1, hb=14.2, sex="M")
+    r = classify_all(sbp=118, dbp=76, glu=95, hba1c=5.4, chol=185, ldl=95, tg=130, hdl=62, bmi=22.1, hb=14.2, sex="M")
     for disease, result in r.items():
         print(f"  {disease}: stage={result.stage} / {result.label}")

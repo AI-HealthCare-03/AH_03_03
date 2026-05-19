@@ -9,8 +9,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,
@@ -88,24 +86,24 @@ def evaluate(
 
 
 def run_ensemble(target_name: str, cfg: dict) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"[{target_name}] 앙상블 시작")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # ── OOF proba 로드 ────────────────────────────────────────
     base_oof = np.load(f"{cfg['baseline_dir']}/oof_proba.npy")
-    opt_oof  = np.load(f"{cfg['optuna_dir']}/oof_proba.npy")
-    y_train  = np.load(f"{cfg['baseline_dir']}/oof_y_true.npy")
+    opt_oof = np.load(f"{cfg['optuna_dir']}/oof_proba.npy")
+    y_train = np.load(f"{cfg['baseline_dir']}/oof_y_true.npy")
 
     # ── OOF 앙상블 proba (단순 평균) ─────────────────────────
     ens_oof = (base_oof + opt_oof) / 2.0
 
     # ── OOF 기반 threshold 탐색 ──────────────────────────────
     base_thr = float(np.load(f"{cfg['baseline_dir']}/best_threshold.npy")[0])
-    opt_thr  = float(np.load(f"{cfg['optuna_dir']}/best_threshold.npy")[0])
+    opt_thr = float(np.load(f"{cfg['optuna_dir']}/best_threshold.npy")[0])
     ens_thr, ens_f1, ens_recall, ens_prec = tune_threshold_f1(ens_oof, y_train)
 
-    print(f"\n[OOF Threshold]")
+    print("\n[OOF Threshold]")
     print(f"  베이스라인 FE : {base_thr:.2f}")
     print(f"  Optuna v3    : {opt_thr:.2f}")
     print(f"  앙상블        : {ens_thr:.2f}  (OOF Recall: {ens_recall:.4f} | F1: {ens_f1:.4f})")
@@ -132,14 +130,14 @@ def run_ensemble(target_name: str, cfg: dict) -> None:
         print("  ✅  상관관계 낮음 (<0.90) → 앙상블 효과 기대")
 
     # ── Test proba는 fold 모델로 직접 예측 필요 안내 ─────────
-    print(f"\n⚠️  Test proba는 저장된 fold 모델로 직접 예측이 필요합니다.")
-    print(f"   아래 OOF 기준 앙상블 성능으로 방향성만 판단하세요.\n")
+    print("\n⚠️  Test proba는 저장된 fold 모델로 직접 예측이 필요합니다.")
+    print("   아래 OOF 기준 앙상블 성능으로 방향성만 판단하세요.\n")
 
     # ── OOF 기준 단독 vs 앙상블 비교 ────────────────────────
     rows = [
         evaluate(base_oof, y_train, base_thr, "베이스라인 FE (OOF)"),
-        evaluate(opt_oof,  y_train, opt_thr,  "Optuna v3 (OOF)"),
-        evaluate(ens_oof,  y_train, ens_thr,  "앙상블 평균 (OOF)"),
+        evaluate(opt_oof, y_train, opt_thr, "Optuna v3 (OOF)"),
+        evaluate(ens_oof, y_train, ens_thr, "앙상블 평균 (OOF)"),
     ]
     result_df = pd.DataFrame(rows)
     print("[OOF 성능 비교]")
@@ -155,10 +153,10 @@ def main() -> None:
     for target_name, cfg in TARGETS.items():
         run_ensemble(target_name, cfg)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("완료. OOF correlation 확인 후 앙상블 방향 결정하세요.")
     print("상관관계 < 0.90이면 Test proba 앙상블 코드로 진행.")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

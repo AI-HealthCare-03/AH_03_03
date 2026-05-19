@@ -15,9 +15,9 @@ import os
 _BASE = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data"
 
 DATASETS: dict[str, str] = {
-    "hn_all":  os.path.join(_BASE, "hn_all_preprocessed.csv"),   # hn18~24 통합 (현재 실험 기준)
-    "hn2224":  os.path.join(_BASE, "hn2224_preprocessed.csv"),   # hn22~24 통합
-    "hn24":    os.path.join(_BASE, "hn24_file1_preprocessed.csv"), # hn24 단독
+    "hn_all": os.path.join(_BASE, "hn_all_preprocessed.csv"),  # hn18~24 통합 (현재 실험 기준)
+    "hn2224": os.path.join(_BASE, "hn2224_preprocessed.csv"),  # hn22~24 통합
+    "hn24": os.path.join(_BASE, "hn24_file1_preprocessed.csv"),  # hn24 단독
 }
 
 # 현재 실험 기본값

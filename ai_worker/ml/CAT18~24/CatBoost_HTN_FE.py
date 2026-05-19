@@ -64,7 +64,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
             df[label] = (df["_나이구간"] == label).astype(int)
         df = df.drop(columns=["_나이구간"])
         added += age_labels
-        print(f"  [ON] 나이 구간화")
+        print("  [ON] 나이 구간화")
 
     if USE_BMI_BIN:
         df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
