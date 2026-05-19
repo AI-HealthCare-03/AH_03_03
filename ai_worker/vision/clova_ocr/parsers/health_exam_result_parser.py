@@ -49,6 +49,8 @@ NUMERIC_FIELDS = {
     "gamma_gtp",
 }
 
+NOT_APPLICABLE = "비해당"
+
 
 def empty_result() -> dict[str, Any]:
     return {field: None for field in VALUE_FIELDS}
@@ -80,14 +82,14 @@ def parse_health_exam_result(text: str) -> dict[str, Any]:
 
     result["hemoglobin"] = _find_number_near_alias(lines, ["혈색소", "헤모글로빈"], min_value=5, max_value=25)
     result["fasting_glucose"] = _find_number_near_alias(lines, ["공복혈당", "공복 혈당"], min_value=40, max_value=500)
-    result["total_cholesterol"] = _find_number_near_alias(
+    result["total_cholesterol"] = _find_lipid_value(
         lines, ["총콜레스테롤", "총 콜레스테롤"], min_value=50, max_value=500
     )
-    result["triglyceride"] = _find_number_near_alias(
+    result["triglyceride"] = _find_lipid_value(
         lines, ["중성지방", "트리글리세라이드", "triglyceride"], min_value=20, max_value=1000
     )
-    result["hdl"] = _find_number_near_alias(lines, ["hdl", "고밀도", "고밀도 콜레스테롤"], min_value=10, max_value=200)
-    result["ldl"] = _find_number_near_alias(
+    result["hdl"] = _find_lipid_value(lines, ["hdl", "고밀도", "고밀도 콜레스테롤"], min_value=10, max_value=200)
+    result["ldl"] = _find_lipid_value(
         lines, ["ldl", "저밀도", "저밀도 콜레스테롤", "저밀도 콜레스트롤"], min_value=10, max_value=300
     )
     result["creatinine"] = _find_number_near_alias(
@@ -107,13 +109,25 @@ def parse_health_exam_result(text: str) -> dict[str, Any]:
         lines, ["흉부촬영", "흉부 촬영", "흉부x선"], ["정상", "비활동성 폐결핵", "질환의심"]
     )
     result["suspected_diseases"] = _parse_suspected_diseases(compact)
-    result["lifestyle_smoking"] = _parse_lifestyle(compact, "흡연", ["금연필요", "금연 필요", "비흡연"])
-    result["lifestyle_drinking"] = _parse_lifestyle(compact, "음주", ["절주필요", "절주 필요", "금주", "정상"])
-    result["lifestyle_physical_activity"] = _parse_lifestyle(
-        compact, "신체활동", ["신체활동필요", "신체 활동 필요", "운동필요", "정상"]
+    result["lifestyle_smoking"] = _parse_lifestyle_need(
+        compact,
+        need_aliases=["금연필요", "금연 필요"],
+        normal_aliases=["비흡연", "금연유지"],
     )
-    result["lifestyle_strength_training"] = _parse_lifestyle(
-        compact, "근력운동", ["근력운동필요", "근력 운동 필요", "정상"]
+    result["lifestyle_drinking"] = _parse_lifestyle_need(
+        compact,
+        need_aliases=["절주필요", "절주 필요", "금주필요", "금주 필요"],
+        normal_aliases=["음주정상", "정상음주"],
+    )
+    result["lifestyle_physical_activity"] = _parse_lifestyle_need(
+        compact,
+        need_aliases=["신체활동필요", "신체 활동 필요", "운동필요", "운동 필요"],
+        normal_aliases=["신체활동정상", "운동정상"],
+    )
+    result["lifestyle_strength_training"] = _parse_lifestyle_need(
+        compact,
+        need_aliases=["근력운동필요", "근력 운동 필요"],
+        normal_aliases=["근력운동정상"],
     )
 
     return _coerce_numeric_fields(result)
@@ -183,6 +197,34 @@ def _find_number_near_alias(
     return None
 
 
+def _find_lipid_value(
+    lines: list[str],
+    aliases: list[str],
+    *,
+    min_value: float,
+    max_value: float,
+    window: int = 12,
+) -> int | float | str | None:
+    normalized_aliases = [_normalize(alias) for alias in aliases]
+    for index, line in enumerate(lines):
+        if not any(alias in _normalize(line) for alias in normalized_aliases):
+            continue
+
+        for candidate in lines[index : index + window]:
+            if NOT_APPLICABLE in _normalize(candidate):
+                return NOT_APPLICABLE
+
+            for match in _number_matches(candidate):
+                number = float(match.group(1))
+                if not min_value <= number <= max_value:
+                    continue
+                if _is_reference_number(candidate, match):
+                    continue
+                return _normalize_number(number)
+
+    return None
+
+
 def _find_number_after_number(
     lines: list[str], first_value: int | float | None, *, min_value: float, max_value: float
 ) -> int | float | None:
@@ -221,14 +263,12 @@ def _parse_suspected_diseases(text: str) -> list[str] | None:
     return diseases or None
 
 
-def _parse_lifestyle(text: str, label: str, statuses: list[str]) -> str | None:
+def _parse_lifestyle_need(text: str, need_aliases: list[str], normal_aliases: list[str]) -> bool | None:
     normalized_text = _normalize(text)
-    normalized_label = _normalize(label)
-    if normalized_label not in normalized_text:
-        return None
-    for status in statuses:
-        if _normalize(status) in normalized_text:
-            return status
+    if any(_normalize(alias) in normalized_text for alias in need_aliases):
+        return True
+    if any(_normalize(alias) in normalized_text for alias in normal_aliases):
+        return False
     return None
 
 
@@ -237,6 +277,15 @@ def _first_number(text: str) -> float | None:
     if not match:
         return None
     return float(match.group(1))
+
+
+def _number_matches(text: str) -> list[re.Match[str]]:
+    return list(re.finditer(r"(?<!\d)(\d{1,4}(?:\.\d+)?)(?!\d)", text))
+
+
+def _is_reference_number(text: str, match: re.Match[str]) -> bool:
+    tail = text[match.end() : match.end() + 8]
+    return bool(re.match(r"\s*(미만|이상|이하|초과)", tail))
 
 
 def _normalize_number(value: float) -> int | float:
@@ -249,6 +298,8 @@ def _coerce_numeric_fields(result: dict[str, Any]) -> dict[str, Any]:
     for field in NUMERIC_FIELDS:
         value = result.get(field)
         if value is None:
+            continue
+        if not isinstance(value, int | float):
             continue
         if field in {
             "systolic_bp",
