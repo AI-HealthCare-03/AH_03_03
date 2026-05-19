@@ -63,7 +63,7 @@ class HealthCheckInput(BaseModel):
     sex: str | None = Field(None, description="성별 — 'M' 또는 'F'")
 
     @validator("sex")
-    def validate_sex(cls, v):
+    def validate_sex(self, v):
         if v is not None and str(v).upper() not in ("M", "F"):
             raise ValueError("sex는 'M' 또는 'F' 만 허용됩니다")
         return v
