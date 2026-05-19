@@ -153,20 +153,18 @@ class PrescriptionAnalysisResponse(BaseAnalysisResponse):
 
 
 class CheckupExtractedData(BaseModel):
-    """4대 만성질환(고혈압·당뇨·이상지질혈증·비만) 관련 수치."""
-
-    systolic_bp: float | None = None  # 수축기 혈압 (mmHg)
-    diastolic_bp: float | None = None  # 이완기 혈압 (mmHg)
-    fasting_glucose: float | None = None  # 공복혈당 (mg/dL)
-    hba1c: float | None = None  # 당화혈색소 (%)
-    total_cholesterol: float | None = None  # 총콜레스테롤 (mg/dL)
-    triglyceride: float | None = None  # 중성지방 (mg/dL)
-    hdl: float | None = None  # HDL (mg/dL)
-    ldl: float | None = None  # LDL (mg/dL)
-    height_cm: float | None = None  # 키 (cm)
-    weight_kg: float | None = None  # 몸무게 (kg)
-    bmi: float | None = None  # BMI
-    waist_cm: float | None = None  # 허리둘레 (cm)
+    systolic_bp: str | float | None = None
+    diastolic_bp: str | float | None = None
+    fasting_glucose: str | float | None = None
+    hba1c: str | float | None = None
+    total_cholesterol: str | float | None = None
+    triglyceride: str | float | None = None
+    hdl: str | float | None = None
+    ldl: str | float | None = None
+    height_cm: str | float | None = None
+    weight_kg: str | float | None = None
+    bmi: str | float | None = None
+    waist_cm: str | float | None = None
 
 
 class CheckupAnalysisResponse(BaseAnalysisResponse):

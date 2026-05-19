@@ -65,20 +65,17 @@ STATUS_MESSAGE: dict[str, str] = {
 
 
 class CheckupOcrData(BaseModel):
-    """4대 만성질환(고혈압·당뇨·이상지질혈증·비만) 관련 수치."""
-
-    systolic_bp: float | None = Field(None, description="수축기 혈압 (mmHg)")
-    diastolic_bp: float | None = Field(None, description="이완기 혈압 (mmHg)")
-    fasting_glucose: float | None = Field(None, description="공복혈당 (mg/dL)")
-    hba1c: float | None = Field(None, description="당화혈색소 (%)")
-    total_cholesterol: float | None = Field(None, description="총콜레스테롤 (mg/dL)")
-    triglyceride: float | None = Field(None, description="중성지방 (mg/dL)")
-    hdl: float | None = Field(None, description="HDL (mg/dL)")
-    ldl: float | None = Field(None, description="LDL (mg/dL)")
-    height_cm: float | None = Field(None, description="키 (cm)")
-    weight_kg: float | None = Field(None, description="몸무게 (kg)")
-    bmi: float | None = Field(None, description="BMI")
-    waist_cm: float | None = Field(None, description="허리둘레 (cm)")
+    systolic_bp: str | float | None = None
+    diastolic_bp: str | float | None = None
+    fasting_glucose: str | float | None = None
+    total_cholesterol: str | float | None = None
+    triglyceride: str | float | None = None
+    hdl: str | float | None = None
+    ldl: str | float | None = None
+    height_cm: str | float | None = None
+    weight_kg: str | float | None = None
+    bmi: str | float | None = None
+    waist_cm: str | float | None = None
 
 
 class ImageQualityReport(BaseModel):

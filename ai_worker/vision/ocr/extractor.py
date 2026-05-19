@@ -38,7 +38,6 @@ FIELD_KEYWORDS = {
     "systolic_bp": ["수축기", "고혈압", "혈압", "mmHg", "SBP"],
     "diastolic_bp": ["이완기", "DBP"],
     "fasting_glucose": ["공복혈당", "혈당", "공복", "GLU", "Glucose"],
-    "hba1c": ["당화혈색소", "HbA1c", "A1C", "HBA1C"],
     "total_cholesterol": ["총콜레스테롤", "콜레스테롤", "TC", "T-CHO", "CHOL"],
     "triglyceride": ["중성지방", "TG", "Triglyceride"],
     "hdl": ["고밀도", "HDL"],
@@ -51,10 +50,15 @@ FIELD_KEYWORDS = {
 
 CONFIDENCE_THRESHOLD = 0.7
 CHECKBOX_PATTERN = re.compile(r"[■□▣▪●○◆◇]")
+NOT_APPLICABLE_KEYWORDS = ["비해당", "해당없음"]
 
 
 def clean_text(text):
     return CHECKBOX_PATTERN.sub("", text).strip()
+
+
+def is_not_applicable(text):
+    return any(kw in text for kw in NOT_APPLICABLE_KEYWORDS)
 
 
 def extract_numbers(text):
@@ -84,7 +88,6 @@ def validate_value(field, value):
         "systolic_bp": (60, 250),
         "diastolic_bp": (40, 150),
         "fasting_glucose": (40, 600),
-        "hba1c": (3, 20),
         "total_cholesterol": (50, 600),
         "triglyceride": (20, 2000),
         "hdl": (10, 200),
@@ -122,21 +125,28 @@ def parse_height_weight(text_lines):
     return None, None
 
 
+def _extract_value_from_context(text_lines, i, text):
+    """현재 줄 또는 다음 줄에서 숫자를 추출합니다."""
+    value = extract_first_number(text)
+    confidence = text_lines[i][1]
+    if value is None:
+        for j in range(i + 1, min(i + 3, len(text_lines))):
+            value = extract_first_number(text_lines[j][0])
+            if value is not None:
+                confidence = text_lines[j][1]
+                break
+    return value, confidence
+
+
 def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
     """일반 필드 파싱 (혈압/키몸무게 제외)."""
-    for i, (text, confidence) in enumerate(text_lines):
+    for i, (text, _) in enumerate(text_lines):
         for field, keywords in FIELD_KEYWORDS.items():
             if field in skip_fields or extracted[field] is not None:
                 continue
             if not is_keyword_match(text, keywords):
                 continue
-            value = extract_first_number(text)
-            if value is None:
-                for j in range(i + 1, min(i + 3, len(text_lines))):
-                    value = extract_first_number(text_lines[j][0])
-                    if value is not None:
-                        confidence = text_lines[j][1]
-                        break
+            value, confidence = _extract_value_from_context(text_lines, i, text)
             if value is not None and validate_value(field, value):
                 extracted[field] = value
                 if confidence < CONFIDENCE_THRESHOLD:
