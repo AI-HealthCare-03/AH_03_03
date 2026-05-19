@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
 DATA_PATH: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
-MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/LGB18~24/outputs/catboost_DL_FE"
+MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs/catboost_DL_FE"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
