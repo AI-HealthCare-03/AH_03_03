@@ -288,10 +288,14 @@ uv run python ai_worker/vision/clova_ocr/experiments/evaluate_value_accuracy.py
 비교 규칙:
 
 - ground truth 값이 `null`이면 평가 제외
+- ground truth 값이 `비해당`이면 평가 대상에 포함
 - 숫자값은 기본 exact 비교
 - float는 tolerance `0.01` 허용
 - 문자열은 `strip` 후 비교
 - 리스트는 set 비교
+
+이상지질혈증 관련 수치(`total_cholesterol`, `triglyceride`, `hdl`, `ldl`)는 숫자 결과와 `비해당` 상태를 모두 평가할 수 있습니다.
+예를 들어 ground truth와 prediction이 모두 `비해당`이면 matched로 처리하고, ground truth가 `비해당`인데 prediction이 `null`이면 missing prediction, 참고치 숫자(`200.0미만`, `150.0미만`, `60.0이상`, `30.0이상`, `130.0미만`)를 결과값으로 잡으면 wrong value로 처리합니다.
 
 ## 파서
 
