@@ -10,26 +10,23 @@
 // - RAG 공식 문서/청크 메타데이터 관리
 // - DASHBOARD 조회/집계
 // - NOTIFICATION 최소기능
-// - DIET 최소 기록
-// - MEDICATION/SUPPLEMENT 최소 기록
-// - FAQ
 // - SETTINGS
+// - QNA / FAQ
+// - DIET 분석 더미/최소 기록
+// - MEDICATION/SUPPLEMENT 최소 기록
+// - LLM 더미/생성 로그
 //
 // 제외:
-// - DIET 실서비스 DB 상세 테이블
-// - LLM 실서비스 DB
 // - FAMILY
-// - QNA
-// - MEDICATION/SUPPLEMENT 실서비스 DB 상세 테이블
-// - FAQ 실서비스 DB 상세 테이블
-// - SETTINGS 실서비스 DB 상세 테이블
 // - ADMIN
+// - WEARABLE 연동
 // - 운영 로그 상세
 // - 외부 알림 SMS/Email/Push/Kakao
+// - pgvector
 
 Project ai_health_mvp {
   database_type: "PostgreSQL"
-  Note: "FastAPI + AI Worker MVP schema. Dashboard는 별도 테이블 없이 관련 테이블을 조회/집계한다."
+  Note: "FastAPI + AI Worker MVP schema. Dashboard와 MyPage는 별도 테이블 없이 관련 테이블을 조회/집계한다."
 }
 
 Enum gender {
@@ -101,12 +98,6 @@ Enum rag_disease_type {
   OBESITY
   DYSLIPIDEMIA
   COMMON
-}
-
-Enum notification_type {
-  ANALYSIS_COMPLETED
-  CHALLENGE_RECOMMENDED
-  CHALLENGE_REMINDER
 }
 
 Table users {
@@ -429,19 +420,192 @@ Table rag_retrieval_logs {
 Table notifications {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
-  notification_type notification_type [not null]
+  notification_type varchar(30) [not null]
   title varchar(100) [not null]
-  message varchar(255) [not null]
-  target_table varchar(50)
-  target_id bigint
+  message text [not null]
   is_read boolean [not null, default: false]
+  related_type varchar(50)
+  related_id bigint
   read_at timestamptz
   created_at timestamptz [not null]
+  updated_at timestamptz [not null]
 
   indexes {
+    (user_id)
     (user_id, is_read)
-    (user_id, created_at)
+    (notification_type)
   }
 
   Note: "웹 내부 알림 최소 기능. SMS/Email/Push/Kakao는 MVP 제외."
+}
+
+Table user_settings {
+  id bigint [pk, increment]
+  user_id bigint [not null, unique, ref: > users.id]
+  notification_enabled boolean [not null, default: true]
+  challenge_reminder_enabled boolean [not null, default: true]
+  challenge_reminder_time time
+  medication_reminder_enabled boolean [not null, default: true]
+  diet_reminder_enabled boolean [not null, default: false]
+  marketing_agreed boolean [not null, default: false]
+  sensitive_data_agreed boolean [not null, default: false]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: "사용자별 알림/마케팅/민감정보 동의 설정. MyPage는 이 테이블과 사용자/건강정보 테이블을 조회해 구성한다."
+}
+
+Table faqs {
+  id bigint [pk, increment]
+  category varchar(50) [not null]
+  question varchar(255) [not null]
+  answer text [not null]
+  display_order int [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (category)
+    (is_active, display_order)
+  }
+
+  Note: "FAQ 최소 기능. 관리자 페이지는 이번 범위에서 제외한다."
+}
+
+Table inquiries {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  category varchar(50) [not null]
+  title varchar(255) [not null]
+  content text [not null]
+  status varchar(30) [not null, default: 'PENDING']
+  answer text
+  answered_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (status)
+    (category)
+  }
+
+  Note: "사용자 QNA/문의 최소 저장 구조. 관리자 답변 UI는 이번 범위에서 제외한다."
+}
+
+Table diet_records {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  meal_type varchar(20)
+  meal_time timestamptz
+  description text
+  image_path varchar(500)
+  detected_foods jsonb
+  nutrition_summary jsonb
+  diet_score float
+  diet_feedback text
+  analysis_method varchar(30)
+  is_user_corrected boolean [not null, default: false]
+  memo text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, meal_time)
+    (analysis_method)
+  }
+
+  Note: "식단 기록 및 더미 분석 결과 저장. 실제 CV/ML 식단 분석 로직은 이번 범위에서 제외한다."
+}
+
+Table diet_photo_results {
+  id bigint [pk, increment]
+  diet_record_id bigint [not null, ref: > diet_records.id]
+  detected_foods jsonb
+  confidence_payload jsonb
+  raw_output jsonb
+  is_dummy boolean [not null, default: true]
+  created_at timestamptz [not null]
+
+  indexes {
+    (diet_record_id)
+  }
+
+  Note: "식단 사진 분석 결과 원본 저장 구조. 실제 모델 추론은 이번 범위에서 제외한다."
+}
+
+Table medications {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  name varchar(100) [not null]
+  medication_type varchar(20) [not null]
+  dosage varchar(100)
+  frequency varchar(100)
+  reminder_time time
+  is_active boolean [not null, default: true]
+  memo text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, is_active)
+    (medication_type)
+  }
+
+  Note: "복약/영양제 등록 최소 기능. 외부 알림 발송 로그는 이번 범위에서 제외한다."
+}
+
+Table medication_records {
+  id bigint [pk, increment]
+  medication_id bigint [not null, ref: > medications.id]
+  user_id bigint [not null, ref: > users.id]
+  scheduled_at timestamptz
+  taken_at timestamptz
+  is_taken boolean [not null, default: false]
+  status varchar(30) [not null, default: 'PENDING']
+  memo text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (medication_id)
+    (user_id)
+    (medication_id, scheduled_at)
+    (user_id, scheduled_at)
+  }
+
+  Note: "복약/영양제 예정 및 복용 기록."
+}
+
+Table llm_generation_logs {
+  id bigint [pk, increment]
+  user_id bigint [ref: > users.id]
+  target_type varchar(50)
+  target_id bigint
+  llm_task_type varchar(50) [not null]
+  provider varchar(50)
+  model_name varchar(100)
+  prompt_version varchar(50)
+  input_summary jsonb
+  output_text text
+  prompt_tokens int
+  completion_tokens int
+  total_tokens int
+  estimated_cost decimal(12,6)
+  status varchar(30) [not null, default: 'SUCCESS']
+  error_message text
+  latency_ms int
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (target_type, target_id)
+    (llm_task_type)
+    (status)
+  }
+
+  Note: "LLM 더미/생성 결과 추적용 로그. 실제 LLM 호출 로직과 운영 모니터링 고도화는 이번 범위에서 제외한다."
 }
