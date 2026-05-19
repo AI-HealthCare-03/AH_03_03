@@ -115,7 +115,6 @@ def run_ensemble(target_name: str, cfg: dict) -> None:
     X = df.drop(columns=[c for c in ["고혈압유병", "당뇨유병", "이상지질혈증유병", "비만단계"] if c in df.columns])
 
     _, _, _, y_test = train_test_split(X, y, test_size=0.2, random_state=SEED, stratify=y)
-    y_test_arr = y_test.values
 
     # ── Test proba 로드 (fold 평균 저장된 버전 없으면 OOF로 대체 안내) ──
     # 각 모델의 fold model로 예측한 test proba가 없으므로
