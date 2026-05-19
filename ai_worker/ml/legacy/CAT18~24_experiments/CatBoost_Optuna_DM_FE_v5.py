@@ -1,14 +1,15 @@
 """
-당뇨유병 예측 — CatBoost + Optuna 하이퍼파라미터 튜닝 + FE (hn18~24 통합)
+당뇨유병 예측 — CatBoost + Optuna 하이퍼파라미터 튜닝 + FE v5 (hn18~24 통합)
 Python 3.13 | catboost>=1.2 | optuna>=3.0 | scikit-learn>=1.4
 
-FE 조합: 나이구간 + BMI구간 + 가족력합산 + BMI_X_나이
+v3 대비 변경점:
+  - class_weight_1 Optuna 탐색 추가 (기존 고정값 3.23 → 1.5~5.0 탐색)
+
+FE 조합: 나이구간 + BMI구간 + 가족력합산 + BMI_X_나이 (v3 확정, 38개)
 Primary Objective : Recall >= 0.87 유지
 Optimization Target: OOF F1 최대화
 Trial 수           : 50
 검증 구조          : Train/Test 8:2 Hold-out → Train 내부 5-Fold OOF
-
-v3 → v3 (서빙용): fold 모델 .cbm 저장 추가
 """
 
 import json
@@ -38,7 +39,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # ── 경로 설정 ─────────────────────────────────────────────────
 DATA_PATH: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
-MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs/optuna_DM_FE_v3"
+MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs/optuna_DM_FE_v5"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
@@ -50,17 +51,12 @@ RECALL_MIN: float = 0.87
 THRESHOLD_RANGE: NDArray[np.float64] = np.arange(0.30, 0.71, 0.01)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# DM 최적 FE 조합
+# FE 플래그 (v3 확정 조합)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 USE_AGE_BIN: bool = True
 USE_BMI_BIN: bool = True
-USE_WEIGHT_BIN: bool = False
-USE_ALCOHOL_RISK: bool = False
-USE_WALK_LEVEL: bool = False
-USE_STRENGTH: bool = False
 USE_FAMILY_SUM: bool = True
 USE_BMI_X_AGE: bool = True
-USE_OBESITY_FLAG: bool = False
 
 
 def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
@@ -81,27 +77,6 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         added += ["BMI_구간"]
         print("  [ON] BMI 구간화")
 
-    if USE_WEIGHT_BIN:
-        wt_bins = [0, 50, 70, 90, 999]
-        wt_labels = ["체중_저체중", "체중_정상", "체중_과체중", "체중_비만"]
-        df["_체중구간"] = pd.cut(df["체중"], bins=wt_bins, labels=wt_labels, right=False)
-        for label in wt_labels:
-            df[label] = (df["_체중구간"] == label).astype(float)
-        df = df.drop(columns=["_체중구간"])
-        added += wt_labels
-
-    if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
-        added += ["음주위험군"]
-
-    if USE_WALK_LEVEL:
-        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
-        added += ["걷기활동량"]
-
-    if USE_STRENGTH:
-        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
-        added += ["근력활동량"]
-
     if USE_FAMILY_SUM:
         df["고혈압가족력_합산"] = (df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)).clip(0, 3)
         df["당뇨가족력_합산"] = (df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)).clip(0, 3)
@@ -113,11 +88,6 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         df["BMI_X_나이"] = df["BMI"] * df["나이"]
         added += ["BMI_X_나이"]
         print("  [ON] BMI × 나이")
-
-    if USE_OBESITY_FLAG:
-        df["비만여부"] = (df["BMI"] >= 25).astype(float)
-        df.loc[df["BMI"].isna(), "비만여부"] = np.nan
-        added += ["비만여부"]
 
     print(f"\n[FE] 추가 피처 수: {len(added)} | 목록: {added}")
     return df
@@ -146,8 +116,10 @@ def objective(
     trial: Trial,
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    class_ratio: float,
 ) -> float:
+    # ── v5 핵심: class_weight_1도 Optuna가 탐색 ──────────────
+    class_weight_1 = trial.suggest_float("class_weight_1", 1.5, 5.0)
+
     params: dict[str, Any] = {
         "iterations": trial.suggest_int("iterations", 200, 1000),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
@@ -157,7 +129,7 @@ def objective(
         "random_strength": trial.suggest_float("random_strength", 0.0, 1.0),
         "loss_function": "Logloss",
         "eval_metric": "AUC",
-        "class_weights": {0: 1.0, 1: class_ratio},
+        "class_weights": {0: 1.0, 1: class_weight_1},
         "early_stopping_rounds": 50,
         "random_seed": SEED,
         "verbose": False,
@@ -195,6 +167,7 @@ def objective(
     trial.set_user_attr("oof_precision", round(oof_prec, 4))
     trial.set_user_attr("oof_f1", round(best_f1, 4))
     trial.set_user_attr("best_thr", best_thr)
+    trial.set_user_attr("class_weight_1", round(class_weight_1, 4))
     trial.set_user_attr("fold_recall_std", round(float(np.std(fold_recalls)), 4))
 
     return best_f1
@@ -202,7 +175,6 @@ def objective(
 
 def retrain_with_best_params(
     best_params: dict[str, Any],
-    class_ratio: float,
     X_train: pd.DataFrame,
     y_train: pd.Series,
 ) -> tuple[NDArray[np.float64], list[CatBoostClassifier], pd.DataFrame]:
@@ -211,10 +183,13 @@ def retrain_with_best_params(
     fold_models: list[CatBoostClassifier] = []
     fold_scores: list[dict[str, Any]] = []
 
+    # class_weight_1은 best_params에서 꺼내서 class_weights로 변환
+    class_weight_1 = best_params.pop("class_weight_1")
+
     params: dict[str, Any] = {
         "loss_function": "Logloss",
         "eval_metric": "AUC",
-        "class_weights": {0: 1.0, 1: class_ratio},
+        "class_weights": {0: 1.0, 1: class_weight_1},
         "early_stopping_rounds": 50,
         "random_seed": SEED,
         "verbose": False,
@@ -231,9 +206,6 @@ def retrain_with_best_params(
 
         model = CatBoostClassifier(**params)
         model.fit(train_pool, eval_set=val_pool)
-
-        # ── 서빙용 fold 모델 저장 ──────────────────────────────
-        model.save_model(os.path.join(MODEL_DIR, f"model_fold{fold}.cbm"))
 
         val_proba: NDArray[np.float64] = model.predict_proba(X_val)[:, 1]
         val_label = (val_proba >= 0.5).astype(int)
@@ -279,8 +251,8 @@ def main() -> None:
     print(f"    Train 양성 비율: {y_train.mean():.4f} | Test 양성 비율: {y_test.mean():.4f}")
 
     neg, pos = (y_train == 0).sum(), (y_train == 1).sum()
-    class_ratio = float(neg / pos)
-    print(f"    class_weights: {{0: 1.0, 1: {class_ratio:.4f}}}")
+    default_ratio = float(neg / pos)
+    print(f"    기본 class_ratio (neg/pos): {default_ratio:.4f} → Optuna 탐색 범위: 1.5 ~ 5.0")
 
     print(f"\n[3] Optuna 시작 | {N_TRIALS} trials | Recall >= {RECALL_MIN} → F1 최대화")
     print("=" * 60)
@@ -291,7 +263,7 @@ def main() -> None:
         sampler=optuna.samplers.TPESampler(seed=SEED),
     )
     study.optimize(
-        lambda trial: objective(trial, X_train, y_train, class_ratio),
+        lambda trial: objective(trial, X_train, y_train),
         n_trials=N_TRIALS,
         show_progress_bar=True,
     )
@@ -299,12 +271,13 @@ def main() -> None:
     print("=" * 60)
     best = study.best_trial
     print(f"\n[4] Best Trial #{best.number}")
-    print(f"    OOF F1        : {best.value:.4f}")
-    print(f"    OOF Recall    : {best.user_attrs.get('oof_recall', '-')}")
-    print(f"    OOF Precision : {best.user_attrs.get('oof_precision', '-')}")
-    print(f"    OOF AUC       : {best.user_attrs.get('oof_auc', '-')}")
-    print(f"    Best Threshold: {best.user_attrs.get('best_thr', '-')}")
-    print(f"    Fold Recall std: {best.user_attrs.get('fold_recall_std', '-')}")
+    print(f"    OOF F1           : {best.value:.4f}")
+    print(f"    OOF Recall       : {best.user_attrs.get('oof_recall', '-')}")
+    print(f"    OOF Precision    : {best.user_attrs.get('oof_precision', '-')}")
+    print(f"    OOF AUC          : {best.user_attrs.get('oof_auc', '-')}")
+    print(f"    Best Threshold   : {best.user_attrs.get('best_thr', '-')}")
+    print(f"    Best class_weight_1: {best.user_attrs.get('class_weight_1', '-')}  (기본값: {default_ratio:.4f})")
+    print(f"    Fold Recall std  : {best.user_attrs.get('fold_recall_std', '-')}")
     print("\n    Best Params:")
     for k, v in best.params.items():
         print(f"      {k}: {v}")
@@ -315,7 +288,7 @@ def main() -> None:
     best_params: dict[str, Any] = best.params.copy()
     best_thr: float = float(best.user_attrs.get("best_thr", 0.44))
 
-    oof_proba, fold_models, scores_df = retrain_with_best_params(best_params, class_ratio, X_train, y_train)
+    oof_proba, fold_models, scores_df = retrain_with_best_params(best_params, X_train, y_train)
 
     print("=" * 60)
     oof_label_05 = (oof_proba >= 0.5).astype(int)
@@ -375,12 +348,11 @@ def main() -> None:
     np.save(os.path.join(MODEL_DIR, "best_threshold.npy"), np.array([best_thr]))
 
     with open(os.path.join(MODEL_DIR, "best_params.json"), "w") as f:
-        json.dump(best_params, f, indent=2, ensure_ascii=False)
+        json.dump(best.params, f, indent=2, ensure_ascii=False)
 
     study.trials_dataframe().to_csv(os.path.join(MODEL_DIR, "optuna_trials.csv"), index=False)
 
     print(f"\n[10] 저장 완료 → {MODEL_DIR}")
-    print(f"     fold 모델: model_fold1.cbm ~ model_fold{N_SPLITS}.cbm")
 
 
 if __name__ == "__main__":
