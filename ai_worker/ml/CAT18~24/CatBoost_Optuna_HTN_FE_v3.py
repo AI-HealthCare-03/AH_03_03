@@ -7,6 +7,8 @@ Primary Objective : Recall >= 0.87 유지
 Optimization Target: OOF F1 최대화
 Trial 수           : 50
 검증 구조          : Train/Test 8:2 Hold-out → Train 내부 5-Fold OOF
+
+v3 → v3 (서빙용): fold 모델 .cbm 저장 추가
 """
 
 import json
@@ -103,15 +105,9 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         added += ["근력활동량"]
 
     if USE_FAMILY_SUM:
-        df["고혈압가족력_합산"] = (
-            df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)
-        ).clip(0, 3)
-        df["당뇨가족력_합산"] = (
-            df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)
-        ).clip(0, 3)
-        df["고지혈증가족력_합산"] = (
-            df["고지혈증가족력_부"].fillna(0) + df["고지혈증가족력_모"].fillna(0) + df["고지혈증가족력_형제"].fillna(0)
-        ).clip(0, 3)
+        df["고혈압가족력_합산"] = (df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)).clip(0, 3)
+        df["당뇨가족력_합산"] = (df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)).clip(0, 3)
+        df["고지혈증가족력_합산"] = (df["고지혈증가족력_부"].fillna(0) + df["고지혈증가족력_모"].fillna(0) + df["고지혈증가족력_형제"].fillna(0)).clip(0, 3)
         added += ["고혈압가족력_합산", "당뇨가족력_합산", "고지혈증가족력_합산"]
         print("  [ON] 가족력 합산")
 
@@ -238,21 +234,22 @@ def retrain_with_best_params(
         model = CatBoostClassifier(**params)
         model.fit(train_pool, eval_set=val_pool)
 
+        # ── 서빙용 fold 모델 저장 ──────────────────────────────
+        model.save_model(os.path.join(MODEL_DIR, f"model_fold{fold}.cbm"))
+
         val_proba: NDArray[np.float64] = model.predict_proba(X_val)[:, 1]
         val_label = (val_proba >= 0.5).astype(int)
         oof_proba[val_idx] = val_proba
         fold_models.append(model)
 
-        fold_scores.append(
-            {
-                "fold": fold,
-                "auc": round(float(roc_auc_score(y_val, val_proba)), 4),
-                "recall": round(float(recall_score(y_val, val_label)), 4),
-                "precision": round(float(precision_score(y_val, val_label, zero_division=0)), 4),
-                "f1": round(float(f1_score(y_val, val_label)), 4),
-                "best_iter": model.best_iteration_,
-            }
-        )
+        fold_scores.append({
+            "fold": fold,
+            "auc": round(float(roc_auc_score(y_val, val_proba)), 4),
+            "recall": round(float(recall_score(y_val, val_label)), 4),
+            "precision": round(float(precision_score(y_val, val_label, zero_division=0)), 4),
+            "f1": round(float(f1_score(y_val, val_label)), 4),
+            "best_iter": model.best_iteration_,
+        })
         print(
             f"  Fold {fold} | AUC: {fold_scores[-1]['auc']:.4f} | "
             f"Recall: {fold_scores[-1]['recall']:.4f} | "
@@ -265,7 +262,6 @@ def retrain_with_best_params(
 
 
 def main() -> None:
-    # ── 데이터 로드 ───────────────────────────────────────────
     df = pd.read_csv(DATA_PATH)
     print(f"[0] 데이터 로드 | shape: {df.shape}")
     df = df.dropna(subset=[TARGET]).reset_index(drop=True)
@@ -288,7 +284,6 @@ def main() -> None:
     class_ratio = float(neg / pos)
     print(f"    class_weights: {{0: 1.0, 1: {class_ratio:.4f}}}")
 
-    # ── Optuna Study ──────────────────────────────────────────
     print(f"\n[3] Optuna 시작 | {N_TRIALS} trials | Recall >= {RECALL_MIN} → F1 최대화")
     print("=" * 60)
 
@@ -303,7 +298,6 @@ def main() -> None:
         show_progress_bar=True,
     )
 
-    # ── Best Trial ────────────────────────────────────────────
     print("=" * 60)
     best = study.best_trial
     print(f"\n[4] Best Trial #{best.number}")
@@ -317,7 +311,6 @@ def main() -> None:
     for k, v in best.params.items():
         print(f"      {k}: {v}")
 
-    # ── 재학습 ───────────────────────────────────────────────
     print("\n[5] Best 파라미터로 최종 OOF 재학습")
     print("=" * 60)
 
@@ -326,21 +319,15 @@ def main() -> None:
 
     oof_proba, fold_models, scores_df = retrain_with_best_params(best_params, class_ratio, X_train, y_train)
 
-    # ── OOF 전체 성능 ─────────────────────────────────────────
     print("=" * 60)
     oof_label_05 = (oof_proba >= 0.5).astype(int)
     oof_auc = float(roc_auc_score(y_train, oof_proba))
 
     print("\n[6] OOF 전체 성능 (threshold=0.5)")
     print(f"    AUC    : {oof_auc:.4f}  (fold avg: {scores_df['auc'].mean():.4f} ± {scores_df['auc'].std():.4f})")
-    print(
-        f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})"
-    )
-    print(
-        f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})"
-    )
+    print(f"    Recall : {recall_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['recall'].mean():.4f} ± {scores_df['recall'].std():.4f})")
+    print(f"    F1     : {f1_score(y_train, oof_label_05):.4f}  (fold avg: {scores_df['f1'].mean():.4f} ± {scores_df['f1'].std():.4f})")
 
-    # ── OOF Threshold 재확인 ──────────────────────────────────
     print(f"\n[7] OOF Threshold 재확인 (best_thr={best_thr:.2f})")
     tuning_rows: list[dict[str, float]] = []
     for thr in THRESHOLD_RANGE:
@@ -351,11 +338,8 @@ def main() -> None:
         tuning_rows.append({"threshold": round(float(thr), 2), "recall": r, "precision": p, "f1": f})
     tuning_df = pd.DataFrame(tuning_rows)
     final_row = tuning_df[tuning_df["threshold"] == best_thr].iloc[0]
-    print(
-        f"    Recall: {final_row['recall']:.4f} | Precision: {final_row['precision']:.4f} | F1: {final_row['f1']:.4f}"
-    )
+    print(f"    Recall: {final_row['recall']:.4f} | Precision: {final_row['precision']:.4f} | F1: {final_row['f1']:.4f}")
 
-    # ── Test 평가 ─────────────────────────────────────────────
     print(f"\n[8] 최종 Hold-out Test 평가 (threshold={best_thr:.2f})")
     print("=" * 60)
 
@@ -373,22 +357,18 @@ def main() -> None:
     print(f"    Recall    : {test_recall:.4f}")
     print(f"    Precision : {test_prec:.4f}")
     print(f"    F1        : {test_f1:.4f}")
-    print(f"    TN={cm[0, 0]}  FP={cm[0, 1]}")
-    print(f"    FN={cm[1, 0]}  TP={cm[1, 1]}")
+    print(f"    TN={cm[0,0]}  FP={cm[0,1]}")
+    print(f"    FN={cm[1,0]}  TP={cm[1,1]}")
     print("\n[8] Classification Report")
     print(classification_report(y_test, test_label, target_names=["정상(0)", "고혈압(1)"]))
 
-    # ── Feature Importance ────────────────────────────────────
     print("[9] Feature Importance Top 20 (마지막 fold)")
-    fi_df = pd.DataFrame(
-        {
-            "feature": X_train.columns,
-            "importance": fold_models[-1].get_feature_importance(),
-        }
-    ).sort_values("importance", ascending=False)
+    fi_df = pd.DataFrame({
+        "feature": X_train.columns,
+        "importance": fold_models[-1].get_feature_importance(),
+    }).sort_values("importance", ascending=False)
     print(fi_df.head(20).to_string(index=False))
 
-    # ── 저장 ─────────────────────────────────────────────────
     scores_df.to_csv(os.path.join(MODEL_DIR, "fold_scores.csv"), index=False)
     fi_df.to_csv(os.path.join(MODEL_DIR, "feature_importance.csv"), index=False)
     tuning_df.to_csv(os.path.join(MODEL_DIR, "threshold_tuning.csv"), index=False)
@@ -402,6 +382,7 @@ def main() -> None:
     study.trials_dataframe().to_csv(os.path.join(MODEL_DIR, "optuna_trials.csv"), index=False)
 
     print(f"\n[10] 저장 완료 → {MODEL_DIR}")
+    print(f"     fold 모델: model_fold1.cbm ~ model_fold{N_SPLITS}.cbm")
 
 
 if __name__ == "__main__":
