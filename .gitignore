@@ -24,6 +24,8 @@ ai_worker/vision/clova_ocr/data/pdfs/*
 ai_worker/vision/clova_ocr/outputs/*
 ai_worker/vision/clova_ocr/outputs/**/*
 !ai_worker/vision/clova_ocr/outputs/.gitkeep
+ai_worker/vision/clova_ocr/ground_truth/*
+!ai_worker/vision/clova_ocr/ground_truth/.gitkeep
 .venv-ocr/
 .venv-ocr2/
 

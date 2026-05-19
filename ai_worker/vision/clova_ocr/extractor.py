@@ -4,16 +4,14 @@ from typing import Any
 
 
 def extract_plain_text(ocr_result: dict) -> str:
-    images = ocr_result.get("images") or []
-    if not images:
-        return ""
-
-    fields = images[0].get("fields") or []
     lines = []
-    for field in fields:
-        text = str(field.get("inferText") or "").strip()
-        if text:
-            lines.append(text)
+    current_page_index = None
+    for field in extract_fields(ocr_result):
+        page_index = field["page_index"]
+        if current_page_index is not None and page_index != current_page_index:
+            lines.append("")
+        lines.append(field["text"])
+        current_page_index = page_index
 
     return "\n".join(lines)
 
@@ -23,20 +21,23 @@ def extract_fields(ocr_result: dict) -> list[dict[str, Any]]:
     if not images:
         return []
 
-    fields = images[0].get("fields") or []
     extracted = []
-    for field in fields:
-        text = str(field.get("inferText") or "").strip()
-        if not text:
-            continue
+    for page_index, image in enumerate(images):
+        fields = image.get("fields") or []
+        for field in fields:
+            text = str(field.get("inferText") or "").strip()
+            if not text:
+                continue
 
-        extracted.append(
-            {
-                "text": text,
-                "confidence": _parse_confidence(field.get("inferConfidence")),
-                "bounding_box": field.get("boundingPoly"),
-            }
-        )
+            extracted.append(
+                {
+                    "text": text,
+                    "confidence": _parse_confidence(field.get("inferConfidence")),
+                    "bounding_box": field.get("boundingPoly"),
+                    "page_index": page_index,
+                    "page_number": page_index + 1,
+                }
+            )
 
     return extracted
 
@@ -64,6 +65,7 @@ def calculate_ocr_metrics(fields: list[dict], elapsed_seconds: float, text: str)
         "fields_per_second": field_count / elapsed if field_count and elapsed > 0 else 0.0,
         "extracted_text_length": len(text),
         "extracted_line_count": len([line for line in text.splitlines() if line.strip()]),
+        "page_count": len({field.get("page_index") for field in fields if field.get("page_index") is not None}),
     }
 
 
