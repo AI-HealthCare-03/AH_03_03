@@ -8,10 +8,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # FE 블록 함수 (단위 함수 — 플래그로 개별 호출)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def add_age_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """나이 6구간 원핫 인코딩 (19~39 / 40대 / 50대 / 60대 / 70대 / 80이상)"""
@@ -26,28 +26,20 @@ def add_age_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_bmi_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """BMI 4구간화 (저체중/정상/과체중/비만)"""
-    df["BMI_구간"] = pd.cut(
-        df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False
-    ).astype(float)
+    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
     return df, ["BMI_구간"]
 
 
 def add_family_sum(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """고혈압/당뇨/고지혈증 가족력 합산 (부+모+형제, 0~3 clip)"""
     df["고혈압가족력_합산"] = (
-        df["고혈압가족력_부"].fillna(0)
-        + df["고혈압가족력_모"].fillna(0)
-        + df["고혈압가족력_형제"].fillna(0)
+        df["고혈압가족력_부"].fillna(0) + df["고혈압가족력_모"].fillna(0) + df["고혈압가족력_형제"].fillna(0)
     ).clip(0, 3)
     df["당뇨가족력_합산"] = (
-        df["당뇨가족력_부"].fillna(0)
-        + df["당뇨가족력_모"].fillna(0)
-        + df["당뇨가족력_형제"].fillna(0)
+        df["당뇨가족력_부"].fillna(0) + df["당뇨가족력_모"].fillna(0) + df["당뇨가족력_형제"].fillna(0)
     ).clip(0, 3)
     df["고지혈증가족력_합산"] = (
-        df["고지혈증가족력_부"].fillna(0)
-        + df["고지혈증가족력_모"].fillna(0)
-        + df["고지혈증가족력_형제"].fillna(0)
+        df["고지혈증가족력_부"].fillna(0) + df["고지혈증가족력_모"].fillna(0) + df["고지혈증가족력_형제"].fillna(0)
     ).clip(0, 3)
     return df, ["고혈압가족력_합산", "당뇨가족력_합산", "고지혈증가족력_합산"]
 
@@ -67,25 +59,19 @@ def add_obesity_flag(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_alcohol_risk(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """음주 위험군 구간화 (0=비음주 / 1=저위험 / 2=고위험)"""
-    df["음주위험군"] = pd.cut(
-        df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True
-    ).astype(float)
+    df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
     return df, ["음주위험군"]
 
 
 def add_walk_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """걷기 활동량 구간화"""
-    df["걷기활동량"] = pd.cut(
-        df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True
-    ).astype(float)
+    df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
     return df, ["걷기활동량"]
 
 
 def add_strength_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """근력 운동 활동량 구간화"""
-    df["근력활동량"] = pd.cut(
-        df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True
-    ).astype(float)
+    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
     return df, ["근력활동량"]
 
 
@@ -99,19 +85,19 @@ def add_strength_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 DISEASE_FE_MAP: dict[str, list[str]] = {
     "HTN": ["age_bin", "alcohol_risk", "walk_level", "family_sum", "bmi_x_age"],
-    "DM":  ["age_bin", "bmi_bin", "family_sum", "bmi_x_age"],
-    "DL":  ["age_bin", "bmi_bin", "family_sum", "bmi_x_age"],
+    "DM": ["age_bin", "bmi_bin", "family_sum", "bmi_x_age"],
+    "DL": ["age_bin", "bmi_bin", "family_sum", "bmi_x_age"],
 }
 
 _FE_REGISTRY = {
-    "age_bin":      add_age_bin,
-    "bmi_bin":      add_bmi_bin,
-    "family_sum":   add_family_sum,
-    "bmi_x_age":    add_bmi_x_age,
+    "age_bin": add_age_bin,
+    "bmi_bin": add_bmi_bin,
+    "family_sum": add_family_sum,
+    "bmi_x_age": add_bmi_x_age,
     "obesity_flag": add_obesity_flag,
     "alcohol_risk": add_alcohol_risk,
-    "walk_level":   add_walk_level,
-    "strength":     add_strength_level,
+    "walk_level": add_walk_level,
+    "strength": add_strength_level,
 }
 
 

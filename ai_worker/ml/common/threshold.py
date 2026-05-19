@@ -70,10 +70,12 @@ def build_threshold_table(
     rows: list[dict[str, float]] = []
     for thr in thr_range:
         pred = (proba >= thr).astype(int)
-        rows.append({
-            "threshold": round(float(thr), 2),
-            "recall": float(recall_score(y_true, pred, zero_division=0)),
-            "precision": float(precision_score(y_true, pred, zero_division=0)),
-            "f1": float(f1_score(y_true, pred, zero_division=0)),
-        })
+        rows.append(
+            {
+                "threshold": round(float(thr), 2),
+                "recall": float(recall_score(y_true, pred, zero_division=0)),
+                "precision": float(precision_score(y_true, pred, zero_division=0)),
+                "f1": float(f1_score(y_true, pred, zero_division=0)),
+            }
+        )
     return rows

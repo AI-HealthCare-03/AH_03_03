@@ -25,15 +25,15 @@ THRESHOLD_RANGE: NDArray[np.float64] = np.arange(0.30, 0.71, 0.01)
 # ── 타겟별 설정 ───────────────────────────────────────────────
 TARGETS: dict = {
     "HTN": {
-        "lgbm_dir":     f"{BASE_DIR}/optuna_HTN_FE_v3",
+        "lgbm_dir": f"{BASE_DIR}/optuna_HTN_FE_v3",
         "catboost_dir": f"{CAT_DIR}/catboost_HTN_FE",
     },
     "DM": {
-        "lgbm_dir":     f"{BASE_DIR}/optuna_DM_FE_v3",
+        "lgbm_dir": f"{BASE_DIR}/optuna_DM_FE_v3",
         "catboost_dir": f"{CAT_DIR}/catboost_DM_FE",
     },
     "DL": {
-        "lgbm_dir":     f"{BASE_DIR}/optuna_DL_FE_v3",
+        "lgbm_dir": f"{BASE_DIR}/optuna_DL_FE_v3",
         "catboost_dir": f"{CAT_DIR}/catboost_DL_FE",
     },
 }
@@ -76,17 +76,17 @@ def evaluate(
 
 
 def run_correlation_check(target_name: str, cfg: dict) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"[{target_name}] LGBM v3 + CatBoost FE Correlation 확인")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # ── OOF proba 로드 ────────────────────────────────────────
-    lgbm_oof  = np.load(f"{cfg['lgbm_dir']}/oof_proba.npy")
-    cat_oof   = np.load(f"{cfg['catboost_dir']}/oof_proba.npy")
-    y_train   = np.load(f"{cfg['lgbm_dir']}/oof_y_true.npy")
+    lgbm_oof = np.load(f"{cfg['lgbm_dir']}/oof_proba.npy")
+    cat_oof = np.load(f"{cfg['catboost_dir']}/oof_proba.npy")
+    y_train = np.load(f"{cfg['lgbm_dir']}/oof_y_true.npy")
 
-    lgbm_thr  = float(np.load(f"{cfg['lgbm_dir']}/best_threshold.npy")[0])
-    cat_thr   = float(np.load(f"{cfg['catboost_dir']}/best_threshold.npy")[0])
+    lgbm_thr = float(np.load(f"{cfg['lgbm_dir']}/best_threshold.npy")[0])
+    cat_thr = float(np.load(f"{cfg['catboost_dir']}/best_threshold.npy")[0])
 
     # ── OOF Correlation ───────────────────────────────────────
     corr = float(np.corrcoef(lgbm_oof, cat_oof)[0, 1])
@@ -105,8 +105,8 @@ def run_correlation_check(target_name: str, cfg: dict) -> None:
     # ── OOF 성능 비교 ─────────────────────────────────────────
     rows = [
         evaluate(lgbm_oof, y_train, lgbm_thr, "LGBM v3 (OOF)"),
-        evaluate(cat_oof,  y_train, cat_thr,  "CatBoost FE (OOF)"),
-        evaluate(ens_oof,  y_train, ens_thr,  "앙상블 평균 (OOF)"),
+        evaluate(cat_oof, y_train, cat_thr, "CatBoost FE (OOF)"),
+        evaluate(ens_oof, y_train, ens_thr, "앙상블 평균 (OOF)"),
     ]
     result_df = pd.DataFrame(rows)
     print("\n[OOF 성능 비교]")
@@ -122,9 +122,9 @@ def main() -> None:
     for target_name, cfg in TARGETS.items():
         run_correlation_check(target_name, cfg)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("판단 기준: correlation < 0.90 → 앙상블 진행")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

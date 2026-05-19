@@ -52,8 +52,8 @@ def evaluate(
     print(f"    Recall    : {recall:.4f}")
     print(f"    Precision : {prec:.4f}")
     print(f"    F1        : {f1:.4f}")
-    print(f"    TN={cm[0,0]}  FP={cm[0,1]}")
-    print(f"    FN={cm[1,0]}  TP={cm[1,1]}")
+    print(f"    TN={cm[0, 0]}  FP={cm[0, 1]}")
+    print(f"    FN={cm[1, 0]}  TP={cm[1, 1]}")
 
     if target_names:
         print(f"\n[{label}] Classification Report")

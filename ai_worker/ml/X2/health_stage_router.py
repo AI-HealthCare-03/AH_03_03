@@ -17,19 +17,18 @@
 # ================================================================
 
 from __future__ import annotations
-from typing import Optional
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, validator
 
+from fastapi import APIRouter, HTTPException
 from health_stage_classifier import (
-    classify_all,
-    classify_htn,
-    classify_dm,
-    classify_dl,
-    classify_obe,
-    classify_anem,
     StageResult,
+    classify_all,
+    classify_anem,
+    classify_dl,
+    classify_dm,
+    classify_htn,
+    classify_obe,
 )
+from pydantic import BaseModel, Field, validator
 
 router = APIRouter(tags=["건강 단계 판정"])
 
@@ -41,27 +40,27 @@ class HealthCheckInput(BaseModel):
     """건강검진 수치 입력 — 전부 Optional, 있는 것만 보내면 됨"""
 
     # 혈압
-    sbp: Optional[float] = Field(None, ge=60, le=250,  description="수축기 혈압 (mmHg)")
-    dbp: Optional[float] = Field(None, ge=40, le=150,  description="이완기 혈압 (mmHg)")
+    sbp: float | None = Field(None, ge=60, le=250, description="수축기 혈압 (mmHg)")
+    dbp: float | None = Field(None, ge=40, le=150, description="이완기 혈압 (mmHg)")
 
     # 혈당
-    glu:   Optional[float] = Field(None, ge=50,  le=600, description="공복혈당 (mg/dL)")
-    hba1c: Optional[float] = Field(None, ge=3.0, le=20,  description="당화혈색소 (%)")
+    glu: float | None = Field(None, ge=50, le=600, description="공복혈당 (mg/dL)")
+    hba1c: float | None = Field(None, ge=3.0, le=20, description="당화혈색소 (%)")
 
     # 지질
-    chol: Optional[float] = Field(None, ge=50,  le=700, description="총콜레스테롤 (mg/dL)")
-    ldl:  Optional[float] = Field(None, ge=10,  le=500, description="LDL 콜레스테롤 (mg/dL)")
-    tg:   Optional[float] = Field(None, ge=20,  le=3000, description="중성지방 (mg/dL)")
-    hdl:  Optional[float] = Field(None, ge=10,  le=200,  description="HDL 콜레스테롤 (mg/dL)")
+    chol: float | None = Field(None, ge=50, le=700, description="총콜레스테롤 (mg/dL)")
+    ldl: float | None = Field(None, ge=10, le=500, description="LDL 콜레스테롤 (mg/dL)")
+    tg: float | None = Field(None, ge=20, le=3000, description="중성지방 (mg/dL)")
+    hdl: float | None = Field(None, ge=10, le=200, description="HDL 콜레스테롤 (mg/dL)")
 
     # 비만
-    bmi:       Optional[float] = Field(None, ge=10,  le=70,   description="체질량지수 (kg/m²)")
-    height_cm: Optional[float] = Field(None, ge=100, le=250,  description="신장 (cm)")
-    weight_kg: Optional[float] = Field(None, ge=20,  le=300,  description="체중 (kg)")
+    bmi: float | None = Field(None, ge=10, le=70, description="체질량지수 (kg/m²)")
+    height_cm: float | None = Field(None, ge=100, le=250, description="신장 (cm)")
+    weight_kg: float | None = Field(None, ge=20, le=300, description="체중 (kg)")
 
     # 빈혈
-    hb:  Optional[float] = Field(None, ge=3.0, le=25,  description="헤모글로빈 (g/dL)")
-    sex: Optional[str]   = Field(None, description="성별 — 'M' 또는 'F'")
+    hb: float | None = Field(None, ge=3.0, le=25, description="헤모글로빈 (g/dL)")
+    sex: str | None = Field(None, description="성별 — 'M' 또는 'F'")
 
     @validator("sex")
     def validate_sex(cls, v):
@@ -72,15 +71,16 @@ class HealthCheckInput(BaseModel):
 
 class StageResultSchema(BaseModel):
     """단일 질환 판정 결과"""
-    disease:  str
-    stage:    Optional[int]
-    label:    str
-    detail:   str
-    missing:  list[str]
+
+    disease: str
+    stage: int | None
+    label: str
+    detail: str
+    missing: list[str]
     is_normal: bool
 
     @classmethod
-    def from_result(cls, r: StageResult) -> "StageResultSchema":
+    def from_result(cls, r: StageResult) -> StageResultSchema:
         return cls(
             disease=r.disease,
             stage=r.stage,
@@ -93,11 +93,12 @@ class StageResultSchema(BaseModel):
 
 class HealthStageResponse(BaseModel):
     """통합 판정 응답"""
-    results:         dict[str, StageResultSchema]
-    classifiable:    list[str]   # 판정된 질환 코드
-    unclassifiable:  list[str]   # 수치 부족으로 판정 불가 질환
-    has_risk:        bool        # 1개 이상 비정상 단계 존재 여부
-    highest_stage:   dict        # 가장 높은 단계 질환 요약
+
+    results: dict[str, StageResultSchema]
+    classifiable: list[str]  # 판정된 질환 코드
+    unclassifiable: list[str]  # 수치 부족으로 판정 불가 질환
+    has_risk: bool  # 1개 이상 비정상 단계 존재 여부
+    highest_stage: dict  # 가장 높은 단계 질환 요약
 
 
 # ================================================================
@@ -106,9 +107,9 @@ class HealthStageResponse(BaseModel):
 def _build_response(raw: dict[str, StageResult]) -> HealthStageResponse:
     results = {k: StageResultSchema.from_result(v) for k, v in raw.items()}
 
-    classifiable   = [k for k, v in raw.items() if v.is_classifiable()]
+    classifiable = [k for k, v in raw.items() if v.is_classifiable()]
     unclassifiable = [k for k, v in raw.items() if not v.is_classifiable()]
-    has_risk       = any(not v.is_normal() for v in raw.values() if v.is_classifiable())
+    has_risk = any(not v.is_normal() for v in raw.values() if v.is_classifiable())
 
     # 가장 높은 단계 질환
     staged = {k: v for k, v in raw.items() if v.stage is not None}
@@ -117,8 +118,8 @@ def _build_response(raw: dict[str, StageResult]) -> HealthStageResponse:
         worst = staged[worst_key]
         highest_stage = {
             "disease": worst_key,
-            "stage":   worst.stage,
-            "label":   worst.label,
+            "stage": worst.stage,
+            "label": worst.label,
         }
     else:
         highest_stage = {}
@@ -136,6 +137,7 @@ def _build_response(raw: dict[str, StageResult]) -> HealthStageResponse:
 # 엔드포인트
 # ================================================================
 
+
 # ── 통합 판정 ─────────────────────────────────────────────────
 @router.post(
     "/health/stage",
@@ -145,23 +147,32 @@ def _build_response(raw: dict[str, StageResult]) -> HealthStageResponse:
 )
 async def stage_all(body: HealthCheckInput):
     raw = classify_all(
-        sbp=body.sbp, dbp=body.dbp,
-        glu=body.glu, hba1c=body.hba1c,
-        chol=body.chol, ldl=body.ldl, tg=body.tg, hdl=body.hdl,
-        bmi=body.bmi, height_cm=body.height_cm, weight_kg=body.weight_kg,
-        hb=body.hb, sex=body.sex,
+        sbp=body.sbp,
+        dbp=body.dbp,
+        glu=body.glu,
+        hba1c=body.hba1c,
+        chol=body.chol,
+        ldl=body.ldl,
+        tg=body.tg,
+        hdl=body.hdl,
+        bmi=body.bmi,
+        height_cm=body.height_cm,
+        weight_kg=body.weight_kg,
+        hb=body.hb,
+        sex=body.sex,
     )
     return _build_response(raw)
 
 
 # ── 단일 질환 판정 ─────────────────────────────────────────────
 SINGLE_CLASSIFIERS = {
-    "HTN":  lambda b: classify_htn(sbp=b.sbp, dbp=b.dbp),
-    "DM":   lambda b: classify_dm(glu=b.glu, hba1c=b.hba1c),
-    "DL":   lambda b: classify_dl(chol=b.chol, ldl=b.ldl, tg=b.tg, hdl=b.hdl),
-    "OBE":  lambda b: classify_obe(bmi=b.bmi, height_cm=b.height_cm, weight_kg=b.weight_kg),
+    "HTN": lambda b: classify_htn(sbp=b.sbp, dbp=b.dbp),
+    "DM": lambda b: classify_dm(glu=b.glu, hba1c=b.hba1c),
+    "DL": lambda b: classify_dl(chol=b.chol, ldl=b.ldl, tg=b.tg, hdl=b.hdl),
+    "OBE": lambda b: classify_obe(bmi=b.bmi, height_cm=b.height_cm, weight_kg=b.weight_kg),
     "ANEM": lambda b: classify_anem(hb=b.hb, sex=b.sex),
 }
+
 
 @router.post(
     "/health/stage/{code}",
