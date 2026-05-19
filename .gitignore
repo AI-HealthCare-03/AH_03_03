@@ -17,3 +17,25 @@ ai_worker/vision/data/images/
 ai_worker/vision/data/results/
 .venv-ocr/
 .venv-ocr2/
+
+# Local data / generated outputs
+/data/
+/output/
+/outputs/
+/results/
+/logs/
+/models/
+/checkpoints/
+
+# Dataset / model artifacts
+*.csv
+*.parquet
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# OS files
+.DS_Store
