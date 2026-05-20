@@ -15,6 +15,49 @@ const analysisTypeLabels: Record<string, string> = {
   HYPERTENSION: "고혈압",
 };
 
+const riskFallbackScores: Record<string, number> = {
+  HIGH: 80,
+  MEDIUM: 55,
+  LOW: 25,
+};
+
+function getRiskLevel(result: AnalysisResult): string {
+  return String(result.risk_level ?? "").toUpperCase();
+}
+
+function getRiskScore(result: AnalysisResult): number {
+  const raw = Number(result.risk_score);
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.round(raw <= 1 ? raw * 100 : raw);
+  }
+  return riskFallbackScores[getRiskLevel(result)] ?? 0;
+}
+
+function getOverallLevel(results: AnalysisResult[]): string {
+  const levels = results.map(getRiskLevel).filter(Boolean);
+  if (levels.includes("HIGH")) {
+    return "HIGH";
+  }
+  if (levels.includes("MEDIUM")) {
+    return "MEDIUM";
+  }
+  if (levels.length > 0 && levels.every((level) => level === "LOW")) {
+    return "LOW";
+  }
+  return "-";
+}
+
+function getOverallScore(results: AnalysisResult[]): number {
+  if (results.length === 0) {
+    return 0;
+  }
+  const scores = results.map(getRiskScore).filter((score) => score > 0);
+  if (scores.length > 0) {
+    return Math.max(...scores);
+  }
+  return riskFallbackScores[getOverallLevel(results)] ?? 0;
+}
+
 export default function AnalysisPage() {
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [healthRecordId, setHealthRecordId] = useState<number | null>(null);
@@ -39,6 +82,9 @@ export default function AnalysisPage() {
     await load();
   };
 
+  const overallLevel = getOverallLevel(results);
+  const overallScore = getOverallScore(results);
+
   return (
     <div className="page-stack">
       <div className="page-header">
@@ -58,9 +104,9 @@ export default function AnalysisPage() {
         <Card title="종합 위험도">
           <div className="score-panel">
             <span>종합 위험도 게이지</span>
-            <strong>{results.some((item) => item.risk_level === "HIGH") ? "HIGH" : "MEDIUM"}</strong>
+            <strong>{overallLevel}</strong>
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: "68%" }} />
+              <div className="progress-fill" style={{ width: `${overallScore}%` }} />
             </div>
             <p>이 결과는 MVP 시연용 더미 분석이며 실제 의료 진단이 아닙니다.</p>
           </div>
@@ -71,17 +117,24 @@ export default function AnalysisPage() {
       </div>
       <div className="metric-grid">
         {results.map((result) => {
-          const level = String(result.risk_level).toLowerCase();
-          const score = Math.round(Number(result.risk_score ?? 0) * 100);
+          const level = getRiskLevel(result);
+          const score = getRiskScore(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 위험도</span>
               <strong>{score}/100</strong>
-              <span className={`badge risk-${level}`}>{String(result.risk_level)}</span>
+              <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
             </div>
           );
         })}
+        {results.length === 0 && (
+          <div className="metric-card card">
+            <span>분석 결과 없음</span>
+            <strong>-</strong>
+            <p>건강정보를 입력한 뒤 더미 분석을 실행하면 seed 데이터와 같은 결과 카드가 표시됩니다.</p>
+          </div>
+        )}
       </div>
       <Card title="추천 액션">
         <div className="button-row">

@@ -1,15 +1,34 @@
 import { apiRequest } from "./client";
 
-export async function listChallenges<T>(): Promise<T> {
-  return apiRequest<T>("/challenges");
+export async function listChallenges<T>(params: { category?: string; limit?: number; offset?: number } = {}): Promise<T> {
+  const query = new URLSearchParams();
+  if (params.category) {
+    query.set("category", params.category);
+  }
+  if (params.limit !== undefined) {
+    query.set("limit", String(params.limit));
+  }
+  if (params.offset !== undefined) {
+    query.set("offset", String(params.offset));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiRequest<T>(`/challenges${suffix}`);
 }
 
 export async function getChallenge<T>(challengeId: number): Promise<T> {
   return apiRequest<T>(`/challenges/${challengeId}`, { skipAuth: true });
 }
 
-export async function listMyChallenges<T>(): Promise<T> {
-  return apiRequest<T>("/challenges/my");
+export async function listMyChallenges<T>(params: { limit?: number; offset?: number } = {}): Promise<T> {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) {
+    query.set("limit", String(params.limit));
+  }
+  if (params.offset !== undefined) {
+    query.set("offset", String(params.offset));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiRequest<T>(`/challenges/my${suffix}`);
 }
 
 export async function joinChallenge<T>(challengeId: number): Promise<T> {
