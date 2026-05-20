@@ -11,3 +11,7 @@ export async function createInquiry<T>(payload: Record<string, ApiValue>): Promi
 export async function listMyInquiries<T>(): Promise<T> {
   return apiRequest<T>("/inquiries/my");
 }
+
+export async function getInquiry<T>(inquiryId: number): Promise<T> {
+  return apiRequest<T>(`/inquiries/${inquiryId}`);
+}

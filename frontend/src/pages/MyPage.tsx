@@ -24,23 +24,55 @@ export default function MyPage() {
   }, []);
 
   return (
-    <div className="page-grid">
-      <Card title="내 프로필">
-        <p>{backendUser?.email}</p>
-        <p>role: {backendUser?.role ?? "USER"}</p>
-        <button className="danger" onClick={() => window.confirm("회원탈퇴는 후속 구현에서 안전장치를 추가합니다.")}>
-          회원탈퇴
-        </button>
+    <div className="dashboard-grid">
+      <Card title="마이페이지">
+        <div className="card-list">
+          {["프로필", "기본 건강정보", "복약/영양제", "챌린지 현황", "구독 결제", "알림 설정", "개인정보", "회원탈퇴"].map(
+            (item) => (
+              <span className={item === "프로필" ? "filter-tab active" : "filter-tab"} key={item}>
+                {item}
+              </span>
+            ),
+          )}
+        </div>
       </Card>
-      <Card title="건강정보 요약">
-        <pre>{JSON.stringify(health[0] ?? null, null, 2)}</pre>
-      </Card>
-      <Card title="최근 분석 결과">
-        <pre>{JSON.stringify(analysis, null, 2)}</pre>
-      </Card>
-      <Card title="진행 중 챌린지">
-        <pre>{JSON.stringify(challenges, null, 2)}</pre>
-      </Card>
+      <div className="page-stack">
+        <Card title="프로필 카드">
+          <div className="button-row">
+            <span className="avatar">{(backendUser?.nickname ?? backendUser?.name ?? "U").slice(0, 1)}</span>
+            <div>
+              <strong>{backendUser?.nickname ?? backendUser?.name}</strong>
+              <p className="muted">{backendUser?.email}</p>
+            </div>
+          </div>
+          <button className="secondary">수정</button>
+        </Card>
+        <Card title="건강 정보 테이블">
+          <div className="table-list">
+            {[
+              ["생년월일", backendUser?.birthday],
+              ["성별", backendUser?.gender],
+              ["키/몸무게", `${String(health[0]?.height_cm ?? "-")}/${String(health[0]?.weight_kg ?? "-")}`],
+              ["BMI", health[0]?.bmi],
+              ["휴대폰", backendUser?.phone_number],
+            ].map(([label, value]) => (
+              <div className="table-row" key={String(label)}>
+                <span>{String(label)}</span>
+                <strong>{String(value ?? "-")}</strong>
+                <span />
+              </div>
+            ))}
+          </div>
+        </Card>
+        <div className="page-grid">
+          <Card title="최근 분석 결과">
+            <pre>{JSON.stringify(analysis, null, 2)}</pre>
+          </Card>
+          <Card title="진행 중 챌린지">
+            <pre>{JSON.stringify(challenges, null, 2)}</pre>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

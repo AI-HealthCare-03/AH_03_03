@@ -4,6 +4,10 @@ export async function listChallenges<T>(): Promise<T> {
   return apiRequest<T>("/challenges");
 }
 
+export async function getChallenge<T>(challengeId: number): Promise<T> {
+  return apiRequest<T>(`/challenges/${challengeId}`, { skipAuth: true });
+}
+
 export async function listMyChallenges<T>(): Promise<T> {
   return apiRequest<T>("/challenges/my");
 }

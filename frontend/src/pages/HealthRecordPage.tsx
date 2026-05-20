@@ -63,9 +63,21 @@ export default function HealthRecordPage() {
   };
 
   return (
-    <div className="page-grid">
+    <div className="dashboard-grid">
+      <Card title="입력 단계">
+        <div className="card-list">
+          {["기본 정보", "건강/생활 정보", "혈액/검진 정보", "복약 후"].map((step, index) => (
+            <span className={index === 0 ? "filter-tab active" : "filter-tab"} key={step}>
+              {step}
+            </span>
+          ))}
+        </div>
+      </Card>
       <Card title="건강정보 입력">
         {error && <ErrorMessage message={error} />}
+        <div className="state-box">
+          정확한 분석을 위해 키, 몸무게, 혈압, 혈당, 지질 수치를 함께 입력해주세요.
+        </div>
         <form className="form two-col" onSubmit={submit}>
           {Object.keys(initialForm).map((key) => (
             <label key={key}>
@@ -78,7 +90,11 @@ export default function HealthRecordPage() {
               />
             </label>
           ))}
-          <button type="submit">저장</button>
+          <div className="button-row">
+            <button className="secondary" type="button">이전</button>
+            <button className="secondary" type="button">추가 정보 입력하기</button>
+            <button type="submit">분석 실행</button>
+          </div>
         </form>
       </Card>
       <Card title="분석 준비 상태">

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { createDietRecord, listDietRecords, runDummyDietAnalysis } from "../api/diets";
 import Card from "../components/Card";
@@ -34,13 +35,23 @@ export default function DietPage() {
 
   return (
     <div className="page-grid">
-      <Card title="식단 기록">
+      <Card
+        title="식단 이미지 분석"
+        actions={
+          <Link className="button secondary" to="/diets/history">
+            결과 전체
+          </Link>
+        }
+      >
         <form className="form" onSubmit={submit}>
           <label>
             식단 메모
             <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
           </label>
-          <div className="placeholder">이미지 업로드/CV 분석은 후속 구현 예정</div>
+          <div className="upload-box">
+            <strong>이미지 업로드 영역</strong>
+            <span>실제 이미지 업로드/CV 분석은 후속 구현 예정이며, 현재는 더미 분석으로 시연합니다.</span>
+          </div>
           <div className="button-row">
             <button type="submit">기록 저장</button>
             <button type="button" onClick={dummyAnalyze}>
@@ -53,7 +64,15 @@ export default function DietPage() {
         <pre>{JSON.stringify(dummyResult, null, 2)}</pre>
       </Card>
       <Card title="최근 식단">
-        <pre>{JSON.stringify(records.slice(0, 5), null, 2)}</pre>
+        <div className="card-list">
+          {records.slice(0, 5).map((record) => (
+            <Link className="mini-card" key={String(record.id)} to={`/diets/${String(record.id)}`}>
+              <strong>{String(record.meal_type ?? "식단 기록")}</strong>
+              <span>점수: {String(record.diet_score ?? "-")}</span>
+              <p>{String(record.description ?? "")}</p>
+            </Link>
+          ))}
+        </div>
       </Card>
     </div>
   );
