@@ -6,6 +6,23 @@ import Card from "../components/Card";
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
 
+function latestValue(items: Record<string, unknown>[] | undefined, fallback = "-"): string {
+  const item = items?.[0];
+  if (!item) {
+    return fallback;
+  }
+  const value = item.value ?? item.systolic;
+  return value === undefined || value === null ? fallback : String(value);
+}
+
+function averageValue(items: Record<string, unknown>[] | undefined): string {
+  const values = (items ?? []).map((item) => Number(item.value)).filter((value) => Number.isFinite(value));
+  if (values.length === 0) {
+    return "-";
+  }
+  return `${Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)}%`;
+}
+
 function Bars({ items }: { items: Record<string, unknown>[] }) {
   return (
     <div className="bars">
@@ -42,13 +59,15 @@ export default function DashboardPage() {
   }, []);
 
   const latest = (summary.latest_health_record ?? {}) as HealthRecord;
+  const challengeRate = averageValue(trends.challenge_completion_rate);
+  const dietScore = latestValue(trends.diet_score);
   const metrics = [
     ["혈당", latest.fasting_glucose ?? "-"],
     ["혈압", `${String(latest.systolic_bp ?? "-")}/${String(latest.diastolic_bp ?? "-")}`],
     ["체중", latest.weight_kg ?? "-"],
-    ["챌린지 수행률", "72%"],
-    ["식단 점수", "84"],
-    ["복약/영양제 수행률", "80%"],
+    ["챌린지 수행률", challengeRate],
+    ["식단 점수", dietScore],
+    ["복약/영양제", `${String(summary.active_medication_count ?? 0)}개`],
     ["수면 시간", latest.sleep_hours ?? "-"],
   ];
 

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { getLatestAnalysisResults } from "../api/analysis";
 import { getMainSummary, getPublicMain } from "../api/main";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 
 type MainData = Record<string, unknown>;
+type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
   service_title: "HealthCare",
@@ -15,22 +17,119 @@ const publicFallback = {
   locked_features: ["개인 대시보드", "맞춤 분석", "챌린지 참여"],
 };
 
+const riskLabelMap: Record<string, string> = {
+  LOW: "낮음",
+  MEDIUM: "관리 필요",
+  HIGH: "높음",
+};
+
+function asRecord(value: unknown): AnyRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as AnyRecord) : {};
+}
+
+function asRecordArray(value: unknown): AnyRecord[] {
+  return Array.isArray(value) ? value.filter((item): item is AnyRecord => Boolean(item) && typeof item === "object") : [];
+}
+
+function formatRisk(value: unknown): string {
+  const raw = String(value ?? "").toUpperCase();
+  return riskLabelMap[raw] ?? (raw || "-");
+}
+
+function formatDate(value: unknown): string {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ko-KR");
+}
+
+function buildOverallRisk(levels: string[]): string {
+  if (levels.includes("HIGH")) {
+    return "높음";
+  }
+  if (levels.includes("MEDIUM")) {
+    return "관리 필요";
+  }
+  if (levels.length > 0 && levels.every((level) => level === "LOW")) {
+    return "낮음";
+  }
+  return "-";
+}
+
 export default function MainPage() {
   const { backendUser, isAuthenticated } = useAuth();
   const [data, setData] = useState<MainData>(publicFallback);
+  const [analysisResults, setAnalysisResults] = useState<AnyRecord[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        setData(isAuthenticated ? await getMainSummary<MainData>() : await getPublicMain<MainData>());
+        if (isAuthenticated) {
+          const [summary, latestResults] = await Promise.all([
+            getMainSummary<MainData>(),
+            getLatestAnalysisResults<AnyRecord[]>(),
+          ]);
+          setData(summary);
+          setAnalysisResults(latestResults);
+          return;
+        }
+        setData(await getPublicMain<MainData>());
+        setAnalysisResults([]);
       } catch {
         setData(publicFallback);
+        setAnalysisResults([]);
       }
     };
     void load();
   }, [isAuthenticated]);
 
   if (isAuthenticated) {
+    const latestHealth = asRecord(data.latest_health_summary);
+    const latestAnalysis = asRecord(data.latest_analysis_summary);
+    const dashboardSummary = asRecord(data.dashboard_summary);
+    const activeChallengeSummary = asRecord(data.active_challenge_summary);
+    const todayTasks = asRecordArray(data.today_tasks);
+    const recentRecords = asRecord(data.recent_records);
+    const recentHealthRecords = asRecordArray(recentRecords.health_records);
+    const effectiveAnalysisResults =
+      analysisResults.length > 0 ? analysisResults : latestAnalysis.analysis_type ? [latestAnalysis] : [];
+    const resultByType = new Map(
+      effectiveAnalysisResults.map((result) => [
+        String(result.analysis_type ?? ""),
+        String(result.risk_level ?? "").toUpperCase(),
+      ]),
+    );
+    const riskLevels =
+      effectiveAnalysisResults.length > 0
+        ? effectiveAnalysisResults.map((result) => String(result.risk_level ?? "").toUpperCase()).filter(Boolean)
+        : [];
+    const taskFallback = [
+      { title: latestHealth.id ? "건강정보 확인" : "건강정보 입력", url: "/health" },
+      { title: "식단 기록", url: "/diets" },
+      { title: activeChallengeSummary.my_challenge_count ? "챌린지 수행" : "챌린지 참여", url: "/challenges" },
+      { title: dashboardSummary.active_medication_count ? "복약 기록" : "복약/영양제 등록", url: "/medications" },
+    ];
+    const taskCards =
+      todayTasks.length > 0
+        ? todayTasks.slice(0, 4).map((task) => ({
+            title: String(task.title ?? "오늘 할 일"),
+            url: task.task_type === "MEDICATION" ? "/medications" : "/challenges",
+          }))
+        : taskFallback;
+    const miniCards = [
+      ["혈당", latestHealth.fasting_glucose ? `${String(latestHealth.fasting_glucose)} mg/dL` : "-"],
+      [
+        "혈압",
+        latestHealth.systolic_bp || latestHealth.diastolic_bp
+          ? `${String(latestHealth.systolic_bp ?? "-")}/${String(latestHealth.diastolic_bp ?? "-")} mmHg`
+          : "-",
+      ],
+      ["체중", latestHealth.weight_kg ? `${String(latestHealth.weight_kg)} kg` : "-"],
+      ["챌린지", `${String(activeChallengeSummary.my_challenge_count ?? 0)}개 진행`],
+      ["최근 기록", `${recentHealthRecords.length}건`],
+    ];
+
     return (
       <div className="page-stack">
         <div className="page-header">
@@ -43,10 +142,10 @@ export default function MainPage() {
           </Link>
         </div>
         <div className="metric-grid">
-          {["건강정보 입력", "식단 기록", "챌린지 수행", "복약 기록"].map((task) => (
-            <Link className="stat-card" key={task} to={task === "식단 기록" ? "/diets" : "/health"}>
+          {taskCards.map((task) => (
+            <Link className="stat-card" key={task.title} to={task.url}>
               <span>오늘 할 일</span>
-              <strong>{task}</strong>
+              <strong>{task.title}</strong>
             </Link>
           ))}
         </div>
@@ -55,19 +154,19 @@ export default function MainPage() {
             <div className="metric-grid">
               <div>
                 <span>당뇨 위험도</span>
-                <strong>MEDIUM</strong>
+                <strong>{formatRisk(resultByType.get("DIABETES"))}</strong>
               </div>
               <div>
                 <span>고혈압 위험도</span>
-                <strong>MEDIUM</strong>
+                <strong>{formatRisk(resultByType.get("HYPERTENSION"))}</strong>
               </div>
               <div>
                 <span>종합 위험도</span>
-                <strong>관리 필요</strong>
+                <strong>{buildOverallRisk(riskLevels)}</strong>
               </div>
               <div>
                 <span>최근 분석일</span>
-                <strong>오늘</strong>
+                <strong>{formatDate(latestAnalysis.analyzed_at ?? latestAnalysis.created_at)}</strong>
               </div>
             </div>
           </Card>
@@ -89,10 +188,10 @@ export default function MainPage() {
           </Card>
           <Card title="추적 미니 카드">
             <div className="metric-grid">
-              {["혈당", "혈압", "체중", "챌린지 수행률", "식단 점수"].map((label) => (
+              {miniCards.map(([label, value]) => (
                 <div key={label}>
                   <span>{label}</span>
-                  <strong>-</strong>
+                  <strong>{value}</strong>
                 </div>
               ))}
             </div>
