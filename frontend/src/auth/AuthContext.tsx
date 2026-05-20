@@ -1,21 +1,20 @@
-import {
-  User,
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { syncFirebaseUser, type BackendUser } from "../api/auth";
-import { auth } from "../firebase";
+import {
+  getMe,
+  login as loginWithFastApi,
+  signup as signupWithFastApi,
+  type BackendUser,
+  type SignupPayload,
+} from "../api/auth";
+import { clearStoredAccessToken, getStoredAccessToken, setStoredAccessToken } from "../api/client";
 
 type AuthContextValue = {
-  firebaseUser: User | null;
   backendUser: BackendUser | null;
   loading: boolean;
+  isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (payload: SignupPayload) => Promise<void>;
   logout: () => Promise<void>;
   refreshBackendUser: () => Promise<void>;
 };
@@ -23,58 +22,54 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshBackendUser = async () => {
-    if (!auth.currentUser) {
+    if (!getStoredAccessToken()) {
       setBackendUser(null);
       return;
     }
-    const token = await auth.currentUser.getIdToken();
-    setBackendUser(await syncFirebaseUser(token));
+    setBackendUser(await getMe());
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
+    const restoreSession = async () => {
       try {
-        if (user) {
-          const token = await user.getIdToken();
-          setBackendUser(await syncFirebaseUser(token));
-        } else {
-          setBackendUser(null);
-        }
+        await refreshBackendUser();
+      } catch {
+        clearStoredAccessToken();
+        setBackendUser(null);
       } finally {
         setLoading(false);
       }
-    });
-    return () => unsubscribe();
+    };
+    void restoreSession();
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      firebaseUser,
       backendUser,
       loading,
+      isAuthenticated: Boolean(backendUser && getStoredAccessToken()),
       login: async (email: string, password: string) => {
-        const credential = await signInWithEmailAndPassword(auth, email, password);
-        const token = await credential.user.getIdToken();
-        setBackendUser(await syncFirebaseUser(token));
+        const response = await loginWithFastApi({ email, password });
+        setStoredAccessToken(response.access_token);
+        await refreshBackendUser();
       },
-      signup: async (email: string, password: string) => {
-        const credential = await createUserWithEmailAndPassword(auth, email, password);
-        const token = await credential.user.getIdToken();
-        setBackendUser(await syncFirebaseUser(token));
+      signup: async (payload: SignupPayload) => {
+        await signupWithFastApi(payload);
+        const response = await loginWithFastApi({ email: payload.email, password: payload.password });
+        setStoredAccessToken(response.access_token);
+        await refreshBackendUser();
       },
       logout: async () => {
-        await signOut(auth);
+        clearStoredAccessToken();
         setBackendUser(null);
       },
       refreshBackendUser,
     }),
-    [backendUser, firebaseUser, loading],
+    [backendUser, loading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,7 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 export default function Navbar() {
-  const { backendUser, firebaseUser, logout } = useAuth();
+  const { backendUser, isAuthenticated, logout } = useAuth();
 
   return (
     <header className="navbar">
@@ -11,9 +11,9 @@ export default function Navbar() {
         AI Health
       </Link>
       <div className="navbar-actions">
-        {firebaseUser ? (
+        {isAuthenticated ? (
           <>
-            <span>{backendUser?.nickname ?? firebaseUser.email}</span>
+            <span>{backendUser?.nickname ?? backendUser?.name ?? backendUser?.email}</span>
             <button type="button" onClick={logout}>
               로그아웃
             </button>

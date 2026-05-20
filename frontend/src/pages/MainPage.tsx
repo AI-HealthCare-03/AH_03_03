@@ -17,25 +17,25 @@ const publicFallback = {
 };
 
 export default function MainPage() {
-  const { firebaseUser } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [data, setData] = useState<MainData>(publicFallback);
 
   useEffect(() => {
     const load = async () => {
       try {
-        setData(firebaseUser ? await getMainSummary<MainData>() : await getPublicMain<MainData>());
+        setData(isAuthenticated ? await getMainSummary<MainData>() : await getPublicMain<MainData>());
       } catch {
         setData(publicFallback);
       }
     };
     void load();
-  }, [firebaseUser]);
+  }, [isAuthenticated]);
 
   return (
     <div className="page-grid">
       <Card title={String(data.service_title ?? "오늘의 건강 홈")}>
         <p>{String(data.service_description ?? "로그인 후 개인 건강 요약을 확인하세요.")}</p>
-        {!firebaseUser && (
+        {!isAuthenticated && (
           <div className="button-row">
             <Link className="button" to="/login">
               로그인
