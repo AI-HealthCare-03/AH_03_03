@@ -1,7 +1,6 @@
 import asyncio
 import os
 import sys
-from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -98,7 +97,7 @@ CHALLENGE_SEEDS = [
 
 
 async def seed_challenges() -> None:
-    await Tortoise.init(config=_get_seed_tortoise_config())
+    await Tortoise.init(config=TORTOISE_ORM)
     created_count = 0
     skipped_count = 0
     for seed in CHALLENGE_SEEDS:
@@ -122,15 +121,6 @@ async def seed_challenges() -> None:
     print("===== MVP Challenge Seed =====")
     print(f"created_count: {created_count}")
     print(f"skipped_count: {skipped_count}")
-
-
-def _get_seed_tortoise_config() -> dict:
-    tortoise_config = deepcopy(TORTOISE_ORM)
-    credentials = tortoise_config["connections"]["default"]["credentials"]
-    connect_timeout = credentials.pop("connect_timeout", None)
-    if connect_timeout is not None:
-        credentials.setdefault("timeout", connect_timeout)
-    return tortoise_config
 
 
 if __name__ == "__main__":
