@@ -32,6 +32,7 @@ ocr-compare/01_tesseract/*.traineddata
 ai_worker/vision/ocr/eval/images/
 ai_worker/vision/ocr/eval/pdfs/
 ai_worker/vision/ocr/eval/results/
+ai_worker/vision/ocr/eval/ground_truth.json
 
 # Local data / generated outputs
 ai_worker/ml/outputs/
