@@ -100,6 +100,17 @@ async def run_dummy_analysis(user_id: int, health_record: HealthRecord) -> list[
         )
         result = await create_analysis_result(user_id, request)
         factors = await create_analysis_factors(result.id, _dummy_factors(analysis_type, health_record, score))
+        await create_analysis_snapshot(
+            result.id,
+            _dummy_snapshot_request(
+                analysis_type=analysis_type,
+                health_record=health_record,
+                score=score,
+                risk_level=risk_level,
+                guide_message=request.summary or "",
+                factors=factors,
+            ),
+        )
         recommendation_ids = await _create_dummy_challenge_recommendations(user_id, result)
         results.append(
             {
@@ -234,6 +245,78 @@ def _dummy_factors(
         ),
     }[analysis_type]
     return [common_factor, disease_factor]
+
+
+def _dummy_snapshot_request(
+    analysis_type: AnalysisType,
+    health_record: HealthRecord,
+    score: Decimal,
+    risk_level: RiskLevel,
+    guide_message: str,
+    factors: list[AnalysisResultFactor],
+) -> AnalysisSnapshotCreateRequest:
+    input_features = {
+        "height_cm": _to_json_value(health_record.height_cm),
+        "weight_kg": _to_json_value(health_record.weight_kg),
+        "bmi": _to_json_value(health_record.bmi),
+        "waist_cm": _to_json_value(health_record.waist_cm),
+        "fasting_glucose": health_record.fasting_glucose,
+        "hba1c": _to_json_value(health_record.hba1c),
+        "total_cholesterol": health_record.total_cholesterol,
+        "ldl_cholesterol": health_record.ldl_cholesterol,
+        "hdl_cholesterol": health_record.hdl_cholesterol,
+        "triglyceride": health_record.triglyceride,
+    }
+    shap_outputs = [
+        {
+            "factor_key": factor.factor_key,
+            "factor_name": factor.factor_name,
+            "factor_value": factor.factor_value,
+            "contribution_score": _to_json_value(factor.contribution_score),
+            "direction": factor.direction,
+        }
+        for factor in factors
+    ]
+    return AnalysisSnapshotCreateRequest(
+        input_payload={
+            "input_features": input_features,
+            "analysis_type": analysis_type,
+        },
+        output_payload={
+            "model_outputs": {
+                analysis_type: {
+                    "risk_score": _to_json_value(score),
+                }
+            },
+            "rule_outputs": {
+                "low_threshold": 0.40,
+                "high_threshold": 0.70,
+                "rule_engine": "dummy_rule_based",
+            },
+            "final_outputs": {
+                "risk_level": risk_level,
+                "guide_message": guide_message,
+            },
+            "model_version_info": {
+                "model_name": "dummy_rule_based",
+                "model_version": "mvp-demo-v1",
+            },
+        },
+        shap_payload={
+            "note": "실제 SHAP 계산이 아닌 프론트 시연용 더미 factor입니다.",
+            "factors": shap_outputs,
+        },
+        model_payload={
+            "model_name": "dummy_rule_based",
+            "model_version": "mvp-demo-v1",
+        },
+    )
+
+
+def _to_json_value(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
 
 
 async def _create_dummy_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:

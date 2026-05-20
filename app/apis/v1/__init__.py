@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.apis.v1.analysis_routers import analysis_router
 from app.apis.v1.auth_routers import auth_router
 from app.apis.v1.challenge_routers import challenge_router
+from app.apis.v1.chatbot_routers import chatbot_router
 from app.apis.v1.dashboard_routers import dashboard_router
 from app.apis.v1.diet_routers import diet_router
 from app.apis.v1.exam_routers import exam_router
@@ -26,6 +27,7 @@ v1_routers.include_router(health_router)
 v1_routers.include_router(exam_router)
 v1_routers.include_router(analysis_router)
 v1_routers.include_router(challenge_router)
+v1_routers.include_router(chatbot_router)
 v1_routers.include_router(notification_router)
 v1_routers.include_router(setting_router)
 v1_routers.include_router(faq_router)

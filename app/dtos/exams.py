@@ -66,3 +66,8 @@ class ExamReportDetailResponse(ExamReportResponse):
 
 class ExamConfirmRequest(BaseModel):
     measurements: list[ExamMeasurementUpdateRequest] | None = None
+
+
+class ExamDummyOCRResponse(BaseModel):
+    message: str
+    measurements: list[ExamMeasurementResponse]
