@@ -7,6 +7,7 @@ class AnalysisType(StrEnum):
     DIABETES = "DIABETES"
     OBESITY = "OBESITY"
     DYSLIPIDEMIA = "DYSLIPIDEMIA"
+    HYPERTENSION = "HYPERTENSION"
 
 
 class RiskLevel(StrEnum):

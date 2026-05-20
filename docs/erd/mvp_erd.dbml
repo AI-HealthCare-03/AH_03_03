@@ -50,6 +50,7 @@ Enum analysis_type {
   DIABETES
   OBESITY
   DYSLIPIDEMIA
+  HYPERTENSION
 }
 
 Enum ocr_status {

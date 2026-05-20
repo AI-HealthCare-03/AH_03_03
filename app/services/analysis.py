@@ -42,7 +42,7 @@ async def list_analysis_results(user_id: int, limit: int = 20, offset: int = 0) 
 
 
 async def list_latest_analysis_results(user_id: int) -> list[AnalysisResult]:
-    return await analysis_repository.list_analysis_results_by_user(user_id, limit=3, offset=0)
+    return await analysis_repository.list_analysis_results_by_user(user_id, limit=4, offset=0)
 
 
 async def create_analysis_factor(
@@ -131,6 +131,7 @@ def _calculate_dummy_scores(record: HealthRecord) -> dict[AnalysisType, Decimal]
         AnalysisType.DIABETES: _diabetes_score(record),
         AnalysisType.OBESITY: _obesity_score(record),
         AnalysisType.DYSLIPIDEMIA: _dyslipidemia_score(record),
+        AnalysisType.HYPERTENSION: _hypertension_score(record),
     }
 
 
@@ -186,6 +187,22 @@ def _dyslipidemia_score(record: HealthRecord) -> Decimal:
     return score
 
 
+def _hypertension_score(record: HealthRecord) -> Decimal:
+    is_high = (record.systolic_bp is not None and record.systolic_bp >= 140) or (
+        record.diastolic_bp is not None and record.diastolic_bp >= 90
+    )
+    if is_high:
+        return Decimal("0.78")
+
+    is_medium = (record.systolic_bp is not None and record.systolic_bp >= 130) or (
+        record.diastolic_bp is not None and record.diastolic_bp >= 80
+    )
+    if is_medium:
+        return Decimal("0.52")
+
+    return Decimal("0.18")
+
+
 def _risk_level(score: Decimal) -> RiskLevel:
     if score >= Decimal("0.70"):
         return RiskLevel.HIGH
@@ -199,12 +216,14 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel) -> str:
         AnalysisType.DIABETES: "당뇨",
         AnalysisType.OBESITY: "비만",
         AnalysisType.DYSLIPIDEMIA: "이상지질혈증",
+        AnalysisType.HYPERTENSION: "고혈압",
     }[analysis_type]
+    dummy_notice = " 이 결과는 MVP 시연용 더미 룰이며 실제 의료 진단이 아닙니다."
     if risk_level == RiskLevel.HIGH:
-        return f"{disease_label} 관련 지표가 높게 나타났습니다. 생활습관 기록과 전문가 상담을 함께 고려해 주세요."
+        return f"{disease_label} 관련 지표가 높게 나타났습니다. 생활습관 기록과 전문가 상담을 함께 고려해 주세요.{dummy_notice}"
     if risk_level == RiskLevel.MEDIUM:
-        return f"{disease_label} 관련 관리가 필요한 구간입니다. 식단과 활동량을 꾸준히 기록해 보세요."
-    return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요."
+        return f"{disease_label} 관련 관리가 필요한 구간입니다. 식단과 활동량을 꾸준히 기록해 보세요.{dummy_notice}"
+    return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{dummy_notice}"
 
 
 def _dummy_factors(
@@ -243,6 +262,16 @@ def _dummy_factors(
             direction=FactorDirection.POSITIVE,
             display_order=1,
         ),
+        AnalysisType.HYPERTENSION: AnalysisResultFactorCreateRequest(
+            factor_key="blood_pressure",
+            factor_name="혈압",
+            factor_value=_blood_pressure_value(record),
+            contribution_score=Decimal("0.42")
+            if record.systolic_bp is not None or record.diastolic_bp is not None
+            else Decimal("0.00"),
+            direction=FactorDirection.POSITIVE,
+            display_order=1,
+        ),
     }[analysis_type]
     return [common_factor, disease_factor]
 
@@ -260,6 +289,8 @@ def _dummy_snapshot_request(
         "weight_kg": _to_json_value(health_record.weight_kg),
         "bmi": _to_json_value(health_record.bmi),
         "waist_cm": _to_json_value(health_record.waist_cm),
+        "systolic_bp": health_record.systolic_bp,
+        "diastolic_bp": health_record.diastolic_bp,
         "fasting_glucose": health_record.fasting_glucose,
         "hba1c": _to_json_value(health_record.hba1c),
         "total_cholesterol": health_record.total_cholesterol,
@@ -292,6 +323,14 @@ def _dummy_snapshot_request(
                 "low_threshold": 0.40,
                 "high_threshold": 0.70,
                 "rule_engine": "dummy_rule_based",
+                "note": "MVP 시연용 더미 룰이며 실제 의료 진단 또는 처방이 아닙니다.",
+                "hypertension_rule": {
+                    "high": "systolic_bp >= 140 또는 diastolic_bp >= 90",
+                    "medium": "systolic_bp >= 130 또는 diastolic_bp >= 80",
+                    "low": "그 외",
+                }
+                if analysis_type == AnalysisType.HYPERTENSION
+                else None,
             },
             "final_outputs": {
                 "risk_level": risk_level,
@@ -319,12 +358,21 @@ def _to_json_value(value: Any) -> Any:
     return value
 
 
+def _blood_pressure_value(record: HealthRecord) -> str | None:
+    if record.systolic_bp is None and record.diastolic_bp is None:
+        return None
+    systolic = record.systolic_bp if record.systolic_bp is not None else "-"
+    diastolic = record.diastolic_bp if record.diastolic_bp is not None else "-"
+    return f"{systolic}/{diastolic}"
+
+
 async def _create_dummy_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
     active_challenges = await challenge_service.list_active_challenges(limit=100)
     target_category = {
         AnalysisType.DIABETES: ChallengeCategory.BLOOD_GLUCOSE,
         AnalysisType.OBESITY: ChallengeCategory.WEIGHT,
         AnalysisType.DYSLIPIDEMIA: ChallengeCategory.DIET,
+        AnalysisType.HYPERTENSION: ChallengeCategory.BLOOD_PRESSURE,
     }[result.analysis_type]
     challenge = next((item for item in active_challenges if item.category == target_category), None)
     if challenge is None and active_challenges:
