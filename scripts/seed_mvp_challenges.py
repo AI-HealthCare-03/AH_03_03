@@ -1,10 +1,21 @@
 import asyncio
+import os
+import sys
+from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 
-from tortoise import Tortoise
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-from app.core.db.databases import TORTOISE_ORM
-from app.models.challenges import Challenge, ChallengeCategory, ChallengeStatus
+os.environ.setdefault("DB_HOST", "localhost")
+os.environ.setdefault("DB_PORT", "5432")
+
+from tortoise import Tortoise  # noqa: E402
+
+from app.core.db.databases import TORTOISE_ORM  # noqa: E402
+from app.models.challenges import Challenge, ChallengeCategory, ChallengeStatus  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -87,7 +98,7 @@ CHALLENGE_SEEDS = [
 
 
 async def seed_challenges() -> None:
-    await Tortoise.init(config=TORTOISE_ORM)
+    await Tortoise.init(config=_get_seed_tortoise_config())
     created_count = 0
     skipped_count = 0
     for seed in CHALLENGE_SEEDS:
@@ -111,6 +122,15 @@ async def seed_challenges() -> None:
     print("===== MVP Challenge Seed =====")
     print(f"created_count: {created_count}")
     print(f"skipped_count: {skipped_count}")
+
+
+def _get_seed_tortoise_config() -> dict:
+    tortoise_config = deepcopy(TORTOISE_ORM)
+    credentials = tortoise_config["connections"]["default"]["credentials"]
+    connect_timeout = credentials.pop("connect_timeout", None)
+    if connect_timeout is not None:
+        credentials.setdefault("timeout", connect_timeout)
+    return tortoise_config
 
 
 if __name__ == "__main__":
