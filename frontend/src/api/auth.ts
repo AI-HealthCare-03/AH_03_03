@@ -61,6 +61,13 @@ export async function getMe(): Promise<BackendUser> {
   return apiRequest<BackendUser>("/users/me");
 }
 
+export async function logout(): Promise<{ detail: string }> {
+  return apiRequest<{ detail: string }>("/auth/logout", {
+    method: "POST",
+    skipRefresh: true,
+  });
+}
+
 export async function syncFirebaseUser(token?: string): Promise<BackendUser> {
   return apiRequest<BackendUser>("/auth/firebase/sync", {
     method: "POST",

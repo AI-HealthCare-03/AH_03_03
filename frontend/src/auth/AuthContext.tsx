@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import {
   getMe,
   login as loginWithFastApi,
+  logout as logoutWithFastApi,
   signup as signupWithFastApi,
   type BackendUser,
   type SignupPayload,
@@ -67,8 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await refreshBackendUser();
       },
       logout: async () => {
-        clearStoredAccessToken();
-        setBackendUser(null);
+        try {
+          await logoutWithFastApi();
+        } finally {
+          clearStoredAccessToken();
+          setBackendUser(null);
+        }
       },
       refreshBackendUser,
     }),
