@@ -1,3 +1,9 @@
+"""Seed challenge master data for local MVP frontend demos.
+
+This script is for local MVP testing only. It is not intended for production or
+shared databases. Challenge rows are created idempotently by title.
+"""
+
 import asyncio
 import os
 import sys

@@ -124,6 +124,19 @@ uv run python -m ai_worker.main
 docker compose up -d --build ai_worker
 ```
 
+**로컬 MVP 데모 DB 준비:**
+프론트 MVP 화면을 빈 데이터 없이 확인하려면 PostgreSQL 컨테이너를 띄운 뒤 로컬 전용 seed를 실행합니다.
+이 방식은 로컬 MVP 테스트용이며, 운영/공유 DB에서는 Aerich migration 기준으로 관리해야 합니다.
+
+```bash
+docker compose up -d postgres
+uv run python scripts/setup_local_mvp_db.py
+```
+
+생성되는 데모 계정:
+- `demo@example.com` / `Demo1234!`
+- `demo_high@example.com` / `Demo1234!`
+
 ### 2. EC2 배포 환경 (Production)
 
 제공된 쉘 스크립트를 사용하여 AWS EC2 환경에 이미지를 빌드, 푸시 및 배포할 수 있습니다.
