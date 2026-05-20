@@ -115,7 +115,7 @@ async def sync_firebase_user(
         decoded_token = verify_firebase_id_token(id_token)
         user = await firebase_auth.sync_firebase_user(decoded_token)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Firebase ID token.") from exc
 

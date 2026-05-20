@@ -63,7 +63,7 @@ async def get_firebase_user(
         decoded_token = verify_firebase_id_token(credential.credentials)
         user = await sync_firebase_user(decoded_token)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Firebase ID token.") from exc
 
@@ -77,7 +77,10 @@ async def get_optional_firebase_user(
 ) -> User | None:
     if credential is None:
         return None
-    return await get_firebase_user(credential)
+    try:
+        return await get_firebase_user(credential)
+    except HTTPException:
+        return None
 
 
 async def get_request_user_with_firebase(
@@ -88,9 +91,11 @@ async def get_request_user_with_firebase(
 
     try:
         return await get_firebase_user(credential)
-    except HTTPException as firebase_error:
-        if firebase_error.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-            raise
+    except HTTPException:
+        # Firebase is an optional provider for the MVP frontend. If Firebase
+        # credentials are missing or the bearer token is not a Firebase ID token,
+        # continue with the existing FastAPI JWT authentication path.
+        pass
 
     try:
         verified = JwtService().verify_jwt(token=credential.credentials, token_type="access")
