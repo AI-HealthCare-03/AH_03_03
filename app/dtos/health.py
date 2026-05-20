@@ -85,3 +85,10 @@ class HealthRecordResponse(BaseSerializerModel):
 class HealthRecordListResponse(BaseModel):
     items: list[HealthRecordResponse]
     total: int
+
+
+class HealthAnalysisReadinessResponse(BaseModel):
+    is_ready: bool
+    latest_health_record_id: int | None = None
+    missing_fields: list[str]
+    message: str

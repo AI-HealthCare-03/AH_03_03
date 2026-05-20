@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from app.apis.v1.dependencies import ensure_admin_user, ensure_found, ensure_owner
 from app.dependencies.security import get_request_user
 from app.dtos.challenges import (
+    ChallengeActionResponse,
     ChallengeCreateRequest,
     ChallengeLogCreateRequest,
     ChallengeLogResponse,
@@ -76,6 +77,31 @@ async def list_challenge_logs(user_challenge_id: int, user: Annotated[User, Depe
     )
     ensure_owner(user_challenge.user_id, user)
     return await challenge_service.list_challenge_logs(user_challenge_id)
+
+
+@challenge_router.post("/my/{user_challenge_id}/complete-today", response_model=ChallengeActionResponse)
+async def complete_today_challenge(user_challenge_id: int, user: Annotated[User, Depends(get_request_user)]):
+    user_challenge = ensure_found(
+        await challenge_service.get_user_challenge(user_challenge_id),
+        "사용자 챌린지를 찾을 수 없습니다.",
+    )
+    ensure_owner(user_challenge.user_id, user)
+    result = await challenge_service.complete_today_challenge(user_challenge_id)
+    return {"message": "오늘 챌린지를 완료 처리했습니다.", "result": result}
+
+
+@challenge_router.patch("/my/{user_challenge_id}/give-up", response_model=ChallengeActionResponse)
+async def give_up_challenge(user_challenge_id: int, user: Annotated[User, Depends(get_request_user)]):
+    user_challenge = ensure_found(
+        await challenge_service.get_user_challenge(user_challenge_id),
+        "사용자 챌린지를 찾을 수 없습니다.",
+    )
+    ensure_owner(user_challenge.user_id, user)
+    result = ensure_found(
+        await challenge_service.give_up_challenge(user_challenge_id),
+        "사용자 챌린지를 찾을 수 없습니다.",
+    )
+    return {"message": "챌린지를 포기 처리했습니다.", "result": result}
 
 
 @challenge_router.post(

@@ -9,6 +9,7 @@ from app.dtos.dashboard import (
     DashboardHealthResponse,
     DashboardMedicationsResponse,
     DashboardSummaryResponse,
+    DashboardTrendsResponse,
 )
 from app.models.users import User
 from app.services import challenges as challenge_service
@@ -18,6 +19,8 @@ from app.services import medications as medication_service
 from app.services import notifications as notification_service
 
 dashboard_router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+TREND_PERIODS = {"week", "month", "three_months", "all"}
 
 
 @dashboard_router.get("/summary", response_model=DashboardSummaryResponse)
@@ -58,4 +61,66 @@ async def get_dashboard_medications(user: Annotated[User, Depends(get_request_us
     return {
         "active_medications": await medication_service.list_medications(user.id, is_active=True, limit=10),
         "recent_medication_records": await medication_service.list_medication_records(user_id=user.id, limit=10),
+    }
+
+
+@dashboard_router.get("/trends", response_model=DashboardTrendsResponse)
+async def get_dashboard_trends(user: Annotated[User, Depends(get_request_user)], period: str = "week"):
+    normalized_period = period if period in TREND_PERIODS else "week"
+    health_records = await health_service.list_health_records(user.id, limit=30)
+    diet_records = await diet_service.list_diet_records(user.id, limit=30)
+    user_challenges = await challenge_service.list_user_challenges(user.id, limit=20)
+
+    challenge_rates = []
+    for user_challenge in user_challenges[:10]:
+        logs = await challenge_service.list_challenge_logs(user_challenge.id)
+        if logs:
+            completed_count = sum(1 for log in logs if log.is_completed)
+            rate = round(completed_count / len(logs) * 100, 2)
+        else:
+            rate = 0.0
+        challenge_rates.append(
+            {
+                "date": user_challenge.started_at.date().isoformat(),
+                "value": rate,
+                "user_challenge_id": user_challenge.id,
+            }
+        )
+
+    return {
+        "period": normalized_period,
+        "glucose": [
+            {
+                "date": record.measured_at.date().isoformat(),
+                "value": record.fasting_glucose,
+            }
+            for record in health_records
+            if record.fasting_glucose is not None
+        ],
+        "blood_pressure": [
+            {
+                "date": record.measured_at.date().isoformat(),
+                "systolic": record.systolic_bp,
+                "diastolic": record.diastolic_bp,
+            }
+            for record in health_records
+            if record.systolic_bp is not None or record.diastolic_bp is not None
+        ],
+        "weight": [
+            {
+                "date": record.measured_at.date().isoformat(),
+                "value": float(record.weight_kg),
+            }
+            for record in health_records
+            if record.weight_kg is not None
+        ],
+        "challenge_completion_rate": challenge_rates,
+        "diet_score": [
+            {
+                "date": record.created_at.date().isoformat(),
+                "value": record.diet_score,
+            }
+            for record in diet_records
+            if record.diet_score is not None
+        ],
     }

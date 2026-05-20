@@ -1,12 +1,14 @@
+from datetime import datetime
 from typing import Any
 
+from app.core import config
 from app.dtos.challenges import (
     ChallengeCreateRequest,
     ChallengeLogCreateRequest,
     ChallengeRecommendationCreateRequest,
     UserChallengeCreateRequest,
 )
-from app.models.challenges import Challenge, ChallengeLog, ChallengeRecommendation, UserChallenge
+from app.models.challenges import Challenge, ChallengeLog, ChallengeRecommendation, UserChallenge, UserChallengeStatus
 from app.repositories import challenge_repository
 
 
@@ -47,6 +49,36 @@ async def create_challenge_log(user_challenge_id: int, request: ChallengeLogCrea
 
 async def list_challenge_logs(user_challenge_id: int) -> list[ChallengeLog]:
     return await challenge_repository.list_challenge_logs(user_challenge_id)
+
+
+async def complete_today_challenge(user_challenge_id: int) -> ChallengeLog:
+    today = datetime.now(config.TIMEZONE).date()
+    existing_log = await challenge_repository.get_challenge_log_by_date(user_challenge_id, today)
+    if existing_log is not None:
+        updated = await challenge_repository.update_challenge_log(
+            existing_log.id,
+            {"is_completed": True, "memo": existing_log.memo or "오늘 챌린지 완료"},
+        )
+        return updated or existing_log
+
+    return await challenge_repository.create_challenge_log(
+        user_challenge_id,
+        {
+            "log_date": today,
+            "is_completed": True,
+            "memo": "오늘 챌린지 완료",
+        },
+    )
+
+
+async def give_up_challenge(user_challenge_id: int) -> UserChallenge | None:
+    return await challenge_repository.update_user_challenge(
+        user_challenge_id,
+        {
+            "status": UserChallengeStatus.CANCELED,
+            "canceled_at": datetime.now(config.TIMEZONE),
+        },
+    )
 
 
 async def create_challenge_recommendation(

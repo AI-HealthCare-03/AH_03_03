@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 from app.models.challenges import Challenge, ChallengeLog, ChallengeRecommendation, ChallengeStatus, UserChallenge
@@ -45,6 +46,21 @@ async def create_challenge_log(user_challenge_id: int, data: dict[str, Any]) -> 
 
 async def list_challenge_logs(user_challenge_id: int) -> list[ChallengeLog]:
     return await ChallengeLog.filter(user_challenge_id=user_challenge_id).order_by("-log_date")
+
+
+async def get_challenge_log_by_date(user_challenge_id: int, log_date: date) -> ChallengeLog | None:
+    return await ChallengeLog.get_or_none(user_challenge_id=user_challenge_id, log_date=log_date)
+
+
+async def update_challenge_log(challenge_log_id: int, data: dict[str, Any]) -> ChallengeLog | None:
+    challenge_log = await ChallengeLog.get_or_none(id=challenge_log_id)
+    if challenge_log is None:
+        return None
+
+    for key, value in data.items():
+        setattr(challenge_log, key, value)
+    await challenge_log.save(update_fields=list(data.keys()) if data else None)
+    return challenge_log
 
 
 async def create_challenge_recommendation(

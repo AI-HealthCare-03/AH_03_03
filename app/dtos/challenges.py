@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -80,3 +81,8 @@ class ChallengeRecommendationResponse(BaseSerializerModel):
     priority: int
     is_selected: bool
     created_at: datetime
+
+
+class ChallengeActionResponse(BaseModel):
+    message: str
+    result: Any
