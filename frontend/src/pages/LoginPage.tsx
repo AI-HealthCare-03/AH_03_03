@@ -38,7 +38,7 @@ export default function LoginPage() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
-              minLength={6}
+              minLength={8}
               required
             />
           </label>

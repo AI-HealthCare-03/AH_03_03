@@ -9,7 +9,7 @@ import Card from "../components/Card";
 type Item = Record<string, unknown>;
 
 export default function MyPage() {
-  const { backendUser, firebaseUser } = useAuth();
+  const { backendUser } = useAuth();
   const [health, setHealth] = useState<Item[]>([]);
   const [analysis, setAnalysis] = useState<Item[]>([]);
   const [challenges, setChallenges] = useState<Item[]>([]);
@@ -26,7 +26,7 @@ export default function MyPage() {
   return (
     <div className="page-grid">
       <Card title="내 프로필">
-        <p>{backendUser?.email ?? firebaseUser?.email}</p>
+        <p>{backendUser?.email}</p>
         <p>role: {backendUser?.role ?? "USER"}</p>
         <button className="danger" onClick={() => window.confirm("회원탈퇴는 후속 구현에서 안전장치를 추가합니다.")}>
           회원탈퇴

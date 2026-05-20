@@ -7,7 +7,7 @@ import Card from "../components/Card";
 type Item = Record<string, unknown>;
 
 export default function FAQPage() {
-  const { firebaseUser } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [faqs, setFaqs] = useState<Item[]>([]);
   const [inquiries, setInquiries] = useState<Item[]>([]);
   const [title, setTitle] = useState("");
@@ -15,14 +15,14 @@ export default function FAQPage() {
 
   const load = async () => {
     setFaqs(await listFaqs<Item[]>());
-    if (firebaseUser) {
+    if (isAuthenticated) {
       setInquiries(await listMyInquiries<Item[]>());
     }
   };
 
   useEffect(() => {
     void load().catch(() => undefined);
-  }, [firebaseUser]);
+  }, [isAuthenticated]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -48,7 +48,7 @@ export default function FAQPage() {
         <form className="form" onSubmit={submit}>
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="제목" required />
           <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="내용" required />
-          <button type="submit" disabled={!firebaseUser}>
+          <button type="submit" disabled={!isAuthenticated}>
             문의 등록
           </button>
         </form>
