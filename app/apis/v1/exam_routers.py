@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user_with_firebase
 from app.dtos.exams import (
     ExamConfirmRequest,
+    ExamDummyOCRResponse,
     ExamMeasurementCreateRequest,
     ExamMeasurementResponse,
     ExamMeasurementUpdateRequest,
@@ -36,6 +37,13 @@ async def get_exam_report(exam_id: int, user: Annotated[User, Depends(get_reques
     report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
     ensure_owner(report.user_id, user)
     return report
+
+
+@exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamDummyOCRResponse)
+async def run_dummy_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
+    report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
+    ensure_owner(report.user_id, user)
+    return await exam_service.run_dummy_ocr(exam_id)
 
 
 @exam_router.patch("/{exam_id}", response_model=ExamReportResponse)
