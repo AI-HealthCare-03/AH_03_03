@@ -68,13 +68,15 @@ class CheckupOcrData(BaseModel):
     systolic_bp: str | float | None = None
     diastolic_bp: str | float | None = None
     fasting_glucose: str | float | None = None
+    hb: str | float | None = Field(None, description="혈색소(Hemoglobin) g/dL")
     total_cholesterol: str | float | None = None
     triglyceride: str | float | None = None
     hdl: str | float | None = None
     ldl: str | float | None = None
     height_cm: str | float | None = None
     weight_kg: str | float | None = None
-    bmi: str | float | None = None
+    bmi: str | float | None = Field(None, description="검진표 수치 또는 키·몸무게 자체 계산값")
+    bmi_calculated: bool = Field(False, description="True = 키·몸무게로 자체 계산 / False = 검진표 원본 수치")
     waist_cm: str | float | None = None
 
 
@@ -102,13 +104,28 @@ class ErrorResponse(BaseModel):
 
 
 ERROR_MAP: dict[str, dict] = {
-    "image_too_large": {"status_code": 413, "message": "이미지 크기가 너무 큽니다. 20MB 이하로 다시 시도해주세요."},
-    "image_too_small": {"status_code": 422, "message": "이미지가 손상되었거나 너무 작습니다. 다시 촬영해주세요."},
-    "unsupported_type": {"status_code": 415, "message": "지원하지 않는 형식입니다. JPG, PNG, WEBP로 업로드해주세요."},
+    "image_too_large": {
+        "status_code": 413,
+        "message": "이미지 크기가 너무 큽니다. 20MB 이하로 다시 시도해주세요.",
+    },
+    "image_too_small": {
+        "status_code": 422,
+        "message": "이미지가 손상되었거나 너무 작습니다. 다시 촬영해주세요.",
+    },
+    "unsupported_type": {
+        "status_code": 415,
+        "message": "지원하지 않는 형식입니다. JPG, PNG, WEBP로 업로드해주세요.",
+    },
     "quality_failed": {
         "status_code": 422,
         "message": "이미지 품질이 낮아 분석할 수 없습니다. 안내에 따라 다시 촬영해주세요.",
     },
-    "ocr_error": {"status_code": 500, "message": "OCR 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."},
-    "server_error": {"status_code": 500, "message": "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요."},
+    "ocr_error": {
+        "status_code": 500,
+        "message": "OCR 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    },
+    "server_error": {
+        "status_code": 500,
+        "message": "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    },
 }

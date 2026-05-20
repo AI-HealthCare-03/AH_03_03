@@ -3,10 +3,6 @@ ai_worker/vision/router.py
 
 GPT Vision 분석 FastAPI 라우터.
 MVP 기준 3개 엔드포인트 제공 (식단 / 처방전 / 건강검진표).
-
-팀 통합 시 app/main.py에 아래 추가:
-    from ai_worker.vision.router import router as vision_router
-    app.include_router(vision_router)
 """
 
 import logging
@@ -18,6 +14,7 @@ from .client import AnalysisType, VisionClient
 from .schemas import (
     ERROR_MAP,
     STATUS_MESSAGE,
+    AnalysisStatus,
     CheckupAnalysisResponse,
     CheckupExtractedData,
     DietAnalysisResponse,
@@ -54,8 +51,6 @@ MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 
 
 async def validate_image(file: UploadFile) -> bytes:
-    """업로드 이미지 형식 및 크기 검증."""
-
     if file.content_type not in ALLOWED_TYPES:
         err = ERROR_MAP["unsupported_type"]
         raise HTTPException(
@@ -99,8 +94,6 @@ async def call_vision(
     file: UploadFile,
     client: VisionClient,
 ) -> dict:
-    """이미지 검증 후 GPT Vision 호출. 에러 시 HTTPException 발생."""
-
     image_bytes = await validate_image(file)
 
     try:
@@ -130,6 +123,21 @@ async def call_vision(
         ) from e
 
 
+# ── BMI 계산 헬퍼 ─────────────────────────────────────────────────────────────
+
+
+def calculate_bmi(height_cm, weight_kg) -> float | None:
+    """키(cm)와 몸무게(kg)로 BMI를 계산합니다."""
+    try:
+        h = float(height_cm)
+        w = float(weight_kg)
+        if h > 0 and w > 0:
+            return round(w / ((h / 100) ** 2), 1)
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass
+    return None
+
+
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 
@@ -137,17 +145,11 @@ async def call_vision(
     "/diet",
     response_model=DietAnalysisResponse,
     summary="식단 이미지 분석",
-    description="""
-식단 사진을 업로드하면 음식명, 카테고리, 신뢰도를 분석합니다.
-
-- 결과는 사용자 확인 후 DIET 도메인에서 저장합니다.
-- 영양성분 계산은 DIET 도메인에서 처리합니다.
-    """,
     responses={
-        413: {"model": ErrorResponse, "description": "이미지 크기 초과"},
-        415: {"model": ErrorResponse, "description": "지원하지 않는 이미지 형식"},
-        422: {"model": ErrorResponse, "description": "이미지 품질 문제"},
-        500: {"model": ErrorResponse, "description": "GPT Vision 오류"},
+        413: {"model": ErrorResponse},
+        415: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 async def analyze_diet(
@@ -170,17 +172,11 @@ async def analyze_diet(
     "/prescription",
     response_model=PrescriptionAnalysisResponse,
     summary="처방전 / 약봉투 분석",
-    description="""
-약 봉투 또는 처방전 사진을 업로드하면 약품명, 용량, 수량을 추출합니다.
-
-- 복용법(횟수, 식전/후/간)은 추출하지 않습니다. 사용자가 직접 선택합니다.
-- 인식 불확실 항목은 requires_manual_input 목록으로 반환됩니다.
-    """,
     responses={
-        413: {"model": ErrorResponse, "description": "이미지 크기 초과"},
-        415: {"model": ErrorResponse, "description": "지원하지 않는 이미지 형식"},
-        422: {"model": ErrorResponse, "description": "이미지 품질 문제"},
-        500: {"model": ErrorResponse, "description": "GPT Vision 오류"},
+        413: {"model": ErrorResponse},
+        415: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 async def analyze_prescription(
@@ -204,17 +200,16 @@ async def analyze_prescription(
     response_model=CheckupAnalysisResponse,
     summary="건강검진표 수치 추출",
     description="""
-건강검진 결과지 사진을 업로드하면 4대 만성질환 관련 수치를 추출합니다.
+건강검진 결과지 사진을 업로드하면 만성질환 및 기초 건강 수치를 추출합니다.
 
-- 추출 항목: 혈압, 혈당, 당화혈색소, 콜레스테롤, 중성지방, HDL, LDL, 체중, BMI, 허리둘레
-- 정상/비정상 판정은 제공하지 않습니다.
-- 추출된 수치는 사용자 확인 후 저장하세요.
+- 추출 항목: 혈압, 혈당, 혈색소(Hb), 콜레스테롤, 중성지방, HDL, LDL, 키, 체중, 허리둘레
+- BMI: 검진표에 수치가 있으면 그대로 사용, 없으면 키·몸무게로 자체 계산 (bmi_calculated=True)
     """,
     responses={
-        413: {"model": ErrorResponse, "description": "이미지 크기 초과"},
-        415: {"model": ErrorResponse, "description": "지원하지 않는 이미지 형식"},
-        422: {"model": ErrorResponse, "description": "이미지 품질 문제"},
-        500: {"model": ErrorResponse, "description": "GPT Vision 오류"},
+        413: {"model": ErrorResponse},
+        415: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 async def analyze_checkup(
@@ -222,13 +217,49 @@ async def analyze_checkup(
     client: VisionClient = Depends(get_vision_client),
 ) -> CheckupAnalysisResponse:
     raw = await call_vision(AnalysisType.CHECKUP, file, client)
-    status = raw.get("analysis_status", "failed")
+
+    extracted = raw.get("extracted_data", {})
+    requires_manual: list[str] = raw.get("requires_manual_input", [])
+    bmi_calculated = False
+
+    # ── BMI 처리 ──────────────────────────────────────────────────────────────
+    # 검진표에 BMI 수치가 있으면 그대로, 없으면 키·몸무게로 자체 계산
+    bmi_raw = extracted.get("bmi")
+    height   = extracted.get("height_cm")
+    weight   = extracted.get("weight_kg")
+
+    if bmi_raw is not None:
+        # 검진표 원본 수치 사용
+        extracted["bmi"] = bmi_raw
+        bmi_calculated = False
+    elif height is not None and weight is not None:
+        # 구형 검진표 등 BMI 수치 없는 경우 → 자체 계산
+        calculated = calculate_bmi(height, weight)
+        if calculated is not None:
+            extracted["bmi"] = calculated
+            bmi_calculated = True
+            logger.info("BMI 자체 계산 | height=%.1f weight=%.1f bmi=%.1f", float(height), float(weight), calculated)
+        else:
+            extracted["bmi"] = None
+            if "bmi" not in requires_manual:
+                requires_manual.append("bmi")
+    else:
+        extracted["bmi"] = None
+        if "bmi" not in requires_manual:
+            requires_manual.append("bmi")
+
+    # ── 상태 재평가 ───────────────────────────────────────────────────────────
+    gpt_status = raw.get("analysis_status", "success")
+    if requires_manual and gpt_status == AnalysisStatus.SUCCESS:
+        gpt_status = AnalysisStatus.PARTIAL
 
     return CheckupAnalysisResponse(
-        analysis_status=status,
-        message=STATUS_MESSAGE.get(status, STATUS_MESSAGE["failed"]),
-        extracted_data=CheckupExtractedData(**raw.get("extracted_data", {})),
-        confidence_per_field=raw.get("confidence_per_field", {}),
-        unreadable_fields=raw.get("unreadable_fields", []),
+        analysis_status=gpt_status,
+        message=STATUS_MESSAGE.get(gpt_status, STATUS_MESSAGE["failed"]),
+        extracted_data=CheckupExtractedData(
+            **extracted,
+            bmi_calculated=bmi_calculated,
+        ),
+        requires_manual_input=requires_manual,
         raw_result=raw,
     )

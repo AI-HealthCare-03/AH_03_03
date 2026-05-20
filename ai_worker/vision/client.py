@@ -3,8 +3,6 @@ ai_worker/vision/client.py
 
 GPT Vision API 호출 클라이언트.
 프롬프트 관리 및 이미지 분석 요청을 담당합니다.
-
-MVP 기준으로 작성. 추후 프롬프트 튜닝 및 fallback 로직 보완 예정.
 """
 
 import base64
@@ -16,17 +14,11 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 
-# ── 분석 유형 ─────────────────────────────────────────────────────────────────
-
-
 class AnalysisType:
     DIET = "diet"
     PRESCRIPTION = "prescription"
     CHECKUP = "checkup"
 
-
-# ── 프롬프트 ──────────────────────────────────────────────────────────────────
-# TODO: 추후 프롬프트 튜닝 예정
 
 PROMPTS: dict[str, str] = {
     AnalysisType.DIET: """
@@ -69,34 +61,19 @@ PROMPTS: dict[str, str] = {
       미네랄   → 시금치, 견과류, 콩류
       항산화   → 토마토, 블루베리, 당근
       건강식   → 아보카도, 연어, 올리브유
-
     - 같은 재료라도 조리법이 다르면 반드시 구분
-      예시) 닭고기 → 치킨(튀김) / 닭가슴살(구이/찜) 구분
-      예시) 돼지고기 → 삼겹살(구이) / 제육볶음 / 돈까스(튀김) 구분
-
     - estimated_amount는 이미지에서 용량 추정이 가능하면 작성, 불가능하면 null
     - amount_requires_input은 용량 추정 불가능하면 true
     - nutrition은 estimated_amount 기준으로 추정, 추정 불가 항목은 null
-
     - 4대 만성질환 관련 영양소 반드시 포함
       고혈압       → 나트륨, 식이섬유
       당뇨         → 당류, 탄수화물, 식이섬유
       이상지질혈증  → 포화지방, 식이섬유
       비만         → 칼로리, 지방
-
-    - 영양성분_신뢰도는 추정 근거에 따라 유동적으로 설정
-      음식명이 명확하고 일반적인 음식 → 0.6~0.7
-      소스/양념에 덮여 재료 불명확   → 0.3~0.4
-      용량 추정 불가               → 0.2 이하
-    - 추후 식약처 영양성분 DB와 매칭 예정이므로 수치는 표준 단위(g, mg, kcal) 사용
     - 음식이 아닌 이미지면 analysis_status를 failed로, fail_reason에 한글로 사유 작성
     - 의료 진단 및 영양 처방 금지
-    - confidence는 음식 인식 확실성 기준으로 유동적으로 설정
-      이미지에서 명확히 식별 가능  → 0.85~0.95
-      대략적으로 식별 가능         → 0.65~0.80
-      소스/양념에 덮여 불분명      → 0.40~0.60
-      거의 식별 불가               → 0.40 이하
     """,
+
     AnalysisType.PRESCRIPTION: """
 이 약 봉투 또는 처방전 이미지에서 약물 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {
@@ -115,11 +92,12 @@ PROMPTS: dict[str, str] = {
 }
 
 규칙:
-- 복용법(횟수, 식전/후/간)은 추출하지 말 것 — 사용자가 직접 선택
+- 복용법(횟수, 식전/후/간)은 추출하지 말 것
 - 글자가 흐리거나 잘 안 보이면 partial로 반환
 - 처방전이 아닌 이미지면 failed로 반환하고 fail_reason 작성
 - 의료 진단 및 처방 변경 권고 금지
 """,
+
     AnalysisType.CHECKUP: """
 이 건강검진 결과지에서 아래 항목의 수치만 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {
@@ -127,6 +105,7 @@ PROMPTS: dict[str, str] = {
     "systolic_bp": null또는숫자,
     "diastolic_bp": null또는숫자,
     "fasting_glucose": null또는숫자,
+    "hb": null또는숫자,
     "total_cholesterol": null또는숫자또는"비해당",
     "triglyceride": null또는숫자또는"비해당",
     "hdl": null또는숫자또는"비해당",
@@ -143,31 +122,41 @@ PROMPTS: dict[str, str] = {
 }
 
 규칙:
-- 검진 결과지에 "비해당", "해당없음", "-", "N/A" 등으로 표시된 항목은 반드시 "비해당" 문자열로 반환할 것. 인식 오류 시 null로 반환. 참고치 수치와 혼동 금지
+- 검진 결과지에 "비해당", "해당없음", "-", "N/A" 등으로 표시된 항목은 반드시 "비해당" 문자열로 반환할 것
+- 인식 오류 시 null로 반환. 참고치 수치와 혼동 금지
 - 모든 수치는 반드시 항목명을 먼저 찾고, 그 항목명과 같은 행 또는 바로 옆에 위치한 수치만 추출할 것
-- 항목명 매핑 기준:
-  · systolic_bp → "수축기", "SBP" 포함 행의 첫 번째 수치
-  · diastolic_bp → "이완기", "DBP" 포함 행의 수치, 또는 혈압 수치에서 "/" 뒤 수치
-  · fasting_glucose → "공복혈당", "혈당", "GLU" 포함 행의 수치. 예: "공복혈당(mg/dL) | 83 | 100.0미만" → 83. "100.0미만"은 참고치이므로 절대 추출 금지
-  · total_cholesterol → "총콜레스테롤", "T-CHO" 포함 행의 수치. 예: "총콜레스테롤(mg/dL) | 비해당 | 200.0미만" → 비해당 (200.0미만은 참고치, 추출 금지)
-  · hdl → "고밀도 콜레스테롤", "HDL" 포함 행의 수치. 예: "고밀도 콜레스테롤(mg/dL) | 49 | 60.0이상" → 49
-  · triglyceride → "중성지방", "TG" 포함 행의 수치. 예: "중성지방(mg/dL) | 105 | 150.0미만" → 105
-  · ldl → "저밀도 콜레스테롤", "LDL" 포함 행의 수치. 예: "저밀도 콜레스테롤(mg/dL) | 67 | 130.0미만" → 67
-  · height_cm → "키", "신장", "Height" 포함 행의 수치
-  · weight_kg → "몸무게", "체중", "Weight" 포함 행의 수치
-  · bmi → "체질량지수", "BMI" 포함 행에서 체크박스(□■) 및 범위 표현(18.5미만, 18.5~24.9, 25~29.9, 30이상) 옆 숫자는 모두 무시하고, 독립적으로 기재된 실측 수치만 추출. 없으면 null
-  · waist_cm → "허리둘레", "허리" 포함 행의 수치
+
+항목명 매핑 기준:
+  · systolic_bp    → "수축기", "SBP" 포함 행의 첫 번째 수치
+  · diastolic_bp   → "이완기", "DBP" 포함 행의 수치, 또는 혈압 수치에서 "/" 뒤 수치
+  · fasting_glucose → "공복혈당", "혈당", "GLU" 포함 행의 수치
+                      예: "공복혈당(mg/dL) | 83 | 100.0미만" → 83 (100.0미만은 참고치, 절대 추출 금지)
+  · hb             → "혈색소", "Hb", "헤모글로빈" 포함 행의 수치 (단위 g/dL)
+                      주의: "당화혈색소(HbA1c)"는 다른 항목이므로 절대 혼동 금지
+                      예: "혈색소(g/dL) | 16.1 | 13.0~16.5" → 16.1 (13.0~16.5는 참고치, 추출 금지)
+  · total_cholesterol → "총콜레스테롤", "T-CHO" 포함 행의 수치
+                        예: "총콜레스테롤(mg/dL) | 비해당 | 200.0미만" → "비해당"
+  · hdl            → "고밀도 콜레스테롤", "HDL" 포함 행의 수치
+                      예: "고밀도 콜레스테롤(mg/dL) | 49 | 60.0이상" → 49
+  · triglyceride   → "중성지방", "TG" 포함 행의 수치
+                      예: "중성지방(mg/dL) | 105 | 150.0미만" → 105
+  · ldl            → "저밀도 콜레스테롤", "LDL" 포함 행의 수치
+                      예: "저밀도 콜레스테롤(mg/dL) | 67 | 130.0미만" → 67
+  · height_cm      → "키", "신장", "Height" 포함 행의 수치
+  · weight_kg      → "몸무게", "체중", "Weight" 포함 행의 수치
+  · bmi            → "체질량지수", "BMI" 포함 행에서 체크박스(□■) 및 범위 표현
+                      (18.5미만, 18.5~24.9, 25~29.9, 30이상) 옆 숫자는 모두 무시하고,
+                      독립적으로 기재된 실측 수치만 추출. 없으면 null
+  · waist_cm       → "허리둘레", "허리" 포함 행의 수치
+
 - 참고치(예: 200.0미만, 60.0이상, 150.0미만, 18.5~24.9, 30이상 등) 숫자는 절대 추출 금지
 - 표 레이아웃이나 항목 순서가 달라도 항목명 기준으로 매칭할 것
 """,
 }
 
 
-# ── Vision 클라이언트 ─────────────────────────────────────────────────────────
-
-
 class VisionClient:
-    """GPT Vision API 호출 클라이언트 (gpt-4o-mini)."""
+    """GPT Vision API 호출 클라이언트."""
 
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         self.client = AsyncOpenAI(api_key=api_key)
@@ -179,21 +168,6 @@ class VisionClient:
         image_bytes: bytes,
         media_type: str = "image/jpeg",
     ) -> dict:
-        """
-        이미지를 분석해 결과 dict를 반환합니다.
-
-        Args:
-            analysis_type: 분석 유형 (diet / prescription / checkup)
-            image_bytes:   원본 이미지 바이트
-            media_type:    MIME 타입 (기본 image/jpeg)
-
-        Returns:
-            GPT Vision 응답 JSON dict
-
-        Raises:
-            ValueError:        JSON 파싱 실패
-            openai.APIError:   OpenAI API 오류
-        """
         b64 = base64.b64encode(image_bytes).decode("utf-8")
         data_url = f"data:{media_type};base64,{b64}"
         prompt = PROMPTS[analysis_type]
@@ -223,7 +197,6 @@ class VisionClient:
         raw_text = response.choices[0].message.content.strip()
         logger.info("GPT Vision 응답 수신 | %s...", raw_text[:80])
 
-        # 마크다운 코드블록 제거 후 JSON 파싱
         cleaned = raw_text.replace("```json", "").replace("```", "").strip()
 
         try:

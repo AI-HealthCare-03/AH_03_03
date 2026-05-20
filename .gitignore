@@ -55,3 +55,14 @@ ai_worker/ml/LGB18~24/outputs/
 *.pth
 *.onnx
 *.h5
+
+# ocr-compare 개인정보 파일
+ocr-compare/results/images/
+ocr-compare/eval/images/
+ocr-compare/eval/pdfs/
+ocr-compare/eval/results/
+ocr-compare/results/*.json
+ai_worker/vision/ocr/eval/ground_truth.json
+ai_worker/vision/ocr/eval/images/
+ai_worker/vision/ocr/eval/pdfs/
+ai_worker/vision/ocr/eval/results/

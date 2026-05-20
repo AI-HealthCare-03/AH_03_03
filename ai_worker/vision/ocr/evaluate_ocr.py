@@ -32,10 +32,10 @@ import httpx
 
 # ── 경로 설정 ─────────────────────────────────────────────────────────────────
 
-BASE_DIR = Path(__file__).parent
-IMAGES_DIR = BASE_DIR / "images"
-PDFS_DIR = BASE_DIR / "pdfs"
-GT_PATH = BASE_DIR / "ground_truth.json"
+BASE_DIR = Path(r"C:\Users\82106\Desktop\PycharmProjects\AH_03_03\ai_worker\vision\ocr\eval")
+IMAGES_DIR  = BASE_DIR / "images"
+PDFS_DIR    = BASE_DIR / "pdfs"
+GT_PATH     = BASE_DIR / "ground_truth.json"
 RESULTS_DIR = BASE_DIR / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -52,27 +52,24 @@ TIMEOUT = 60.0
 def normalize(value) -> str | None:
     if value is None:
         return None
-    if isinstance(value, str) and value.strip() == "비해당":
-        return None
     return str(value).strip().replace(" ", "")
 
 
-def is_match(gt_value, ocr_value, tolerance: float = 0.05) -> bool | None:
+def is_match(gt_value, ocr_value) -> bool | None:
     gt_norm = normalize(gt_value)
     if gt_norm is None:
         return None
     if ocr_value is None:
         return False
     ocr_norm = normalize(ocr_value)
+    # 비해당은 문자열 완전 일치
+    if gt_norm == "비해당":
+        return ocr_norm == "비해당"
+    # 숫자는 완전 일치
     try:
-        gt_num = float(gt_norm)
-        ocr_num = float(ocr_norm)
-        if gt_num == 0:
-            return ocr_num == 0
-        return abs(gt_num - ocr_num) / abs(gt_num) <= tolerance
+        return float(gt_norm) == float(ocr_norm)
     except (ValueError, TypeError):
-        pass
-    return gt_norm == ocr_norm
+        return gt_norm == ocr_norm
 
 
 def calc_accuracy(gt: dict, extracted: dict) -> tuple[float, dict]:
