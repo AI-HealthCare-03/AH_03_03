@@ -35,18 +35,18 @@ def get_ocr_engine():
 # ── 키워드 매핑 ───────────────────────────────────────────────────────────────
 
 FIELD_KEYWORDS = {
-    "systolic_bp":       ["수축기", "고혈압", "혈압", "mmHg", "SBP"],
-    "diastolic_bp":      ["이완기", "DBP"],
-    "fasting_glucose":   ["공복혈당", "혈당", "공복", "GLU", "Glucose"],
-    "hb":                ["혈색소", "헤모글로빈"],  # Hb 단독 키워드는 HbA1c와 혼동 위험으로 제외
+    "systolic_bp": ["수축기", "고혈압", "혈압", "mmHg", "SBP"],
+    "diastolic_bp": ["이완기", "DBP"],
+    "fasting_glucose": ["공복혈당", "혈당", "공복", "GLU", "Glucose"],
+    "hb": ["혈색소", "헤모글로빈"],  # Hb 단독 키워드는 HbA1c와 혼동 위험으로 제외
     "total_cholesterol": ["총콜레스테롤", "콜레스테롤", "TC", "T-CHO", "CHOL"],
-    "triglyceride":      ["중성지방", "TG", "Triglyceride"],
-    "hdl":               ["고밀도", "HDL"],
-    "ldl":               ["저밀도", "LDL"],
-    "height_cm":         ["신장", "키(cm)", "키", "Height", "HT"],
-    "weight_kg":         ["체중", "몸무게(kg)", "몸무게", "Weight", "WT"],
-    "bmi":               ["BMI", "체질량", "비만도", "체질량지수"],
-    "waist_cm":          ["허리둘레(cm)", "허리둘레", "허리", "복부둘레", "Waist"],
+    "triglyceride": ["중성지방", "TG", "Triglyceride"],
+    "hdl": ["고밀도", "HDL"],
+    "ldl": ["저밀도", "LDL"],
+    "height_cm": ["신장", "키(cm)", "키", "Height", "HT"],
+    "weight_kg": ["체중", "몸무게(kg)", "몸무게", "Weight", "WT"],
+    "bmi": ["BMI", "체질량", "비만도", "체질량지수"],
+    "waist_cm": ["허리둘레(cm)", "허리둘레", "허리", "복부둘레", "Waist"],
 }
 
 # hb 유효 범위 (g/dL): 남 13~17, 여 12~16. 넉넉하게 설정
@@ -89,18 +89,18 @@ def is_keyword_match(text, keywords):
 
 def validate_value(field, value):
     ranges = {
-        "systolic_bp":       (60,   250),
-        "diastolic_bp":      (40,   150),
-        "fasting_glucose":   (40,   600),
-        "hb":                (5.0,  25.0),
-        "total_cholesterol": (50,   600),
-        "triglyceride":      (20,  2000),
-        "hdl":               (10,   200),
-        "ldl":               (20,   500),
-        "height_cm":         (100,  250),
-        "weight_kg":         (20,   300),
-        "bmi":               (10,    70),
-        "waist_cm":          (40,   200),
+        "systolic_bp": (60, 250),
+        "diastolic_bp": (40, 150),
+        "fasting_glucose": (40, 600),
+        "hb": (5.0, 25.0),
+        "total_cholesterol": (50, 600),
+        "triglyceride": (20, 2000),
+        "hdl": (10, 200),
+        "ldl": (20, 500),
+        "height_cm": (100, 250),
+        "weight_kg": (20, 300),
+        "bmi": (10, 70),
+        "waist_cm": (40, 200),
     }
     if field not in ranges:
         return True
@@ -139,7 +139,7 @@ def parse_height_weight(text_lines):
     for i, (text, _) in enumerate(text_lines):
         if is_keyword_match(text, FIELD_KEYWORDS["height_cm"]):
             # 현재 줄 + 이후 6줄 안에서 키/몸무게 탐색
-            context = text_lines[i: i + 7]
+            context = text_lines[i : i + 7]
             all_nums = []
             for ctx_text, _ in context:
                 all_nums.extend(extract_numbers(ctx_text))
@@ -216,6 +216,7 @@ def _extract_value_from_context(text_lines, i, text):
 
 
 DYSLIPIDEMIA_FIELDS = {"total_cholesterol", "triglyceride", "hdl", "ldl"}
+
 
 def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
     for i, (text, _) in enumerate(text_lines):

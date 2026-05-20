@@ -20,16 +20,16 @@ from dotenv import load_dotenv
 # ── 환경변수 로드 (.env는 AH_03_03 루트) ─────────────────────────────────────
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
-CLOVA_API_URL    = os.getenv("CLOVA_API_URL", "")
+CLOVA_API_URL = os.getenv("CLOVA_API_URL", "")
 CLOVA_SECRET_KEY = os.getenv("CLOVA_SECRET_KEY", "")
 
 # ── 경로 설정 ─────────────────────────────────────────────────────────────────
-BASE_DIR        = Path(__file__).parent.parent          # ocr-compare/
-IMAGES_DIR      = BASE_DIR / "results" / "images" / "checkup"
-RESULTS_DIR     = BASE_DIR / "results"
-COLUMNS_FILE    = RESULTS_DIR / "columns.json"
+BASE_DIR = Path(__file__).parent.parent  # ocr-compare/
+IMAGES_DIR = BASE_DIR / "results" / "images" / "checkup"
+RESULTS_DIR = BASE_DIR / "results"
+COLUMNS_FILE = RESULTS_DIR / "columns.json"
 GROUND_TRUTH_FILE = RESULTS_DIR / "ground_truth.json"
-OCR_NAME        = "clova"
+OCR_NAME = "clova"
 
 # ── 데이터 로드 ───────────────────────────────────────────────────────────────
 with open(COLUMNS_FILE, encoding="utf-8") as f:
@@ -38,10 +38,10 @@ with open(COLUMNS_FILE, encoding="utf-8") as f:
 with open(GROUND_TRUTH_FILE, encoding="utf-8") as f:
     ground_truth = json.load(f)
 
-NOT_MEASURED_VALUE    = columns_data["not_measured_value"]
+NOT_MEASURED_VALUE = columns_data["not_measured_value"]
 NOT_MEASURED_KEYWORDS = columns_data["not_measured_keywords"]
 
-FIELD_KEYS      = []
+FIELD_KEYS = []
 NULLABLE_FIELDS = set()
 for category in columns_data["columns"].values():
     for field in category["fields"]:
@@ -65,7 +65,7 @@ FIELD_KEYWORDS = {
 }
 
 # ── 노이즈 패턴 ───────────────────────────────────────────────────────────────
-NOISE_PATTERN    = re.compile(r"\d+\.?\d*\s*(만만|미만|이하|이상|초과|이내)")
+NOISE_PATTERN = re.compile(r"\d+\.?\d*\s*(만만|미만|이하|이상|초과|이내)")
 CHECKBOX_PATTERN = re.compile(r"[■□▣▪●○◆◇]")
 
 
@@ -92,17 +92,17 @@ def is_not_measured(text: str) -> bool:
 
 def validate_value(field: str, value: float) -> bool:
     ranges = {
-        "systolic_bp":       (60,  250),
-        "diastolic_bp":      (40,  150),
-        "fasting_glucose":   (40,  600),
-        "total_cholesterol": (50,  600),
-        "triglyceride":      (20, 2000),
-        "hdl":               (10,  200),
-        "ldl":               (20,  500),
-        "height_cm":         (100, 250),
-        "weight_kg":         (20,  300),
-        "bmi":               (10,   70),
-        "waist_cm":          (40,  200),
+        "systolic_bp": (60, 250),
+        "diastolic_bp": (40, 150),
+        "fasting_glucose": (40, 600),
+        "total_cholesterol": (50, 600),
+        "triglyceride": (20, 2000),
+        "hdl": (10, 200),
+        "ldl": (20, 500),
+        "height_cm": (100, 250),
+        "weight_kg": (20, 300),
+        "bmi": (10, 70),
+        "waist_cm": (40, 200),
     }
     if field not in ranges:
         return True
@@ -111,6 +111,7 @@ def validate_value(field: str, value: float) -> bool:
 
 
 # ── 파싱 함수 ─────────────────────────────────────────────────────────────────
+
 
 def parse_blood_pressure(lines: list[str]) -> tuple:
     for line in lines:
@@ -121,7 +122,7 @@ def parse_blood_pressure(lines: list[str]) -> tuple:
 
     for i, line in enumerate(lines):
         if "mmHg" in line or "mHg" in line:
-            context = lines[max(0, i - 3): i + 3]
+            context = lines[max(0, i - 3) : i + 3]
             combined = " ".join(context)
             nums = [n for n in extract_numbers(combined) if 40 <= n <= 250]
             if len(nums) >= 2:
@@ -145,7 +146,7 @@ def parse_height_weight(lines: list[str]) -> tuple:
     """
     for i, line in enumerate(lines):
         if is_keyword_match(line, ["키", "신장", "몸무게", "체중"]):
-            context = lines[i: i + 7]
+            context = lines[i : i + 7]
             nums = []
             for ctx_line in context:
                 for n in extract_numbers(ctx_line):
@@ -201,7 +202,7 @@ def parse_waist(lines: list[str]):
     for i, line in enumerate(lines):
         if not is_keyword_match(line, FIELD_KEYWORDS["waist_cm"]):
             continue
-        for ctx_line in lines[i: i + 4]:
+        for ctx_line in lines[i : i + 4]:
             nums = [n for n in extract_numbers(ctx_line) if 40 <= n <= 200]
             if nums:
                 return nums[0]
@@ -218,7 +219,7 @@ def parse_fasting_glucose(lines: list[str]):
     for i, line in enumerate(lines):
         if not is_keyword_match(line, FIELD_KEYWORDS["fasting_glucose"]):
             continue
-        for ctx_line in lines[i: i + 4]:
+        for ctx_line in lines[i : i + 4]:
             nums = [n for n in extract_numbers(ctx_line) if 40 <= n <= 600]
             if nums:
                 return nums[0]
@@ -242,16 +243,16 @@ def parse_dyslipidemia_all(lines: list[str]) -> dict:
     단일 키워드 파싱 fallback도 포함.
     """
     DYSLIPIDEMIA_KEYWORDS = {
-        "triglyceride":      FIELD_KEYWORDS["triglyceride"],
+        "triglyceride": FIELD_KEYWORDS["triglyceride"],
         "total_cholesterol": FIELD_KEYWORDS["total_cholesterol"],
-        "hdl":               FIELD_KEYWORDS["hdl"],
-        "ldl":               FIELD_KEYWORDS["ldl"],
+        "hdl": FIELD_KEYWORDS["hdl"],
+        "ldl": FIELD_KEYWORDS["ldl"],
     }
     DYSLIPIDEMIA_RANGES = {
-        "total_cholesterol": (50,  600),
-        "triglyceride":      (20, 2000),
-        "hdl":               (10,  200),
-        "ldl":               (20,  500),
+        "total_cholesterol": (50, 600),
+        "triglyceride": (20, 2000),
+        "hdl": (10, 200),
+        "ldl": (20, 500),
     }
 
     result = {k: None for k in DYSLIPIDEMIA_KEYWORDS}
@@ -270,7 +271,7 @@ def parse_dyslipidemia_all(lines: list[str]) -> dict:
     if len(keyword_order) >= 2:
         last_kw_idx = keyword_order[-1][1]
         # 마지막 키워드 이후 최대 15줄에서 값/비해당 수집
-        value_lines = lines[last_kw_idx + 1: last_kw_idx + 16]
+        value_lines = lines[last_kw_idx + 1 : last_kw_idx + 16]
         collected = []  # (type, value) - type: "not_measured" or "number"
         for vl in value_lines:
             if is_not_measured(vl):
@@ -296,7 +297,7 @@ def parse_dyslipidemia_all(lines: list[str]) -> dict:
         for i, line in enumerate(lines):
             if not is_keyword_match(line, DYSLIPIDEMIA_KEYWORDS[field]):
                 continue
-            check = lines[i: i + 4]
+            check = lines[i : i + 4]
             if any(is_not_measured(line) for line in check):
                 result[field] = NOT_MEASURED_VALUE
                 break
@@ -347,6 +348,7 @@ def extract_fields(lines: list[str]) -> dict:
 
 # ── CLOVA OCR API 호출 ────────────────────────────────────────────────────────
 
+
 def call_clova_api(file_path: Path) -> list[str]:
     suffix = file_path.suffix.lower()
 
@@ -360,7 +362,7 @@ def call_clova_api(file_path: Path) -> list[str]:
         with open(file_path, "rb") as f:
             files = {
                 "message": (None, json.dumps(request_json), "application/json"),
-                "file":    (file_path.name, f, "application/pdf"),
+                "file": (file_path.name, f, "application/pdf"),
             }
             headers = {"X-OCR-SECRET": CLOVA_SECRET_KEY}
             response = requests.post(CLOVA_API_URL, headers=headers, files=files, timeout=30)
@@ -374,7 +376,7 @@ def call_clova_api(file_path: Path) -> list[str]:
         with open(file_path, "rb") as f:
             files = {
                 "message": (None, json.dumps(request_json), "application/json"),
-                "file":    (file_path.name, f, "image/jpeg"),
+                "file": (file_path.name, f, "image/jpeg"),
             }
             headers = {"X-OCR-SECRET": CLOVA_SECRET_KEY}
             response = requests.post(CLOVA_API_URL, headers=headers, files=files, timeout=30)
@@ -395,6 +397,7 @@ def call_clova_api(file_path: Path) -> list[str]:
 
 # ── 정확도 측정 ───────────────────────────────────────────────────────────────
 
+
 def evaluate(extracted: dict, subject: str) -> dict:
     """
     gt_val이 None인 필드(동욱님 BMI 등)는 total에서 제외하고
@@ -402,11 +405,11 @@ def evaluate(extracted: dict, subject: str) -> dict:
     """
     gt = ground_truth["subjects"][subject]["ground_truth"]
     correct = 0
-    total   = 0
+    total = 0
     details = {}
 
     for key in FIELD_KEYS:
-        gt_val  = gt.get(key)
+        gt_val = gt.get(key)
         ext_val = extracted.get(key)
 
         # gt가 null → 정답 없음, 평가 제외
@@ -415,10 +418,10 @@ def evaluate(extracted: dict, subject: str) -> dict:
             continue
 
         total += 1
-        match  = False
+        match = False
 
         if gt_val == NOT_MEASURED_VALUE:
-            match = (ext_val == NOT_MEASURED_VALUE)
+            match = ext_val == NOT_MEASURED_VALUE
         elif ext_val is not None and ext_val != NOT_MEASURED_VALUE:
             tolerance = abs(float(gt_val)) * 0.05
             match = abs(float(ext_val) - float(gt_val)) <= tolerance
@@ -433,6 +436,7 @@ def evaluate(extracted: dict, subject: str) -> dict:
 
 # ── 결과 출력/저장 ────────────────────────────────────────────────────────────
 
+
 def print_result(subject: str, file_type: str, eval_result: dict, elapsed_ms: int):
     print(f"\n{'=' * 50}")
     print(f"  {OCR_NAME.upper()} | {subject} | {file_type.upper()}")
@@ -443,13 +447,13 @@ def print_result(subject: str, file_type: str, eval_result: dict, elapsed_ms: in
     for key, detail in eval_result["details"].items():
         if detail["match"] is None:
             status = "⬜"
-            note   = "(정답 없음 - 평가 제외)"
+            note = "(정답 없음 - 평가 제외)"
         elif detail["match"]:
             status = "✅"
-            note   = ""
+            note = ""
         else:
             status = "❌"
-            note   = ""
+            note = ""
         ext = "비해당" if detail["extracted"] == NOT_MEASURED_VALUE else detail["extracted"]
         print(f"  {status} {key}: 정답={detail['gt']} / 추출={ext} {note}")
     print("=" * 50)
@@ -458,13 +462,13 @@ def print_result(subject: str, file_type: str, eval_result: dict, elapsed_ms: in
 def save_result(subject: str, file_type: str, eval_result: dict, elapsed_ms: int):
     output = {
         "ocr_engine": OCR_NAME,
-        "subject":    subject,
-        "file_type":  file_type,
-        "accuracy":   eval_result["accuracy"],
-        "correct":    eval_result["correct"],
-        "total":      eval_result["total"],
+        "subject": subject,
+        "file_type": file_type,
+        "accuracy": eval_result["accuracy"],
+        "correct": eval_result["correct"],
+        "total": eval_result["total"],
         "elapsed_ms": elapsed_ms,
-        "details":    eval_result["details"],
+        "details": eval_result["details"],
     }
     filename = RESULTS_DIR / f"{OCR_NAME}_{subject}_{file_type}.json"
     with open(filename, "w", encoding="utf-8") as f:
@@ -474,6 +478,7 @@ def save_result(subject: str, file_type: str, eval_result: dict, elapsed_ms: int
 
 # ── README 자동 생성 ──────────────────────────────────────────────────────────
 
+
 def generate_readme(all_results: list):
     if not all_results:
         return
@@ -482,15 +487,13 @@ def generate_readme(all_results: list):
     pdf_results = [r for r in all_results if r["file_type"] == "pdf"]
 
     avg_acc_jpg = (
-        round(sum(r["eval_result"]["accuracy"] for r in jpg_results) / len(jpg_results), 1)
-        if jpg_results else 0
+        round(sum(r["eval_result"]["accuracy"] for r in jpg_results) / len(jpg_results), 1) if jpg_results else 0
     )
     avg_acc_pdf = (
-        round(sum(r["eval_result"]["accuracy"] for r in pdf_results) / len(pdf_results), 1)
-        if pdf_results else 0
+        round(sum(r["eval_result"]["accuracy"] for r in pdf_results) / len(pdf_results), 1) if pdf_results else 0
     )
-    avg_speed  = round(sum(r["elapsed_ms"] for r in all_results) / len(all_results))
-    subjects   = list(dict.fromkeys(r["subject"] for r in all_results))
+    avg_speed = round(sum(r["elapsed_ms"] for r in all_results) / len(all_results))
+    subjects = list(dict.fromkeys(r["subject"] for r in all_results))
 
     jpg_rows = [
         f"| {r['subject']} | {r['eval_result']['correct']}/{r['eval_result']['total']} ({r['eval_result']['accuracy']}%) | {r['elapsed_ms']}ms |"
@@ -502,8 +505,8 @@ def generate_readme(all_results: list):
     ]
 
     col_header = f"| 컬럼 | {' | '.join(subjects)} | 평균 |"
-    col_sep    = f"|------|{'--------|' * len(subjects)}--------|"
-    col_rows   = []
+    col_sep = f"|------|{'--------|' * len(subjects)}--------|"
+    col_rows = []
     for key in FIELD_KEYS:
         cells = []
         for subj in subjects:
@@ -589,17 +592,18 @@ CLOVA_SECRET_KEY=...
 
 # ── 테스트 실행 ───────────────────────────────────────────────────────────────
 
+
 def run_test(file_path: Path, subject: str, file_type: str):
     print(f"\n분석 중: {file_path.name}")
     try:
-        start   = time.time()
-        lines   = call_clova_api(file_path)
+        start = time.time()
+        lines = call_clova_api(file_path)
         elapsed = round((time.time() - start) * 1000)
     except Exception as e:
         print(f"  ❌ API 오류: {e}")
         return None
 
-    extracted   = extract_fields(lines)
+    extracted = extract_fields(lines)
     eval_result = evaluate(extracted, subject)
     print_result(subject, file_type, eval_result, elapsed)
     save_result(subject, file_type, eval_result, elapsed)

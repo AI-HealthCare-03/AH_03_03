@@ -73,7 +73,6 @@ PROMPTS: dict[str, str] = {
     - 음식이 아닌 이미지면 analysis_status를 failed로, fail_reason에 한글로 사유 작성
     - 의료 진단 및 영양 처방 금지
     """,
-
     AnalysisType.PRESCRIPTION: """
 이 약 봉투 또는 처방전 이미지에서 약물 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {
@@ -97,7 +96,6 @@ PROMPTS: dict[str, str] = {
 - 처방전이 아닌 이미지면 failed로 반환하고 fail_reason 작성
 - 의료 진단 및 처방 변경 권고 금지
 """,
-
     AnalysisType.CHECKUP: """
 이 건강검진 결과지에서 아래 항목의 수치만 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {

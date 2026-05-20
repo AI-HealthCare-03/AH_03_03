@@ -33,9 +33,9 @@ import httpx
 # ── 경로 설정 ─────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(r"C:\Users\82106\Desktop\PycharmProjects\AH_03_03\ai_worker\vision\ocr\eval")
-IMAGES_DIR  = BASE_DIR / "images"
-PDFS_DIR    = BASE_DIR / "pdfs"
-GT_PATH     = BASE_DIR / "ground_truth.json"
+IMAGES_DIR = BASE_DIR / "images"
+PDFS_DIR = BASE_DIR / "pdfs"
+GT_PATH = BASE_DIR / "ground_truth.json"
 RESULTS_DIR = BASE_DIR / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 

@@ -225,8 +225,8 @@ async def analyze_checkup(
     # ── BMI 처리 ──────────────────────────────────────────────────────────────
     # 검진표에 BMI 수치가 있으면 그대로, 없으면 키·몸무게로 자체 계산
     bmi_raw = extracted.get("bmi")
-    height   = extracted.get("height_cm")
-    weight   = extracted.get("weight_kg")
+    height = extracted.get("height_cm")
+    weight = extracted.get("weight_kg")
 
     if bmi_raw is not None:
         # 검진표 원본 수치 사용
