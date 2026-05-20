@@ -12,9 +12,15 @@ wheels/
 .coverage
 *.coverage
 .coverage.*
+*.sas7bdat
+.DS_Store
+**/.DS_Store
+ai_worker/outputs/
+ai_worker/data/
 # Vision 평가 데이터 (로컬 전용)
 ai_worker/vision/data/images/
 ai_worker/vision/data/results/
+.venv-ocr/
 .venv-ocr2/
 .venv-easyocr/
 
@@ -22,8 +28,29 @@ ai_worker/vision/data/results/
 ocr-compare/results/images/
 ocr-compare/results/*.json
 ocr-compare/01_tesseract/node_modules/
-ocr-compare/results/*.json
+ocr-compare/01_tesseract/*.traineddata
 ai_worker/vision/ocr/eval/images/
 ai_worker/vision/ocr/eval/pdfs/
 ai_worker/vision/ocr/eval/results/
-ocr-compare/01_tesseract/*.traineddata
+
+# Local data / generated outputs
+ai_worker/ml/outputs/
+ai_worker/ml/LGB18~24/outputs/
+**/outputs/
+/data/
+/output/
+/outputs/
+/results/
+/logs/
+/models/
+/checkpoints/
+
+# Dataset / model artifacts
+*.csv
+*.parquet
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.h5

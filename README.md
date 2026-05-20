@@ -101,6 +101,13 @@ docker-compose up -d --build
 
 DB는 PostgreSQL(pgvector) 컨테이너로 실행됩니다. 기존 MySQL 기준 Aerich migration을 사용하던 경우에는 migration 파일을 임의로 삭제하지 말고, 팀에서 PostgreSQL 기준으로 재초기화할지 먼저 결정한 뒤 `aerich init-db` 또는 신규 migration 생성 절차를 진행하세요.
 
+모델 변경 후 migration을 생성/적용할 때는 app dependency group을 포함해서 실행합니다.
+
+```bash
+uv run --group app aerich migrate --name <migration_name>
+uv run --group app aerich upgrade
+```
+
 #### 로컬에서 개별 실행 (개발용)
 
 **FastAPI 서버 실행:**
