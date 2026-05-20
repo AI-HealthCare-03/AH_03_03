@@ -30,7 +30,6 @@ TORTOISE_ORM = {
                 "user": config.DB_USER,
                 "password": config.DB_PASSWORD,
                 "database": config.DB_NAME,
-                "connect_timeout": config.DB_CONNECT_TIMEOUT,
                 "maxsize": config.DB_CONNECTION_POOL_MAXSIZE,
             },
         },
