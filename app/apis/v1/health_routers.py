@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner
 from app.dependencies.security import get_request_user
-from app.dtos.health import HealthRecordCreateRequest, HealthRecordResponse, HealthRecordUpdateRequest
+from app.dtos.health import (
+    HealthAnalysisReadinessResponse,
+    HealthRecordCreateRequest,
+    HealthRecordResponse,
+    HealthRecordUpdateRequest,
+)
 from app.models.users import User
 from app.services import health as health_service
 
@@ -24,6 +29,11 @@ async def list_health_records(user: Annotated[User, Depends(get_request_user)], 
 @health_router.get("/records/latest", response_model=HealthRecordResponse | None)
 async def get_latest_health_record(user: Annotated[User, Depends(get_request_user)]):
     return await health_service.get_latest_health_record(user.id)
+
+
+@health_router.get("/analysis-readiness", response_model=HealthAnalysisReadinessResponse)
+async def get_analysis_readiness(user: Annotated[User, Depends(get_request_user)]):
+    return await health_service.get_analysis_readiness(user.id)
 
 
 @health_router.get("/records/{record_id}", response_model=HealthRecordResponse)

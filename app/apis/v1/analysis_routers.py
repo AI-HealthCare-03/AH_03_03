@@ -11,11 +11,31 @@ from app.dtos.analysis import (
     AnalysisResultResponse,
     AnalysisSnapshotCreateRequest,
     AnalysisSnapshotResponse,
+    DummyAnalysisResultResponse,
+    DummyAnalysisRunRequest,
 )
 from app.models.users import User
 from app.services import analysis as analysis_service
+from app.services import health as health_service
 
 analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
+
+
+@analysis_router.post(
+    "/dummy-run",
+    response_model=list[DummyAnalysisResultResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def run_dummy_analysis(
+    request: DummyAnalysisRunRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    health_record = ensure_found(
+        await health_service.get_health_record(request.health_record_id),
+        "건강 기록을 찾을 수 없습니다.",
+    )
+    ensure_owner(health_record.user_id, user)
+    return await analysis_service.run_dummy_analysis(user.id, health_record)
 
 
 @analysis_router.post("/results", response_model=AnalysisResultResponse, status_code=status.HTTP_201_CREATED)
@@ -28,6 +48,11 @@ async def create_analysis_result(
 @analysis_router.get("/results", response_model=list[AnalysisResultResponse])
 async def list_analysis_results(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
     return await analysis_service.list_analysis_results(user.id, limit=limit, offset=offset)
+
+
+@analysis_router.get("/results/latest", response_model=list[AnalysisResultResponse])
+async def list_latest_analysis_results(user: Annotated[User, Depends(get_request_user)]):
+    return await analysis_service.list_latest_analysis_results(user.id)
 
 
 @analysis_router.get("/results/{result_id}", response_model=AnalysisResultResponse)

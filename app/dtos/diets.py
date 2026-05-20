@@ -78,3 +78,21 @@ class DietPhotoResultResponse(BaseModel):
 
 class DietRecordDetailResponse(DietRecordResponse):
     photo_results: list[DietPhotoResultResponse]
+
+
+class DietDummyAnalyzeRequest(BaseModel):
+    meal_type: str | None = None
+    meal_time: datetime | None = None
+    description: str | None = None
+    image_path: str | None = None
+    memo: str | None = None
+
+
+class DietDummyAnalyzeResponse(BaseModel):
+    message: str
+    diet_record: DietRecordResponse
+    photo_result: DietPhotoResultResponse
+    detected_foods: list[dict[str, Any]]
+    nutrition_summary: dict[str, Any]
+    diet_score: float
+    diet_feedback: str

@@ -26,3 +26,12 @@ class DashboardDietsResponse(BaseModel):
 class DashboardMedicationsResponse(BaseModel):
     active_medications: list[Any]
     recent_medication_records: list[Any]
+
+
+class DashboardTrendsResponse(BaseModel):
+    period: str
+    glucose: list[dict[str, Any]]
+    blood_pressure: list[dict[str, Any]]
+    weight: list[dict[str, Any]]
+    challenge_completion_rate: list[dict[str, Any]]
+    diet_score: list[dict[str, Any]]

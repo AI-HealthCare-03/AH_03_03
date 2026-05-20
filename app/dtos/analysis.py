@@ -14,6 +14,10 @@ class AnalysisRunRequest(BaseModel):
     exam_report_id: int | None = None
 
 
+class DummyAnalysisRunRequest(BaseModel):
+    health_record_id: int
+
+
 class AnalysisResultCreateRequest(BaseModel):
     health_record_id: int
     async_job_id: int | None = None
@@ -84,3 +88,13 @@ class AnalysisResultDetailResponse(BaseModel):
     result: AnalysisResultResponse
     factors: list[AnalysisResultFactorResponse]
     snapshot: AnalysisSnapshotResponse | None = None
+
+
+class DummyAnalysisResultResponse(BaseModel):
+    analysis_result_id: int
+    analysis_type: AnalysisType
+    risk_score: Decimal
+    risk_level: RiskLevel
+    guide_message: str
+    challenge_recommendation_ids: list[int]
+    factor_count: int = 0
