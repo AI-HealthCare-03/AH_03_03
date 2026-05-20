@@ -10,6 +10,8 @@ from app.models.users import Gender
 
 class UserUpdateRequest(BaseModel):
     name: Annotated[str | None, Field(None, min_length=2, max_length=20)]
+    login_id: Annotated[str | None, Field(None, min_length=6, max_length=40)] = None
+    nickname: Annotated[str | None, Field(None, max_length=30)] = None
     email: Annotated[
         EmailStr | None,
         Field(None, max_length=40),
@@ -28,13 +30,23 @@ class UserUpdateRequest(BaseModel):
         Gender | None,
         Field(None, description="'MALE' or 'FEMALE'"),
     ]
+    address: Annotated[str | None, Field(None, max_length=255)] = None
+    profile_image_url: Annotated[str | None, Field(None, max_length=500)] = None
 
 
 class UserInfoResponse(BaseSerializerModel):
     id: int
+    login_id: str | None = None
     name: str
+    nickname: str | None = None
     email: str
     phone_number: str
     birthday: date
     gender: Gender
+    address: str | None = None
+    profile_image_url: str | None = None
+    role: str = "USER"
+    is_active: bool
+    email_verified_at: datetime | None = None
+    deactivated_at: datetime | None = None
     created_at: datetime
