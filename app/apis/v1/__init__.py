@@ -14,10 +14,12 @@ from app.apis.v1.medication_routers import medication_router
 from app.apis.v1.mypage_routers import mypage_router
 from app.apis.v1.notification_routers import notification_router
 from app.apis.v1.setting_routers import setting_router
+from app.apis.v1.system_routers import system_router
 from app.apis.v1.user_routers import user_router
 
 v1_routers = APIRouter(prefix="/api/v1")
 v1_routers.include_router(main_router)
+v1_routers.include_router(system_router)
 v1_routers.include_router(auth_router)
 v1_routers.include_router(user_router)
 v1_routers.include_router(health_router)
