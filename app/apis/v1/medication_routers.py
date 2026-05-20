@@ -2,8 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.apis.v1.dependencies import ensure_found, ensure_owner
-from app.dependencies.security import get_request_user
+from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user_with_firebase
 from app.dtos.medications import (
     MedicationCreateRequest,
     MedicationRecordCreateRequest,
@@ -19,13 +18,15 @@ medication_router = APIRouter(prefix="/medications", tags=["medications"])
 
 
 @medication_router.post("", response_model=MedicationResponse, status_code=status.HTTP_201_CREATED)
-async def create_medication(request: MedicationCreateRequest, user: Annotated[User, Depends(get_request_user)]):
+async def create_medication(
+    request: MedicationCreateRequest, user: Annotated[User, Depends(get_request_user_with_firebase)]
+):
     return await medication_service.create_medication(user.id, request)
 
 
 @medication_router.get("", response_model=list[MedicationResponse])
 async def list_medications(
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
     is_active: bool | None = None,
     medication_type: str | None = None,
     limit: int = 20,
@@ -41,7 +42,7 @@ async def list_medications(
 
 
 @medication_router.get("/{medication_id}", response_model=MedicationResponse)
-async def get_medication(medication_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_medication(medication_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
     medication = ensure_found(
         await medication_service.get_medication(medication_id), "복약/영양제 정보를 찾을 수 없습니다."
     )
@@ -53,7 +54,7 @@ async def get_medication(medication_id: int, user: Annotated[User, Depends(get_r
 async def update_medication(
     medication_id: int,
     request: MedicationUpdateRequest,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
 ):
     medication = ensure_found(
         await medication_service.get_medication(medication_id), "복약/영양제 정보를 찾을 수 없습니다."
@@ -64,7 +65,7 @@ async def update_medication(
 
 
 @medication_router.patch("/{medication_id}/deactivate", response_model=MedicationResponse)
-async def deactivate_medication(medication_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def deactivate_medication(medication_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
     medication = ensure_found(
         await medication_service.get_medication(medication_id), "복약/영양제 정보를 찾을 수 없습니다."
     )
@@ -79,7 +80,7 @@ async def deactivate_medication(medication_id: int, user: Annotated[User, Depend
 async def create_medication_record(
     medication_id: int,
     request: MedicationRecordCreateRequest,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
 ):
     medication = ensure_found(
         await medication_service.get_medication(medication_id), "복약/영양제 정보를 찾을 수 없습니다."
@@ -91,7 +92,7 @@ async def create_medication_record(
 @medication_router.get("/{medication_id}/records", response_model=list[MedicationRecordResponse])
 async def list_medication_records(
     medication_id: int,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
     status: str | None = None,
     limit: int = 20,
     offset: int = 0,
@@ -113,7 +114,7 @@ async def list_medication_records(
 async def update_medication_record(
     record_id: int,
     request: MedicationRecordUpdateRequest,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
 ):
     record = ensure_found(await medication_service.get_medication_record(record_id), "복약 기록을 찾을 수 없습니다.")
     ensure_owner(record.user_id, user)

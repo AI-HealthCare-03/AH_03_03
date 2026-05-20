@@ -2,8 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.apis.v1.dependencies import ensure_found, ensure_owner
-from app.dependencies.security import get_request_user
+from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user_with_firebase
 from app.dtos.analysis import (
     AnalysisResultCreateRequest,
     AnalysisResultFactorCreateRequest,
@@ -28,7 +27,7 @@ analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
 )
 async def run_dummy_analysis(
     request: DummyAnalysisRunRequest,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
 ):
     health_record = ensure_found(
         await health_service.get_health_record(request.health_record_id),
@@ -40,30 +39,32 @@ async def run_dummy_analysis(
 
 @analysis_router.post("/results", response_model=AnalysisResultResponse, status_code=status.HTTP_201_CREATED)
 async def create_analysis_result(
-    request: AnalysisResultCreateRequest, user: Annotated[User, Depends(get_request_user)]
+    request: AnalysisResultCreateRequest, user: Annotated[User, Depends(get_request_user_with_firebase)]
 ):
     return await analysis_service.create_analysis_result(user.id, request)
 
 
 @analysis_router.get("/results", response_model=list[AnalysisResultResponse])
-async def list_analysis_results(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
+async def list_analysis_results(
+    user: Annotated[User, Depends(get_request_user_with_firebase)], limit: int = 20, offset: int = 0
+):
     return await analysis_service.list_analysis_results(user.id, limit=limit, offset=offset)
 
 
 @analysis_router.get("/results/latest", response_model=list[AnalysisResultResponse])
-async def list_latest_analysis_results(user: Annotated[User, Depends(get_request_user)]):
+async def list_latest_analysis_results(user: Annotated[User, Depends(get_request_user_with_firebase)]):
     return await analysis_service.list_latest_analysis_results(user.id)
 
 
 @analysis_router.get("/results/{result_id}", response_model=AnalysisResultResponse)
-async def get_analysis_result(result_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_analysis_result(result_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
     result = ensure_found(await analysis_service.get_analysis_result(result_id), "분석 결과를 찾을 수 없습니다.")
     ensure_owner(result.user_id, user)
     return result
 
 
 @analysis_router.get("/results/{result_id}/detail")
-async def get_analysis_result_detail(result_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_analysis_result_detail(result_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
     result = ensure_found(await analysis_service.get_analysis_result(result_id), "분석 결과를 찾을 수 없습니다.")
     ensure_owner(result.user_id, user)
     detail = await analysis_service.get_analysis_result_detail(result_id)
@@ -78,7 +79,7 @@ async def get_analysis_result_detail(result_id: int, user: Annotated[User, Depen
 async def create_analysis_factor(
     result_id: int,
     request: AnalysisResultFactorCreateRequest,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
 ):
     result = ensure_found(await analysis_service.get_analysis_result(result_id), "분석 결과를 찾을 수 없습니다.")
     ensure_owner(result.user_id, user)
@@ -86,7 +87,7 @@ async def create_analysis_factor(
 
 
 @analysis_router.get("/results/{result_id}/factors", response_model=list[AnalysisResultFactorResponse])
-async def list_analysis_factors(result_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def list_analysis_factors(result_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
     result = ensure_found(await analysis_service.get_analysis_result(result_id), "분석 결과를 찾을 수 없습니다.")
     ensure_owner(result.user_id, user)
     return await analysis_service.list_analysis_factors(result_id)
@@ -96,7 +97,7 @@ async def list_analysis_factors(result_id: int, user: Annotated[User, Depends(ge
 async def create_analysis_snapshot(
     analysis_result_id: int,
     request: AnalysisSnapshotCreateRequest,
-    user: Annotated[User, Depends(get_request_user)],
+    user: Annotated[User, Depends(get_request_user_with_firebase)],
 ):
     result = ensure_found(
         await analysis_service.get_analysis_result(analysis_result_id), "분석 결과를 찾을 수 없습니다."
@@ -106,7 +107,7 @@ async def create_analysis_snapshot(
 
 
 @analysis_router.get("/snapshots/{snapshot_id}", response_model=AnalysisSnapshotResponse)
-async def get_analysis_snapshot(snapshot_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_analysis_snapshot(snapshot_id: int, user: Annotated[User, Depends(get_request_user_with_firebase)]):
     snapshot = ensure_found(
         await analysis_service.get_analysis_snapshot_by_id(snapshot_id), "분석 스냅샷을 찾을 수 없습니다."
     )

@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.dependencies.security import get_request_user
+from app.apis.v1.dependencies import get_request_user_with_firebase
 from app.dtos.mypage import MyPageSummaryResponse
 from app.models.users import User
 from app.services import health as health_service
@@ -13,7 +13,7 @@ mypage_router = APIRouter(prefix="/mypage", tags=["mypage"])
 
 
 @mypage_router.get("/summary", response_model=MyPageSummaryResponse)
-async def get_mypage_summary(user: Annotated[User, Depends(get_request_user)]):
+async def get_mypage_summary(user: Annotated[User, Depends(get_request_user_with_firebase)]):
     unread_notifications = await notification_service.list_unread_notifications(user.id, limit=1000)
     return {
         "user": user,
