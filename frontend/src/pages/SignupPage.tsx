@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { createHealthRecord, type HealthRecordPayload } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
@@ -18,14 +19,36 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [lifestyle, setLifestyle] = useState({ smoking: "비흡연", drinking: "주 1회 이하", exercise: "주 3회" });
-  const [extraHealth, setExtraHealth] = useState({ height: "", weight: "", diseaseHistory: "" });
+  const [extraHealth, setExtraHealth] = useState({ height: "", weight: "", sleepHours: "", diseaseHistory: "" });
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const steps = ["계정 정보", "기본 정보", "생활 습관", "추가 건강 정보"];
+  const bmi =
+    extraHealth.height && extraHealth.weight
+      ? Number(extraHealth.weight) / (Number(extraHealth.height) / 100) ** 2
+      : null;
+
+  const buildInitialHealthPayload = (): HealthRecordPayload => {
+    const height = Number(extraHealth.height);
+    const weight = Number(extraHealth.weight);
+    const sleepHours = Number(extraHealth.sleepHours);
+    return {
+      measured_at: new Date().toISOString(),
+      ...(Number.isFinite(height) && height > 0 ? { height_cm: height } : {}),
+      ...(Number.isFinite(weight) && weight > 0 ? { weight_kg: weight } : {}),
+      ...(bmi ? { bmi: Number(bmi.toFixed(2)) } : {}),
+      is_smoker: lifestyle.smoking === "현재 흡연",
+      drinks_alcohol: lifestyle.drinking !== "주 1회 이하",
+      exercise_days_per_week: lifestyle.exercise === "주 5회 이상" ? 5 : lifestyle.exercise === "주 3회" ? 3 : 1,
+      ...(Number.isFinite(sleepHours) && sleepHours > 0 ? { sleep_hours: sleepHours } : {}),
+    };
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+    setNotice("");
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
       return;
@@ -36,7 +59,7 @@ export default function SignupPage() {
       return;
     }
 
-    const normalizedPhoneNumber = phoneNumber.replace(/[\s-]/g, "");
+    const normalizedPhoneNumber = phoneNumber.replace(/\D/g, "");
     try {
       await signup({
         login_id: loginId.trim(),
@@ -49,9 +72,12 @@ export default function SignupPage() {
         nickname: name.trim(),
         sensitive_data_agreed: true,
       });
-      // TODO: 생활 습관과 추가 건강 정보는 회원가입 후 health/profile API로 분리 저장한다.
-      void lifestyle;
-      void extraHealth;
+      try {
+        await createHealthRecord<unknown>(buildInitialHealthPayload());
+      } catch {
+        setNotice("회원가입은 완료되었습니다. 초기 건강정보 저장은 실패했지만, 나중에 건강정보 화면에서 입력할 수 있습니다.");
+        return;
+      }
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "회원가입에 실패했습니다.");
@@ -62,6 +88,11 @@ export default function SignupPage() {
     <div className="auth-page">
       <Card title="회원가입">
         {error && <ErrorMessage message={error} />}
+        {notice && (
+          <div className="state-box">
+            {notice} <Link to="/health">건강정보 입력으로 이동</Link>
+          </div>
+        )}
         <div className="stepper">
           {steps.map((label, index) => (
             <button
@@ -187,7 +218,7 @@ export default function SignupPage() {
                   <option>주 5회 이상</option>
                 </select>
               </label>
-              <p className="placeholder">생활 습관 항목은 회원가입 후 건강정보 API와 연결 예정입니다.</p>
+              <p className="placeholder">생활 습관 항목은 회원가입 후 초기 건강정보로 저장됩니다.</p>
             </>
           )}
 
@@ -210,14 +241,19 @@ export default function SignupPage() {
                 />
               </label>
               <div className="state-box">
-                BMI 자동 표시:{" "}
-                {extraHealth.height && extraHealth.weight
-                  ? (
-                      Number(extraHealth.weight) /
-                      (Number(extraHealth.height) / 100) ** 2
-                    ).toFixed(1)
-                  : "-"}
+                BMI 자동 표시: {bmi ? bmi.toFixed(1) : "-"}
               </div>
+              <label>
+                수면 시간
+                <input
+                  value={extraHealth.sleepHours}
+                  onChange={(event) => setExtraHealth((prev) => ({ ...prev, sleepHours: event.target.value }))}
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  placeholder="7"
+                />
+              </label>
               <label>
                 당뇨/고혈압/이상지질 가족력 여부
                 <select>
@@ -234,7 +270,7 @@ export default function SignupPage() {
                   placeholder="가족력, 복약, 관리 중인 질환 등을 적어주세요."
                 />
               </label>
-              <p className="placeholder">추가 건강 정보는 후속 단계에서 건강 기록으로 저장하도록 연결 예정입니다.</p>
+              <p className="placeholder">키, 몸무게, BMI, 수면 시간은 회원가입 후 초기 건강정보로 저장됩니다.</p>
             </>
           )}
 

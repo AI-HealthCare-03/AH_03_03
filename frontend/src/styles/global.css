@@ -76,6 +76,20 @@ button.danger {
   background: var(--color-primary-dark);
 }
 
+.btn-danger {
+  background: var(--color-primary-dark);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 18px;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -389,6 +403,26 @@ pre {
   padding: 5px 10px;
 }
 
+.badge-required {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+}
+
+.badge-optional {
+  background: var(--color-blue-soft);
+  color: var(--color-blue);
+}
+
+.badge-saved {
+  background: var(--color-green-soft);
+  color: var(--color-green);
+}
+
+.badge-missing {
+  background: var(--color-yellow-soft);
+  color: var(--color-yellow);
+}
+
 .risk-low {
   background: var(--color-green-soft);
   color: var(--color-green);
@@ -545,6 +579,88 @@ pre {
 .step.active {
   background: var(--color-primary);
   color: #fff;
+}
+
+.dialog-backdrop {
+  align-items: center;
+  background: rgba(17, 24, 39, 0.48);
+  display: grid;
+  inset: 0;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.confirm-dialog {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  display: grid;
+  gap: 14px;
+  margin: 0 auto;
+  max-width: 420px;
+  padding: 24px;
+  width: 100%;
+}
+
+.profile-section {
+  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  gap: 14px;
+  padding-bottom: 22px;
+}
+
+.profile-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.section-heading h3 {
+  margin-bottom: 4px;
+}
+
+.section-heading p {
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.profile-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-summary-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.profile-summary-item span {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.readiness-card {
+  display: grid;
+  gap: 12px;
+}
+
+.sticky-actions {
+  background: #fff;
+  border-top: 1px solid var(--color-border);
+  bottom: 0;
+  margin-top: 20px;
+  padding-top: 16px;
+  position: sticky;
 }
 
 .filter-tabs {

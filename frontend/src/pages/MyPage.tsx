@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { getLatestAnalysisResults } from "../api/analysis";
 import { listMyChallenges } from "../api/challenges";
@@ -62,6 +63,14 @@ export default function MyPage() {
                 <span />
               </div>
             ))}
+          </div>
+          <div className="button-row" style={{ marginTop: 16 }}>
+            <Link className="button secondary" to="/health/profile">
+              건강정보 수정
+            </Link>
+            <Link className="button secondary" to="/health">
+              건강 분석 입력
+            </Link>
           </div>
         </Card>
         <div className="page-grid">

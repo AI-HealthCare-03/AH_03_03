@@ -11,6 +11,7 @@ import DietHistoryPage from "./pages/DietHistoryPage";
 import DietPage from "./pages/DietPage";
 import DietResultPage from "./pages/DietResultPage";
 import FAQPage from "./pages/FAQPage";
+import HealthProfilePage from "./pages/HealthProfilePage";
 import HealthRecordPage from "./pages/HealthRecordPage";
 import InquiryPage from "./pages/InquiryPage";
 import LoginPage from "./pages/LoginPage";
@@ -24,6 +25,7 @@ import SignupPage from "./pages/SignupPage";
 // Wireframe mapping:
 // public landing -> MainPage, signup 4-step -> SignupPage, login -> LoginPage,
 // logged-in dashboard -> MainPage/DashboardPage, health input -> HealthRecordPage,
+// health profile management -> HealthProfilePage,
 // analysis result/list -> AnalysisPage/AnalysisHistoryPage, challenge list/detail -> ChallengePage/ChallengeDetailPage,
 // diet upload/result/history -> DietPage/DietResultPage/DietHistoryPage, inquiry -> InquiryPage,
 // account/settings/notifications/FAQ -> MyPage/SettingsPage/NotificationPage/FAQPage.
@@ -39,6 +41,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/health" element={<HealthRecordPage />} />
+          <Route path="/health/profile" element={<HealthProfilePage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/analysis/history" element={<AnalysisHistoryPage />} />
           <Route path="/analysis/:analysisId" element={<AnalysisHistoryPage />} />
