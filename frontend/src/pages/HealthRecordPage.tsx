@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { createHealthRecord, getAnalysisReadiness, listHealthRecords } from "../api/health";
 import Card from "../components/Card";
@@ -29,6 +30,7 @@ const initialForm = {
 };
 
 export default function HealthRecordPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
   const [records, setRecords] = useState<HealthRecord[]>([]);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
@@ -60,6 +62,13 @@ export default function HealthRecordPage() {
       measured_at: new Date().toISOString(),
     });
     await load();
+    const latestReadiness = await getAnalysisReadiness<Readiness>();
+    if (!latestReadiness.is_ready) {
+      setReadiness(latestReadiness);
+      setError("분석에 필요한 필수 건강정보가 부족합니다. 필수 건강정보 관리 화면에서 보완해주세요.");
+      return;
+    }
+    navigate("/analysis");
   };
 
   return (
@@ -77,6 +86,11 @@ export default function HealthRecordPage() {
         {error && <ErrorMessage message={error} />}
         <div className="state-box">
           정확한 분석을 위해 키, 몸무게, 혈압, 혈당, 지질 수치를 함께 입력해주세요.
+          <div className="button-row" style={{ marginTop: 12 }}>
+            <Link className="button secondary" to="/health/profile">
+              필수 건강정보 관리로 이동
+            </Link>
+          </div>
         </div>
         <form className="form two-col" onSubmit={submit}>
           {Object.keys(initialForm).map((key) => (
@@ -92,7 +106,7 @@ export default function HealthRecordPage() {
           ))}
           <div className="button-row">
             <button className="secondary" type="button">이전</button>
-            <button className="secondary" type="button">추가 정보 입력하기</button>
+            <Link className="button secondary" to="/health/profile">추가 정보 입력하기</Link>
             <button type="submit">분석 실행</button>
           </div>
         </form>
