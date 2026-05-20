@@ -30,6 +30,50 @@ export function clearStoredAccessToken(): void {
   window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
+function formatApiErrorDetail(detail: unknown): string | null {
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        if (item && typeof item === "object") {
+          const errorItem = item as { loc?: unknown; msg?: unknown; message?: unknown };
+          const rawMessage = errorItem.msg ?? errorItem.message;
+          if (rawMessage) {
+            const message = String(rawMessage).replace(/^Value error,\s*/i, "");
+            const field = Array.isArray(errorItem.loc)
+              ? errorItem.loc
+                  .filter((part) => part !== "body")
+                  .map(String)
+                  .join(".")
+              : "";
+            return field ? `${field}: ${message}` : message;
+          }
+        }
+        return JSON.stringify(item);
+      })
+      .filter(Boolean);
+    return messages.length > 0 ? messages.join("\n") : null;
+  }
+
+  if (detail && typeof detail === "object") {
+    if ("msg" in detail) {
+      return String((detail as { msg: unknown }).msg);
+    }
+    if ("message" in detail) {
+      return String((detail as { message: unknown }).message);
+    }
+    return JSON.stringify(detail);
+  }
+
+  return null;
+}
+
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   const isFormData = options.body instanceof FormData;
@@ -57,8 +101,8 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   if (!response.ok) {
     let message = `API 요청 실패 (${response.status})`;
     try {
-      const errorBody = (await response.json()) as { detail?: string };
-      message = errorBody.detail ?? message;
+      const errorBody = (await response.json()) as { detail?: unknown; message?: unknown };
+      message = formatApiErrorDetail(errorBody.detail ?? errorBody.message) ?? message;
     } catch {
       // Keep the status based fallback message.
     }

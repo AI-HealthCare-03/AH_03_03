@@ -53,7 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isAuthenticated: Boolean(backendUser && getStoredAccessToken()),
       login: async (email: string, password: string) => {
-        const response = await loginWithFastApi({ email, password });
+        const identifier = email.trim();
+        const response = await loginWithFastApi(
+          identifier.includes("@") ? { email: identifier, password } : { login_id: identifier, password },
+        );
         setStoredAccessToken(response.access_token);
         await refreshBackendUser();
       },

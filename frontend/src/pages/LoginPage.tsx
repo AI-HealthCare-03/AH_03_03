@@ -19,18 +19,30 @@ export default function LoginPage() {
       await login(email, password);
       navigate("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
+      const message = err instanceof Error ? err.message : "";
+      setError(
+        message.includes("Authenticate Failed") || message.includes("인증")
+          ? "이메일 또는 비밀번호를 확인해주세요."
+          : message || "로그인에 실패했습니다.",
+      );
     }
   };
 
   return (
     <div className="auth-page">
-      <Card title="로그인">
+      <Card>
+        <div className="page-header">
+          <div>
+            <span className="eyebrow">HealthCare</span>
+            <h1>다시 만나 반가워요!</h1>
+            <p>아이디 또는 이메일로 로그인하고 오늘의 건강 상태를 확인하세요.</p>
+          </div>
+        </div>
         {error && <ErrorMessage message={error} />}
         <form className="form" onSubmit={submit}>
           <label>
-            이메일
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required />
+            아이디 또는 이메일
+            <input value={email} onChange={(event) => setEmail(event.target.value)} required />
           </label>
           <label>
             비밀번호
@@ -44,6 +56,10 @@ export default function LoginPage() {
           </label>
           <button type="submit">로그인</button>
         </form>
+        <div className="button-row" style={{ marginTop: 12 }}>
+          <span className="muted">아이디 찾기</span>
+          <span className="muted">비밀번호 찾기</span>
+        </div>
         <p className="muted">
           계정이 없다면 <Link to="/signup">회원가입</Link>
         </p>
