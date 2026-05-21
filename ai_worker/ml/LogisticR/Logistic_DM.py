@@ -14,7 +14,6 @@ import warnings
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     classification_report,
