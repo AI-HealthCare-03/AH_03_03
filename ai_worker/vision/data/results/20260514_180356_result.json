@@ -1,0 +1,449 @@
+{
+  "평가일시": "2026-05-14T18:03:56.280924",
+  "모델": "gpt-4o-mini",
+  "전체이미지": 10,
+  "분석성공": 10,
+  "분석실패": 0,
+  "정확": 5.0,
+  "틀림": 5.0,
+  "정확도": "50.0%",
+  "상세결과": [
+    {
+      "image": "1.jpg",
+      "status": "대략맞음",
+      "gpt_result": [
+        {
+          "name": "새우 볶음밥",
+          "nutrient_category": "탄수화물|단백질|지방",
+          "cooking_method": "볶음",
+          "estimated_amount": "1공기",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 450,
+            "탄수화물": 60,
+            "당류": 5,
+            "단백질": 25,
+            "지방": 15,
+            "포화지방": 3,
+            "식이섬유": 2,
+            "나트륨": 600,
+            "영양성분_신뢰도": 0.65,
+            "추정값_여부": true
+          },
+          "confidence": 0.75,
+          "search_keyword": "새우 볶음밥"
+        }
+      ],
+      "correct_answer": null,
+      "score": 0.5
+    },
+    {
+      "image": "10.jpg",
+      "status": "정확",
+      "gpt_result": [
+        {
+          "name": "너겟",
+          "nutrient_category": "단백질|지방",
+          "cooking_method": "튀김",
+          "estimated_amount": null,
+          "amount_requires_input": true,
+          "nutrition": {
+            "칼로리": null,
+            "탄수화물": null,
+            "당류": null,
+            "단백질": null,
+            "지방": null,
+            "포화지방": null,
+            "식이섬유": null,
+            "나트륨": null,
+            "영양성분_신뢰도": 0.2,
+            "추정값_여부": true
+          },
+          "confidence": 0.7,
+          "search_keyword": "너겟"
+        }
+      ],
+      "correct_answer": null,
+      "score": 1.0
+    },
+    {
+      "image": "2.jpg",
+      "status": "정확",
+      "gpt_result": [
+        {
+          "name": "돈가스",
+          "nutrient_category": "단백질|지방|탄수화물",
+          "cooking_method": "튀김",
+          "estimated_amount": "300g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 700,
+            "탄수화물": 70,
+            "당류": 10,
+            "단백질": 30,
+            "지방": 40,
+            "포화지방": 15,
+            "식이섬유": 3,
+            "나트륨": 800,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.85,
+          "search_keyword": "돈가스"
+        }
+      ],
+      "correct_answer": null,
+      "score": 1.0
+    },
+    {
+      "image": "3.jpg",
+      "status": "틀림",
+      "gpt_result": [
+        {
+          "name": "프렌치 토스트",
+          "nutrient_category": "탄수화물|단백질|지방",
+          "cooking_method": "구이",
+          "estimated_amount": "200g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 350,
+            "탄수화물": 45,
+            "당류": 10,
+            "단백질": 12,
+            "지방": 15,
+            "포화지방": 5,
+            "식이섬유": null,
+            "나트륨": null,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.8,
+          "search_keyword": "프렌치 토스트"
+        },
+        {
+          "name": "핫도그",
+          "nutrient_category": "단백질|지방",
+          "cooking_method": "구이",
+          "estimated_amount": "50g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 150,
+            "탄수화물": 3,
+            "당류": null,
+            "단백질": 5,
+            "지방": 12,
+            "포화지방": 4,
+            "식이섬유": null,
+            "나트륨": 700,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.8,
+          "search_keyword": "핫도그"
+        }
+      ],
+      "correct_answer": "프렌치토스트, 소시지",
+      "score": 0.0
+    },
+    {
+      "image": "4.jpg",
+      "status": "틀림",
+      "gpt_result": [
+        {
+          "name": "삼겹살(구이)",
+          "nutrient_category": "단백질|지방",
+          "cooking_method": "구이",
+          "estimated_amount": "200g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 500,
+            "탄수화물": null,
+            "당류": null,
+            "단백질": 35,
+            "지방": 45,
+            "포화지방": 15,
+            "식이섬유": null,
+            "나트륨": null,
+            "영양성분_신뢰도": 0.7,
+            "추정값_여부": true
+          },
+          "confidence": 0.85,
+          "search_keyword": "삼겹살 구이"
+        }
+      ],
+      "correct_answer": "돼지갈비(구이)",
+      "score": 0.0
+    },
+    {
+      "image": "5.jpg",
+      "status": "정확",
+      "gpt_result": [
+        {
+          "name": "만두",
+          "nutrient_category": "탄수화물|단백질",
+          "cooking_method": "찜",
+          "estimated_amount": "3개",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 300,
+            "탄수화물": 60,
+            "당류": 5,
+            "단백질": 12,
+            "지방": 5,
+            "포화지방": 1,
+            "식이섬유": 2,
+            "나트륨": 600,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.8,
+          "search_keyword": "만두"
+        }
+      ],
+      "correct_answer": null,
+      "score": 1.0
+    },
+    {
+      "image": "6.jpg",
+      "status": "틀림",
+      "gpt_result": [
+        {
+          "name": "소라구이",
+          "nutrient_category": "단백질|지방|항산화",
+          "cooking_method": "구이",
+          "estimated_amount": "150g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 200,
+            "탄수화물": null,
+            "당류": null,
+            "단백질": 30,
+            "지방": 10,
+            "포화지방": null,
+            "식이섬유": null,
+            "나트륨": null,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.7,
+          "search_keyword": "소라구이"
+        }
+      ],
+      "correct_answer": "오징어(구이)",
+      "score": 0.0
+    },
+    {
+      "image": "7.jpg",
+      "status": "정확",
+      "gpt_result": [
+        {
+          "name": "치즈햄샌드위치",
+          "nutrient_category": "탄수화물|단백질|지방",
+          "cooking_method": "구이",
+          "estimated_amount": "1개",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 350,
+            "탄수화물": 30,
+            "당류": 5,
+            "단백질": 15,
+            "지방": 20,
+            "포화지방": 8,
+            "식이섬유": 2,
+            "나트륨": 600,
+            "영양성분_신뢰도": 0.7,
+            "추정값_여부": true
+          },
+          "confidence": 0.85,
+          "search_keyword": "치즈햄샌드위치"
+        }
+      ],
+      "correct_answer": null,
+      "score": 1.0
+    },
+    {
+      "image": "8.jpg",
+      "status": "틀림",
+      "gpt_result": [
+        {
+          "name": "닭고기(구이)",
+          "nutrient_category": "단백질|지방|식이섬유",
+          "cooking_method": "구이",
+          "estimated_amount": "200g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 400,
+            "탄수화물": null,
+            "당류": null,
+            "단백질": 30,
+            "지방": 30,
+            "포화지방": 10,
+            "식이섬유": null,
+            "나트륨": 700,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.85,
+          "search_keyword": "닭고기 구이"
+        },
+        {
+          "name": "메밀면",
+          "nutrient_category": "탄수화물|식이섬유",
+          "cooking_method": "생것",
+          "estimated_amount": "100g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 200,
+            "탄수화물": 40,
+            "당류": null,
+            "단백질": 8,
+            "지방": 2,
+            "포화지방": null,
+            "식이섬유": 5,
+            "나트륨": null,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.75,
+          "search_keyword": "메밀면"
+        },
+        {
+          "name": "상추",
+          "nutrient_category": "식이섬유|비타민",
+          "cooking_method": "생것",
+          "estimated_amount": "30g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 10,
+            "탄수화물": 2,
+            "당류": 1,
+            "단백질": 1,
+            "지방": null,
+            "포화지방": null,
+            "식이섬유": 1,
+            "나트륨": null,
+            "영양성분_신뢰도": 0.7,
+            "추정값_여부": true
+          },
+          "confidence": 0.8,
+          "search_keyword": "상추"
+        }
+      ],
+      "correct_answer": "족발, 상추, 메밀면",
+      "score": 0.0
+    },
+    {
+      "image": "9.jpg",
+      "status": "대략맞음",
+      "gpt_result": [
+        {
+          "name": "구운 가지",
+          "nutrient_category": "식이섬유|비타민",
+          "cooking_method": "구이",
+          "estimated_amount": "100g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 35,
+            "탄수화물": 8,
+            "당류": 3,
+            "단백질": 1,
+            "지방": 0.4,
+            "포화지방": 0,
+            "식이섬유": 2.5,
+            "나트륨": 1,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.8,
+          "search_keyword": "가지"
+        },
+        {
+          "name": "소시지",
+          "nutrient_category": "단백질|지방",
+          "cooking_method": "구이",
+          "estimated_amount": "70g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 220,
+            "탄수화물": 2,
+            "당류": 0,
+            "단백질": 12,
+            "지방": 20,
+            "포화지방": 8,
+            "식이섬유": 0,
+            "나트륨": 500,
+            "영양성분_신뢰도": 0.7,
+            "추정값_여부": true
+          },
+          "confidence": 0.85,
+          "search_keyword": "소시지"
+        },
+        {
+          "name": "옥수수",
+          "nutrient_category": "탄수화물|식이섬유",
+          "cooking_method": "삶은",
+          "estimated_amount": "50g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 50,
+            "탄수화물": 12,
+            "당류": 3,
+            "단백질": 2,
+            "지방": 0.5,
+            "포화지방": 0.2,
+            "식이섬유": 2,
+            "나트륨": 1,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.75,
+          "search_keyword": "옥수수"
+        },
+        {
+          "name": "검은 올리브",
+          "nutrient_category": "지방|항산화",
+          "cooking_method": "생것",
+          "estimated_amount": "30g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 50,
+            "탄수화물": 3,
+            "당류": 0,
+            "단백질": 1,
+            "지방": 5,
+            "포화지방": 0.5,
+            "식이섬유": 2,
+            "나트륨": 200,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.7,
+          "search_keyword": "검은 올리브"
+        },
+        {
+          "name": "녹두",
+          "nutrient_category": "식이섬유|단백질|비타민",
+          "cooking_method": "삶은",
+          "estimated_amount": "50g",
+          "amount_requires_input": false,
+          "nutrition": {
+            "칼로리": 30,
+            "탄수화물": 7,
+            "당류": 1,
+            "단백질": 3,
+            "지방": 0.2,
+            "포화지방": 0,
+            "식이섬유": 3,
+            "나트륨": 1,
+            "영양성분_신뢰도": 0.6,
+            "추정값_여부": true
+          },
+          "confidence": 0.65,
+          "search_keyword": "녹두"
+        }
+      ],
+      "correct_answer": null,
+      "score": 0.5
+    }
+  ]
+}
