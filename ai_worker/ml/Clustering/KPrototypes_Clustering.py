@@ -50,7 +50,7 @@ CONT_COLS = [
 ]
 
 CAT_COLS = [
-    "성별코드",
+    # "성별코드",
     "연령대코드(5세단위)",
     "흡연상태",
     "음주여부",
@@ -238,7 +238,7 @@ def main() -> None:
     print("시각화 저장 완료")
 
     # ── 저장 ─────────────────────────────────────────────────
-    cluster_summary.to_csv(os.path.join(OUTPUT_DIR, "cluster_summary.csv"))
+    cluster_summary.to_csv(os.path.join(OUTPUT_DIR, "no_gender_cluster_summary.csv"))
     df[
         ["cluster"] + CONT_COLS_FINAL + CAT_COLS + ["고혈압_기준", "당뇨_기준", "이상지질혈증_기준", "비만_기준"]
     ].to_csv(os.path.join(OUTPUT_DIR, "clustered_data.csv"), index=False)
