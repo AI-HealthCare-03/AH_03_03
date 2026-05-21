@@ -17,5 +17,7 @@ ai_worker/vision/data/images/
 ai_worker/vision/data/results/
 .venv-ocr/
 .venv-ocr2/
+# ML
 .csv
 .sas7bdat
+*.oof
