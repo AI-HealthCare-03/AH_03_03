@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { completeToday, giveUpChallenge, joinChallenge, listChallenges, listMyChallenges } from "../api/challenges";
+import {
+  completeToday,
+  giveUpChallenge,
+  joinChallenge,
+  listChallengeLogs,
+  listChallenges,
+  listMyChallenges,
+} from "../api/challenges";
 import Card from "../components/Card";
 
 type Challenge = Record<string, unknown>;
+type ChallengeLog = Record<string, unknown>;
+
+const PAGE_SIZE = 6;
 
 const tabToCategory: Record<string, string | null> = {
   전체: null,
@@ -46,8 +56,15 @@ const categoryLabel: Record<string, string> = {
   WEIGHT: "체중 관리",
 };
 
+const challengeTypeLabel: Record<string, string> = {
+  SPECIAL: "특수 챌린지",
+  COMMON: "공통 챌린지",
+  GENERAL: "일반 챌린지",
+};
+
 const targetDiseaseLabel: Record<string, string> = {
   COMMON: "공통 건강관리",
+  GENERAL: "일반 건강관리",
   DIABETES: "당뇨 관리",
   HYPERTENSION: "고혈압 관리",
   DYSLIPIDEMIA: "이상지질혈증 관리",
@@ -89,6 +106,11 @@ function getDisplayStatus(value: unknown): string {
 function getDisplayCategory(value: unknown): string {
   const category = String(value ?? "COMMON").toUpperCase();
   return categoryLabel[category] ?? "공통";
+}
+
+function getDisplayChallengeType(challenge: Challenge): string {
+  const raw = String(challenge.challenge_type ?? "GENERAL").toUpperCase();
+  return challengeTypeLabel[raw] ?? "일반 챌린지";
 }
 
 function getDifficulty(value: unknown): string {
@@ -191,6 +213,52 @@ function isTodayCompleted(item: Challenge): boolean {
   return Boolean(item.today_completed ?? item.is_today_completed ?? item.completed_today);
 }
 
+function getDailyGoalCount(item: Challenge | undefined, challengeList: Challenge[] = []): number {
+  if (!item) {
+    return 1;
+  }
+  const direct = Number(item.daily_goal_count ?? item.daily_goal);
+  if (Number.isFinite(direct) && direct > 0) {
+    return Math.max(1, Math.min(Math.round(direct), 10));
+  }
+  const master = findMasterChallenge(item, challengeList);
+  const metric = String(item.target_metric ?? master?.target_metric ?? "").toLowerCase();
+  if (!["count", "times", "횟수", "회"].some((token) => metric.includes(token))) {
+    return 1;
+  }
+  const matched = String(item.target_value ?? master?.target_value ?? "").match(/\d+/);
+  return matched ? Math.max(1, Math.min(Number(matched[0]), 10)) : 1;
+}
+
+function getTodayCompletedCount(item: Challenge | undefined): number {
+  if (!item) {
+    return 0;
+  }
+  const count = Number(item.today_completed_count ?? item.today_count);
+  if (Number.isFinite(count) && count >= 0) {
+    return Math.round(count);
+  }
+  return isTodayCompleted(item) ? 1 : 0;
+}
+
+function getTodayActionLabel(item: Challenge | undefined, challengeList: Challenge[] = []): string {
+  const dailyGoal = getDailyGoalCount(item, challengeList);
+  const current = getTodayCompletedCount(item);
+  if (current >= dailyGoal) {
+    return "오늘 완료됨";
+  }
+  if (dailyGoal > 1) {
+    return `${current + 1}/${dailyGoal} 수행하기`;
+  }
+  return "오늘 수행 완료";
+}
+
+function getLocalDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 function getProgress(item: Challenge, challengeList: Challenge[] = []): number {
   const explicit = Number(item.progress ?? item.progress_rate);
   if (Number.isFinite(explicit)) {
@@ -221,13 +289,23 @@ function isJoinedStatus(item: Challenge | undefined): boolean {
   return !["", "PENDING"].includes(normalizeStatus(item.status));
 }
 
+function isActiveChallengeStatus(item: Challenge | undefined): boolean {
+  if (!item) {
+    return false;
+  }
+  return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status));
+}
+
 export default function ChallengePage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [myChallenges, setMyChallenges] = useState<Challenge[]>([]);
+  const [logsByUserChallengeId, setLogsByUserChallengeId] = useState<Record<number, ChallengeLog[]>>({});
   const [activeTab, setActiveTab] = useState("전체");
-  const [limit, setLimit] = useState(8);
+  const [page, setPage] = useState(1);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -235,11 +313,26 @@ export default function ChallengePage() {
     try {
       const category = tabToCategory[activeTab] ?? undefined;
       const [challengeItems, myChallengeItems] = await Promise.all([
-        listChallenges<Challenge[]>({ category, limit, offset: 0 }),
-        listMyChallenges<Challenge[]>({ limit: 20, offset: 0 }),
+        listChallenges<Challenge[]>({ category, limit: 100, offset: 0 }),
+        listMyChallenges<Challenge[]>({ limit: 100, offset: 0 }),
       ]);
       setChallenges(challengeItems);
       setMyChallenges(myChallengeItems);
+      const logEntries = await Promise.all(
+        myChallengeItems.map(async (item) => {
+          const id = Number(item.id);
+          if (!Number.isFinite(id)) {
+            return null;
+          }
+          try {
+            const logs = await listChallengeLogs<ChallengeLog[]>(id);
+            return [id, logs] as const;
+          } catch {
+            return [id, []] as const;
+          }
+        }),
+      );
+      setLogsByUserChallengeId(Object.fromEntries(logEntries.filter((entry): entry is readonly [number, ChallengeLog[]] => Boolean(entry))));
     } catch (err) {
       setError(err instanceof Error ? err.message : "챌린지 목록을 불러오지 못했습니다.");
     } finally {
@@ -249,7 +342,7 @@ export default function ChallengePage() {
 
   useEffect(() => {
     void load();
-  }, [activeTab, limit]);
+  }, [activeTab]);
 
   const filteredChallenges = useMemo(() => {
     const category = tabToCategory[activeTab];
@@ -270,6 +363,95 @@ export default function ChallengePage() {
     return mapped;
   }, [myChallenges]);
 
+  const pageCount = Math.max(1, Math.ceil(filteredChallenges.length / PAGE_SIZE));
+  const pagedChallenges = filteredChallenges.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
+
+  const activeMyChallenges = myChallenges.filter((item) => ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status)));
+  const todayDoneCount = activeMyChallenges.filter((item) => getTodayCompletedCount(item) >= getDailyGoalCount(item, challenges)).length;
+  const averageProgress =
+    activeMyChallenges.length > 0
+      ? Math.round(activeMyChallenges.reduce((sum, item) => sum + getProgress(item, challenges), 0) / activeMyChallenges.length)
+      : 0;
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const weeklyLogCount = Object.values(logsByUserChallengeId)
+    .flat()
+    .filter((log) => {
+      const rawDate = String(log.log_date ?? "");
+      const parsed = rawDate ? new Date(`${rawDate.slice(0, 10)}T00:00:00`) : null;
+      return Boolean(log.is_completed) && parsed !== null && parsed >= weekStart;
+    }).length;
+
+  const firstOfMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const monthDays = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const leadingBlankDays = firstOfMonth.getDay();
+  const todayKey = getLocalDateKey(new Date());
+  const calendarCells = [
+    ...Array.from({ length: leadingBlankDays }, (_, index) => ({ key: `blank-${index}`, day: null as number | null })),
+    ...Array.from({ length: monthDays }, (_, index) => ({ key: `day-${index + 1}`, day: index + 1 })),
+  ];
+
+  const getCalendarDayState = (day: number) => {
+    const key = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const done = Object.values(logsByUserChallengeId)
+      .flat()
+      .filter((log) => String(log.log_date ?? "").slice(0, 10) === key && Boolean(log.is_completed)).length;
+    const goal = activeMyChallenges.reduce((sum, item) => sum + getDailyGoalCount(item, challenges), 0);
+    return { done, goal, isToday: key === todayKey };
+  };
+
+  const handleJoin = async (challengeId: number) => {
+    setActionId(`join-${challengeId}`);
+    try {
+      await joinChallenge(challengeId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "챌린지 참여 처리에 실패했습니다.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleComplete = async (userChallenge: Challenge) => {
+    const id = Number(userChallenge.id);
+    if (!Number.isFinite(id)) {
+      return;
+    }
+    setActionId(`complete-${id}`);
+    try {
+      await completeToday(id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "오늘 수행 완료 처리에 실패했습니다.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleGiveUp = async (userChallenge: Challenge) => {
+    const id = Number(userChallenge.id);
+    if (!Number.isFinite(id)) {
+      return;
+    }
+    if (!window.confirm("챌린지를 포기하면 현재 진행 상태가 중단됩니다. 계속하시겠습니까?")) {
+      return;
+    }
+    setActionId(`give-up-${id}`);
+    try {
+      await giveUpChallenge(id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "챌린지 포기 처리에 실패했습니다.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   return (
     <div className="page-stack">
       <div className="page-header">
@@ -285,7 +467,7 @@ export default function ChallengePage() {
             key={tab}
             onClick={() => {
               setActiveTab(tab);
-              setLimit(8);
+              setPage(1);
             }}
           >
             {tab}
@@ -301,12 +483,16 @@ export default function ChallengePage() {
               {!loading && filteredChallenges.length === 0 && (
                 <div className="state-box">현재 선택한 카테고리에 표시할 챌린지가 없습니다.</div>
               )}
-              {filteredChallenges.map((challenge) => {
+              {pagedChallenges.map((challenge) => {
                 const category = getCategory(challenge);
                 const challengeId = Number(challenge.id);
                 const joinedChallenge = Number.isFinite(challengeId) ? myChallengeByMasterId.get(challengeId) : undefined;
                 const joined = isJoinedStatus(joinedChallenge);
+                const activeJoined = isActiveChallengeStatus(joinedChallenge);
                 const progress = joinedChallenge ? getProgress(joinedChallenge, challenges) : 0;
+                const todayCount = getTodayCompletedCount(joinedChallenge);
+                const dailyGoal = getDailyGoalCount(joinedChallenge ?? challenge, challenges);
+                const todayComplete = todayCount >= dailyGoal;
                 return (
                   <article className="challenge-list-card" key={String(challenge.id)}>
                     <div className="challenge-card-header">
@@ -319,10 +505,15 @@ export default function ChallengePage() {
                     <div className="challenge-card-meta">
                       <span className="badge risk-low">난이도 {getDifficulty(challenge.difficulty)}</span>
                       <span className="badge risk-medium">{String(challenge.duration_days ?? 7)}일</span>
+                      <span className="badge badge-reference">{getDisplayChallengeType(challenge)}</span>
                       <span className="badge badge-reference">{getDisplayCategory(category)}</span>
                       <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
                       <span className="badge badge-reference">참여 상태: {joinedChallenge ? getDisplayStatus(joinedChallenge.status) : "참여 전"}</span>
                     </div>
+                    {Boolean(challenge.caution_message) && <div className="state-box warning-card">{String(challenge.caution_message)}</div>}
+                    {Boolean(challenge.contraindication_message) && (
+                      <div className="state-box warning-card">{String(challenge.contraindication_message)}</div>
+                    )}
                     {joinedChallenge ? (
                       <div className="challenge-progress">
                         <span className="muted">{getProgressLabel(joinedChallenge, challenges)}</span>
@@ -337,13 +528,21 @@ export default function ChallengePage() {
                       <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
                         상세
                       </Link>
-                      {joined ? (
+                      {activeJoined && joinedChallenge ? (
+                        <button
+                          disabled={todayComplete || actionId === `complete-${String(joinedChallenge.id)}`}
+                          onClick={() => void handleComplete(joinedChallenge)}
+                          type="button"
+                        >
+                          {actionId === `complete-${String(joinedChallenge.id)}` ? "저장 중..." : getTodayActionLabel(joinedChallenge, challenges)}
+                        </button>
+                      ) : joined ? (
                         <button disabled type="button">
-                          참여 중
+                          {getDisplayStatus(joinedChallenge?.status)}
                         </button>
                       ) : (
-                        <button onClick={() => void joinChallenge(Number(challenge.id)).then(load)} type="button">
-                          참여하기
+                        <button disabled={actionId === `join-${String(challenge.id)}`} onClick={() => void handleJoin(Number(challenge.id))} type="button">
+                          {actionId === `join-${String(challenge.id)}` ? "참여 중..." : "참여하기"}
                         </button>
                       )}
                     </div>
@@ -351,13 +550,39 @@ export default function ChallengePage() {
                 );
               })}
             </div>
-            <button className="secondary" style={{ marginTop: 16 }} onClick={() => setLimit((prev) => prev + 8)}>
-              더 많은 챌린지 보기
-            </button>
+            <div className="pagination-row">
+              <button className="secondary compact-button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+                이전
+              </button>
+              <span>
+                {page} / {pageCount}
+              </span>
+              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}>
+                다음
+              </button>
+            </div>
           </Card>
         </main>
         <aside className="my-challenge-panel">
           <Card title="내 챌린지 요약">
+            <div className="challenge-summary-metrics">
+              <div>
+                <span>참여 중</span>
+                <strong>{activeMyChallenges.length}</strong>
+              </div>
+              <div>
+                <span>오늘 완료</span>
+                <strong>{todayDoneCount}</strong>
+              </div>
+              <div>
+                <span>이번 주 기록</span>
+                <strong>{weeklyLogCount}</strong>
+              </div>
+              <div>
+                <span>평균 진행률</span>
+                <strong>{averageProgress}%</strong>
+              </div>
+            </div>
             <div className="my-challenge-summary-list">
               {!loading && myChallenges.length === 0 && (
                 <div className="compact-empty-state">아직 참여 중인 챌린지가 없습니다. 관심 있는 챌린지를 시작해보세요.</div>
@@ -383,25 +608,83 @@ export default function ChallengePage() {
                     </div>
                     <div className="button-row">
                       <span className={isTodayCompleted(challenge) ? "badge risk-low" : "badge badge-missing"}>
-                        오늘 수행: {isTodayCompleted(challenge) ? "완료" : "기록 전"}
+                        오늘 수행: {getTodayCompletedCount(challenge)}/{getDailyGoalCount(challenge, challenges)}
                       </span>
                       <Link className="button secondary compact-button" to={`/challenges/${String(getChallengeId(challenge) ?? "")}`}>
                         상세
                       </Link>
                     </div>
                     <div className="button-row">
-                      <button className="compact-button" onClick={() => void completeToday(Number(challenge.id)).then(load)} type="button">
-                        오늘 완료
-                      </button>
-                      <button
-                        className="secondary compact-button"
-                        onClick={() => void giveUpChallenge(Number(challenge.id)).then(load)}
-                        type="button"
-                      >
-                        포기
-                      </button>
+                      {isActiveChallengeStatus(challenge) ? (
+                        <>
+                          <button
+                            className="compact-button"
+                            disabled={getTodayCompletedCount(challenge) >= getDailyGoalCount(challenge, challenges) || actionId === `complete-${String(challenge.id)}`}
+                            onClick={() => void handleComplete(challenge)}
+                            type="button"
+                          >
+                            {getTodayActionLabel(challenge, challenges)}
+                          </button>
+                          <button
+                            className="secondary compact-button"
+                            disabled={actionId === `give-up-${String(challenge.id)}`}
+                            onClick={() => void handleGiveUp(challenge)}
+                            type="button"
+                          >
+                            포기
+                          </button>
+                        </>
+                      ) : (
+                        <span className="badge badge-reference">{getDisplayStatus(challenge.status)}</span>
+                      )}
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          </Card>
+          <Card title="챌린지 달력">
+            <div className="challenge-calendar-header">
+              <button
+                className="secondary compact-button"
+                onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                type="button"
+              >
+                이전 달
+              </button>
+              <strong>
+                {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+              </strong>
+              <button
+                className="secondary compact-button"
+                onClick={() => setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                type="button"
+              >
+                다음 달
+              </button>
+            </div>
+            <div className="challenge-calendar-grid">
+              {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                <span className="challenge-calendar-weekday" key={day}>
+                  {day}
+                </span>
+              ))}
+              {calendarCells.map((cell) => {
+                if (cell.day === null) {
+                  return <span className="challenge-calendar-cell empty" key={cell.key} />;
+                }
+                const state = getCalendarDayState(cell.day);
+                const complete = state.goal > 0 && state.done >= state.goal;
+                const partial = state.done > 0 && !complete;
+                return (
+                  <span
+                    className={`challenge-calendar-cell ${state.isToday ? "today" : ""} ${complete ? "complete" : ""} ${partial ? "partial" : ""}`}
+                    key={cell.key}
+                  >
+                    <strong>{cell.day}</strong>
+                    {complete ? <em>✅</em> : null}
+                    {partial ? <small>{state.done}/{state.goal}</small> : null}
+                  </span>
                 );
               })}
             </div>
