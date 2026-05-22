@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.dtos.base import BaseSerializerModel
 from app.models.exams import OCRStatus
@@ -27,6 +27,16 @@ class ExamReportResponse(BaseSerializerModel):
     confirmed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class ExamReportUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    original_filename: str | None = None
+    file_path: str | None = None
+    exam_date: date | None = None
+    ocr_status: OCRStatus | None = None
+    uploaded_at: datetime | None = None
 
 
 class ExamMeasurementCreateRequest(BaseModel):

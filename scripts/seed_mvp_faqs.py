@@ -118,8 +118,8 @@ FAQ_SEEDS = [
     ),
     FAQSeed(
         "개인정보/보안",
-        "Firebase 인증은 꼭 필요한가요?",
-        "아닙니다. 현재 MVP 기본 인증은 FastAPI JWT이며 Firebase는 optional provider로 유지됩니다.",
+        "소셜 로그인은 지원하나요?",
+        "1차 풀서비스 범위에서는 아이디/이메일 기반 로그인과 이메일 인증을 사용합니다.",
         16,
     ),
 ]

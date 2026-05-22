@@ -12,6 +12,7 @@ class Env(StrEnum):
     LOCAL = "local"
     DEV = "dev"
     PROD = "prod"
+    PRODUCTION = "production"
 
 
 class Config(BaseSettings):
@@ -28,6 +29,16 @@ class Config(BaseSettings):
     DB_PASSWORD: str = "pw1234"
     DB_NAME: str = "ai_health"
     DB_CONNECTION_POOL_MAXSIZE: int = 10
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str | None = None
+    LOGIN_FAILURE_LIMIT: int = 5
+    LOGIN_SOFT_LOCK_MINUTES: int = 1
+    ACCOUNT_LOCK_MINUTES: int = 15
+    TWILIO_ENABLED: bool = False
+    TWILIO_ACCOUNT_SID: str | None = None
+    TWILIO_AUTH_TOKEN: str | None = None
+    TWILIO_VERIFY_SERVICE_SID: str | None = None
 
     COOKIE_DOMAIN: str = "localhost"
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
@@ -40,3 +51,7 @@ class Config(BaseSettings):
     @property
     def cors_allow_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENV in {Env.PROD, Env.PRODUCTION}

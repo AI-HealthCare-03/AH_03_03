@@ -2,16 +2,19 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.dtos.health import HealthRecordResponse
+
 
 class DashboardSummaryResponse(BaseModel):
-    latest_health_record: Any | None = None
+    latest_health_record: HealthRecordResponse | None = None
     unread_notification_count: int
     active_challenge_count: int
+    active_medication_count: int = 0
 
 
 class DashboardHealthResponse(BaseModel):
-    latest_health_record: Any | None = None
-    recent_health_records: list[Any]
+    latest_health_record: HealthRecordResponse | None = None
+    recent_health_records: list[HealthRecordResponse]
 
 
 class DashboardChallengesResponse(BaseModel):
@@ -30,6 +33,8 @@ class DashboardMedicationsResponse(BaseModel):
 
 class DashboardTrendsResponse(BaseModel):
     period: str
+    date_from: str | None = None
+    date_to: str | None = None
     glucose: list[dict[str, Any]]
     blood_pressure: list[dict[str, Any]]
     weight: list[dict[str, Any]]
