@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.models.notifications import Notification
+from app.models.notifications import Notification, NotificationLog, ReminderSchedule
 
 
 async def create_notification(user_id: int, data: dict[str, Any]) -> Notification:
@@ -41,3 +41,45 @@ async def update_notification(notification_id: int, data: dict[str, Any]) -> Not
 
 async def delete_notification(notification_id: int) -> int:
     return await Notification.filter(id=notification_id).delete()
+
+
+async def create_reminder_schedule(user_id: int, data: dict[str, Any]) -> ReminderSchedule:
+    return await ReminderSchedule.create(user_id=user_id, **data)
+
+
+async def get_reminder_schedule_by_id(schedule_id: int) -> ReminderSchedule | None:
+    return await ReminderSchedule.get_or_none(id=schedule_id)
+
+
+async def list_reminder_schedules_by_user(
+    user_id: int,
+    is_active: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[ReminderSchedule]:
+    query = ReminderSchedule.filter(user_id=user_id)
+    if is_active is not None:
+        query = query.filter(is_active=is_active)
+    return await query.order_by("-created_at").offset(offset).limit(limit)
+
+
+async def update_reminder_schedule(schedule_id: int, data: dict[str, Any]) -> ReminderSchedule | None:
+    schedule = await get_reminder_schedule_by_id(schedule_id)
+    if schedule is None:
+        return None
+    for key, value in data.items():
+        setattr(schedule, key, value)
+    await schedule.save(update_fields=list(data.keys()) if data else None)
+    return schedule
+
+
+async def delete_reminder_schedule(schedule_id: int) -> int:
+    return await ReminderSchedule.filter(id=schedule_id).delete()
+
+
+async def create_notification_log(user_id: int, data: dict[str, Any]) -> NotificationLog:
+    return await NotificationLog.create(user_id=user_id, **data)
+
+
+async def list_notification_logs_by_user(user_id: int, limit: int = 50, offset: int = 0) -> list[NotificationLog]:
+    return await NotificationLog.filter(user_id=user_id).order_by("-created_at").offset(offset).limit(limit)
