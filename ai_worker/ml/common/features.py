@@ -15,7 +15,7 @@ import pandas as pd
 
 def add_age_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """나이 6구간 원핫 인코딩 (19~39 / 40대 / 50대 / 60대 / 70대 / 80이상)"""
-    age_bins = [0, 40, 50, 60, 70, 80, 999]
+    age_bins = [0, 40, 50, 60, 70, 80, np.inf]
     age_labels = ["나이_19_39", "나이_40대", "나이_50대", "나이_60대", "나이_70대", "나이_80이상"]
     df["_나이구간"] = pd.cut(df["나이"], bins=age_bins, labels=age_labels, right=False)
     for label in age_labels:
