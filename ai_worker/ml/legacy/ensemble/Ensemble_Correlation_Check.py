@@ -5,6 +5,8 @@ HTN / DM / DL 각각 단순 평균 앙상블 후 OOF 성능 비교
 Python 3.13 | numpy | scikit-learn
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -16,8 +18,8 @@ from sklearn.metrics import (
 )
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-BASE_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/LGB18~24/outputs"
-CAT_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs"
+BASE_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs")
+CAT_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs")
 
 RECALL_MIN: float = 0.87
 THRESHOLD_RANGE: NDArray[np.float64] = np.arange(0.30, 0.71, 0.01)

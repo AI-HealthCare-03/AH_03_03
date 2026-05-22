@@ -22,6 +22,7 @@ Trial 수           : 50
 import json
 import os
 import warnings
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -45,8 +46,10 @@ warnings.filterwarnings("ignore")
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-DATA_PATH: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
-MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs/optuna_DL_FE_v4"
+DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
+MODEL_DIR: str = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "optuna_DL_FE_v4"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
@@ -87,7 +90,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     # ── 기존 FE (v3 확정) ────────────────────────────────────
     if USE_AGE_BIN:
-        age_bins = [0, 40, 50, 60, 70, 80, 999]
+        age_bins = [0, 40, 50, 60, 70, 80, np.inf]
         age_labels = ["나이_19_39", "나이_40대", "나이_50대", "나이_60대", "나이_70대", "나이_80이상"]
         df["_나이구간"] = pd.cut(df["나이"], bins=age_bins, labels=age_labels, right=False)
         for label in age_labels:
@@ -97,12 +100,12 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         print("  [ON] 나이 구간화")
 
     if USE_BMI_BIN:
-        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
+        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, np.inf], labels=[0, 1, 2, 3], right=False).astype(float)
         added += ["BMI_구간"]
         print("  [ON] BMI 구간화")
 
     if USE_WEIGHT_BIN:
-        wt_bins = [0, 50, 70, 90, 999]
+        wt_bins = [0, 50, 70, 90, np.inf]
         wt_labels = ["체중_저체중", "체중_정상", "체중_과체중", "체중_비만"]
         df["_체중구간"] = pd.cut(df["체중"], bins=wt_bins, labels=wt_labels, right=False)
         for label in wt_labels:
@@ -111,15 +114,21 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         added += wt_labels
 
     if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(
+            float
+        )
         added += ["음주위험군"]
 
     if USE_WALK_LEVEL:
-        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
+        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(
+            float
+        )
         added += ["걷기활동량"]
 
     if USE_STRENGTH:
-        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+        df["근력활동량"] = pd.cut(
+            df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True
+        ).astype(float)
         added += ["근력활동량"]
 
     if USE_FAMILY_SUM:
