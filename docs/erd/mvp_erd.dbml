@@ -124,7 +124,7 @@ Table users {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "AUTH / USER 기준 테이블. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
+  Note: "AUTH / USER 기준 테이블. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
 }
 
 Table health_records {
@@ -155,9 +155,6 @@ Table health_records {
   drinking_amount varchar(30)
   walking_days_per_week int
   strength_days_per_week int
-  is_smoker boolean
-  drinks_alcohol boolean
-  exercise_days_per_week int
   sleep_hours decimal(4,2)
   measured_at timestamptz [not null]
   created_at timestamptz [not null]

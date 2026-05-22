@@ -8,6 +8,14 @@ class Gender(StrEnum):
     FEMALE = "FEMALE"
 
 
+class UserRole(StrEnum):
+    USER = "USER"
+    MONITOR = "MONITOR"
+    OPERATOR = "OPERATOR"
+    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN"
+
+
 class User(models.Model):
     id = fields.BigIntField(primary_key=True)
     login_id = fields.CharField(max_length=40, unique=True, null=True)

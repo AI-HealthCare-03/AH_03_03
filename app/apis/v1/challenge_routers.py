@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user, require_admin_user
+from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user, require_operator_user
 from app.dtos.challenges import (
     ChallengeActionResponse,
     ChallengeCreateRequest,
@@ -28,7 +28,7 @@ async def list_active_challenges(limit: int = 50, offset: int = 0):
 
 
 @challenge_router.post("", response_model=ChallengeResponse, status_code=status.HTTP_201_CREATED)
-async def create_challenge(request: ChallengeCreateRequest, user: Annotated[User, Depends(require_admin_user)]):
+async def create_challenge(request: ChallengeCreateRequest, user: Annotated[User, Depends(require_operator_user)]):
     return await challenge_service.create_challenge(request)
 
 

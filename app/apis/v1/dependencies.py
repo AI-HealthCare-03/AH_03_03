@@ -3,7 +3,12 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException, status
 
 from app.dependencies.security import get_request_user
-from app.models.users import User
+from app.models.users import User, UserRole
+
+MONITOR_ROLES = {UserRole.MONITOR, UserRole.OPERATOR, UserRole.ADMIN, UserRole.SUPER_ADMIN}
+OPERATOR_ROLES = {UserRole.OPERATOR, UserRole.ADMIN, UserRole.SUPER_ADMIN}
+ADMIN_ROLES = {UserRole.ADMIN, UserRole.SUPER_ADMIN}
+SUPER_ADMIN_ROLES = {UserRole.SUPER_ADMIN}
 
 
 def raise_not_found(message: str) -> None:
@@ -23,7 +28,19 @@ def ensure_admin_user(current_user: User) -> None:
 def ensure_super_admin_user(current_user: User) -> None:
     if is_super_admin_user(current_user):
         return
-    raise_forbidden("최고 관리자 권한이 필요합니다.")
+    raise_forbidden("관리자 권한이 필요합니다.")
+
+
+def ensure_monitor_user(current_user: User) -> None:
+    if is_monitor_user(current_user):
+        return
+    raise_forbidden("관리자 권한이 필요합니다.")
+
+
+def ensure_operator_user(current_user: User) -> None:
+    if is_operator_user(current_user):
+        return
+    raise_forbidden("관리자 권한이 필요합니다.")
 
 
 def normalize_user_role(current_user: User | None) -> str:
@@ -32,19 +49,31 @@ def normalize_user_role(current_user: User | None) -> str:
     return str(getattr(current_user, "role", "") or "").upper()
 
 
-def is_admin_user(current_user: User) -> bool:
+def _user_role(current_user: User | None) -> UserRole | None:
     if current_user is None:
-        return False
+        return None
+    try:
+        return UserRole(normalize_user_role(current_user))
+    except ValueError:
+        return None
 
+
+def is_monitor_user(current_user: User) -> bool:
+    return _user_role(current_user) in MONITOR_ROLES
+
+
+def is_operator_user(current_user: User) -> bool:
+    return _user_role(current_user) in OPERATOR_ROLES
+
+
+def is_admin_user(current_user: User) -> bool:
     # users.role is the source of truth for authorization.
     # is_admin remains on the User model only for legacy data compatibility.
-    return normalize_user_role(current_user) in {"ADMIN", "SUPER_ADMIN", "ROLE_ADMIN", "ROLE_SUPER_ADMIN"}
+    return _user_role(current_user) in ADMIN_ROLES
 
 
 def is_super_admin_user(current_user: User) -> bool:
-    if current_user is None:
-        return False
-    return normalize_user_role(current_user) in {"SUPER_ADMIN", "ROLE_SUPER_ADMIN"}
+    return _user_role(current_user) in SUPER_ADMIN_ROLES
 
 
 def ensure_owner(resource_user_id: int | None, current_user: User) -> None:
@@ -54,6 +83,12 @@ def ensure_owner(resource_user_id: int | None, current_user: User) -> None:
 
 def ensure_owner_or_admin(resource_user_id: int | None, current_user: User) -> None:
     if is_admin_user(current_user):
+        return
+    ensure_owner(resource_user_id, current_user)
+
+
+def ensure_owner_or_operator(resource_user_id: int | None, current_user: User) -> None:
+    if is_operator_user(current_user):
         return
     ensure_owner(resource_user_id, current_user)
 
@@ -71,4 +106,14 @@ async def require_admin_user(user: Annotated[User, Depends(get_request_user)]) -
 
 async def require_super_admin_user(user: Annotated[User, Depends(get_request_user)]) -> User:
     ensure_super_admin_user(user)
+    return user
+
+
+async def require_monitor_user(user: Annotated[User, Depends(get_request_user)]) -> User:
+    ensure_monitor_user(user)
+    return user
+
+
+async def require_operator_user(user: Annotated[User, Depends(get_request_user)]) -> User:
+    ensure_operator_user(user)
     return user

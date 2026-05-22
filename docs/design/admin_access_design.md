@@ -1,7 +1,7 @@
 # 관리자 접근/권한 설계
 
 이 문서는 풀서비스 기준 관리자 콘솔 접근 구조와 role 정책을 정의한다.
-이번 설계는 코드 구현이 아니라 향후 구현 기준이다.
+2026-05-23 기준 백엔드 공통 dependency와 일부 관리자성 API 권한 체크에 1차 반영했다.
 
 ## 1. 관리자 권한 체계 개요
 
@@ -165,7 +165,7 @@
 
 ## 6. Dependency 설계
 
-추후 코드 구현 시 아래 dependency를 만든다.
+백엔드 공통 dependency는 아래 기준으로 구현한다.
 
 | dependency | 허용 role |
 |---|---|
@@ -180,6 +180,13 @@
 - `users.role`만 기준으로 판단한다.
 - 권한이 부족하면 403을 반환한다.
 - 프론트에서 메뉴를 숨기더라도 백엔드 dependency 검사는 반드시 적용한다.
+
+2026-05-23 1차 구현 상태:
+
+- `require_monitor_user`, `require_operator_user`, `require_admin_user`, `require_super_admin_user`를 `app/apis/v1/dependencies.py`에 구현했다.
+- FAQ 생성/수정, 문의 답변, 챌린지 생성은 `OPERATOR` 이상으로 보호한다.
+- LLM log 조회는 `MONITOR` 이상, LLM log 생성은 `OPERATOR` 이상으로 보호한다.
+- 사용자 관리, audit log, 관리자 콘솔 화면, 세분화된 permission table은 후속 작업이다.
 
 ## 7. 관리자 콘솔 분리 정책
 
