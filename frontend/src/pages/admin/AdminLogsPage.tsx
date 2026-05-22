@@ -7,19 +7,7 @@ import {
   getAdminSystemErrors,
 } from "../../api/admin";
 import { useAuth } from "../../auth/AuthContext";
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
+import { formatDateTime, formatRelativeTime } from "../../utils/format";
 
 export default function AdminLogsPage() {
   const { backendUser } = useAuth();
@@ -98,7 +86,7 @@ export default function AdminLogsPage() {
                   <tbody>
                     {systemErrors.map((item) => (
                       <tr key={item.id}>
-                        <td>{formatDateTime(item.created_at)}</td>
+                        <td title={formatDateTime(item.created_at)}>{formatRelativeTime(item.created_at)}</td>
                         <td>{item.status_code}</td>
                         <td>{item.path}</td>
                         <td>{item.error_type}</td>
@@ -137,7 +125,7 @@ export default function AdminLogsPage() {
                   <tbody>
                     {sensitiveLogs.map((item) => (
                       <tr key={item.id}>
-                        <td>{formatDateTime(item.created_at)}</td>
+                        <td title={formatDateTime(item.created_at)}>{formatRelativeTime(item.created_at)}</td>
                         <td>
                           #{item.actor_user_id} {item.actor_role ? `(${item.actor_role})` : ""}
                         </td>
