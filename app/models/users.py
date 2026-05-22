@@ -23,7 +23,6 @@ class User(models.Model):
     role = fields.CharField(max_length=20, default="USER")
     is_active = fields.BooleanField(default=True)
     is_admin = fields.BooleanField(default=False)
-    last_login = fields.DatetimeField(null=True)
     last_login_at = fields.DatetimeField(null=True)
     failed_login_count = fields.IntField(default=0)
     locked_until = fields.DatetimeField(null=True)

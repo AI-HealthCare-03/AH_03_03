@@ -108,7 +108,7 @@ class AuthService:
         return user
 
     async def login(self, user: User) -> dict[str, AccessToken | JWTRefreshToken]:
-        await self.user_repo.update_last_login(user.id)
+        await self.user_repo.update_last_login_at(user.id)
         tokens = self.jwt_service.issue_jwt_pair(user)
         refresh_token = tokens["refresh_token"]
         await self.user_repo.create_refresh_token(

@@ -116,7 +116,6 @@ Table users {
   role varchar(20) [not null, default: 'USER']
   is_active boolean [not null, default: true]
   is_admin boolean [not null, default: false]
-  last_login timestamptz
   last_login_at timestamptz
   failed_login_count int [not null, default: 0]
   locked_until timestamptz
@@ -125,7 +124,7 @@ Table users {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "AUTH / USER 기준 테이블. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이며 last_login은 legacy 호환 필드로 유지한다."
+  Note: "AUTH / USER 기준 테이블. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
 }
 
 Table health_records {

@@ -8,7 +8,7 @@
 - `is_smoker`, `drinks_alcohol`, `exercise_days_per_week`는 과거 단순 입력값 또는 호환 필드 성격이 강하므로 legacy 제거 후보로 분류한다.
 - 다만 프론트의 최신 기록 초기값 fallback, 회원가입 후 health payload, seed 스크립트, DTO 응답에 아직 legacy 필드가 남아 있어 즉시 삭제하면 화면 초기값과 데모 데이터가 흔들릴 수 있다.
 - `MedicationRecord.user_id`는 `Medication.user_id`와 중복될 수 있지만, 현재 대시보드/메인 요약/라우터 권한 체크가 직접 `medication_records.user_id`에 의존한다. 당장 제거보다 유지하면서 service layer에서 `medication.user_id == record.user_id` 일치 검증을 강화하는 편이 안전하다.
-- `users.last_login`은 코드에서 갱신하지 않고 `last_login_at`만 표준으로 사용 중이다. 모델/ERD/기존 migration에 남아 있는 legacy 컬럼으로, 추후 migration에서 제거 가능성이 높다.
+- `users.last_login`은 코드에서 갱신하지 않고 `last_login_at`만 표준으로 사용 중이다. 2026-05-23 신규 migration으로 제거 대상으로 확정했다.
 
 ## 2. HealthRecord 표준 필드와 Legacy 필드
 
@@ -122,16 +122,16 @@
 
 ### 현재 상태
 
-- `app/models/users.py`에는 `last_login`과 `last_login_at`이 모두 있다.
-- `app/repositories/user_repository.py`의 `update_last_login`은 `last_login_at`만 갱신한다.
-- `app/services/auth.py`는 로그인 성공 시 `update_last_login(user.id)`를 호출한다.
+- `app/models/users.py`에는 `last_login_at`만 표준 필드로 남긴다.
+- `app/repositories/user_repository.py`의 `update_last_login_at`은 `last_login_at`만 갱신한다.
+- `app/services/auth.py`는 로그인 성공 시 `update_last_login_at(user.id)`를 호출한다.
 - 프론트, seed, 라우터에서 `last_login` 직접 사용처는 검색되지 않았다.
-- `docs/erd/mvp_erd.dbml`과 문서에는 `last_login`을 legacy, `last_login_at`을 표준으로 명시하고 있다.
+- `docs/erd/mvp_erd.dbml`에는 `last_login_at`만 남긴다.
 
 ### 판단
 
-- `last_login`은 제거 가능성이 높다.
-- 단, 기존 DB와 migration history에 남아 있고 관리자 콘솔에서 최근 로그인 표시를 만들 가능성이 있으므로, 관리자 화면 구현 전에 `last_login_at`만 쓰도록 명확히 고정한 뒤 제거 migration을 진행한다.
+- `last_login`은 제거 대상으로 확정한다.
+- 관리자 콘솔의 최근 로그인 표시는 `last_login_at`만 사용한다.
 
 ### 제거 단계
 
@@ -139,6 +139,7 @@
 2. seed와 운영 데이터에 `last_login_at` backfill 필요 여부 확인.
 3. `docs/erd/mvp_erd.dbml`에서 `last_login` 제거.
 4. 새 migration으로 `users.last_login` drop.
+5. 로컬 setup 안전 보강 SQL에서도 `last_login`을 제거한다.
 
 ## 6. 코드 영향 범위
 
@@ -208,9 +209,10 @@
 - `drinks_alcohol`
 - `exercise_days_per_week`
 - `medication_records.user_id`
-- `users.last_login`
 
 이 항목들은 삭제 후보 또는 legacy 후보지만, 현재 프론트 fallback, DTO, seed, dashboard/summary 조회 흐름에 아직 영향이 있다. 바로 삭제하면 런타임 오류나 오래된 데이터 표시 누락이 생길 수 있다.
+
+`users.last_login`은 `last_login_at` 표준화가 완료되어 2026-05-23 migration으로 제거 대상으로 확정했다.
 
 ### 2026-05-23 1단계 반영 상태
 
@@ -236,6 +238,9 @@
 ### 후보 B: User last_login cleanup
 
 - Drop `users.last_login`
+
+상태:
+- 2026-05-23 migration으로 제거 반영.
 
 선행 작업:
 - 관리자/사용자 화면에서 `last_login_at`만 사용하는지 확인.
