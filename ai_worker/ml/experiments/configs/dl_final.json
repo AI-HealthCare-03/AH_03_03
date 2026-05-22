@@ -1,0 +1,27 @@
+{
+  "experiment_id": "dl_catboost_baseline",
+  "disease": "DL",
+  "target_col": "이상지질혈증유병",
+  "dataset_name": "hn_all",
+  "model_type": "catboost",
+  "experiment_type": "baseline",
+  "feature_set_name": "dl_fe_v1",
+  "fe_keys": ["age_bin", "bmi_bin", "family_sum", "bmi_x_age"],
+  "n_features": 38,
+  "recall_min": 0.87,
+  "n_splits": 5,
+  "n_trials": null,
+  "seed": 42,
+  "threshold": 0.45,
+  "best_params": null,
+  "metrics": {
+    "auc": 0.7837,
+    "recall": 0.8871,
+    "precision": null,
+    "f1": 0.5888
+  },
+  "output_dir": "ai_worker/ml/CAT18~24/outputs/catboost_DL_FE",
+  "script": "ai_worker/ml/CAT18~24/CatBoost_DL_FE.py",
+  "status": "final",
+  "note": "DL 최종 모델. CatBoost FE 베이스라인 채택. Optuna v3/v4 모두 베이스라인 대비 전 지표 열위. 나이/BMI_X_나이가 정보 포화 상태로 추가 FE 효과 없음 확인."
+}
