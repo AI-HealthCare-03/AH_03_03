@@ -12,7 +12,7 @@ const tabToCategory: Record<string, string | null> = {
   운동: "EXERCISE",
   수면: "SLEEP",
   복약: "MEDICATION",
-  수분섭취: "HABIT",
+  수분섭취: "WATER",
   혈압: "BLOOD_PRESSURE",
   혈당: "BLOOD_GLUCOSE",
   생활습관: "HABIT",
@@ -214,6 +214,13 @@ function getProgress(item: Challenge, challengeList: Challenge[] = []): number {
   return 0;
 }
 
+function isJoinedStatus(item: Challenge | undefined): boolean {
+  if (!item) {
+    return false;
+  }
+  return !["", "PENDING"].includes(normalizeStatus(item.status));
+}
+
 export default function ChallengePage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [myChallenges, setMyChallenges] = useState<Challenge[]>([]);
@@ -252,6 +259,17 @@ export default function ChallengePage() {
     return challenges.filter((challenge) => getCategory(challenge) === category);
   }, [activeTab, challenges]);
 
+  const myChallengeByMasterId = useMemo(() => {
+    const mapped = new Map<number, Challenge>();
+    myChallenges.forEach((item) => {
+      const challengeId = getChallengeId(item);
+      if (challengeId !== null) {
+        mapped.set(challengeId, item);
+      }
+    });
+    return mapped;
+  }, [myChallenges]);
+
   return (
     <div className="page-stack">
       <div className="page-header">
@@ -285,6 +303,10 @@ export default function ChallengePage() {
               )}
               {filteredChallenges.map((challenge) => {
                 const category = getCategory(challenge);
+                const challengeId = Number(challenge.id);
+                const joinedChallenge = Number.isFinite(challengeId) ? myChallengeByMasterId.get(challengeId) : undefined;
+                const joined = isJoinedStatus(joinedChallenge);
+                const progress = joinedChallenge ? getProgress(joinedChallenge, challenges) : 0;
                 return (
                   <article className="challenge-list-card" key={String(challenge.id)}>
                     <div className="challenge-card-header">
@@ -299,15 +321,31 @@ export default function ChallengePage() {
                       <span className="badge risk-medium">{String(challenge.duration_days ?? 7)}일</span>
                       <span className="badge badge-reference">{getDisplayCategory(category)}</span>
                       <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
-                      <span className="badge badge-reference">참여 상태: 대기</span>
+                      <span className="badge badge-reference">참여 상태: {joinedChallenge ? getDisplayStatus(joinedChallenge.status) : "참여 전"}</span>
                     </div>
+                    {joinedChallenge ? (
+                      <div className="challenge-progress">
+                        <span className="muted">{getProgressLabel(joinedChallenge, challenges)}</span>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="muted">아직 참여 전입니다.</p>
+                    )}
                     <div className="challenge-card-actions">
                       <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
                         상세
                       </Link>
-                      <button onClick={() => void joinChallenge(Number(challenge.id)).then(load)} type="button">
-                        참여하기
-                      </button>
+                      {joined ? (
+                        <button disabled type="button">
+                          참여 중
+                        </button>
+                      ) : (
+                        <button onClick={() => void joinChallenge(Number(challenge.id)).then(load)} type="button">
+                          참여하기
+                        </button>
+                      )}
                     </div>
                   </article>
                 );
