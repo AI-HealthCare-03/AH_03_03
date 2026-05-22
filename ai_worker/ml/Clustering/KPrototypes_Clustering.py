@@ -132,6 +132,8 @@ def main() -> None:
     print(f"\n[2] BMI 추가 | 연속형: {len(CONT_COLS_FINAL)}개 | 범주형: {len(CAT_COLS)}개")
 
     # ── 결측치 처리 ───────────────────────────────────────────
+    # 결측 비율 최대 0.008% (허리둘레 28건/336,389명) → 분포 영향 미미
+    # 수치형: 중앙값 대체 (이상치에 robust), 범주형: 최빈값 대체
     for c in CONT_COLS_FINAL:
         if c in df.columns:
             df[c] = df[c].fillna(df[c].median())
