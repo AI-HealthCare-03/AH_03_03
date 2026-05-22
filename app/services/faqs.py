@@ -18,8 +18,21 @@ async def list_active_faqs(category: str | None = None, limit: int = 20, offset:
     return await faq_repository.list_faqs(category=category, is_active=True, limit=limit, offset=offset)
 
 
+async def list_faqs(
+    category: str | None = None,
+    is_active: bool | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[FAQ]:
+    return await faq_repository.list_faqs(category=category, is_active=is_active, limit=limit, offset=offset)
+
+
 async def update_faq(faq_id: int, request: FAQUpdateRequest) -> FAQ | None:
     return await faq_repository.update_faq(faq_id, request.model_dump(exclude_unset=True))
+
+
+async def deactivate_faq(faq_id: int) -> FAQ | None:
+    return await faq_repository.update_faq(faq_id, {"is_active": False})
 
 
 async def create_inquiry(user_id: int, request: InquiryCreateRequest) -> Inquiry:
@@ -32,6 +45,15 @@ async def get_inquiry(inquiry_id: int) -> Inquiry | None:
 
 async def list_user_inquiries(user_id: int, limit: int = 20, offset: int = 0) -> list[Inquiry]:
     return await faq_repository.list_inquiries(user_id=user_id, limit=limit, offset=offset)
+
+
+async def list_inquiries(
+    status: str | None = None,
+    category: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[Inquiry]:
+    return await faq_repository.list_inquiries(status=status, category=category, limit=limit, offset=offset)
 
 
 async def update_inquiry(inquiry_id: int, request: InquiryUpdateRequest) -> Inquiry | None:

@@ -52,6 +52,10 @@ class InquiryUpdateRequest(BaseModel):
     answered_at: datetime | None = None
 
 
+class InquiryAnswerRequest(BaseModel):
+    answer: str
+
+
 class InquiryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -3,9 +3,14 @@ import { Link, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
 const ADMIN_ROLES = new Set(["MONITOR", "OPERATOR", "ADMIN", "SUPER_ADMIN"]);
+const OPERATOR_ROLES = new Set(["OPERATOR", "ADMIN", "SUPER_ADMIN"]);
 
 export function isAdminConsoleRole(role?: string | null): boolean {
   return ADMIN_ROLES.has(String(role ?? "").toUpperCase());
+}
+
+export function isOperatorRole(role?: string | null): boolean {
+  return OPERATOR_ROLES.has(String(role ?? "").toUpperCase());
 }
 
 export default function AdminRoute() {
