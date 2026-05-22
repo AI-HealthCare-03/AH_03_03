@@ -33,6 +33,8 @@ async def setup_local_mvp_db() -> None:
     print("===== Local MVP DB Setup Complete =====")
     print("demo@example.com / Demo1234!")
     print("demo_high@example.com / Demo1234!")
+    print("admin@example.com / Demo1234! (SUPER_ADMIN)")
+    print("monitor@example.com / Demo1234! (MONITOR)")
 
 
 if __name__ == "__main__":

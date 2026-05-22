@@ -342,3 +342,20 @@
 - 프론트 숨김은 UX 처리일 뿐이며, 실제 보안 기준은 백엔드 role dependency입니다.
 
 이번 구현에는 관리자 로그인 분리, 2FA, IP allowlist, 관리자 권한 변경, 사용자 상세 관리 화면은 포함하지 않았습니다.
+
+## 14. 관리자 계정 bootstrap 정책
+
+최초 `SUPER_ADMIN`은 운영 환경에서 별도 CLI/bootstrap 절차로 생성해야 합니다.
+운영 DB에서 임의 seed를 실행해 관리자 계정을 만드는 방식은 사용하지 않습니다.
+
+로컬/시연 환경에서는 `scripts/seed_demo_users.py`가 아래 관리자 데모 계정을 생성합니다.
+
+- `admin@example.com` / `Demo1234!` / `SUPER_ADMIN`
+- `monitor@example.com` / `Demo1234!` / `MONITOR`
+
+로컬 seed는 idempotent하게 동작합니다.
+`admin@example.com` 또는 `monitor@example.com` 계정이 이미 존재하지만 role이 기대값과 다르면 시연 계정 기준 role로 보정합니다.
+일반 데모 사용자 계정은 기존 정책을 유지합니다.
+
+운영 이후 role 변경은 `SUPER_ADMIN` 전용 API와 관리자 화면으로 처리할 예정입니다.
+role 변경 API와 관리자 권한 부여/회수 UI는 후속 작업입니다.
