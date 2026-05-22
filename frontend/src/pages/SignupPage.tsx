@@ -32,7 +32,6 @@ export default function SignupPage() {
   const [phoneParts, setPhoneParts] = useState({ first: "010", second: "", third: "" });
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState<"MALE" | "FEMALE">("MALE");
-  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [lifestyle, setLifestyle] = useState({
@@ -159,9 +158,6 @@ export default function SignupPage() {
       }
       if (!gender) {
         nextErrors.gender = "성별을 선택해주세요.";
-      }
-      if (!address.trim()) {
-        nextErrors.address = "주소를 입력해주세요.";
       }
     }
 
@@ -415,7 +411,6 @@ export default function SignupPage() {
         birth_date: birthDate,
         phone_number: normalizedPhoneNumber,
         nickname: name.trim(),
-        address: address.trim(),
         sensitive_data_agreed: true,
       });
       try {
@@ -677,18 +672,6 @@ export default function SignupPage() {
                   <option value="FEMALE">여성</option>
                 </select>
                 {fieldErrors.gender && <span className="field-error">{fieldErrors.gender}</span>}
-              </label>
-              <label>
-                주소
-                <input
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  maxLength={255}
-                  placeholder="예: 서울특별시 강남구"
-                  required
-                />
-                <span className="muted">초기에는 서비스 지역 확인용으로 사용하며, 상세주소 정책은 운영 전 재검토합니다.</span>
-                {fieldErrors.address && <span className="field-error">{fieldErrors.address}</span>}
               </label>
             </>
           )}

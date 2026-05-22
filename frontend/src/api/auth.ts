@@ -24,7 +24,7 @@ export type SignupPayload = {
   birth_date: string;
   phone_number: string;
   nickname?: string;
-  address: string;
+  address?: string;
   sensitive_data_agreed?: boolean;
   marketing_agreed?: boolean;
 };

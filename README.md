@@ -154,7 +154,7 @@ Seed 포함 데이터:
 - 휴대폰 SMS 인증은 Twilio Verify 기반입니다. 서버는 한국 휴대폰 번호를 Twilio 호출용 E.164 형식(`+821012345678`)으로 정규화하고, 기존 사용자 DB 호환을 위해 저장/중복확인은 로컬 번호(`01012345678`) 기준도 함께 확인합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용할 수 있지만, 운영환경에서는 debug code를 응답하지 않으며 `TWILIO_ENABLED=true`와 Twilio Verify secret 설정이 필요합니다.
 - 휴대폰 인증번호 요청은 같은 번호 기준 60초 이내 재발송을 제한하고, 1시간 5회 초과 요청을 제한합니다. 인증번호 확인 실패도 같은 번호 기준 5회 이상이면 일정 시간 제한합니다.
 - 알림은 `notifications` inbox, `reminder_schedules` 예약 설정, `notification_logs` 발송 이력으로 분리합니다. 현재 외부 Push/SMS/Kakao/Email 발송 worker는 후속 범위이며, 발송 로그에는 민감 건강 수치 원문이나 인증코드/토큰을 저장하지 않습니다.
-- 회원가입 주소는 초기 서비스 지역 확인용 필수 기본정보입니다. 상세주소 수집 범위와 보관 정책은 운영 전 개인정보 최소수집 원칙에 따라 재검토합니다.
+- 주소는 1차 풀서비스 회원가입 필수 입력에서 제외합니다. 지역 기반 병원/검진기관 추천, 배송, 방문 케어 등이 도입될 경우 개인정보 최소수집 원칙에 따라 선택 정보로 재검토합니다.
 - 풀서비스 관리자 권한은 `users.role`을 기준으로 판단합니다. `is_admin`은 legacy 호환 필드로만 남기고, 관리자 role은 `USER/MONITOR/OPERATOR/ADMIN/SUPER_ADMIN` 구조로 설계합니다. 운영 단계에서는 관리자 서브도메인, 2FA, audit log를 추가해야 합니다.
 - 로그인 실패가 5회 이상 누적되면 CAPTCHA 등 추가 확인을 요구하는 soft-lock 정책을 적용합니다. CAPTCHA 도입 전에는 짧은 제한과 일반화된 안내 메시지를 사용합니다. `/api/v1/system/health`는 DB/Redis 상태를 포함하고, 모든 응답은 `X-Request-ID` 헤더로 요청 추적값을 반환합니다.
 - 로그인 시각은 `last_login_at`을 표준 필드로 사용합니다. `last_login` legacy 컬럼은 제거 대상이며 신규 코드에서 사용하지 않습니다.
