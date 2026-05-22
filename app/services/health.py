@@ -1,20 +1,46 @@
+from decimal import ROUND_HALF_UP, Decimal
+
 from app.dtos.health import HealthRecordCreateRequest, HealthRecordUpdateRequest
 from app.models.health import HealthRecord
+from app.models.users import User
 from app.repositories import health_repository
 
-REQUIRED_ANALYSIS_FIELDS = {
+REQUIRED_USER_ANALYSIS_FIELDS = {
+    "gender": "성별",
+    "birthday": "나이",
+}
+
+REQUIRED_BASIC_ANALYSIS_FIELDS = {
     "height_cm": "키",
     "weight_kg": "몸무게",
     "bmi": "BMI",
+    "occupation_code": "직업군",
+    "family_htn": "고혈압 가족력 여부",
+    "family_dm": "당뇨병 가족력 여부",
+    "family_dyslipidemia": "이상지질혈증 가족력 여부",
+    "smoking_status": "현재 흡연 여부",
+    "drinking_frequency": "1년간 음주 빈도",
+    "drinking_amount": "한 번 음주량",
+    "walking_days_per_week": "1주일간 걷기 일수",
+    "strength_days_per_week": "1주일간 근력운동 일수",
+}
+
+REQUIRED_PRECISION_ANALYSIS_FIELDS = {
+    "systolic_bp": "수축기 혈압",
+    "diastolic_bp": "이완기 혈압",
     "fasting_glucose": "공복혈당",
+    "hba1c": "당화혈색소",
+    "total_cholesterol": "총콜레스테롤",
     "ldl_cholesterol": "LDL 콜레스테롤",
     "hdl_cholesterol": "HDL 콜레스테롤",
     "triglyceride": "중성지방",
+    "waist_cm": "허리둘레",
 }
 
 
 async def create_health_record(user_id: int, request: HealthRecordCreateRequest) -> HealthRecord:
-    return await health_repository.create_health_record(user_id, request.model_dump())
+    data = _with_calculated_bmi(request.model_dump())
+    return await health_repository.create_health_record(user_id, data)
 
 
 async def get_health_record(record_id: int) -> HealthRecord | None:
@@ -31,6 +57,7 @@ async def list_health_records(user_id: int, limit: int = 20, offset: int = 0) ->
 
 async def update_health_record(record_id: int, request: HealthRecordUpdateRequest) -> HealthRecord | None:
     data = request.model_dump(exclude_unset=True)
+    data = _with_calculated_bmi(data)
     return await health_repository.update_health_record(record_id, data)
 
 
@@ -39,23 +66,73 @@ async def delete_health_record(record_id: int) -> int:
 
 
 async def get_analysis_readiness(user_id: int) -> dict[str, object]:
+    user = await User.get_or_none(id=user_id)
+    missing_user_fields = [
+        label
+        for field_name, label in REQUIRED_USER_ANALYSIS_FIELDS.items()
+        if user is None or _is_missing_value(getattr(user, field_name))
+    ]
     latest_record = await get_latest_health_record(user_id)
     if latest_record is None:
+        missing_basic_fields = missing_user_fields + list(REQUIRED_BASIC_ANALYSIS_FIELDS.values())
+        missing_precision_fields = list(REQUIRED_PRECISION_ANALYSIS_FIELDS.values())
         return {
             "is_ready": False,
+            "basic_ready": False,
+            "precision_ready": False,
             "latest_health_record_id": None,
-            "missing_fields": list(REQUIRED_ANALYSIS_FIELDS.values()),
+            "missing_fields": missing_basic_fields,
+            "missing_basic_fields": missing_basic_fields,
+            "missing_precision_fields": missing_precision_fields,
             "message": "건강 분석을 시작하려면 먼저 건강 정보를 입력해 주세요.",
         }
 
-    missing_fields = [
-        label for field_name, label in REQUIRED_ANALYSIS_FIELDS.items() if getattr(latest_record, field_name) is None
+    missing_basic_fields = missing_user_fields + [
+        label
+        for field_name, label in REQUIRED_BASIC_ANALYSIS_FIELDS.items()
+        if _is_missing_health_record_field(latest_record, field_name)
     ]
-    is_ready = not missing_fields
-    message = "건강 분석을 실행할 수 있습니다." if is_ready else "건강 분석에 필요한 항목을 더 입력해 주세요."
+    missing_precision_fields = [
+        label
+        for field_name, label in REQUIRED_PRECISION_ANALYSIS_FIELDS.items()
+        if _is_missing_value(getattr(latest_record, field_name))
+    ]
+    basic_ready = not missing_basic_fields
+    precision_ready = not missing_precision_fields
+    message = "건강 분석을 실행할 수 있습니다." if basic_ready else "기본 분석에 필요한 항목을 더 입력해 주세요."
     return {
-        "is_ready": is_ready,
+        "is_ready": basic_ready,
+        "basic_ready": basic_ready,
+        "precision_ready": precision_ready,
         "latest_health_record_id": latest_record.id,
-        "missing_fields": missing_fields,
+        "missing_fields": missing_basic_fields,
+        "missing_basic_fields": missing_basic_fields,
+        "missing_precision_fields": missing_precision_fields,
         "message": message,
     }
+
+
+def _with_calculated_bmi(data: dict) -> dict:
+    height = data.get("height_cm")
+    weight = data.get("weight_kg")
+    if height is None or weight is None:
+        return data
+
+    height_decimal = Decimal(str(height))
+    weight_decimal = Decimal(str(weight))
+    if height_decimal <= 0 or weight_decimal <= 0:
+        return data
+
+    height_m = height_decimal / Decimal("100")
+    data["bmi"] = (weight_decimal / (height_m * height_m)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return data
+
+
+def _is_missing_value(value: object) -> bool:
+    return value is None or value == ""
+
+
+def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bool:
+    if field_name == "bmi" and not _is_missing_value(record.height_cm) and not _is_missing_value(record.weight_kg):
+        return False
+    return _is_missing_value(getattr(record, field_name))

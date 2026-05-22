@@ -55,7 +55,7 @@ CHALLENGE_SEEDS = [
         title="단 음료 대신 물 마시기",
         category=ChallengeCategory.HABIT,
         target_disease="DIABETES",
-        description="WATER 성격의 챌린지는 현 스키마에서 HABIT 카테고리로 저장합니다.",
+        description="단 음료를 줄이고 물을 선택하는 습관을 기록합니다.",
         target_metric="water_replacement_count",
         target_value="1",
     ),
@@ -87,7 +87,7 @@ CHALLENGE_SEEDS = [
         title="복약 시간 기록하기",
         category=ChallengeCategory.HABIT,
         target_disease="COMMON",
-        description="MEDICATION 성격의 챌린지는 현 스키마에서 HABIT 카테고리로 저장합니다.",
+        description="매일 복약 시간을 확인하고 기록하는 습관을 만듭니다.",
         target_metric="medication_record_count",
         target_value="1",
     ),
@@ -114,7 +114,7 @@ async def seed_challenges() -> None:
 
         await Challenge.create(
             title=seed.title,
-            description=f"[target_disease={seed.target_disease}] {seed.description}",
+            description=seed.description,
             category=seed.category,
             target_metric=seed.target_metric,
             target_value=seed.target_value,

@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.dtos.base import BaseSerializerModel
 
@@ -23,9 +23,15 @@ class HealthRecordCreateRequest(BaseModel):
     has_obesity: bool | None = None
     has_dyslipidemia: bool | None = None
     has_hypertension: bool | None = None
-    is_smoker: bool | None = None
-    drinks_alcohol: bool | None = None
-    exercise_days_per_week: int | None = None
+    occupation_code: str | None = None
+    family_htn: str | None = None
+    family_dm: str | None = None
+    family_dyslipidemia: str | None = None
+    smoking_status: str | None = None
+    drinking_frequency: str | None = None
+    drinking_amount: str | None = None
+    walking_days_per_week: int | None = Field(default=None, ge=0, le=7)
+    strength_days_per_week: int | None = Field(default=None, ge=0, le=7)
     sleep_hours: Decimal | None = None
     measured_at: datetime
 
@@ -47,9 +53,15 @@ class HealthRecordUpdateRequest(BaseModel):
     has_obesity: bool | None = None
     has_dyslipidemia: bool | None = None
     has_hypertension: bool | None = None
-    is_smoker: bool | None = None
-    drinks_alcohol: bool | None = None
-    exercise_days_per_week: int | None = None
+    occupation_code: str | None = None
+    family_htn: str | None = None
+    family_dm: str | None = None
+    family_dyslipidemia: str | None = None
+    smoking_status: str | None = None
+    drinking_frequency: str | None = None
+    drinking_amount: str | None = None
+    walking_days_per_week: int | None = Field(default=None, ge=0, le=7)
+    strength_days_per_week: int | None = Field(default=None, ge=0, le=7)
     sleep_hours: Decimal | None = None
     measured_at: datetime | None = None
 
@@ -73,6 +85,15 @@ class HealthRecordResponse(BaseSerializerModel):
     has_obesity: bool | None
     has_dyslipidemia: bool | None
     has_hypertension: bool | None
+    occupation_code: str | None
+    family_htn: str | None
+    family_dm: str | None
+    family_dyslipidemia: str | None
+    smoking_status: str | None
+    drinking_frequency: str | None
+    drinking_amount: str | None
+    walking_days_per_week: int | None
+    strength_days_per_week: int | None
     is_smoker: bool | None
     drinks_alcohol: bool | None
     exercise_days_per_week: int | None
@@ -89,6 +110,10 @@ class HealthRecordListResponse(BaseModel):
 
 class HealthAnalysisReadinessResponse(BaseModel):
     is_ready: bool
+    basic_ready: bool | None = None
+    precision_ready: bool | None = None
     latest_health_record_id: int | None = None
     missing_fields: list[str]
+    missing_basic_fields: list[str] = []
+    missing_precision_fields: list[str] = []
     message: str

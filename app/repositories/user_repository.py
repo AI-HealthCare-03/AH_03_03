@@ -40,8 +40,6 @@ class UserRepository:
         birthday: date,
         *,
         login_id: str | None = None,
-        firebase_uid: str | None = None,
-        auth_provider: str = "local",
         nickname: str | None = None,
         address: str | None = None,
         profile_image_url: str | None = None,
@@ -52,8 +50,6 @@ class UserRepository:
     ) -> User:
         return await self._model.create(
             login_id=login_id,
-            firebase_uid=firebase_uid,
-            auth_provider=auth_provider,
             email=email,
             hashed_password=hashed_password,
             name=name,
@@ -75,8 +71,11 @@ class UserRepository:
     async def get_user_by_login_id(self, login_id: str) -> User | None:
         return await self._model.get_or_none(login_id=login_id)
 
-    async def get_user_by_firebase_uid(self, firebase_uid: str) -> User | None:
-        return await self._model.get_or_none(firebase_uid=firebase_uid)
+    async def get_user_by_name_and_email(self, name: str, email: str) -> User | None:
+        return await self._model.get_or_none(name=name, email=email)
+
+    async def get_user_by_name_and_phone_number(self, name: str, phone_number: str) -> User | None:
+        return await self._model.get_or_none(name=name, phone_number=phone_number)
 
     async def exists_by_email(self, email: str) -> bool:
         return await self._model.filter(email=email).exists()
@@ -88,7 +87,21 @@ class UserRepository:
         return await self._model.filter(phone_number=phone_number).exists()
 
     async def update_last_login(self, user_id: int) -> None:
-        await self._model.filter(id=user_id).update(last_login=datetime.now(config.TIMEZONE))
+        now = datetime.now(config.TIMEZONE)
+        await self._model.filter(id=user_id).update(last_login_at=now)
+
+    async def record_login_failure(self, user: User, failed_count: int, locked_until: datetime | None) -> None:
+        user.failed_login_count = failed_count
+        user.locked_until = locked_until
+        user.updated_at = datetime.now(config.TIMEZONE)
+        await user.save(update_fields=["failed_login_count", "locked_until", UPDATED_AT_FIELD])
+
+    async def reset_login_failures(self, user_id: int) -> None:
+        await self._model.filter(id=user_id).update(
+            failed_login_count=0,
+            locked_until=None,
+            updated_at=datetime.now(config.TIMEZONE),
+        )
 
     async def update_instance(self, user: User, data: dict[str, Any]) -> None:
         update_fields = []
@@ -179,56 +192,3 @@ class UserRepository:
             sensitive_data_agreed=sensitive_data_agreed,
             marketing_agreed=marketing_agreed,
         )
-
-    async def sync_firebase_user(
-        self,
-        *,
-        firebase_uid: str,
-        email: str,
-        name: str,
-        nickname: str | None = None,
-        profile_image_url: str | None = None,
-        email_verified_at: datetime | None = None,
-    ) -> User:
-        user = await self.get_user_by_firebase_uid(firebase_uid)
-        if user is None:
-            user = await self.get_user_by_email(email)
-
-        data = {
-            "firebase_uid": firebase_uid,
-            "auth_provider": "firebase",
-            "email": email,
-            "name": name,
-            "nickname": nickname,
-            "profile_image_url": profile_image_url,
-            "email_verified_at": email_verified_at,
-            "role": "USER",
-        }
-
-        if user is not None:
-            await self.update_instance(user, {key: value for key, value in data.items() if value is not None})
-            await user.refresh_from_db()
-            return user
-
-        return await self.create_user(
-            login_id=self._build_firebase_login_id(firebase_uid),
-            firebase_uid=firebase_uid,
-            auth_provider="firebase",
-            email=email,
-            hashed_password="firebase-auth-user",
-            name=name,
-            nickname=nickname,
-            phone_number=self._build_firebase_phone_number(firebase_uid),
-            gender=Gender.MALE,
-            birthday=date(1970, 1, 1),
-            profile_image_url=profile_image_url,
-            email_verified_at=email_verified_at,
-            role="USER",
-        )
-
-    def _build_firebase_login_id(self, firebase_uid: str) -> str:
-        return f"fb_{firebase_uid[:37]}"
-
-    def _build_firebase_phone_number(self, firebase_uid: str) -> str:
-        digits = "".join(str(ord(char) % 10) for char in firebase_uid)
-        return f"fb{digits[:9]}".ljust(11, "0")

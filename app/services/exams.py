@@ -1,5 +1,4 @@
 from decimal import Decimal
-from typing import Any
 
 from app.dtos.exams import (
     ExamConfirmRequest,
@@ -7,6 +6,7 @@ from app.dtos.exams import (
     ExamMeasurementCreateRequest,
     ExamMeasurementUpdateRequest,
     ExamReportCreateRequest,
+    ExamReportUpdateRequest,
 )
 from app.models.exams import ExamMeasurement, ExamReport, OCRStatus
 from app.repositories import exam_repository
@@ -46,7 +46,8 @@ async def list_exam_reports(user_id: int, limit: int = 20, offset: int = 0) -> l
     return await exam_repository.list_exam_reports_by_user(user_id, limit=limit, offset=offset)
 
 
-async def update_exam_report(exam_report_id: int, data: dict[str, Any]) -> ExamReport | None:
+async def update_exam_report(exam_report_id: int, request: ExamReportUpdateRequest) -> ExamReport | None:
+    data = request.model_dump(exclude_unset=True)
     return await exam_repository.update_exam_report(exam_report_id, data)
 
 
@@ -101,7 +102,7 @@ async def run_dummy_ocr(exam_report_id: int) -> ExamDummyOCRResponse:
         updated = await update_exam_measurement(existing.id, ExamMeasurementUpdateRequest(**request.model_dump()))
         saved_measurements.append(updated or existing)
 
-    await update_exam_report(exam_report_id, {"ocr_status": OCRStatus.SUCCESS})
+    await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS))
     return ExamDummyOCRResponse(
         message="더미 OCR 측정값이 생성되었습니다. 실제 CLOVA OCR 호출은 수행하지 않았습니다.",
         measurements=saved_measurements,

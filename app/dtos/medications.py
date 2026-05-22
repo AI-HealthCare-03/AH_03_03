@@ -1,6 +1,6 @@
 from datetime import datetime, time
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MedicationCreateRequest(BaseModel):
@@ -44,7 +44,54 @@ class MedicationListResponse(BaseModel):
     total: int
 
 
+class MedicationOCRDummyRequest(BaseModel):
+    source_type: str | None = "PRESCRIPTION"
+    image_filename: str | None = None
+    memo: str | None = None
+
+
+class MedicationOCRItem(BaseModel):
+    temp_id: str | None = None
+    name: str
+    dosage: str | None = None
+    frequency: str | None = None
+    time_slots: list[str] = Field(default_factory=list)
+    duration_days: int | None = None
+    memo: str | None = None
+    confidence: float | None = None
+
+
+class MedicationOCRDummyResponse(BaseModel):
+    is_dummy: bool = True
+    source_type: str
+    ocr_confidence: float
+    items: list[MedicationOCRItem]
+    message: str
+
+
+class MedicationOCRConfirmItem(BaseModel):
+    name: str
+    dosage: str | None = None
+    frequency: str | None = None
+    time_slots: list[str] = Field(default_factory=list)
+    duration_days: int | None = None
+    memo: str | None = None
+
+
+class MedicationOCRConfirmRequest(BaseModel):
+    items: list[MedicationOCRConfirmItem]
+
+
+class MedicationOCRConfirmResponse(BaseModel):
+    created_count: int
+    created_medication_ids: list[int]
+    skipped_count: int = 0
+    message: str
+
+
 class MedicationRecordCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scheduled_at: datetime | None = None
     taken_at: datetime | None = None
     is_taken: bool = False
@@ -53,6 +100,8 @@ class MedicationRecordCreateRequest(BaseModel):
 
 
 class MedicationRecordUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scheduled_at: datetime | None = None
     taken_at: datetime | None = None
     is_taken: bool | None = None

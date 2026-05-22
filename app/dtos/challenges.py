@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.dtos.base import BaseSerializerModel
 from app.models.challenges import ChallengeCategory, ChallengeStatus, UserChallengeStatus
@@ -34,6 +34,15 @@ class UserChallengeCreateRequest(BaseModel):
     challenge_id: int
     status: UserChallengeStatus = UserChallengeStatus.JOINED
     started_at: datetime
+
+
+class UserChallengeUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: UserChallengeStatus | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    canceled_at: datetime | None = None
 
 
 class UserChallengeResponse(BaseSerializerModel):

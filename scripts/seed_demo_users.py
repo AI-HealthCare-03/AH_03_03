@@ -126,7 +126,6 @@ async def _get_or_create_user(seed: DemoUserSeed) -> tuple[User, bool]:
 
     user = await User.create(
         login_id=seed.login_id,
-        auth_provider="local",
         email=seed.email,
         hashed_password=hash_password(DEMO_PASSWORD),
         name=seed.name,
@@ -194,9 +193,9 @@ def _health_payload(
     ldl: int,
     hdl: int,
     triglyceride: int,
-    is_smoker: int,
-    drinks_alcohol: int,
-    exercise_days: int,
+    smoker_flag: int,
+    alcohol_flag: int,
+    activity_days: int,
     sleep_hours: str,
 ) -> dict[str, Any]:
     return {
@@ -216,9 +215,15 @@ def _health_payload(
         "has_obesity": bmi >= 25,
         "has_dyslipidemia": ldl >= 130 or triglyceride >= 150,
         "has_hypertension": systolic >= 130 or diastolic >= 80,
-        "is_smoker": bool(is_smoker),
-        "drinks_alcohol": bool(drinks_alcohol),
-        "exercise_days_per_week": exercise_days,
+        "occupation_code": "OFFICE",
+        "family_htn": "YES" if systolic >= 130 else "NO",
+        "family_dm": "YES" if glucose >= 126 else "NO",
+        "family_dyslipidemia": "YES" if ldl >= 130 or triglyceride >= 150 else "NO",
+        "smoking_status": "CURRENT_SMOKER" if smoker_flag else "NON_SMOKER",
+        "drinking_frequency": "MONTHLY_2_4" if alcohol_flag else "RARE",
+        "drinking_amount": "ONE_TO_TWO" if alcohol_flag else "NONE",
+        "walking_days_per_week": activity_days,
+        "strength_days_per_week": min(activity_days, 3),
         "sleep_hours": Decimal(sleep_hours),
     }
 
@@ -445,14 +450,39 @@ async def _seed_diets(user: User, risk_profile: str) -> int:
 
     now = datetime.now(config.TIMEZONE)
     meals = [
-        ("BREAKFAST", "현미밥, 달걀, 나물 반찬", 82.0),
-        ("LUNCH", "닭가슴살 샐러드와 고구마", 88.0),
-        ("DINNER", "잡곡밥, 생선구이, 된장국", 76.0),
-        ("SNACK", "무가당 요거트와 견과류", 84.0),
-        ("DINNER", "외식 메뉴와 탄산음료", 58.0 if risk_profile == "high" else 68.0),
+        (
+            "BREAKFAST",
+            "현미밥, 달걀, 나물 반찬",
+            82.0,
+            "아침 식단으로 복합 탄수화물과 단백질이 균형 있게 구성되어 있습니다. 나트륨 섭취는 적정 수준입니다.",
+        ),
+        (
+            "LUNCH",
+            "닭가슴살 샐러드와 고구마",
+            88.0,
+            "점심 식단으로 저지방 고단백 구성이 우수합니다. 식이섬유가 풍부하고 혈당 조절에 도움이 됩니다.",
+        ),
+        (
+            "DINNER",
+            "잡곡밥, 생선구이, 된장국",
+            76.0,
+            "저녁 식단으로 오메가3가 풍부한 생선과 발효 식품이 포함되어 건강에 도움이 됩니다.",
+        ),
+        (
+            "SNACK",
+            "무가당 요거트와 견과류",
+            84.0,
+            "당 지수가 낮은 건강한 간식입니다. 불포화지방산과 프로바이오틱스가 포함되어 있습니다.",
+        ),
+        (
+            "DINNER",
+            "외식 메뉴와 탄산음료",
+            58.0 if risk_profile == "high" else 68.0,
+            "나트륨과 당분이 높은 편입니다. 외식 시 채소 반찬을 추가하고 탄산음료 대신 물을 선택하는 것이 좋습니다.",
+        ),
     ]
     created_count = 0
-    for index, (meal_type, description, score) in enumerate(meals):
+    for index, (meal_type, description, score, feedback) in enumerate(meals):
         existing = await DietRecord.get_or_none(user=user, description=description)
         if existing is not None:
             continue
@@ -465,7 +495,7 @@ async def _seed_diets(user: User, risk_profile: str) -> int:
             detected_foods=[{"name": food.strip(), "confidence": 0.92} for food in description.split(",")],
             nutrition_summary={"calories": 520 + index * 35, "carbs_g": 65, "protein_g": 28, "fat_g": 16},
             diet_score=score,
-            diet_feedback="MVP 데모용 식단 분석 결과입니다.",
+            diet_feedback=feedback,
             analysis_method="DUMMY",
             memo="로컬 MVP 데모 식단",
         )

@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Any
+
+from fastapi import HTTPException
+from starlette import status
 
 from app.core import config
 from app.dtos.challenges import (
@@ -7,6 +9,7 @@ from app.dtos.challenges import (
     ChallengeLogCreateRequest,
     ChallengeRecommendationCreateRequest,
     UserChallengeCreateRequest,
+    UserChallengeUpdateRequest,
 )
 from app.models.challenges import Challenge, ChallengeLog, ChallengeRecommendation, UserChallenge, UserChallengeStatus
 from app.repositories import challenge_repository
@@ -27,6 +30,11 @@ async def create_challenge(request: ChallengeCreateRequest) -> Challenge:
 async def join_challenge(
     user_id: int, challenge_id: int, request: UserChallengeCreateRequest | None = None
 ) -> UserChallenge:
+    existing = await challenge_repository.get_user_challenge_by_user_and_challenge(user_id, challenge_id)
+    if existing is not None:
+        # Rejoining a canceled challenge needs a product policy and DB constraint pass.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 참여한 챌린지입니다.")
+
     data = request.model_dump(exclude={"challenge_id"}) if request is not None else None
     return await challenge_repository.create_user_challenge(user_id, challenge_id, data)
 
@@ -39,7 +47,12 @@ async def list_user_challenges(user_id: int, limit: int = 20, offset: int = 0) -
     return await challenge_repository.list_user_challenges(user_id, limit=limit, offset=offset)
 
 
-async def update_user_challenge(user_challenge_id: int, data: dict[str, Any]) -> UserChallenge | None:
+async def count_active_user_challenges(user_id: int) -> int:
+    return await challenge_repository.count_user_challenges_by_status(user_id, [UserChallengeStatus.JOINED])
+
+
+async def update_user_challenge(user_challenge_id: int, request: UserChallengeUpdateRequest) -> UserChallenge | None:
+    data = request.model_dump(exclude_unset=True)
     return await challenge_repository.update_user_challenge(user_challenge_id, data)
 
 

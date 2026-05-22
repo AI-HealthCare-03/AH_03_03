@@ -1,10 +1,17 @@
-from datetime import date, datetime
+from datetime import date
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, EmailStr, Field, model_validator
 
 from app.core.validators import validate_birthday, validate_password, validate_phone_number
 from app.models.users import Gender
+
+
+def validate_required_text(value: str) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("필수 입력값입니다.")
+    return stripped
 
 
 class SignUpRequest(BaseModel):
@@ -19,7 +26,7 @@ class SignUpRequest(BaseModel):
     birth_date: Annotated[date, AfterValidator(validate_birthday)]
     phone_number: Annotated[str, AfterValidator(validate_phone_number)]
     nickname: Annotated[str | None, Field(None, max_length=30)] = None
-    address: Annotated[str | None, Field(None, max_length=255)] = None
+    address: Annotated[str, Field(min_length=1, max_length=255), AfterValidator(validate_required_text)]
     profile_image_url: Annotated[str | None, Field(None, max_length=500)] = None
     sensitive_data_agreed: bool = False
     marketing_agreed: bool = False
@@ -46,6 +53,25 @@ class TokenRefreshResponse(LoginResponse): ...
 
 class AvailabilityResponse(BaseModel):
     available: bool
+    message: str | None = None
+
+
+class FindLoginIdRequest(BaseModel):
+    name: Annotated[str, Field(min_length=1, max_length=20)]
+    email: EmailStr | None = None
+    phone_number: str | None = None
+
+    @model_validator(mode="after")
+    def validate_contact(self) -> "FindLoginIdRequest":
+        if self.email is None and not self.phone_number:
+            raise ValueError("email 또는 phone_number 중 하나는 필요합니다.")
+        return self
+
+
+class FindLoginIdResponse(BaseModel):
+    found: bool
+    masked_login_id: str | None = None
+    message: str
 
 
 class EmailVerificationSendRequest(BaseModel):
@@ -63,6 +89,24 @@ class EmailVerificationVerifyRequest(BaseModel):
 
 
 class EmailVerificationVerifyResponse(BaseModel):
+    verified: bool
+
+
+class PhoneVerificationSendRequest(BaseModel):
+    phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+
+
+class PhoneVerificationSendResponse(BaseModel):
+    detail: str
+    debug_code: str | None = None
+
+
+class PhoneVerificationVerifyRequest(BaseModel):
+    phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+    code: Annotated[str, Field(min_length=4, max_length=10)]
+
+
+class PhoneVerificationVerifyResponse(BaseModel):
     verified: bool
 
 
@@ -87,20 +131,3 @@ class PasswordChangeRequest(BaseModel):
 
 class SimpleMessageResponse(BaseModel):
     detail: str
-
-
-class FirebaseSyncRequest(BaseModel):
-    id_token: str | None = None
-
-
-class FirebaseUserResponse(BaseModel):
-    id: int
-    email: str
-    name: str
-    nickname: str | None = None
-    role: str
-    is_active: bool
-    auth_provider: str
-    has_firebase_uid: bool
-    created_at: datetime
-    updated_at: datetime
