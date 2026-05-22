@@ -1,12 +1,12 @@
 # Schema Normalization Plan
 
-이 문서는 풀서비스 전환 과정에서 DB 컬럼을 바로 삭제하기 전에 영향 범위를 점검하고, 안전한 정규화 순서를 정리하기 위한 설계 메모입니다. 이번 단계에서는 코드, DB, migration을 수정하지 않고 삭제 후보와 보류 대상을 분류한다.
+이 문서는 풀서비스 전환 과정에서 DB 컬럼 정규화 영향 범위와 안전한 정리 순서를 기록하기 위한 설계 메모입니다.
 
 ## 1. 전체 결론
 
 - `HealthRecord`의 x1 생활습관 컬럼은 `smoking_status`, `drinking_frequency`, `drinking_amount`, `walking_days_per_week`, `strength_days_per_week`를 표준 필드로 유지하는 방향이 적절하다.
-- `is_smoker`, `drinks_alcohol`, `exercise_days_per_week`는 과거 단순 입력값 또는 호환 필드 성격이 강하므로 legacy 제거 후보로 분류한다.
-- 다만 프론트의 최신 기록 초기값 fallback, 회원가입 후 health payload, seed 스크립트, DTO 응답에 아직 legacy 필드가 남아 있어 즉시 삭제하면 화면 초기값과 데모 데이터가 흔들릴 수 있다.
+- `is_smoker`, `drinks_alcohol`, `exercise_days_per_week`는 과거 단순 입력값 또는 호환 필드 성격이 강해 제거 대상으로 확정했고, 2026-05-23 신규 migration으로 제거했다.
+- 프론트 최신 기록 초기값 fallback, 회원가입 후 health payload, seed 스크립트, DTO 응답에서도 legacy 필드 사용을 제거했다.
 - `MedicationRecord.user_id`는 `Medication.user_id`와 중복될 수 있지만, 현재 대시보드/메인 요약/라우터 권한 체크가 직접 `medication_records.user_id`에 의존한다. 당장 제거보다 유지하면서 service layer에서 `medication.user_id == record.user_id` 일치 검증을 강화하는 편이 안전하다.
 - `users.last_login`은 코드에서 갱신하지 않고 `last_login_at`만 표준으로 사용 중이다. 2026-05-23 신규 migration으로 제거 대상으로 확정했다.
 
@@ -19,25 +19,25 @@
 | 표준 | `drinking_amount` | `health.py` readiness, `analysis.py` snapshot, DTO, 프론트 입력/표시, seed | 유지 |
 | 표준 | `walking_days_per_week` | `health.py` readiness, `analysis.py` snapshot, DTO, 프론트 입력/표시, seed | 유지 |
 | 표준 | `strength_days_per_week` | `health.py` readiness, `analysis.py` snapshot, DTO, 프론트 입력/표시, seed | 유지 |
-| legacy 후보 | `is_smoker` | DTO, 프론트 fallback/payload, seed | 삭제 후보, 단계적 제거 필요 |
-| legacy 후보 | `drinks_alcohol` | DTO, 프론트 fallback/payload, seed | 삭제 후보, 단계적 제거 필요 |
-| legacy 후보 | `exercise_days_per_week` | DTO, 프론트 fallback/payload, seed | 삭제 후보, 단계적 제거 필요 |
+| 제거 완료 | `is_smoker` | 과거 단순 흡연 여부 필드 | `smoking_status`로 대체 |
+| 제거 완료 | `drinks_alcohol` | 과거 단순 음주 여부 필드 | `drinking_frequency`, `drinking_amount`로 대체 |
+| 제거 완료 | `exercise_days_per_week` | 과거 단순 운동일수 필드 | `walking_days_per_week`, `strength_days_per_week`로 대체 |
 
 ### 코드 사용처 요약
 
-- 백엔드 모델: `app/models/health.py`에 표준 필드와 legacy 후보가 모두 존재한다.
-- 백엔드 DTO: `app/dtos/health.py`의 create/update/response 모두 표준 필드와 legacy 후보를 함께 노출한다.
+- 백엔드 모델: `app/models/health.py`는 표준 필드만 유지한다.
+- 백엔드 DTO: `app/dtos/health.py`의 create/update/response는 표준 필드만 노출한다.
 - readiness: `app/services/health.py`는 표준 필드만 기본 분석 필수값으로 본다.
 - 분석 snapshot: `app/services/analysis.py`는 표준 필드만 `input_features`에 포함한다.
 - 프론트 입력:
-  - `frontend/src/pages/SignupPage.tsx`는 표준 필드와 legacy 후보를 함께 health payload에 넣는다.
-  - `frontend/src/pages/HealthRecordPage.tsx`와 `HealthProfilePage.tsx`는 표준 필드가 없을 때 legacy 값을 fallback으로 읽고, 저장 시 legacy 후보도 함께 보낸다.
-  - `frontend/src/api/health.ts` 타입에도 legacy 후보가 남아 있다.
+  - `frontend/src/pages/SignupPage.tsx`는 표준 필드만 health payload에 넣는다.
+  - `frontend/src/pages/HealthRecordPage.tsx`와 `HealthProfilePage.tsx`는 legacy fallback 없이 표준 필드만 읽고 저장한다.
+  - `frontend/src/api/health.ts` 타입은 표준 필드만 사용한다.
 - seed:
   - `scripts/seed_demo_users.py`
   - `scripts/seed_current_user_dashboard_demo.py`
-  두 스크립트 모두 표준 필드와 legacy 후보를 함께 채운다.
-- ERD: `docs/erd/mvp_erd.dbml`에도 표준 필드와 legacy 후보가 함께 남아 있다.
+  두 스크립트 모두 표준 필드만 채운다.
+- ERD: `docs/erd/mvp_erd.dbml`에는 x1 표준 필드만 남긴다.
 
 ## 3. HealthRecord 정규화 권장안
 
@@ -50,23 +50,21 @@
 
 ### 단계적 migration 계획
 
-1. 쓰기 중단
+1. 쓰기 중단 완료
    - 프론트 `SignupPage`, `HealthRecordPage`, `HealthProfilePage`에서 legacy 후보를 payload에 넣지 않는다.
    - seed 스크립트에서도 legacy 후보를 더 이상 생성하지 않는다.
 
-2. 읽기 fallback 제거
+2. 읽기 fallback 제거 완료
    - `record?.is_smoker`, `record?.drinks_alcohol`, `record?.exercise_days_per_week` fallback을 제거한다.
-   - 오래된 로컬 데이터는 한 번성 backfill로 표준 필드에 반영한다.
 
-3. DTO 응답 정리
+3. DTO 응답 정리 완료
    - `HealthRecordCreateRequest`, `HealthRecordUpdateRequest`, `HealthRecordResponse`에서 legacy 후보를 제거한다.
    - 프론트 타입 `frontend/src/api/health.ts`에서도 제거한다.
 
-4. DB migration
-   - 기존 데이터를 표준 필드로 backfill한다.
+4. DB migration 완료
    - 검증 후 `is_smoker`, `drinks_alcohol`, `exercise_days_per_week` 컬럼을 drop한다.
 
-5. ERD 반영
+5. ERD 반영 완료
    - `docs/erd/mvp_erd.dbml`에서 legacy 후보를 제거하고, x1 표준 필드만 남긴다.
 
 ## 4. MedicationRecord.user FK 유지/제거 판단
@@ -205,12 +203,9 @@
 
 ## 8. 지금 삭제하면 안 되는 항목
 
-- `is_smoker`
-- `drinks_alcohol`
-- `exercise_days_per_week`
 - `medication_records.user_id`
 
-이 항목들은 삭제 후보 또는 legacy 후보지만, 현재 프론트 fallback, DTO, seed, dashboard/summary 조회 흐름에 아직 영향이 있다. 바로 삭제하면 런타임 오류나 오래된 데이터 표시 누락이 생길 수 있다.
+`medication_records.user_id`는 삭제 후보 또는 legacy 후보지만, 현재 대시보드/요약/알림 조회 흐름과 성능에 영향이 있다. 바로 삭제하면 런타임 오류나 조회 구조 변경이 생길 수 있다.
 
 `users.last_login`은 `last_login_at` 표준화가 완료되어 2026-05-23 migration으로 제거 대상으로 확정했다.
 
@@ -220,20 +215,28 @@
 - 프론트 `SignupPage`, `HealthRecordPage`, `HealthProfilePage` 저장 payload는 `smoking_status`, `drinking_frequency`, `drinking_amount`, `walking_days_per_week`, `strength_days_per_week` 중심으로 정리했다.
 - 백엔드 `HealthRecordCreateRequest`, `HealthRecordUpdateRequest`에서도 legacy 후보를 제거했다.
 - seed 스크립트는 표준 필드만 채우도록 정리했다.
-- 응답 DTO와 오래된 데이터 읽기 fallback은 다음 단계 호환을 위해 유지한다.
+- 응답 DTO와 오래된 데이터 읽기 fallback도 제거했다.
+
+### 2026-05-23 2~3단계 반영 상태
+
+- `HealthRecordResponse`에서 `is_smoker`, `drinks_alcohol`, `exercise_days_per_week` 노출을 제거했다.
+- `HealthRecordPage`, `HealthProfilePage`의 legacy fallback을 제거하고 표준 필드만 표시한다.
+- `app/models/health.py`에서 legacy 컬럼 정의를 제거했다.
+- `app/core/db/migrations/models/12_20260523000001_drop_health_record_legacy_lifestyle_fields.py` migration으로 legacy 컬럼 3개를 drop한다.
+- `scripts/init_local_dev_db.py` local safe ALTER SQL도 로컬 DB의 legacy 컬럼을 제거하도록 보강했다.
+- `docs/erd/mvp_erd.dbml`에서 legacy 컬럼 3개를 제거했다.
 
 ## 9. 다음 migration 후보
 
-### 후보 A: HealthRecord legacy cleanup
+### 완료: HealthRecord legacy cleanup
 
 - Drop `health_records.is_smoker`
 - Drop `health_records.drinks_alcohol`
 - Drop `health_records.exercise_days_per_week`
 
-선행 작업:
-- 프론트/seed/DTO에서 legacy 쓰기 제거.
-- 표준 필드 backfill.
-- 프론트 fallback 제거.
+상태:
+- 2026-05-23 migration 추가 완료.
+- 프론트/seed/DTO legacy 쓰기와 fallback 제거 완료.
 
 ### 후보 B: User last_login cleanup
 
