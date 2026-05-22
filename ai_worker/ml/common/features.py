@@ -59,19 +59,19 @@ def add_obesity_flag(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_alcohol_risk(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """음주 위험군 구간화 (0=비음주 / 1=저위험 / 2=고위험)"""
-    df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+    df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
     return df, ["음주위험군"]
 
 
 def add_walk_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """걷기 활동량 구간화"""
-    df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
+    df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(float)
     return df, ["걷기활동량"]
 
 
 def add_strength_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """근력 운동 활동량 구간화"""
-    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
     return df, ["근력활동량"]
 
 
