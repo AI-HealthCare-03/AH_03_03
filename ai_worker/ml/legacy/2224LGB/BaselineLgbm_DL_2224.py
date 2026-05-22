@@ -12,6 +12,7 @@ Python 3.13 | lightgbm>=4.0 | scikit-learn>=1.4 | pandas>=2.2
 
 import os
 import warnings
+from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
@@ -30,8 +31,10 @@ from sklearn.utils.class_weight import compute_class_weight
 warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-DATA_PATH = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn2224_preprocessed.csv"
-MODEL_DIR = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/LGB18~24/outputs/baseline_lgbm_DL_2224"
+DATA_PATH = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn2224_preprocessed.csv")
+MODEL_DIR = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs" / "baseline_lgbm_DL_2224"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
