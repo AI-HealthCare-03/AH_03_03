@@ -15,6 +15,7 @@ Trial 수           : 50
 import json
 import os
 import warnings
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -38,8 +39,10 @@ warnings.filterwarnings("ignore")
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-DATA_PATH: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
-MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs/optuna_DM_FE_v5"
+DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
+MODEL_DIR: str = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "optuna_DM_FE_v5"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
@@ -63,7 +66,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     added: list[str] = []
 
     if USE_AGE_BIN:
-        age_bins = [0, 40, 50, 60, 70, 80, 999]
+        age_bins = [0, 40, 50, 60, 70, 80, np.inf]
         age_labels = ["나이_19_39", "나이_40대", "나이_50대", "나이_60대", "나이_70대", "나이_80이상"]
         df["_나이구간"] = pd.cut(df["나이"], bins=age_bins, labels=age_labels, right=False)
         for label in age_labels:
@@ -73,7 +76,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         print("  [ON] 나이 구간화")
 
     if USE_BMI_BIN:
-        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
+        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, np.inf], labels=[0, 1, 2, 3], right=False).astype(float)
         added += ["BMI_구간"]
         print("  [ON] BMI 구간화")
 
