@@ -30,8 +30,8 @@ from sklearn.utils.class_weight import compute_class_weight
 warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-DATA_PATH = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
-MODEL_DIR = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/LGB18~24/outputs/baseline_lgbm_DL"
+DATA_PATH = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
+MODEL_DIR = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs" / "baseline_lgbm_DL")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
