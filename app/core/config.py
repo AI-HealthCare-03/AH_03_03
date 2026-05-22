@@ -50,6 +50,10 @@ class Config(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:5173"
 
     COOKIE_DOMAIN: str = "localhost"
+    REFRESH_TOKEN_COOKIE_NAME: str = "refresh_token"
+    REFRESH_TOKEN_COOKIE_PATH: str = "/api/v1/auth"
+    REFRESH_TOKEN_COOKIE_SAMESITE: str = "lax"
+    REFRESH_TOKEN_COOKIE_SECURE: bool | None = None
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
 
     JWT_ALGORITHM: str = "HS256"
@@ -64,6 +68,20 @@ class Config(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENV in {Env.PROD, Env.PRODUCTION}
+
+    @property
+    def refresh_token_cookie_secure(self) -> bool:
+        if self.REFRESH_TOKEN_COOKIE_SECURE is not None:
+            return self.REFRESH_TOKEN_COOKIE_SECURE
+        return self.is_production
+
+    @property
+    def refresh_token_cookie_domain(self) -> str | None:
+        if not self.COOKIE_DOMAIN:
+            return None
+        if not self.is_production and self.COOKIE_DOMAIN == "localhost":
+            return None
+        return self.COOKIE_DOMAIN
 
     @property
     def twilio_verify_status(self) -> str:
