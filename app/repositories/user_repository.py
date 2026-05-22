@@ -143,6 +143,29 @@ class UserRepository:
             await VerificationCode.filter(email=email, purpose=purpose, is_used=False).order_by("-created_at").first()
         )
 
+    async def count_verification_codes(self, email: str, purpose: str, created_after: datetime) -> int:
+        return await VerificationCode.filter(email=email, purpose=purpose, created_at__gte=created_after).count()
+
+    async def has_recent_verified_code(self, email: str, purpose: str, verified_after: datetime) -> bool:
+        return await VerificationCode.filter(
+            email=email,
+            purpose=purpose,
+            is_used=True,
+            verified_at__isnull=False,
+            verified_at__gte=verified_after,
+        ).exists()
+
+    async def mark_active_verification_codes_used(
+        self,
+        email: str,
+        purpose: str,
+        verified_at: datetime | None = None,
+    ) -> int:
+        return await VerificationCode.filter(email=email, purpose=purpose, is_used=False).update(
+            is_used=True,
+            verified_at=verified_at,
+        )
+
     async def mark_verification_code_used(self, code: VerificationCode, verified_at: datetime) -> VerificationCode:
         code.is_used = True
         code.verified_at = verified_at

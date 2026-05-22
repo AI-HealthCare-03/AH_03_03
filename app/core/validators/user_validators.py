@@ -4,6 +4,7 @@ from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 
 from app.core import config
+from app.core.utils.common import normalize_phone_number
 
 
 def validate_password(password: str) -> str:
@@ -26,14 +27,10 @@ def validate_password(password: str) -> str:
 
 
 def validate_phone_number(phone_number: str) -> str:
-    patterns = [
-        r"010-\d{4}-\d{4}",  # 010-1234-5678
-        r"010\d{8}",  # 01012345678
-        r"\+8210\d{8}",  # +821012345678
-    ]
-
-    if not any(re.fullmatch(p, phone_number) for p in patterns):
-        raise ValueError("유효하지 않은 휴대폰 번호 형식입니다.")
+    try:
+        normalize_phone_number(phone_number)
+    except ValueError as exc:
+        raise ValueError("유효하지 않은 휴대폰 번호 형식입니다.") from exc
 
     return phone_number
 

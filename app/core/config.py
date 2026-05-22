@@ -64,3 +64,10 @@ class Config(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENV in {Env.PROD, Env.PRODUCTION}
+
+    @property
+    def twilio_verify_status(self) -> str:
+        if not self.TWILIO_ENABLED:
+            return "disabled"
+        required_values = [self.TWILIO_ACCOUNT_SID, self.TWILIO_AUTH_TOKEN, self.TWILIO_VERIFY_SERVICE_SID]
+        return "configured" if all(required_values) else "misconfigured"
