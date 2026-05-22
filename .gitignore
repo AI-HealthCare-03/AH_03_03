@@ -9,6 +9,7 @@ wheels/
 .venv
 .*.env
 .env
+infra/langfuse/.env
 firebase-service-account*.json
 *firebase-adminsdk*.json
 serviceAccountKey.json
