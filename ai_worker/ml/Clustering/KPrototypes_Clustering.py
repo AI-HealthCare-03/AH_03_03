@@ -10,6 +10,7 @@ Python 3.13 | kmodes>=0.12 | scikit-learn>=1.4
 
 import os
 import warnings
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,8 +23,8 @@ from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-DATA_PATH = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/lipid_only.csv"
-OUTPUT_DIR = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/Clustering/outputs"
+DATA_PATH = str(Path(__file__).parent.parent.parent / "data" / "lipid_only.csv")
+OUTPUT_DIR = str(Path(__file__).parent / "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
