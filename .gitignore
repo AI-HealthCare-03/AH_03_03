@@ -20,24 +20,24 @@ ai_worker/data/
 # Vision 평가 데이터 (로컬 전용)
 ai_worker/vision/data/images/
 ai_worker/vision/data/results/
-
-# CLOVA OCR PoC local inputs/outputs
-ai_worker/vision/clova_ocr/data/images/*
-!ai_worker/vision/clova_ocr/data/images/.gitkeep
-ai_worker/vision/clova_ocr/data/pdfs/*
-!ai_worker/vision/clova_ocr/data/pdfs/.gitkeep
-ai_worker/vision/clova_ocr/outputs/*
-ai_worker/vision/clova_ocr/outputs/**/*
-!ai_worker/vision/clova_ocr/outputs/.gitkeep
-ai_worker/vision/clova_ocr/ground_truth/*
-!ai_worker/vision/clova_ocr/ground_truth/.gitkeep
 .venv-ocr/
 .venv-ocr2/
+.venv-easyocr/
+
+# ocr-compare 건강검진표 원본 파일 제외 (개인정보)
+ocr-compare/results/images/
+ocr-compare/results/*.json
+ocr-compare/01_tesseract/node_modules/
+ocr-compare/01_tesseract/*.traineddata
+ai_worker/vision/ocr/eval/images/
+ai_worker/vision/ocr/eval/pdfs/
+ai_worker/vision/ocr/eval/results/
+ai_worker/vision/ocr/eval/ground_truth.json
+
+# Local data / generated outputs
 ai_worker/ml/outputs/
 ai_worker/ml/LGB18~24/outputs/
 **/outputs/
-
-# Local data / generated outputs
 /data/
 /output/
 /outputs/
@@ -56,5 +56,13 @@ ai_worker/ml/LGB18~24/outputs/
 *.onnx
 *.h5
 
-# OS files
-.DS_Store
+# ocr-compare 개인정보 파일
+ocr-compare/results/images/
+ocr-compare/eval/images/
+ocr-compare/eval/pdfs/
+ocr-compare/eval/results/
+ocr-compare/results/*.json
+ai_worker/vision/ocr/eval/ground_truth.json
+ai_worker/vision/ocr/eval/images/
+ai_worker/vision/ocr/eval/pdfs/
+ai_worker/vision/ocr/eval/results/
