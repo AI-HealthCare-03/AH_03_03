@@ -330,3 +330,15 @@
 - 민감정보 조회 로그 없이 관리자 조회를 허용하지 않는다.
 - `is_admin`을 신규 권한 판단 기준으로 사용하지 않는다.
 - Firebase/social login은 1차 범위 제외 상태를 유지한다.
+
+## 13. 2026-05-23 P0 구현 상태
+
+관리자 콘솔의 P0 진입점과 운영 모니터링 API를 1차 구현했습니다.
+
+- `/admin`, `/admin/monitoring`, `/admin/logs`는 `AdminRoute`로 보호합니다.
+- 프론트 접근 가능 role은 `MONITOR`, `OPERATOR`, `ADMIN`, `SUPER_ADMIN`입니다.
+- 백엔드 `/api/v1/admin/*` API는 각 endpoint별 최소 role dependency를 적용합니다.
+- 일반 사용자 사이드바/상단바의 관리자 진입 링크는 관리자 role 사용자에게만 표시합니다.
+- 프론트 숨김은 UX 처리일 뿐이며, 실제 보안 기준은 백엔드 role dependency입니다.
+
+이번 구현에는 관리자 로그인 분리, 2FA, IP allowlist, 관리자 권한 변경, 사용자 상세 관리 화면은 포함하지 않았습니다.

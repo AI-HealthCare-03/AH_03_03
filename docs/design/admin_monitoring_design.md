@@ -820,3 +820,27 @@ OCR 처리 로그.
 - 관리자 작업 replay 방지
 - 모델 변경 승인 절차
 - 의료/법무 검수 workflow
+
+## 19. 2026-05-23 P0 구현 반영
+
+P0 운영 모니터링의 최소 백엔드/프론트 골격을 구현했습니다.
+
+- 백엔드:
+  - `GET /api/v1/admin/summary`
+  - `GET /api/v1/admin/system/health`
+  - `GET /api/v1/admin/system/errors`
+  - `GET /api/v1/admin/sensitive-access-logs`
+  - `GET /api/v1/admin/users/summary`
+- 권한:
+  - summary, system health, system errors, users summary는 `MONITOR` 이상 접근
+  - 민감정보 접근 로그 목록은 원문 데이터는 없지만 운영상 민감하므로 `ADMIN` 이상 접근
+- 프론트:
+  - `/admin`
+  - `/admin/monitoring`
+  - `/admin/logs`
+  - 일반 사용자 앱과 분리된 `AdminLayout`과 `AdminRoute`
+- 노출 제한:
+  - `system_error_logs.stack_trace`는 관리자 화면/API 기본 응답에서 제외
+  - 건강 수치, 요청 body, 토큰, 인증코드 같은 민감 원문은 관리자 화면에 표시하지 않음
+
+사용자 상세 관리, 관리자 권한 변경, 모델 활성화, audit log, async job/worker 모니터링은 후속 단계로 유지합니다.

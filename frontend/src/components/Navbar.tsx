@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 
 import { listUnreadNotifications } from "../api/notifications";
+import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
   const { backendUser, isAuthenticated, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const showAdminLink = isAdminConsoleRole(backendUser?.role);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -49,6 +51,11 @@ export default function Navbar() {
             <Link className="icon-button" to="/chatbot" aria-label="AI 건강 상담">
               상담
             </Link>
+            {showAdminLink && (
+              <Link className="icon-button" to="/admin" aria-label="관리자 콘솔">
+                관리자
+              </Link>
+            )}
             <Link className="user-chip" to="/mypage">
               <span className="avatar">{(backendUser?.nickname ?? backendUser?.name ?? "U").slice(0, 1)}</span>
               <span>{backendUser?.nickname ?? backendUser?.name ?? backendUser?.email}</span>

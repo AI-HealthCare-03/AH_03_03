@@ -1,5 +1,8 @@
 import { NavLink } from "react-router-dom";
 
+import { isAdminConsoleRole } from "../auth/AdminRoute";
+import { useAuth } from "../auth/AuthContext";
+
 const links = [
   { to: "/", icon: "🏠", label: "홈" },
   { to: "/health", icon: "🧭", label: "건강 분석" },
@@ -16,6 +19,9 @@ const links = [
 ];
 
 export default function Sidebar() {
+  const { backendUser } = useAuth();
+  const showAdminLink = isAdminConsoleRole(backendUser?.role);
+
   return (
     <aside className="sidebar">
       <div className="sidebar-title">
@@ -28,6 +34,12 @@ export default function Sidebar() {
           <span className="sidebar-label">{link.label}</span>
         </NavLink>
       ))}
+      {showAdminLink && (
+        <NavLink to="/admin">
+          <span className="sidebar-icon">🛡️</span>
+          <span className="sidebar-label">관리자 콘솔</span>
+        </NavLink>
+      )}
     </aside>
   );
 }
