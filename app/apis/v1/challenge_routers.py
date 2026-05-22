@@ -23,8 +23,20 @@ challenge_router = APIRouter(prefix="/challenges", tags=["challenges"])
 
 
 @challenge_router.get("", response_model=list[ChallengeResponse])
-async def list_active_challenges(limit: int = 50, offset: int = 0):
-    return await challenge_service.list_active_challenges(limit=limit, offset=offset)
+async def list_active_challenges(
+    category: str | None = None,
+    challenge_type: str | None = None,
+    target_disease: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    return await challenge_service.list_active_challenges(
+        category=category,
+        challenge_type=challenge_type,
+        target_disease=target_disease,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @challenge_router.post("", response_model=ChallengeResponse, status_code=status.HTTP_201_CREATED)

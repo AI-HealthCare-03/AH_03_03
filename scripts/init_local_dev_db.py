@@ -23,6 +23,16 @@ from app.core.db.databases import TORTOISE_ORM  # noqa: E402
 PRE_GENERATE_SAFE_ALTER_SQL = """
 ALTER TABLE IF EXISTS "analysis_results"
     ADD COLUMN IF NOT EXISTS "analysis_mode" VARCHAR(9) NOT NULL DEFAULT 'BASIC';
+ALTER TABLE IF EXISTS "challenges"
+    ADD COLUMN IF NOT EXISTS "challenge_type" VARCHAR(10) NOT NULL DEFAULT 'GENERAL';
+ALTER TABLE IF EXISTS "challenges"
+    ADD COLUMN IF NOT EXISTS "target_disease" VARCHAR(20) NOT NULL DEFAULT 'GENERAL';
+ALTER TABLE IF EXISTS "challenges"
+    ADD COLUMN IF NOT EXISTS "difficulty" VARCHAR(10) NOT NULL DEFAULT 'NORMAL';
+ALTER TABLE IF EXISTS "challenges"
+    ADD COLUMN IF NOT EXISTS "caution_message" TEXT;
+ALTER TABLE IF EXISTS "challenges"
+    ADD COLUMN IF NOT EXISTS "contraindication_message" TEXT;
 """
 
 LOCAL_SAFE_ALTER_SQL = """
@@ -40,6 +50,13 @@ ALTER TABLE "health_records" DROP COLUMN IF EXISTS "drinks_alcohol";
 ALTER TABLE "health_records" DROP COLUMN IF EXISTS "exercise_days_per_week";
 ALTER TABLE "analysis_results" ADD COLUMN IF NOT EXISTS "analysis_mode" VARCHAR(9) NOT NULL DEFAULT 'BASIC';
 CREATE INDEX IF NOT EXISTS "idx_analysis_results_mode_1a9f30" ON "analysis_results" ("analysis_mode");
+ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "challenge_type" VARCHAR(10) NOT NULL DEFAULT 'GENERAL';
+ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "target_disease" VARCHAR(20) NOT NULL DEFAULT 'GENERAL';
+ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "difficulty" VARCHAR(10) NOT NULL DEFAULT 'NORMAL';
+ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "caution_message" TEXT;
+ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "contraindication_message" TEXT;
+CREATE INDEX IF NOT EXISTS "idx_challenges_type_target_status_4e2a91"
+    ON "challenges" ("challenge_type", "target_disease", "status");
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "failed_login_count" INT NOT NULL DEFAULT 0;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "locked_until" TIMESTAMPTZ;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_login_at" TIMESTAMPTZ;
