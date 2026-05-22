@@ -28,6 +28,14 @@
   --chart-gold: #b58b4a;
   --chart-lavender: #8b86a3;
   --chart-slate: #64748b;
+  --chart-hypertension: #b45353;
+  --chart-hypertension-soft-line: #c88484;
+  --chart-diabetes: #c27a2c;
+  --chart-dyslipidemia: #6d5a9c;
+  --chart-obesity: #2f7c7a;
+  --chart-obesity-soft-line: #6aa5a1;
+  --chart-overall: #475569;
+  --chart-grid: #cbd5e1;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -75,6 +83,14 @@
   --chart-gold: #c6a15b;
   --chart-lavender: #a5a1c5;
   --chart-slate: #94a3b8;
+  --chart-hypertension: #f0a6a6;
+  --chart-hypertension-soft-line: #d78f8f;
+  --chart-diabetes: #f2b56b;
+  --chart-dyslipidemia: #b9a7e8;
+  --chart-obesity: #7dd3c7;
+  --chart-obesity-soft-line: #5fb5ab;
+  --chart-overall: #cbd5e1;
+  --chart-grid: #475569;
   --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.34);
   --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.26);
 }
@@ -1480,6 +1496,75 @@ pre {
   display: grid;
   gap: 12px;
   grid-template-columns: 96px 1fr 64px;
+}
+
+.line-chart-card {
+  display: grid;
+  gap: 12px;
+}
+
+.line-chart-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.line-chart {
+  display: block;
+  height: auto;
+  min-width: 520px;
+  width: 100%;
+}
+
+.line-chart-grid {
+  opacity: 0.72;
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.line-chart-axis {
+  fill: var(--color-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.line-chart-path {
+  fill: none;
+  stroke: var(--series-color);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
+}
+
+.line-chart-point {
+  fill: var(--color-surface);
+  stroke: var(--series-color);
+  stroke-width: 2.4;
+}
+
+.line-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.line-chart-legend span {
+  align-items: center;
+  color: var(--color-muted);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 6px;
+}
+
+.line-chart-legend i {
+  border-radius: 999px;
+  display: inline-block;
+  height: 9px;
+  width: 18px;
+}
+
+.chart-empty-state {
+  align-items: flex-start;
 }
 
 .chat-context-tabs {
