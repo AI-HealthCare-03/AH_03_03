@@ -54,6 +54,7 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 - `X-Request-ID` 기반 요청 추적과 `system_error_logs` 500 서버 예외 저장은 P0 기반으로 1차 구현했다.
 - `sensitive_access_logs`는 건강정보/분석결과/검진표/복약정보/대시보드 조회 접근 기록용으로 1차 구현했다. 관리자 콘솔 조회 UI는 후속 작업이다.
 - 이메일 인증과 비밀번호 재설정은 SMTP 기반 `EmailService`로 분리했다. `/system/health`에서 `email_service` 설정 상태를 확인할 수 있다.
+- `reminder_schedules`와 `notification_logs`는 풀서비스 알림 기반 P0 테이블/API로 구현했다. 현재는 사용자 본인 알림 예약과 본인 발송 로그 조회 중심이며, 외부 발송 worker와 관리자 전체 로그 조회는 후속 작업이다.
 
 ## 3. 관리자 주요 화면
 
@@ -324,8 +325,9 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 
 관리 대상:
 
-- `reminder_schedules`
-- `notification_logs`
+- `notifications`: 사용자 화면에 노출되는 알림 inbox
+- `reminder_schedules`: 복약/챌린지/건강기록/가족/시스템 알림 예약 설정
+- `notification_logs`: 알림 발송 시도/성공/실패 이력
 - 발송 성공/실패
 - 가족 알림
 - 복약 알림
@@ -338,6 +340,7 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 - 사용자 id
 - notification type
 - channel
+- reminder schedule id
 - status
 - scheduled_at
 - sent_at
@@ -347,6 +350,7 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 정책:
 
 - 앱 내부 알림과 외부 발송 로그를 분리한다.
+- `notification_logs.message_summary`에는 민감 건강 수치 원문, 인증코드, 토큰, 비밀번호를 저장하지 않는다.
 - 외부 Push/SMS/Email/Kakao 발송은 provider 응답과 비용을 기록한다.
 - 실패 알림은 재시도 정책을 가진다.
 - 가족 알림은 공유 권한을 재확인한 뒤 발송한다.
@@ -500,21 +504,28 @@ OCR 처리 로그.
 
 ### 13.7 `notification_logs`
 
-외부 알림 발송 로그.
+알림 발송 시도/성공/실패 이력. 실제 외부 Push/SMS/Email/Kakao worker가 붙기 전에도 in-app 알림 처리 결과를 기록할 수 있다.
 
 권장 정보:
 
 - notification id
+- reminder schedule id
+- notification type
 - channel
 - provider
-- recipient hash
 - status
-- provider response
-- retry count
+- provider message id
+- error code/message
+- sent/failed timestamp
+
+주의:
+
+- 건강 수치 원문, OCR 원문, 인증코드, 토큰, 비밀번호는 저장하지 않는다.
+- 사용자에게 보여주는 알림 본문 전체가 아니라 민감정보를 제거한 `message_summary`만 저장한다.
 
 ### 13.8 `reminder_schedules`
 
-복약/챌린지/식단/건강기록 리마인드 스케줄.
+복약/챌린지/건강기록/가족/시스템 알림 예약 설정. 기본 채널은 `IN_APP`이며, `EMAIL`, `SMS`, `PUSH`, `KAKAO`는 후속 외부 발송 worker 연동을 위한 채널 값으로 준비한다.
 
 ### 13.9 `file_uploads`
 
