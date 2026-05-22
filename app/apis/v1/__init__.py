@@ -8,6 +8,7 @@ from app.apis.v1.chatbot_routers import chatbot_router
 from app.apis.v1.dashboard_routers import dashboard_router
 from app.apis.v1.diet_routers import diet_router
 from app.apis.v1.exam_routers import exam_router
+from app.apis.v1.family_routers import family_router
 from app.apis.v1.faq_routers import faq_router
 from app.apis.v1.health_routers import health_router
 from app.apis.v1.llm_log_routers import llm_log_router
@@ -33,6 +34,7 @@ v1_routers.include_router(chatbot_router)
 v1_routers.include_router(notification_router)
 v1_routers.include_router(setting_router)
 v1_routers.include_router(faq_router)
+v1_routers.include_router(family_router)
 v1_routers.include_router(diet_router)
 v1_routers.include_router(medication_router)
 v1_routers.include_router(llm_log_router)

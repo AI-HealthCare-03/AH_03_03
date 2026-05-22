@@ -15,9 +15,9 @@
 // - DIET 분석 더미/최소 기록
 // - MEDICATION/SUPPLEMENT 최소 기록
 // - LLM 더미/생성 로그
+// - FAMILY 1차 DB/API
 //
 // 제외:
-// - FAMILY
 // - ADMIN
 // - WEARABLE 연동
 // - 운영 로그 상세
@@ -101,6 +101,44 @@ Enum rag_disease_type {
   COMMON
 }
 
+Enum family_status {
+  ACTIVE
+  REMOVED
+}
+
+Enum family_relation_type {
+  SELF
+  FATHER
+  MOTHER
+  SPOUSE
+  CHILD
+  SIBLING
+  GRANDPARENT
+  OTHER
+}
+
+Enum family_member_role {
+  OWNER
+  MEMBER
+  GUARDIAN
+  DEPENDENT
+}
+
+Enum family_member_status {
+  ACTIVE
+  INVITED
+  PENDING_UNREGISTERED
+  REMOVED
+}
+
+Enum family_invite_status {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELED
+}
+
 Table users {
   id bigint [pk, increment]
   login_id varchar(40) [unique]
@@ -125,6 +163,103 @@ Table users {
   updated_at timestamptz [not null]
 
   Note: "AUTH / USER 기준 테이블. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
+}
+
+Table families {
+  id bigint [pk, increment]
+  name varchar(100) [not null]
+  owner_user_id bigint [not null, ref: > users.id]
+  status family_status [not null, default: 'ACTIVE']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (owner_user_id)
+    (status)
+  }
+
+  Note: "가족 그룹. 생성자가 OWNER 구성원으로 등록된다. 삭제 API는 status=REMOVED soft remove로 처리한다."
+}
+
+Table family_members {
+  id bigint [pk, increment]
+  family_id bigint [not null, ref: > families.id]
+  user_id bigint [ref: > users.id]
+  display_name varchar(100) [not null]
+  phone_number varchar(30)
+  email varchar(255)
+  relation_type family_relation_type [not null]
+  member_role family_member_role [not null, default: 'MEMBER']
+  status family_member_status [not null, default: 'ACTIVE']
+  is_registered boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (family_id)
+    (user_id)
+    (family_id, user_id)
+    (family_id, status)
+    (email)
+    (phone_number)
+  }
+
+  Note: "가족 구성원. 미가입 가족은 user_id=null, is_registered=false, status=PENDING_UNREGISTERED로 저장한다."
+}
+
+Table family_invites {
+  id bigint [pk, increment]
+  family_id bigint [not null, ref: > families.id]
+  inviter_user_id bigint [not null, ref: > users.id]
+  invitee_user_id bigint [ref: > users.id]
+  invitee_email varchar(255)
+  invitee_phone varchar(30)
+  code_hash varchar(128) [not null, unique]
+  relation_type family_relation_type [not null]
+  member_role family_member_role [not null, default: 'MEMBER']
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  status family_invite_status [not null, default: 'PENDING']
+  created_at timestamptz [not null]
+
+  indexes {
+    (family_id)
+    (inviter_user_id)
+    (invitee_user_id)
+    (invitee_email)
+    (invitee_phone)
+    (status)
+    (expires_at)
+  }
+
+  Note: "가족 초대. 초대 코드 원문은 저장하지 않고 code_hash만 저장한다. 원문 코드는 생성 직후 1회만 응답한다."
+}
+
+Table family_share_settings {
+  id bigint [pk, increment]
+  family_id bigint [not null, ref: > families.id]
+  owner_user_id bigint [not null, ref: > users.id]
+  viewer_user_id bigint [not null, ref: > users.id]
+  share_health_records boolean [not null, default: false]
+  share_analysis_results boolean [not null, default: false]
+  share_diet_records boolean [not null, default: false]
+  share_medications boolean [not null, default: false]
+  share_challenges boolean [not null, default: false]
+  share_exam_reports boolean [not null, default: false]
+  receive_analysis_alerts boolean [not null, default: false]
+  receive_abnormal_value_alerts boolean [not null, default: false]
+  receive_medication_alerts boolean [not null, default: false]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (family_id)
+    (owner_user_id)
+    (viewer_user_id)
+    (family_id, owner_user_id, viewer_user_id)
+  }
+
+  Note: "가족 공유 권한. 기본값은 모두 false이며 가족 연결만으로 자동 공유하지 않는다."
 }
 
 Table health_records {
