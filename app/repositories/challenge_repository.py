@@ -15,6 +15,24 @@ async def list_active_challenges(limit: int = 50, offset: int = 0) -> list[Chall
     return await Challenge.filter(status=ChallengeStatus.ACTIVE).order_by("-created_at").offset(offset).limit(limit)
 
 
+async def list_active_challenges_filtered(
+    *,
+    category: str | None = None,
+    challenge_type: str | None = None,
+    target_disease: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Challenge]:
+    query = Challenge.filter(status=ChallengeStatus.ACTIVE)
+    if category:
+        query = query.filter(category=category)
+    if challenge_type:
+        query = query.filter(challenge_type=challenge_type)
+    if target_disease:
+        query = query.filter(target_disease=target_disease)
+    return await query.order_by("-created_at").offset(offset).limit(limit)
+
+
 async def get_challenge_by_id(challenge_id: int) -> Challenge | None:
     return await Challenge.get_or_none(id=challenge_id)
 

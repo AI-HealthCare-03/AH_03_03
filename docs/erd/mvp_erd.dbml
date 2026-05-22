@@ -82,6 +82,8 @@ Enum challenge_category {
   EXERCISE
   DIET
   SLEEP
+  MEDICATION
+  WATER
   BLOOD_PRESSURE
   BLOOD_GLUCOSE
   WEIGHT
@@ -431,8 +433,13 @@ Table challenges {
   title varchar(100) [not null]
   description text
   category challenge_category [not null]
+  challenge_type varchar(10) [not null, default: 'GENERAL']
+  target_disease varchar(20) [not null, default: 'GENERAL']
+  difficulty varchar(10) [not null, default: 'NORMAL']
   target_metric varchar(100)
   target_value varchar(100)
+  caution_message text
+  contraindication_message text
   duration_days int [not null]
   status challenge_status [not null, default: 'ACTIVE']
   created_at timestamptz [not null]
@@ -440,9 +447,10 @@ Table challenges {
 
   indexes {
     (category, status)
+    (challenge_type, target_disease, status)
   }
 
-  Note: "MVP 챌린지 마스터 데이터."
+  Note: "팀 챌린지 마스터 데이터. SPECIAL/COMMON/GENERAL 분류와 질환군 대상, 주의/금기 문구를 포함한다."
 }
 
 Table user_challenges {
