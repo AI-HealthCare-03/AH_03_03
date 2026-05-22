@@ -94,17 +94,17 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         print(f"  [ON] 체중 구간화: {wt_labels}")
 
     if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
         added += ["음주위험군"]
         print("  [ON] 음주위험군: 0=비음주/1=저위험(월1회이하)/2=고위험(월2회이상)")
 
     if USE_WALK_LEVEL:
-        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
+        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(float)
         added += ["걷기활동량"]
         print("  [ON] 걷기활동량: 0=비활동/1=저활동(1~3일)/2=활동(4일이상)")
 
     if USE_STRENGTH:
-        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
         added += ["근력활동량"]
         print("  [ON] 근력활동량: 0=비활동/1=저활동(1~2일)/2=활동(3일이상)")
 
