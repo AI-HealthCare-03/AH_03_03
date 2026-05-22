@@ -44,6 +44,14 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 - `require_admin_user`: `ADMIN`, `SUPER_ADMIN`
 - `require_super_admin_user`: `SUPER_ADMIN`
 
+2026-05-23 1차 구현 상태:
+
+- 백엔드 공통 dependency 4종을 구현했다.
+- 기존 `is_admin` 필드는 유지하지만 신규 권한 판단에는 사용하지 않는다.
+- FAQ/문의/챌린지 운영성 쓰기 API는 `OPERATOR` 이상으로 보호한다.
+- LLM log 조회는 `MONITOR` 이상으로 보호한다.
+- 관리자 콘솔, audit log, 별도 admin router는 아직 구현하지 않았다.
+
 ## 3. 관리자 주요 화면
 
 권장 라우트:
