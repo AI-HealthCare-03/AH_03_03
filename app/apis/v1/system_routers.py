@@ -13,6 +13,8 @@ async def get_system_health():
         "api": "ok",
         "database": "unknown",
         "redis": "unknown",
+        "request_id": "ok",
+        "system_error_logging": "ok",
     }
     details: dict[str, str] = {}
 

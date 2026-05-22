@@ -30,6 +30,9 @@ ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "drinking_frequency" VARCH
 ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "drinking_amount" VARCHAR(30);
 ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "walking_days_per_week" INT;
 ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "strength_days_per_week" INT;
+ALTER TABLE "health_records" DROP COLUMN IF EXISTS "is_smoker";
+ALTER TABLE "health_records" DROP COLUMN IF EXISTS "drinks_alcohol";
+ALTER TABLE "health_records" DROP COLUMN IF EXISTS "exercise_days_per_week";
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "failed_login_count" INT NOT NULL DEFAULT 0;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "locked_until" TIMESTAMPTZ;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_login_at" TIMESTAMPTZ;
@@ -41,6 +44,24 @@ DROP INDEX IF EXISTS "idx_users_firebase_uid_unique";
 ALTER TABLE "users" DROP COLUMN IF EXISTS "firebase_uid";
 ALTER TABLE "users" DROP COLUMN IF EXISTS "auth_provider";
 ALTER TABLE "users" DROP COLUMN IF EXISTS "last_login";
+CREATE TABLE IF NOT EXISTS "system_error_logs" (
+    "id" BIGSERIAL NOT NULL PRIMARY KEY,
+    "request_id" VARCHAR(64),
+    "user_id" BIGINT,
+    "method" VARCHAR(10) NOT NULL,
+    "path" VARCHAR(500) NOT NULL,
+    "status_code" INT NOT NULL,
+    "error_type" VARCHAR(100) NOT NULL,
+    "error_message" TEXT,
+    "stack_trace" TEXT,
+    "client_ip" VARCHAR(100),
+    "user_agent" VARCHAR(500),
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "idx_system_err_request_9d4b31" ON "system_error_logs" ("request_id");
+CREATE INDEX IF NOT EXISTS "idx_system_err_user_id_f2a8d0" ON "system_error_logs" ("user_id");
+CREATE INDEX IF NOT EXISTS "idx_system_err_status_b8c5e1" ON "system_error_logs" ("status_code");
+CREATE INDEX IF NOT EXISTS "idx_system_err_created_32f0ca" ON "system_error_logs" ("created_at");
 """
 
 
