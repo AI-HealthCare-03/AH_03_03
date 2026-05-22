@@ -86,7 +86,7 @@ class UserRepository:
     async def exists_by_phone_number(self, phone_number: str) -> bool:
         return await self._model.filter(phone_number=phone_number).exists()
 
-    async def update_last_login(self, user_id: int) -> None:
+    async def update_last_login_at(self, user_id: int) -> None:
         now = datetime.now(config.TIMEZONE)
         await self._model.filter(id=user_id).update(last_login_at=now)
 

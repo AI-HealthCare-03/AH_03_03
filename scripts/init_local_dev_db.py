@@ -40,6 +40,7 @@ DROP INDEX IF EXISTS "idx_users_auth_provider";
 DROP INDEX IF EXISTS "idx_users_firebase_uid_unique";
 ALTER TABLE "users" DROP COLUMN IF EXISTS "firebase_uid";
 ALTER TABLE "users" DROP COLUMN IF EXISTS "auth_provider";
+ALTER TABLE "users" DROP COLUMN IF EXISTS "last_login";
 """
 
 
