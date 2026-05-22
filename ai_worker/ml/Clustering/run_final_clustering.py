@@ -1,6 +1,7 @@
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from kmodes.kprototypes import KPrototypes
 from sklearn.preprocessing import StandardScaler
 
@@ -102,7 +103,7 @@ def main():
     df["cluster"] = kp.fit_predict(X, categorical=cat_indices)
 
     summary = analyze_clusters(df, df["cluster"].values)
-    print(f"\n[군집 분석]")
+    print("\n[군집 분석]")
     print(summary.to_string())
     print("\n[성별 분포]")
     print(df.groupby("cluster")["성별코드"].value_counts(normalize=True).unstack().round(3).to_string())
