@@ -22,6 +22,10 @@ function analysisMethodLabel(value: unknown): string {
   return "수동 기록";
 }
 
+function isManualRecord(record: Item | null): boolean {
+  return String(record?.analysis_method ?? "").toUpperCase() === "MANUAL";
+}
+
 export default function DietResultPage() {
   const { dietRecordId } = useParams();
   const navigate = useNavigate();
@@ -46,6 +50,9 @@ export default function DietResultPage() {
     record?.nutrition_summary && typeof record.nutrition_summary === "object"
       ? (record.nutrition_summary as Record<string, unknown>)
       : {};
+  const hasNutrition = ["calories", "carbohydrate_g", "protein_g", "fat_g", "sodium_mg"].some(
+    (key) => nutrition[key] !== null && nutrition[key] !== undefined && nutrition[key] !== "",
+  );
   const detectedFoods = normalizeFoods(record?.detected_foods ?? photoResults[0]?.detected_foods);
   const photoConfidence =
     photoResults[0]?.confidence_payload && typeof photoResults[0].confidence_payload === "object"
@@ -59,8 +66,13 @@ export default function DietResultPage() {
       }
       setError("");
       try {
-        setRecord(await getDietRecord<Item>(Number(dietRecordId)));
-        setPhotoResults(await listDietPhotoResults<Item[]>(Number(dietRecordId)));
+        const nextRecord = await getDietRecord<Item>(Number(dietRecordId));
+        setRecord(nextRecord);
+        if (String(nextRecord.analysis_method ?? "").toUpperCase() === "MANUAL") {
+          setPhotoResults([]);
+        } else {
+          setPhotoResults(await listDietPhotoResults<Item[]>(Number(dietRecordId)));
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "식단 분석 결과를 불러오지 못했습니다.");
       }
@@ -68,11 +80,13 @@ export default function DietResultPage() {
     void load();
   }, [dietRecordId]);
 
+  const isManual = isManualRecord(record);
+
   return (
     <div className="page-grid">
       {error && <ErrorMessage message={error} />}
       <Card
-        title="식단 분석 결과"
+        title={isManual ? "식단 직접 기록" : "식단 분석 결과"}
         actions={
           <Link className="button secondary" to="/diets/history">
             전체 기록
@@ -89,54 +103,86 @@ export default function DietResultPage() {
             <span>식단 점수</span>
             {record?.diet_score != null ? (
               <strong className={scoreBadgeClass(Number(record.diet_score))}>{String(record.diet_score)}점</strong>
+            ) : isManual ? (
+              <strong>점수 미산정</strong>
             ) : (
               <strong>-</strong>
             )}
-            <p>{String(record?.diet_feedback ?? "식단 분석 또는 수동 기록 결과가 여기에 표시됩니다.")}</p>
+            <p>
+              {isManual
+                ? "직접 입력 기록입니다."
+                : String(record?.diet_feedback ?? "식단 분석 결과를 확인해보세요.")}
+            </p>
           </div>
         </div>
       </Card>
-      <Card title="탐지 음식">
-        <div className="chip-list">
-          {detectedFoods.length === 0 && <div className="state-box">탐지된 음식 정보가 없습니다.</div>}
-          {detectedFoods.map((food, index) => (
-            <span className="badge badge-reference" key={`${String(food.name ?? "food")}-${index}`}>
-              {String(food.name ?? "음식")} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
-            </span>
-          ))}
-        </div>
-      </Card>
+      {isManual ? (
+        <Card title="입력한 음식 목록">
+          <div className="card-list">
+            {detectedFoods.length === 0 && <div className="state-box">입력된 음식 목록이 없습니다.</div>}
+            {detectedFoods.map((food, index) => (
+              <div className="mini-card" key={`${String(food.name ?? "food")}-${index}`}>
+                <strong>{String(food.name ?? "음식")}</strong>
+                <span className="muted">
+                  {[food.quantity ? `수량: ${String(food.quantity)}` : "", food.memo ? `메모: ${String(food.memo)}` : ""]
+                    .filter(Boolean)
+                    .join(" · ") || "추가 정보 없음"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card title="탐지 음식">
+          <div className="chip-list">
+            {detectedFoods.length === 0 && <div className="state-box">탐지된 음식 정보가 없습니다.</div>}
+            {detectedFoods.map((food, index) => (
+              <span className="badge badge-reference" key={`${String(food.name ?? "food")}-${index}`}>
+                {String(food.name ?? "음식")} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
       <Card title="영양 구성">
-        {[
-          ["탄수화물", Number(nutrition.carbohydrate_g ?? 0), "g"],
-          ["단백질", Number(nutrition.protein_g ?? 0), "g"],
-          ["지방", Number(nutrition.fat_g ?? 0), "g"],
-          ["나트륨", Number(nutrition.sodium_mg ?? 0), "mg"],
-        ].map(([label, value, unit]) => (
-          <div className="bar-row" key={label}>
-            <span>{label}</span>
-            <div className="bar-track">
-              <div className="bar-fill" style={{ width: `${Math.min(Number(value), 100)}%` }} />
+        {!hasNutrition ? (
+          <div className="state-box">입력된 영양정보가 없습니다.</div>
+        ) : (
+          <div className="card-list">
+            {[
+              ["탄수화물", nutrition.carbohydrate_g, "g"],
+              ["단백질", nutrition.protein_g, "g"],
+              ["지방", nutrition.fat_g, "g"],
+              ["나트륨", nutrition.sodium_mg, "mg"],
+            ].map(([label, value, unit]) => (
+              <div className="bar-row" key={String(label)}>
+                <span>{String(label)}</span>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${Math.min(Number(value ?? 0), 100)}%` }} />
+                </div>
+                <strong>
+                  {String(value ?? "-")} {String(unit)}
+                </strong>
+              </div>
+            ))}
+            <div className="nutrition-grid" style={{ marginTop: 12 }}>
+              <div>
+                <span>칼로리</span>
+                <strong>{String(nutrition.calories ?? "-")} kcal</strong>
+              </div>
+              {!isManual && (
+                <div>
+                  <span>인식 신뢰도</span>
+                  <strong>
+                    {photoConfidence.average_confidence
+                      ? `${Math.round(Number(photoConfidence.average_confidence) * 100)}%`
+                      : "-"}
+                  </strong>
+                </div>
+              )}
             </div>
-            <strong>
-              {Number(value) || "-"} {unit}
-            </strong>
           </div>
-        ))}
-        <div className="nutrition-grid" style={{ marginTop: 12 }}>
-          <div>
-            <span>칼로리</span>
-            <strong>{String(nutrition.calories ?? "-")} kcal</strong>
-          </div>
-          <div>
-            <span>인식 신뢰도</span>
-            <strong>
-              {photoConfidence.average_confidence
-                ? `${Math.round(Number(photoConfidence.average_confidence) * 100)}%`
-                : "-"}
-            </strong>
-          </div>
-        </div>
+        )}
       </Card>
       <Card title="추천 액션">
         <div className="button-row">
@@ -167,7 +213,11 @@ export default function DietResultPage() {
             <span className="muted">식단 메모</span>
             <strong>{String(record?.description ?? record?.memo ?? "기록된 메모가 없습니다.")}</strong>
           </div>
-          <div className="state-box">자동 분석 결과는 참고용이며, 실제 진단이나 처방을 대신하지 않습니다.</div>
+          <div className="state-box">
+            {isManual
+              ? "직접 입력 기록은 사용자가 입력한 내용을 기준으로 저장됩니다."
+              : "자동 분석 결과는 참고용이며, 실제 진단이나 처방을 대신하지 않습니다."}
+          </div>
         </div>
       </Card>
     </div>

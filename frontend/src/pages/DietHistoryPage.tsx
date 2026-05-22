@@ -27,6 +27,24 @@ function filterRecords(records: DietRecord[], tab: string): DietRecord[] {
   return records;
 }
 
+function isManualRecord(record: DietRecord): boolean {
+  return String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
+}
+
+function summarizeFoodItems(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const food = item as Record<string, unknown>;
+      const name = String(food.name ?? "").trim();
+      const quantity = String(food.quantity ?? "").trim();
+      return name ? `${name}${quantity ? ` ${quantity}` : ""}` : "";
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
 export default function DietHistoryPage() {
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [activeTab, setActiveTab] = useState("전체");
@@ -63,10 +81,12 @@ export default function DietHistoryPage() {
       <div className="table-list">
         {filtered.map((record) => {
           const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
-          const mealName = String(record.description ?? record.meal_name ?? "기록된 식단");
-          const summary = String(
-            record.diet_feedback ?? record.summary ?? "식단 사진을 기반으로 영양 균형을 확인했습니다.",
-          );
+          const isManual = isManualRecord(record);
+          const foodSummary = summarizeFoodItems(record.detected_foods);
+          const mealName = String(record.description ?? record.meal_name ?? (foodSummary || "기록된 식단"));
+          const summary = isManual
+            ? String(record.memo ?? (foodSummary || "직접 입력한 식단 기록입니다."))
+            : String(record.diet_feedback ?? record.summary ?? "식단 분석 결과를 확인해보세요.");
           const dateStr = String(record.meal_time ?? record.created_at ?? "");
 
           return (
@@ -75,11 +95,12 @@ export default function DietHistoryPage() {
                 <div className="diet-record-meta">
                   <span className="muted">{formatDateTime(dateStr)}</span>
                   <span className="badge badge-reference">{mealTypeLabel(record.meal_type)}</span>
+                  {isManual && <span className="badge badge-reference">직접 기록</span>}
                 </div>
                 {scoreRaw !== null ? (
                   <span className={`badge ${scoreBadgeClass(scoreRaw)}`}>{scoreRaw}점</span>
                 ) : (
-                  <span className="badge badge-reference">-</span>
+                  <span className="badge badge-reference">{isManual ? "점수 미산정" : "-"}</span>
                 )}
               </div>
               <strong>{mealName}</strong>

@@ -1,15 +1,82 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { analyzeDiet, createDietRecord, listDietRecords } from "../api/diets";
+import {
+  analyzeDiet,
+  createDietRecord,
+  listDietRecords,
+  type DietFoodItem,
+  type DietNutritionSummary,
+  type DietRecordPayload,
+} from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
 
+type ManualFoodDraft = {
+  name: string;
+  quantity: string;
+  memo: string;
+};
+
+type NutritionDraft = {
+  calories: string;
+  carbohydrate_g: string;
+  protein_g: string;
+  fat_g: string;
+  sodium_mg: string;
+};
+
+const mealTypeOptions = [
+  { value: "BREAKFAST", label: "아침" },
+  { value: "LUNCH", label: "점심" },
+  { value: "DINNER", label: "저녁" },
+  { value: "SNACK", label: "간식" },
+  { value: "LATE_NIGHT", label: "야식" },
+];
+
+function currentLocalDateTime(): string {
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+const emptyFoodDraft: ManualFoodDraft = { name: "", quantity: "", memo: "" };
+const emptyNutritionDraft: NutritionDraft = {
+  calories: "",
+  carbohydrate_g: "",
+  protein_g: "",
+  fat_g: "",
+  sodium_mg: "",
+};
+
+function parseOptionalNumber(value: string): number | null {
+  if (value.trim() === "") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function buildNutritionSummary(draft: NutritionDraft): DietNutritionSummary | null {
+  const nutrition: DietNutritionSummary = {
+    calories: parseOptionalNumber(draft.calories),
+    carbohydrate_g: parseOptionalNumber(draft.carbohydrate_g),
+    protein_g: parseOptionalNumber(draft.protein_g),
+    fat_g: parseOptionalNumber(draft.fat_g),
+    sodium_mg: parseOptionalNumber(draft.sodium_mg),
+  };
+  return Object.values(nutrition).some((value) => value !== null) ? nutrition : null;
+}
+
 export default function DietPage() {
-  const [description, setDescription] = useState("");
+  const [analysisDescription, setAnalysisDescription] = useState("");
+  const [manualMealType, setManualMealType] = useState("LUNCH");
+  const [manualMealTime, setManualMealTime] = useState(currentLocalDateTime());
+  const [manualDescription, setManualDescription] = useState("");
+  const [manualMemo, setManualMemo] = useState("");
+  const [manualFoods, setManualFoods] = useState<ManualFoodDraft[]>([{ ...emptyFoodDraft }]);
+  const [manualNutrition, setManualNutrition] = useState<NutritionDraft>({ ...emptyNutritionDraft });
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
@@ -27,12 +94,41 @@ export default function DietPage() {
     void load();
   }, []);
 
-  const submit = async (event: FormEvent) => {
+  const submitManualDiet = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+    const foodItems: DietFoodItem[] = manualFoods
+      .map((food) => ({
+        name: food.name.trim(),
+        quantity: food.quantity.trim() || null,
+        memo: food.memo.trim() || null,
+      }))
+      .filter((food) => food.name.length > 0);
+    if (foodItems.length === 0 && !manualDescription.trim()) {
+      setError("음식명 또는 식단 설명을 입력해주세요.");
+      return;
+    }
+    const nutritionSummary = buildNutritionSummary(manualNutrition);
+    const description =
+      manualDescription.trim() || foodItems.map((food) => food.name).join(", ") || "직접 입력한 식단";
+    const payload: DietRecordPayload = {
+      meal_type: manualMealType,
+      meal_time: manualMealTime ? new Date(manualMealTime).toISOString() : new Date().toISOString(),
+      description,
+      detected_foods: foodItems.length > 0 ? foodItems : null,
+      nutrition_summary: nutritionSummary,
+      analysis_method: "MANUAL",
+      is_user_corrected: true,
+      memo: manualMemo.trim() || null,
+    };
     try {
-      await createDietRecord({ description, meal_time: new Date().toISOString(), analysis_method: "MANUAL" });
-      setDescription("");
+      await createDietRecord(payload);
+      setManualMealType("LUNCH");
+      setManualMealTime(currentLocalDateTime());
+      setManualDescription("");
+      setManualMemo("");
+      setManualFoods([{ ...emptyFoodDraft }]);
+      setManualNutrition({ ...emptyNutritionDraft });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "식단 기록 저장에 실패했습니다.");
@@ -43,7 +139,7 @@ export default function DietPage() {
     setError("");
     try {
       const result = await analyzeDiet<Record<string, unknown>>({
-        description: description || "기록된 식단 이미지",
+        description: analysisDescription || "기록된 식단",
         meal_time: new Date().toISOString(),
       });
       setAnalysisResult(result);
@@ -76,20 +172,159 @@ export default function DietPage() {
           </Link>
         }
       >
-        <form className="form" onSubmit={submit}>
+        <form className="form" onSubmit={(event) => event.preventDefault()}>
           <label>
             식단 메모
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
+            <textarea value={analysisDescription} onChange={(event) => setAnalysisDescription(event.target.value)} />
           </label>
           <div className="upload-box">
             <strong>이미지 업로드 영역</strong>
             <span>사진을 선택하거나 식단 메모를 남기면 간편 분석 결과를 확인할 수 있습니다.</span>
           </div>
           <div className="button-row">
-            <button type="submit">기록 저장</button>
             <button type="button" onClick={runDietAnalysis}>
               간편 식단 분석
             </button>
+          </div>
+        </form>
+      </Card>
+      <Card title="식단 직접 입력">
+        <form className="form" onSubmit={submitManualDiet}>
+          <div className="state-box">사진 없이 식단을 직접 기록할 수 있습니다. 영양정보를 알고 있다면 선택적으로 입력해주세요.</div>
+          <div className="form-grid">
+            <label>
+              식사 구분
+              <select value={manualMealType} onChange={(event) => setManualMealType(event.target.value)}>
+                {mealTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              식사 시각
+              <input type="datetime-local" value={manualMealTime} onChange={(event) => setManualMealTime(event.target.value)} />
+            </label>
+          </div>
+          <label>
+            식단 설명
+            <input
+              placeholder="예: 현미밥, 닭가슴살 샐러드"
+              value={manualDescription}
+              onChange={(event) => setManualDescription(event.target.value)}
+            />
+          </label>
+          <div className="manual-food-list">
+            <div className="diet-record-header">
+              <strong>음식 목록</strong>
+              <button
+                className="secondary compact-button"
+                onClick={() => setManualFoods((prev) => [...prev, { ...emptyFoodDraft }])}
+                type="button"
+              >
+                음식 추가
+              </button>
+            </div>
+            {manualFoods.map((food, index) => (
+              <div className="manual-food-row" key={`manual-food-${index}`}>
+                <label>
+                  음식명
+                  <input
+                    placeholder="예: 현미밥"
+                    value={food.name}
+                    onChange={(event) =>
+                      setManualFoods((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, name: event.target.value } : item)))
+                    }
+                  />
+                </label>
+                <label>
+                  수량
+                  <input
+                    placeholder="예: 1공기"
+                    value={food.quantity}
+                    onChange={(event) =>
+                      setManualFoods((prev) =>
+                        prev.map((item, itemIndex) => (itemIndex === index ? { ...item, quantity: event.target.value } : item)),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  메모
+                  <input
+                    placeholder="선택"
+                    value={food.memo}
+                    onChange={(event) =>
+                      setManualFoods((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, memo: event.target.value } : item)))
+                    }
+                  />
+                </label>
+                {manualFoods.length > 1 && (
+                  <button
+                    className="btn-danger-outline compact-button"
+                    onClick={() => setManualFoods((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                    type="button"
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="nutrition-input-grid">
+            <label>
+              칼로리 kcal
+              <input
+                min="0"
+                type="number"
+                value={manualNutrition.calories}
+                onChange={(event) => setManualNutrition((prev) => ({ ...prev, calories: event.target.value }))}
+              />
+            </label>
+            <label>
+              탄수화물 g
+              <input
+                min="0"
+                type="number"
+                value={manualNutrition.carbohydrate_g}
+                onChange={(event) => setManualNutrition((prev) => ({ ...prev, carbohydrate_g: event.target.value }))}
+              />
+            </label>
+            <label>
+              단백질 g
+              <input
+                min="0"
+                type="number"
+                value={manualNutrition.protein_g}
+                onChange={(event) => setManualNutrition((prev) => ({ ...prev, protein_g: event.target.value }))}
+              />
+            </label>
+            <label>
+              지방 g
+              <input
+                min="0"
+                type="number"
+                value={manualNutrition.fat_g}
+                onChange={(event) => setManualNutrition((prev) => ({ ...prev, fat_g: event.target.value }))}
+              />
+            </label>
+            <label>
+              나트륨 mg
+              <input
+                min="0"
+                type="number"
+                value={manualNutrition.sodium_mg}
+                onChange={(event) => setManualNutrition((prev) => ({ ...prev, sodium_mg: event.target.value }))}
+              />
+            </label>
+          </div>
+          <label>
+            메모
+            <textarea value={manualMemo} onChange={(event) => setManualMemo(event.target.value)} />
+          </label>
+          <div className="button-row">
+            <button type="submit">직접 기록 저장</button>
           </div>
         </form>
       </Card>
@@ -155,16 +390,20 @@ export default function DietPage() {
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
           {records.slice(0, 5).map((record) => {
             const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
+            const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             return (
               <Link className="mini-card" key={String(record.id)} to={`/diets/${String(record.id)}`}>
                 <div className="diet-record-meta">
                   <span className="muted">{formatDateTime(record.meal_time ?? record.created_at)}</span>
                   <span className="badge badge-reference">{mealTypeLabel(record.meal_type)}</span>
+                  {isManual && <span className="badge badge-reference">직접 기록</span>}
                 </div>
                 <strong>{String(record.description ?? "식단 기록")}</strong>
-                {scoreRaw !== null && (
+                {scoreRaw !== null ? (
                   <span className={`badge ${scoreBadgeClass(scoreRaw)}`}>{scoreRaw}점</span>
-                )}
+                ) : isManual ? (
+                  <span className="badge badge-reference">점수 미산정</span>
+                ) : null}
               </Link>
             );
           })}
