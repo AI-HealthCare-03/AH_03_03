@@ -96,6 +96,7 @@ ignore = ["UP046", "E501", "N806", "N803", "C901", "B905", "B023", "B007", "F601
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "db/migrations/*" = ["ALL"]
+"ai_worker/ml/X2/*" = ["N999"]
 "ai_worker/vision/router.py" = ["B008"]
 "ai_worker/vision/evaluate.py" = ["C901", "E402"]
 
