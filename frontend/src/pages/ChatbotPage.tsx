@@ -35,12 +35,7 @@ const exampleQuestions = [
 ];
 
 function toUserFacingText(text: string) {
-  return text
-    .replaceAll("더미", "간편")
-    .replaceAll("mock", "예시")
-    .replaceAll("Mock", "예시")
-    .replaceAll("dummy", "예시")
-    .replaceAll("Dummy", "예시");
+  return text;
 }
 
 export default function ChatbotPage() {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runDummyAnalysis } from "../api/analysis";
+import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysis } from "../api/analysis";
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
@@ -114,7 +114,6 @@ export default function AnalysisPage() {
           const detail = await getAnalysisResultDetail<{ factors?: AnalysisFactor[] }>(Number(result.id));
           return [String(result.id), detail.factors ?? []] as const;
         } catch {
-          // TODO: 상세 factor API 응답 구조가 바뀌어도 분석 화면은 fallback 문구로 유지한다.
           return [String(result.id), []] as const;
         }
       }),
@@ -168,7 +167,7 @@ export default function AnalysisPage() {
         setError("정밀 분석에 필요한 검진값이 부족해 분석을 실행하지 않았습니다.");
         return;
       }
-      await runDummyAnalysis(readiness.latest_health_record_id, mode);
+      await runAnalysis(readiness.latest_health_record_id, mode);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");

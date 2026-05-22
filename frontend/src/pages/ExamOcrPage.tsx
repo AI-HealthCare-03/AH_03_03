@@ -5,7 +5,7 @@ import {
   confirmExam,
   createExam,
   listMeasurements,
-  runDummyOcr,
+  runExamOcr,
   updateMeasurement,
   type ExamMeasurement,
   type ExamReport,
@@ -32,7 +32,7 @@ export default function ExamOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const startDummyOcr = async () => {
+  const startExamOcr = async () => {
     setError("");
     setMessage("");
     try {
@@ -40,11 +40,11 @@ export default function ExamOcrPage() {
         exam ??
         (await createExam({
           original_filename: selectedFileName,
-          file_path: `mock-upload/${selectedFileName}`,
+          file_path: `exam-upload/${selectedFileName}`,
           uploaded_at: new Date().toISOString(),
         }));
       setExam(report);
-      const result = await runDummyOcr(report.id);
+      const result = await runExamOcr(report.id);
       setMeasurements(result.measurements);
       setMessage(toUserMessage(result.message));
     } catch (err) {
@@ -125,7 +125,7 @@ export default function ExamOcrPage() {
             </div>
             <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
           </div>
-          <button onClick={startDummyOcr} type="button">
+          <button onClick={startExamOcr} type="button">
             자동 인식 실행
           </button>
         </Card>
@@ -167,5 +167,5 @@ export default function ExamOcrPage() {
 }
 
 function toUserMessage(message: string): string {
-  return message.replaceAll("더미 OCR", "자동 인식").replaceAll("더미", "예시");
+  return message;
 }

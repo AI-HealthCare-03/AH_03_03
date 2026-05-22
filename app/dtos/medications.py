@@ -50,6 +50,10 @@ class MedicationOCRDummyRequest(BaseModel):
     memo: str | None = None
 
 
+class MedicationOCRRequest(MedicationOCRDummyRequest):
+    pass
+
+
 class MedicationOCRItem(BaseModel):
     temp_id: str | None = None
     name: str
@@ -67,6 +71,10 @@ class MedicationOCRDummyResponse(BaseModel):
     ocr_confidence: float
     items: list[MedicationOCRItem]
     message: str
+
+
+class MedicationOCRResponse(MedicationOCRDummyResponse):
+    pass
 
 
 class MedicationOCRConfirmItem(BaseModel):
