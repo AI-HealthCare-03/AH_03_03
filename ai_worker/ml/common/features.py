@@ -15,7 +15,7 @@ import pandas as pd
 
 def add_age_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """나이 6구간 원핫 인코딩 (19~39 / 40대 / 50대 / 60대 / 70대 / 80이상)"""
-    age_bins = [0, 40, 50, 60, 70, 80, 999]
+    age_bins = [0, 40, 50, 60, 70, 80, np.inf]
     age_labels = ["나이_19_39", "나이_40대", "나이_50대", "나이_60대", "나이_70대", "나이_80이상"]
     df["_나이구간"] = pd.cut(df["나이"], bins=age_bins, labels=age_labels, right=False)
     for label in age_labels:
@@ -26,7 +26,7 @@ def add_age_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_bmi_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """BMI 4구간화 (저체중/정상/과체중/비만)"""
-    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
+    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, np.inf], labels=[0, 1, 2, 3], right=False).astype(float)
     return df, ["BMI_구간"]
 
 
@@ -59,19 +59,21 @@ def add_obesity_flag(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_alcohol_risk(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """음주 위험군 구간화 (0=비음주 / 1=저위험 / 2=고위험)"""
-    df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+    df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
     return df, ["음주위험군"]
 
 
 def add_walk_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """걷기 활동량 구간화"""
-    df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-1, 0, 3, 99], labels=[0, 1, 2], right=True).astype(float)
+    df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(float)
     return df, ["걷기활동량"]
 
 
 def add_strength_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """근력 운동 활동량 구간화"""
-    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-1, 0, 2, 99], labels=[0, 1, 2], right=True).astype(float)
+    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(
+        float
+    )
     return df, ["근력활동량"]
 
 
