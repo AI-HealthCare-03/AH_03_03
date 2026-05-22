@@ -13,6 +13,7 @@ TORTOISE_APP_MODELS = [
     "app.models.faqs",
     "app.models.health",
     "app.models.llm_logs",
+    "app.models.logs",
     "app.models.medications",
     "app.models.notifications",
     "app.models.rag",

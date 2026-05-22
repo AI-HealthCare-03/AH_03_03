@@ -625,3 +625,27 @@ Table llm_generation_logs {
 
   Note: "LLM 더미/생성 결과 추적용 로그. 실제 LLM 호출 로직과 운영 모니터링 고도화는 이번 범위에서 제외한다."
 }
+
+Table system_error_logs {
+  id bigint [pk, increment]
+  request_id varchar(64)
+  user_id bigint
+  method varchar(10) [not null]
+  path varchar(500) [not null]
+  status_code int [not null]
+  error_type varchar(100) [not null]
+  error_message text
+  stack_trace text
+  client_ip varchar(100)
+  user_agent varchar(500)
+  created_at timestamptz [not null]
+
+  indexes {
+    (request_id)
+    (user_id)
+    (status_code)
+    (created_at)
+  }
+
+  Note: "처리되지 않은 500 서버 예외 추적용 운영 로그. request body와 민감정보 원문은 저장하지 않는다. stack_trace는 운영환경에서 제한한다."
+}
