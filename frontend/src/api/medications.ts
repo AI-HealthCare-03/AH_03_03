@@ -11,13 +11,13 @@ export type MedicationOcrItem = {
   confidence?: number | null;
 };
 
-export type MedicationDummyOcrRequest = {
+export type MedicationOcrRequest = {
   source_type?: "PRESCRIPTION" | "MEDICATION_BAG" | "SUPPLEMENT" | string;
   image_filename?: string;
   memo?: string;
 };
 
-export type MedicationDummyOcrResponse = {
+export type MedicationOcrResponse = {
   is_dummy: boolean;
   source_type: string;
   ocr_confidence: number;
@@ -77,10 +77,10 @@ export async function deleteMedication<T>(medicationId: number): Promise<T> {
   return apiRequest<T>(`/medications/${medicationId}`, { method: "DELETE" });
 }
 
-export async function runMedicationDummyOcr(
-  payload: MedicationDummyOcrRequest,
-): Promise<MedicationDummyOcrResponse> {
-  return apiRequest<MedicationDummyOcrResponse>("/medications/dummy-ocr", { method: "POST", body: payload });
+export async function runMedicationOcr(
+  payload: MedicationOcrRequest,
+): Promise<MedicationOcrResponse> {
+  return apiRequest<MedicationOcrResponse>("/medications/ocr", { method: "POST", body: payload });
 }
 
 export async function confirmMedicationOcr(

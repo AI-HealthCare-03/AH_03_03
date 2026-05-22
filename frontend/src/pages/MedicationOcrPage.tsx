@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import {
   confirmMedicationOcr,
   type MedicationOcrItem,
-  runMedicationDummyOcr,
+  runMedicationOcr,
 } from "../api/medications";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
@@ -30,15 +30,15 @@ export default function MedicationOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const runDummyOcr = async () => {
+  const runMedicationRecognition = async () => {
     setError("");
     setMessage("");
     setIsRunning(true);
     try {
-      const response = await runMedicationDummyOcr({
+      const response = await runMedicationOcr({
         source_type: sourceType,
         image_filename: imageFilename || undefined,
-        memo: "MVP medication OCR demo request",
+        memo: "medication ocr request",
       });
       setItems(response.items);
       setMessage(`${toUserMessage(response.message)} 저장 전 약 이름과 복용 정보를 확인해주세요.`);
@@ -127,7 +127,7 @@ export default function MedicationOcrPage() {
               <option value="SUPPLEMENT">영양제</option>
             </select>
           </label>
-          <button disabled={isRunning} onClick={runDummyOcr} type="button">
+          <button disabled={isRunning} onClick={runMedicationRecognition} type="button">
             {isRunning ? "자동 인식 실행 중..." : "자동 인식 실행"}
           </button>
         </Card>
@@ -202,5 +202,5 @@ export default function MedicationOcrPage() {
 }
 
 function toUserMessage(message: string): string {
-  return message.replaceAll("더미 OCR", "자동 인식").replaceAll("더미", "예시").replaceAll("dummy", "demo");
+  return message;
 }

@@ -16,6 +16,6 @@ export async function createDietRecord<T>(payload: Record<string, ApiValue>): Pr
   return apiRequest<T>("/diets", { method: "POST", body: payload });
 }
 
-export async function runDummyDietAnalysis<T>(payload: Record<string, ApiValue>): Promise<T> {
-  return apiRequest<T>("/diets/dummy-analyze", { method: "POST", body: payload });
+export async function analyzeDiet<T>(payload: Record<string, ApiValue>): Promise<T> {
+  return apiRequest<T>("/diets/analyze", { method: "POST", body: payload });
 }

@@ -58,7 +58,10 @@ export default function SettingsPage() {
             </label>
           ),
         )}
-        <div className="placeholder">마케팅/민감정보 동의 상세 설정은 준비 중입니다.</div>
+        <div className="state-box">
+          민감정보와 마케팅 수신 동의는 가입 및 계정 보안 정책에 따라 관리됩니다. 변경이 필요한 경우 1:1 문의로
+          요청해주세요.
+        </div>
       </div>
     </Card>
   );

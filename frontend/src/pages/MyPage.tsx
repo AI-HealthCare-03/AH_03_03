@@ -43,7 +43,7 @@ const myPageMenuItems = [
   { label: "내 가족", to: "/family" },
   { label: "알림 설정", to: "/settings" },
   { label: "개인정보", to: "/settings", badge: "설정에서 관리" },
-  { label: "회원탈퇴", disabled: true, badge: "준비 중", danger: true },
+  { label: "회원탈퇴", action: "deactivate", danger: true },
 ];
 
 function getText(item: Item | undefined | null, key: string, fallback = "-"): string {
@@ -261,10 +261,13 @@ export default function MyPage() {
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                disabled={item.disabled}
                 key={item.label}
                 type="button"
-                onClick={() => setNotice(item.disabled ? "해당 기능은 MVP 이후 단계에서 제공될 예정입니다." : "")}
+                onClick={() => {
+                  if (item.action === "deactivate") {
+                    void deactivateAccount();
+                  }
+                }}
               >
                 <span>{item.label}</span>
                 {item.badge && <span className="badge badge-reference">{item.badge}</span>}
