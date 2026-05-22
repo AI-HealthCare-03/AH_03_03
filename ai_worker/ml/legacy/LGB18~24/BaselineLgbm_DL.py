@@ -10,6 +10,7 @@ Python 3.13 | lightgbm>=4.0 | scikit-learn>=1.4 | pandas>=2.2
   - Threshold 선택 기준: Recall >= 0.85 만족 시 Precision 최대
 """
 
+from pathlib import Path
 import os
 import warnings
 
