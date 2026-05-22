@@ -1,16 +1,20 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { isOperatorRole } from "../auth/AdminRoute";
 import ThemeToggle from "./ThemeToggle";
 
 const adminLinks = [
-  { to: "/admin", label: "운영 대시보드", icon: "📊" },
-  { to: "/admin/monitoring", label: "모니터링", icon: "🩺" },
-  { to: "/admin/logs", label: "운영 로그", icon: "📋" },
+  { to: "/admin", label: "운영 대시보드", icon: "📊", minRole: "MONITOR" },
+  { to: "/admin/monitoring", label: "모니터링", icon: "🩺", minRole: "MONITOR" },
+  { to: "/admin/logs", label: "운영 로그", icon: "📋", minRole: "MONITOR" },
+  { to: "/admin/faqs", label: "FAQ 관리", icon: "?" , minRole: "OPERATOR" },
+  { to: "/admin/inquiries", label: "문의 관리", icon: "💬", minRole: "OPERATOR" },
 ];
 
 export default function AdminLayout() {
   const { backendUser, logout } = useAuth();
+  const visibleLinks = adminLinks.filter((link) => link.minRole !== "OPERATOR" || isOperatorRole(backendUser?.role));
 
   return (
     <div className="admin-shell">
@@ -20,7 +24,7 @@ export default function AdminLayout() {
           Admin
         </NavLink>
         <nav className="admin-nav">
-          {adminLinks.map((link) => (
+          {visibleLinks.map((link) => (
             <NavLink key={link.to} to={link.to} end={link.to === "/admin"}>
               <span>{link.icon}</span>
               {link.label}

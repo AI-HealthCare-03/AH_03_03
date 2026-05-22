@@ -32,6 +32,8 @@ import PasswordResetRequestPage from "./pages/PasswordResetRequestPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminFaqPage from "./pages/admin/AdminFaqPage";
+import AdminInquiryPage from "./pages/admin/AdminInquiryPage";
 import AdminLogsPage from "./pages/admin/AdminLogsPage";
 import AdminMonitoringPage from "./pages/admin/AdminMonitoringPage";
 
@@ -84,6 +86,8 @@ export default function App() {
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/monitoring" element={<AdminMonitoringPage />} />
           <Route path="/admin/logs" element={<AdminLogsPage />} />
+          <Route path="/admin/faqs" element={<AdminFaqPage />} />
+          <Route path="/admin/inquiries" element={<AdminInquiryPage />} />
         </Route>
       </Route>
     </Routes>

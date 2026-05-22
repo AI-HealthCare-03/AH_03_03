@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, type ApiValue } from "./client";
 
 export type AdminSummary = {
   total_users: number;
@@ -72,6 +72,38 @@ export type AdminLogList<T> = {
   filters: Record<string, string | number | null>;
 };
 
+export type AdminFaq = {
+  id: number;
+  category: string;
+  question: string;
+  answer: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminFaqPayload = {
+  category: string;
+  question: string;
+  answer: string;
+  display_order?: number;
+  is_active?: boolean;
+};
+
+export type AdminInquiry = {
+  id: number;
+  user_id: number;
+  category: string;
+  title: string;
+  content: string;
+  status: string;
+  answer: string | null;
+  answered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export function getAdminSummary(): Promise<AdminSummary> {
   return apiRequest<AdminSummary>("/admin/summary");
 }
@@ -90,4 +122,46 @@ export function getAdminSystemErrors(limit = 50): Promise<AdminLogList<AdminSyst
 
 export function getAdminSensitiveAccessLogs(limit = 50): Promise<AdminLogList<AdminSensitiveAccessLog>> {
   return apiRequest<AdminLogList<AdminSensitiveAccessLog>>(`/admin/sensitive-access-logs?limit=${limit}`);
+}
+
+export function listAdminFaqs(params: { category?: string; isActive?: boolean } = {}): Promise<AdminFaq[]> {
+  const query = new URLSearchParams();
+  query.set("limit", "100");
+  if (params.category) query.set("category", params.category);
+  if (params.isActive !== undefined) query.set("is_active", String(params.isActive));
+  return apiRequest<AdminFaq[]>(`/admin/faqs?${query.toString()}`);
+}
+
+export function createAdminFaq(payload: AdminFaqPayload): Promise<AdminFaq> {
+  return apiRequest<AdminFaq>("/admin/faqs", { method: "POST", body: payload as Record<string, ApiValue> });
+}
+
+export function updateAdminFaq(faqId: number, payload: Partial<AdminFaqPayload>): Promise<AdminFaq> {
+  return apiRequest<AdminFaq>(`/admin/faqs/${faqId}`, {
+    method: "PATCH",
+    body: payload as Record<string, ApiValue>,
+  });
+}
+
+export function deactivateAdminFaq(faqId: number): Promise<AdminFaq> {
+  return apiRequest<AdminFaq>(`/admin/faqs/${faqId}`, { method: "DELETE" });
+}
+
+export function listAdminInquiries(params: { status?: string; category?: string } = {}): Promise<AdminInquiry[]> {
+  const query = new URLSearchParams();
+  query.set("limit", "100");
+  if (params.status) query.set("status", params.status);
+  if (params.category) query.set("category", params.category);
+  return apiRequest<AdminInquiry[]>(`/admin/inquiries?${query.toString()}`);
+}
+
+export function getAdminInquiry(inquiryId: number): Promise<AdminInquiry> {
+  return apiRequest<AdminInquiry>(`/admin/inquiries/${inquiryId}`);
+}
+
+export function answerAdminInquiry(inquiryId: number, answer: string): Promise<AdminInquiry> {
+  return apiRequest<AdminInquiry>(`/admin/inquiries/${inquiryId}/answer`, {
+    method: "POST",
+    body: { answer },
+  });
 }
