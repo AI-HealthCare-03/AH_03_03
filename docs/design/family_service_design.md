@@ -690,3 +690,53 @@ P1 이후 이상 수치 감지/알림을 worker로 분리할 경우:
 - 감사 로그 보관 기간
 - 관리자 화면에서 가족 분쟁/신고 처리 범위
 
+## 12. 2026-05-23 1차 백엔드 구현 상태
+
+가족 관리 기능의 1차 DB/API 골격을 구현했습니다.
+
+### 구현된 테이블
+
+- `families`
+- `family_members`
+- `family_invites`
+- `family_share_settings`
+
+`family_invites`는 초대 코드 원문을 저장하지 않고 `code_hash`만 저장합니다. 초대 코드 원문은 생성 응답에서 1회만 반환합니다. 기본 만료 시간은 24시간입니다.
+
+### 구현된 API
+
+- `POST /api/v1/family/groups`
+- `GET /api/v1/family/groups`
+- `GET /api/v1/family/groups/{family_id}`
+- `PATCH /api/v1/family/groups/{family_id}`
+- `DELETE /api/v1/family/groups/{family_id}`
+- `GET /api/v1/family/groups/{family_id}/members`
+- `POST /api/v1/family/groups/{family_id}/members/unregistered`
+- `DELETE /api/v1/family/members/{member_id}`
+- `POST /api/v1/family/groups/{family_id}/invites`
+- `GET /api/v1/family/invites/me`
+- `POST /api/v1/family/invites/{invite_id}/accept`
+- `POST /api/v1/family/invites/{invite_id}/decline`
+- `POST /api/v1/family/invites/code/accept`
+- `GET /api/v1/family/share-settings`
+- `GET /api/v1/family/groups/{family_id}/share-settings`
+- `PATCH /api/v1/family/share-settings/{setting_id}`
+
+### 1차 정책
+
+- 가족 그룹 생성자는 `OWNER` 구성원으로 자동 등록됩니다.
+- 가족 그룹 삭제는 물리 삭제가 아니라 `families.status = REMOVED` soft remove로 처리합니다.
+- 미가입 가족은 `family_members.user_id = null`, `is_registered = false`, `status = PENDING_UNREGISTERED`로 저장합니다.
+- 공유 권한은 기본값을 모두 `false`로 둡니다.
+- 공유 권한 변경은 정보 소유자(`owner_user_id`) 본인만 가능합니다.
+- 가족 연결만으로 건강정보가 자동 공유되지 않습니다.
+
+### 후속 작업
+
+- 프론트 `FamilyPage` API 연결
+- 미가입 가족이 앱 가입 시 email/phone 기반 자동 연결 hook
+- 가족 건강분석 결과 알림
+- 이상 수치 알림
+- 복약 미수행 알림
+- 챌린지 미수행 알림
+- 가족 공유 데이터 상세 조회 API와 `sensitive_access_logs` 연동
