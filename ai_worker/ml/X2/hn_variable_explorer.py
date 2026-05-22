@@ -7,6 +7,7 @@
 #   출력: 콘솔 요약 + plots/ 폴더에 png 저장
 # ================================================================
 
+from pathlib import Path
 import os
 import warnings
 
