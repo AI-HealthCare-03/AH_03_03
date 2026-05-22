@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, status
@@ -32,6 +33,22 @@ from app.services.auth import AuthService
 from app.services.jwt import JwtService
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _refresh_cookie_settings() -> dict[str, object]:
+    return {
+        "key": config.REFRESH_TOKEN_COOKIE_NAME,
+        "path": config.REFRESH_TOKEN_COOKIE_PATH,
+        "domain": config.refresh_token_cookie_domain,
+        "secure": config.refresh_token_cookie_secure,
+        "httponly": True,
+        "samesite": config.REFRESH_TOKEN_COOKIE_SAMESITE,
+    }
+
+
+def _refresh_cookie_max_age(refresh_token_exp: int) -> int:
+    expires_at = datetime.fromtimestamp(refresh_token_exp, tz=config.TIMEZONE)
+    return max(0, int((expires_at - datetime.now(config.TIMEZONE)).total_seconds()))
 
 
 def _allow_auth_debug_response() -> bool:
@@ -162,12 +179,10 @@ async def login(
         content=LoginResponse(access_token=str(tokens["access_token"])).model_dump(), status_code=status.HTTP_200_OK
     )
     resp.set_cookie(
-        key="refresh_token",
+        **_refresh_cookie_settings(),
         value=str(tokens["refresh_token"]),
-        httponly=True,
-        secure=config.is_production,
-        domain=config.COOKIE_DOMAIN or None,
-        expires=tokens["access_token"].payload["exp"],
+        max_age=_refresh_cookie_max_age(tokens["refresh_token"].payload["exp"]),
+        expires=datetime.fromtimestamp(tokens["refresh_token"].payload["exp"], tz=config.TIMEZONE),
     )
     return resp
 
@@ -176,7 +191,7 @@ async def login(
 async def token_refresh(
     jwt_service: Annotated[JwtService, Depends(JwtService)],
     auth_service: Annotated[AuthService, Depends(AuthService)],
-    refresh_token: Annotated[str | None, Cookie()] = None,
+    refresh_token: Annotated[str | None, Cookie(alias=config.REFRESH_TOKEN_COOKIE_NAME)] = None,
 ) -> Response:
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing.")
@@ -230,11 +245,11 @@ async def change_password(
 @auth_router.post("/logout", response_model=SimpleMessageResponse, status_code=status.HTTP_200_OK)
 async def logout(
     auth_service: Annotated[AuthService, Depends(AuthService)],
-    refresh_token: Annotated[str | None, Cookie()] = None,
+    refresh_token: Annotated[str | None, Cookie(alias=config.REFRESH_TOKEN_COOKIE_NAME)] = None,
 ) -> Response:
     await auth_service.logout(refresh_token)
     resp = Response(
         content=SimpleMessageResponse(detail="로그아웃되었습니다.").model_dump(), status_code=status.HTTP_200_OK
     )
-    resp.delete_cookie(key="refresh_token", domain=config.COOKIE_DOMAIN or None)
+    resp.delete_cookie(**_refresh_cookie_settings())
     return resp

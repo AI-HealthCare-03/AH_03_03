@@ -149,6 +149,9 @@ Seed 포함 데이터:
 - 루트 `.env`는 백엔드/공용 환경변수용이고, `frontend/.env`는 Vite 프론트용입니다.
 - Firebase Auth와 소셜 로그인은 1차 풀서비스 범위에서 제외/보류합니다. 현재 로그인/회원가입은 FastAPI JWT Auth와 이메일 인증 기준이며, Firebase 전용 사용자 컬럼은 사용하지 않습니다.
 - 향후 소셜 로그인을 재도입할 경우 `users` 테이블에 provider 정보를 직접 넣지 않고 별도 OAuth 계정 연결 테이블을 설계합니다.
+- JWT 저장 정책은 access token은 기존 프론트 저장 방식을 유지하고, refresh token은 HttpOnly cookie로만 전달합니다. refresh cookie 기본값은 `SameSite=Lax`, `Path=/api/v1/auth`, `HttpOnly=true`이며 local/dev에서는 `Secure=false`, prod/production에서는 `Secure=true`를 사용합니다.
+- refresh cookie의 `Max-Age/Expires`는 refresh token의 `exp`와 맞춥니다. logout은 같은 cookie name/path/domain/samesite/secure 조건으로 삭제하므로 브라우저에 남은 refresh cookie가 재사용되지 않도록 합니다.
+- `SameSite=Lax`는 일반적인 CSRF 위험을 줄이지만 모든 교차 출처 요청을 완전히 막는 장치는 아닙니다. 운영에서는 HTTPS, 제한된 CORS origin, refresh token 서버 검증/폐기, 짧은 access token 수명을 함께 적용합니다.
 - 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 대신 `/api/v1/auth/email-verifications/send` 응답의 `debug_code`로 확인합니다. 프론트는 로컬 테스트 편의를 위해 이 값을 인증코드 입력칸에 자동 반영합니다.
 - 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. `EMAIL_ENABLED=true`와 SMTP 환경변수를 설정하면 실제 인증코드/비밀번호 재설정 링크를 발송합니다.
 - 휴대폰 SMS 인증은 Twilio Verify 기반입니다. 서버는 한국 휴대폰 번호를 Twilio 호출용 E.164 형식(`+821012345678`)으로 정규화하고, 기존 사용자 DB 호환을 위해 저장/중복확인은 로컬 번호(`01012345678`) 기준도 함께 확인합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용할 수 있지만, 운영환경에서는 debug code를 응답하지 않으며 `TWILIO_ENABLED=true`와 Twilio Verify secret 설정이 필요합니다.
