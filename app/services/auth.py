@@ -7,6 +7,7 @@ import urllib.request
 from base64 import b64encode
 from datetime import datetime, timedelta
 from random import randint
+from urllib.error import HTTPError
 
 from fastapi.exceptions import HTTPException
 from pydantic import EmailStr
@@ -16,7 +17,7 @@ from tortoise.transactions import in_transaction
 from app.core import config
 from app.core.jwt.tokens import AccessToken
 from app.core.jwt.tokens import RefreshToken as JWTRefreshToken
-from app.core.utils.common import normalize_phone_number
+from app.core.utils.common import normalize_phone_number, normalize_phone_number_e164
 from app.core.utils.security import hash_password, verify_password
 from app.dtos.auth import (
     FindLoginIdRequest,
@@ -38,6 +39,14 @@ PASSWORD_RESET_TOKEN_TTL_MINUTES = 30
 INVALID_LOGIN_MESSAGE = "아이디 또는 비밀번호가 올바르지 않습니다."
 ACCOUNT_LOCKED_MESSAGE = "로그인 시도가 여러 번 실패했습니다. 잠시 후 다시 시도하거나 추가 확인을 진행해주세요."
 PHONE_VERIFICATION_PURPOSE = "PHONE_VERIFICATION"
+PHONE_VERIFICATION_FAILURE_PURPOSE = "PHONE_VERIFICATION_FAILURE"
+PHONE_VERIFICATION_RESEND_SECONDS = 60
+PHONE_VERIFICATION_HOURLY_LIMIT = 5
+PHONE_VERIFICATION_FAILURE_LIMIT = 5
+PHONE_VERIFICATION_FAILURE_LOCK_MINUTES = 15
+PHONE_VERIFICATION_SIGNUP_TTL_MINUTES = 30
+PHONE_VERIFICATION_RATE_LIMIT_MESSAGE = "인증번호 요청이 너무 잦습니다. 잠시 후 다시 시도해주세요."
+PHONE_VERIFICATION_FAILURE_LIMIT_MESSAGE = "인증번호 확인 시도가 여러 번 실패했습니다. 잠시 후 다시 시도해주세요."
 
 
 class AuthService:
@@ -53,8 +62,9 @@ class AuthService:
         # 이메일 중복 체크
         await self.check_email_exists(data.email)
 
-        # 입력받은 휴대폰 번호를 노말라이즈
-        normalized_phone_number = normalize_phone_number(data.phone_number)
+        # 입력받은 휴대폰 번호는 서버에서 최종 정규화한다.
+        normalized_phone_number = self._normalize_phone_for_db(data.phone_number)
+        await self.ensure_phone_verified(data.phone_number)
 
         # 휴대폰 번호 중복 체크
         await self.check_phone_number_exists(normalized_phone_number)
@@ -129,7 +139,7 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용중인 아이디입니다.")
 
     async def check_phone_number_exists(self, phone_number: str) -> None:
-        if await self.user_repo.exists_by_phone_number(phone_number):
+        if await self._phone_number_exists(phone_number):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용중인 휴대폰 번호입니다.")
 
     async def is_login_id_available(self, login_id: str) -> bool:
@@ -139,7 +149,7 @@ class AuthService:
         return not await self.user_repo.exists_by_email(email)
 
     async def is_phone_number_available(self, phone_number: str) -> bool:
-        return not await self.user_repo.exists_by_phone_number(normalize_phone_number(phone_number))
+        return not await self._phone_number_exists(phone_number)
 
     async def find_login_id(self, data: FindLoginIdRequest) -> FindLoginIdResponse:
         name = data.name.strip()
@@ -189,13 +199,21 @@ class AuthService:
         return code
 
     async def send_phone_verification_code(self, phone_number: str) -> str | None:
-        normalized_phone_number = normalize_phone_number(phone_number)
+        self._ensure_phone_delivery_available()
+        normalized_phone_number = self._normalize_phone_for_e164(phone_number)
+        await self._enforce_phone_send_rate_limit(normalized_phone_number)
+        expires_at = datetime.now(config.TIMEZONE) + timedelta(minutes=VERIFICATION_CODE_TTL_MINUTES)
         if config.TWILIO_ENABLED:
             await self._send_twilio_verification(normalized_phone_number)
+            await self.user_repo.create_verification_code(
+                email=self._phone_verification_key(normalized_phone_number),
+                code_hash=self._digest(f"twilio-sent:{secrets.token_urlsafe(16)}"),
+                expires_at=expires_at,
+                purpose=PHONE_VERIFICATION_PURPOSE,
+            )
             return None
 
         code = f"{randint(0, 999999):06d}"
-        expires_at = datetime.now(config.TIMEZONE) + timedelta(minutes=VERIFICATION_CODE_TTL_MINUTES)
         await self.user_repo.create_verification_code(
             email=self._phone_verification_key(normalized_phone_number),
             code_hash=self._digest(code),
@@ -221,9 +239,21 @@ class AuthService:
         return True
 
     async def verify_phone_code(self, phone_number: str, code: str) -> bool:
-        normalized_phone_number = normalize_phone_number(phone_number)
+        self._ensure_phone_delivery_available()
+        normalized_phone_number = self._normalize_phone_for_e164(phone_number)
+        await self._enforce_phone_verify_failure_limit(normalized_phone_number)
         if config.TWILIO_ENABLED:
-            return await self._check_twilio_verification(normalized_phone_number, code)
+            try:
+                verified = await self._check_twilio_verification(normalized_phone_number, code)
+            except HTTPException as exc:
+                if exc.status_code == status.HTTP_400_BAD_REQUEST:
+                    await self._record_phone_verification_failure(normalized_phone_number, invalidate_on_limit=True)
+                raise
+            if verified:
+                await self._record_phone_verification_success(normalized_phone_number)
+                return True
+            await self._record_phone_verification_failure(normalized_phone_number, invalidate_on_limit=True)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="인증번호가 올바르지 않습니다.")
 
         verification = await self.user_repo.get_latest_verification_code(
             self._phone_verification_key(normalized_phone_number),
@@ -235,10 +265,22 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="인증번호가 만료되었거나 존재하지 않습니다."
             )
         if verification.code_hash != self._digest(code):
+            await self._record_phone_verification_failure(normalized_phone_number, invalidate_on_limit=True)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="인증번호가 올바르지 않습니다.")
 
         await self.user_repo.mark_verification_code_used(verification, now)
         return True
+
+    async def ensure_phone_verified(self, phone_number: str) -> None:
+        normalized_phone_number = self._normalize_phone_for_e164(phone_number)
+        verified_after = datetime.now(config.TIMEZONE) - timedelta(minutes=PHONE_VERIFICATION_SIGNUP_TTL_MINUTES)
+        is_verified = await self.user_repo.has_recent_verified_code(
+            self._phone_verification_key(normalized_phone_number),
+            PHONE_VERIFICATION_PURPOSE,
+            verified_after,
+        )
+        if not is_verified:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="휴대폰 인증을 완료해주세요.")
 
     async def request_password_reset(self, email: str | EmailStr) -> str:
         self._ensure_email_delivery_available()
@@ -328,13 +370,107 @@ class AuthService:
                 detail="이메일 발송 설정이 필요합니다.",
             )
 
-    def _to_e164_kr(self, phone_number: str) -> str:
-        normalized = normalize_phone_number(phone_number)
-        if normalized.startswith("0"):
-            return f"+82{normalized[1:]}"
-        if normalized.startswith("82"):
-            return f"+{normalized}"
-        return f"+{normalized}"
+    def _normalize_phone_for_db(self, phone_number: str) -> str:
+        try:
+            return normalize_phone_number(phone_number)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    def _normalize_phone_for_e164(self, phone_number: str) -> str:
+        try:
+            return normalize_phone_number_e164(phone_number)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    async def _phone_number_exists(self, phone_number: str) -> bool:
+        local_number = self._normalize_phone_for_db(phone_number)
+        e164_number = self._normalize_phone_for_e164(phone_number)
+        return await self.user_repo.exists_by_phone_number(local_number) or await self.user_repo.exists_by_phone_number(
+            e164_number
+        )
+
+    def _ensure_phone_delivery_available(self) -> None:
+        if config.is_production and not config.TWILIO_ENABLED:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="휴대폰 인증 설정이 필요합니다.",
+            )
+        if config.TWILIO_ENABLED and config.twilio_verify_status != "configured":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="휴대폰 인증 설정이 필요합니다.",
+            )
+
+    async def _enforce_phone_send_rate_limit(self, normalized_phone_number: str) -> None:
+        now = datetime.now(config.TIMEZONE)
+        key = self._phone_verification_key(normalized_phone_number)
+        recent_count = await self.user_repo.count_verification_codes(
+            key,
+            PHONE_VERIFICATION_PURPOSE,
+            now - timedelta(seconds=PHONE_VERIFICATION_RESEND_SECONDS),
+        )
+        if recent_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=PHONE_VERIFICATION_RATE_LIMIT_MESSAGE
+            )
+
+        hourly_count = await self.user_repo.count_verification_codes(
+            key,
+            PHONE_VERIFICATION_PURPOSE,
+            now - timedelta(hours=1),
+        )
+        if hourly_count >= PHONE_VERIFICATION_HOURLY_LIMIT:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=PHONE_VERIFICATION_RATE_LIMIT_MESSAGE
+            )
+
+    async def _enforce_phone_verify_failure_limit(self, normalized_phone_number: str) -> None:
+        failed_count = await self._count_recent_phone_failures(normalized_phone_number)
+        if failed_count >= PHONE_VERIFICATION_FAILURE_LIMIT:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=PHONE_VERIFICATION_FAILURE_LIMIT_MESSAGE,
+            )
+
+    async def _count_recent_phone_failures(self, normalized_phone_number: str) -> int:
+        return await self.user_repo.count_verification_codes(
+            self._phone_verification_key(normalized_phone_number),
+            PHONE_VERIFICATION_FAILURE_PURPOSE,
+            datetime.now(config.TIMEZONE) - timedelta(minutes=PHONE_VERIFICATION_FAILURE_LOCK_MINUTES),
+        )
+
+    async def _record_phone_verification_failure(
+        self,
+        normalized_phone_number: str,
+        *,
+        invalidate_on_limit: bool,
+    ) -> None:
+        now = datetime.now(config.TIMEZONE)
+        key = self._phone_verification_key(normalized_phone_number)
+        await self.user_repo.create_verification_code(
+            email=key,
+            code_hash=self._digest(f"failure:{secrets.token_urlsafe(16)}"),
+            expires_at=now + timedelta(minutes=PHONE_VERIFICATION_FAILURE_LOCK_MINUTES),
+            purpose=PHONE_VERIFICATION_FAILURE_PURPOSE,
+        )
+        failed_count = await self._count_recent_phone_failures(normalized_phone_number)
+        if invalidate_on_limit and failed_count >= PHONE_VERIFICATION_FAILURE_LIMIT:
+            await self.user_repo.mark_active_verification_codes_used(key, PHONE_VERIFICATION_PURPOSE)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=PHONE_VERIFICATION_FAILURE_LIMIT_MESSAGE,
+            )
+
+    async def _record_phone_verification_success(self, normalized_phone_number: str) -> None:
+        now = datetime.now(config.TIMEZONE)
+        key = self._phone_verification_key(normalized_phone_number)
+        verification = await self.user_repo.create_verification_code(
+            email=key,
+            code_hash=self._digest(f"twilio-approved:{secrets.token_urlsafe(16)}"),
+            expires_at=now + timedelta(minutes=PHONE_VERIFICATION_SIGNUP_TTL_MINUTES),
+            purpose=PHONE_VERIFICATION_PURPOSE,
+        )
+        await self.user_repo.mark_verification_code_used(verification, now)
 
     def _require_twilio_settings(self) -> tuple[str, str, str]:
         if not config.TWILIO_ACCOUNT_SID or not config.TWILIO_AUTH_TOKEN or not config.TWILIO_VERIFY_SERVICE_SID:
@@ -349,7 +485,7 @@ class AuthService:
             sid,
             token,
             f"https://verify.twilio.com/v2/Services/{service_sid}/Verifications",
-            {"To": self._to_e164_kr(phone_number), "Channel": "sms"},
+            {"To": phone_number, "Channel": "sms"},
         )
 
     async def _check_twilio_verification(self, phone_number: str, code: str) -> bool:
@@ -358,7 +494,7 @@ class AuthService:
             sid,
             token,
             f"https://verify.twilio.com/v2/Services/{service_sid}/VerificationCheck",
-            {"To": self._to_e164_kr(phone_number), "Code": code},
+            {"To": phone_number, "Code": code},
         )
         try:
             return json.loads(response.decode("utf-8")).get("status") == "approved"
@@ -385,6 +521,20 @@ class AuthService:
 
         try:
             return await asyncio.to_thread(_request)
+        except HTTPError as exc:
+            if exc.code in {400, 404}:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="인증번호가 만료되었거나 올바르지 않습니다.",
+                ) from exc
+            if exc.code == 429:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=PHONE_VERIFICATION_RATE_LIMIT_MESSAGE,
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail="휴대폰 인증 처리에 실패했습니다."
+            ) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY, detail="휴대폰 인증 처리에 실패했습니다."

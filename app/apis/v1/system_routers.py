@@ -17,6 +17,7 @@ async def get_system_health():
         "request_id": "ok",
         "system_error_logging": "ok",
         "email_service": EmailService().status(),
+        "twilio_verify": config.twilio_verify_status,
     }
     details: dict[str, str] = {}
 
