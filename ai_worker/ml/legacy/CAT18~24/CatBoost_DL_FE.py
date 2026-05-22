@@ -59,7 +59,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     added: list[str] = []
 
     if USE_AGE_BIN:
-        age_bins = [0, 40, 50, 60, 70, 80, 999]
+        age_bins = [0, 40, 50, 60, 70, 80, np.inf]
         age_labels = ["나이_19_39", "나이_40대", "나이_50대", "나이_60대", "나이_70대", "나이_80이상"]
         df["_나이구간"] = pd.cut(df["나이"], bins=age_bins, labels=age_labels, right=False)
         for label in age_labels:
