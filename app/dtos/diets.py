@@ -88,6 +88,10 @@ class DietDummyAnalyzeRequest(BaseModel):
     memo: str | None = None
 
 
+class DietAnalyzeRequest(DietDummyAnalyzeRequest):
+    pass
+
+
 class DietDummyAnalyzeResponse(BaseModel):
     message: str
     diet_record: DietRecordResponse
@@ -98,3 +102,7 @@ class DietDummyAnalyzeResponse(BaseModel):
     diet_feedback: str
     warnings: list[str] = []
     recommended_actions: list[str] = []
+
+
+class DietAnalyzeResponse(DietDummyAnalyzeResponse):
+    pass

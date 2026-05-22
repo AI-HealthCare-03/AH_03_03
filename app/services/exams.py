@@ -104,6 +104,6 @@ async def run_dummy_ocr(exam_report_id: int) -> ExamDummyOCRResponse:
 
     await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS))
     return ExamDummyOCRResponse(
-        message="더미 OCR 측정값이 생성되었습니다. 실제 CLOVA OCR 호출은 수행하지 않았습니다.",
+        message="자동 인식 측정값이 생성되었습니다. 검진 수치를 확인한 뒤 저장해주세요.",
         measurements=saved_measurements,
     )

@@ -465,7 +465,7 @@ export default function DashboardPage() {
                 type="button"
               >
                 {item.label}
-                {!item.ready && <span className="badge badge-reference">준비 중</span>}
+                {!item.ready && <span className="badge badge-reference">데이터 필요</span>}
               </button>
             ))}
           </div>

@@ -20,6 +20,10 @@ class DummyAnalysisRunRequest(BaseModel):
     mode: AnalysisMode = AnalysisMode.BASIC
 
 
+class AnalysisRunByHealthRecordRequest(DummyAnalysisRunRequest):
+    pass
+
+
 class AnalysisResultCreateRequest(BaseModel):
     health_record_id: int
     async_job_id: int | None = None
@@ -103,3 +107,7 @@ class DummyAnalysisResultResponse(BaseModel):
     guide_message: str
     challenge_recommendation_ids: list[int]
     factor_count: int = 0
+
+
+class AnalysisRunResultResponse(DummyAnalysisResultResponse):
+    pass

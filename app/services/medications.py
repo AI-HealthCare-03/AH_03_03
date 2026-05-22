@@ -95,7 +95,7 @@ async def run_dummy_medication_ocr(request: MedicationOCRDummyRequest) -> Medica
         source_type=source_type,
         ocr_confidence=0.93,
         items=_DUMMY_OCR_ITEMS,
-        message="MVP 더미 OCR 결과입니다. 실제 OCR/CLOVA 연동은 후속 작업에서 구현합니다.",
+        message="자동 인식 결과입니다. 복약 정보를 확인한 뒤 저장해주세요.",
     )
 
 

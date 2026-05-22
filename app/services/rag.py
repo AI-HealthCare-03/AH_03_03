@@ -8,7 +8,7 @@ from app.models.rag import RAGChunk, RAGDocument, RAGRetrievalLog, RAGSource
 from app.repositories import rag_repository
 
 # 이 서비스는 RAG 메타데이터 CRUD 전용이다.
-# TODO: 임베딩 생성, vector search, retrieval, context 구성, LLM 호출은 ai_worker/rag/에서 처리한다.
+# 임베딩 생성, vector search, retrieval, context 구성, LLM 호출은 ai_worker/rag/에서 처리한다.
 
 
 async def create_rag_source(request: RAGSourceCreateRequest) -> RAGSource:

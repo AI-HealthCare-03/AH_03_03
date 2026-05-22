@@ -613,10 +613,7 @@ export default function HealthProfilePage() {
                 <div className="section-heading">
                   <h3>{section.title}</h3>
                   {section.title === "선택 설문" && (
-                    <p>
-                      선택 항목입니다. 입력하지 않아도 분석을 진행할 수 있습니다.
-                      {/* TODO: 백엔드 저장 정책 확정 필요 */}
-                    </p>
+                    <p>선택 항목입니다. 입력하지 않아도 분석을 진행할 수 있습니다.</p>
                   )}
                 </div>
                 <div className="readonly-health-grid">

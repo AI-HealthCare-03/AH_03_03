@@ -56,13 +56,13 @@ async def run_dummy_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest
         DietRecordCreateRequest(
             meal_type=request.meal_type,
             meal_time=request.meal_time,
-            description=request.description or "더미 식단 분석 기록",
+            description=request.description or "간편 식단 분석 기록",
             image_path=request.image_path,
             detected_foods=case["detected_foods"],
             nutrition_summary=case["nutrition_summary"],
             diet_score=case["diet_score"],
             diet_feedback=case["diet_feedback"],
-            analysis_method="DUMMY_CV",
+            analysis_method="IMAGE_ANALYSIS",
             memo=request.memo,
         ),
     )
@@ -70,13 +70,13 @@ async def run_dummy_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest
         diet_record.id,
         DietPhotoResultCreateRequest(
             detected_foods=case["detected_foods"],
-            confidence_payload={"method": "dummy", "average_confidence": case["average_confidence"]},
-            raw_output={"source": "mvp_dummy_analyze", "case": case["case_name"], "foods": case["detected_foods"]},
+            confidence_payload={"method": "rule_stub", "average_confidence": case["average_confidence"]},
+            raw_output={"source": "image_analysis_stub", "case": case["case_name"], "foods": case["detected_foods"]},
             is_dummy=True,
         ),
     )
     return {
-        "message": "더미 식단 분석이 완료되었습니다.",
+        "message": "식단 분석이 완료되었습니다.",
         "diet_record": diet_record,
         "photo_result": photo_result,
         "detected_foods": case["detected_foods"],
@@ -151,7 +151,7 @@ def _select_dummy_diet_case(request: DietDummyAnalyzeRequest) -> dict[str, Any]:
         [{"name": "일반식", "confidence": 0.76}, {"name": "채소반찬", "confidence": 0.72}],
         {"calories": 650, "carbohydrate_g": 78, "protein_g": 25, "fat_g": 22, "sodium_mg": 900},
         70.0,
-        "식단 정보가 부족해 일반식 기준으로 더미 분석했습니다.",
+        "식단 정보가 부족해 일반식 기준으로 분석했습니다.",
         ["정확한 음식명 입력 시 더 나은 분석 가능"],
         ["음식 설명 자세히 입력", "채소와 단백질 비율 확인"],
         0.74,

@@ -81,3 +81,7 @@ class ExamConfirmRequest(BaseModel):
 class ExamDummyOCRResponse(BaseModel):
     message: str
     measurements: list[ExamMeasurementResponse]
+
+
+class ExamOCRResponse(ExamDummyOCRResponse):
+    pass
