@@ -26,7 +26,7 @@ def add_age_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_bmi_bin(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """BMI 4구간화 (저체중/정상/과체중/비만)"""
-    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
+    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, np.inf], labels=[0, 1, 2, 3], right=False).astype(float)
     return df, ["BMI_구간"]
 
 
