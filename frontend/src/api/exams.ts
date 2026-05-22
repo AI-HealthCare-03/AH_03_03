@@ -27,7 +27,7 @@ export type ExamMeasurement = {
   updated_at: string;
 };
 
-export type DummyOcrResponse = {
+export type ExamOcrResponse = {
   message: string;
   measurements: ExamMeasurement[];
 };
@@ -49,8 +49,8 @@ export async function createExam(payload: {
   return apiRequest<ExamReport>("/exams", { method: "POST", body: payload });
 }
 
-export async function runDummyOcr(examId: number): Promise<DummyOcrResponse> {
-  return apiRequest<DummyOcrResponse>(`/exams/${examId}/dummy-ocr`, { method: "POST" });
+export async function runExamOcr(examId: number): Promise<ExamOcrResponse> {
+  return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST" });
 }
 
 export async function listMeasurements(examId: number): Promise<ExamMeasurement[]> {

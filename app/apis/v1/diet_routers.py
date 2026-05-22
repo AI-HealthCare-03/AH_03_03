@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.diets import (
+    DietAnalyzeRequest,
+    DietAnalyzeResponse,
     DietDummyAnalyzeRequest,
     DietDummyAnalyzeResponse,
     DietPhotoResultCreateRequest,
@@ -38,12 +40,32 @@ async def list_diet_records(
     )
 
 
-@diet_router.post("/dummy-analyze", response_model=DietDummyAnalyzeResponse, status_code=status.HTTP_201_CREATED)
+async def _run_diet_analysis(
+    request: DietDummyAnalyzeRequest,
+    user: User,
+) -> DietDummyAnalyzeResponse:
+    return await diet_service.run_dummy_diet_analysis(user.id, request)
+
+
+@diet_router.post("/analyze", response_model=DietAnalyzeResponse, status_code=status.HTTP_201_CREATED)
+async def run_diet_analysis(
+    request: DietAnalyzeRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    return await _run_diet_analysis(request, user)
+
+
+@diet_router.post(
+    "/dummy-analyze",
+    response_model=DietDummyAnalyzeResponse,
+    status_code=status.HTTP_201_CREATED,
+    deprecated=True,
+)
 async def run_dummy_diet_analysis(
     request: DietDummyAnalyzeRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):
-    return await diet_service.run_dummy_diet_analysis(user.id, request)
+    return await _run_diet_analysis(request, user)
 
 
 @diet_router.get("/{diet_record_id}", response_model=DietRecordResponse)

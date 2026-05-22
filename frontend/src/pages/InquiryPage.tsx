@@ -75,11 +75,6 @@ export default function InquiryPage() {
               내용
               <textarea value={content} onChange={(event) => setContent(event.target.value)} required />
             </label>
-            <label>
-              첨부파일
-              <input disabled type="file" />
-              <span className="muted">파일 첨부는 준비 중입니다.</span>
-            </label>
             <label className="toggle-row">
               <span>답변 알림 받기</span>
               <input defaultChecked type="checkbox" />
@@ -101,7 +96,10 @@ export default function InquiryPage() {
       </Card>
       <Card title="답변 안내">
         <p>문의 답변은 관리자 확인 후 상태가 변경됩니다.</p>
-        <p className="placeholder">실시간 상담/파일 첨부는 준비 중입니다.</p>
+        <p className="muted">자주 묻는 질문을 먼저 확인하면 더 빠르게 해결할 수 있습니다.</p>
+        <Link className="button secondary" to="/faq">
+          FAQ 보기
+        </Link>
       </Card>
     </div>
   );

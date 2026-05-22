@@ -9,6 +9,7 @@ from app.dtos.exams import (
     ExamMeasurementCreateRequest,
     ExamMeasurementResponse,
     ExamMeasurementUpdateRequest,
+    ExamOCRResponse,
     ExamReportCreateRequest,
     ExamReportResponse,
     ExamReportUpdateRequest,
@@ -57,11 +58,20 @@ async def get_exam_report(exam_id: int, request: Request, user: Annotated[User, 
     return report
 
 
-@exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamDummyOCRResponse)
-async def run_dummy_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def _run_exam_ocr(exam_id: int, user: User) -> ExamDummyOCRResponse:
     report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
     ensure_owner(report.user_id, user)
     return await exam_service.run_dummy_ocr(exam_id)
+
+
+@exam_router.post("/{exam_id}/ocr", response_model=ExamOCRResponse)
+async def run_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
+    return await _run_exam_ocr(exam_id, user)
+
+
+@exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamDummyOCRResponse, deprecated=True)
+async def run_dummy_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
+    return await _run_exam_ocr(exam_id, user)
 
 
 @exam_router.patch("/{exam_id}", response_model=ExamReportResponse)

@@ -8,6 +8,8 @@ from app.dtos.analysis import (
     AnalysisResultFactorCreateRequest,
     AnalysisResultFactorResponse,
     AnalysisResultResponse,
+    AnalysisRunByHealthRecordRequest,
+    AnalysisRunResultResponse,
     AnalysisSnapshotCreateRequest,
     AnalysisSnapshotResponse,
     DummyAnalysisResultResponse,
@@ -21,15 +23,10 @@ from app.services.sensitive_access_logs import safe_record_sensitive_access
 analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 
-@analysis_router.post(
-    "/dummy-run",
-    response_model=list[DummyAnalysisResultResponse],
-    status_code=status.HTTP_201_CREATED,
-)
-async def run_dummy_analysis(
+async def _run_analysis(
     request: DummyAnalysisRunRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
+    user: User,
+) -> list[DummyAnalysisResultResponse]:
     health_record = ensure_found(
         await health_service.get_health_record(request.health_record_id),
         "건강 기록을 찾을 수 없습니다.",
@@ -43,6 +40,31 @@ async def run_dummy_analysis(
             detail=f"{mode_label}에 필요한 정보가 부족합니다: {', '.join(missing_fields)}",
         )
     return await analysis_service.run_dummy_analysis(user.id, health_record, request.mode)
+
+
+@analysis_router.post(
+    "/run",
+    response_model=list[AnalysisRunResultResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def run_analysis(
+    request: AnalysisRunByHealthRecordRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    return await _run_analysis(request, user)
+
+
+@analysis_router.post(
+    "/dummy-run",
+    response_model=list[DummyAnalysisResultResponse],
+    status_code=status.HTTP_201_CREATED,
+    deprecated=True,
+)
+async def run_dummy_analysis(
+    request: DummyAnalysisRunRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    return await _run_analysis(request, user)
 
 
 @analysis_router.post("/results", response_model=AnalysisResultResponse, status_code=status.HTTP_201_CREATED)

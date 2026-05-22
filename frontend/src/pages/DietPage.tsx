@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { createDietRecord, listDietRecords, runDummyDietAnalysis } from "../api/diets";
+import { analyzeDiet, createDietRecord, listDietRecords } from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
@@ -39,11 +39,11 @@ export default function DietPage() {
     }
   };
 
-  const dummyAnalyze = async () => {
+  const runDietAnalysis = async () => {
     setError("");
     try {
-      const result = await runDummyDietAnalysis<Record<string, unknown>>({
-        description: description || "시연용 식단 이미지",
+      const result = await analyzeDiet<Record<string, unknown>>({
+        description: description || "기록된 식단 이미지",
         meal_time: new Date().toISOString(),
       });
       setAnalysisResult(result);
@@ -83,11 +83,11 @@ export default function DietPage() {
           </label>
           <div className="upload-box">
             <strong>이미지 업로드 영역</strong>
-            <span>현재 개발 환경에서는 예시 결과로 식단 분석 흐름을 확인할 수 있습니다.</span>
+            <span>사진을 선택하거나 식단 메모를 남기면 간편 분석 결과를 확인할 수 있습니다.</span>
           </div>
           <div className="button-row">
             <button type="submit">기록 저장</button>
-            <button type="button" onClick={dummyAnalyze}>
+            <button type="button" onClick={runDietAnalysis}>
               간편 식단 분석
             </button>
           </div>
