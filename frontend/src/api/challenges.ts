@@ -1,9 +1,17 @@
 import { apiRequest } from "./client";
 
-export async function listChallenges<T>(params: { category?: string; limit?: number; offset?: number } = {}): Promise<T> {
+export async function listChallenges<T>(
+  params: { category?: string; challengeType?: string; targetDisease?: string; limit?: number; offset?: number } = {},
+): Promise<T> {
   const query = new URLSearchParams();
   if (params.category) {
     query.set("category", params.category);
+  }
+  if (params.challengeType) {
+    query.set("challenge_type", params.challengeType);
+  }
+  if (params.targetDisease) {
+    query.set("target_disease", params.targetDisease);
   }
   if (params.limit !== undefined) {
     query.set("limit", String(params.limit));
