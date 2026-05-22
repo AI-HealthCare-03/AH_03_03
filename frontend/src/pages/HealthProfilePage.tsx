@@ -212,7 +212,7 @@ function getReadOnlyValue(form: HealthProfileFormState, key: keyof HealthProfile
 }
 
 function formFromRecord(record: HealthRecord | null, userGender?: string | null, userBirth?: string | null): HealthProfileFormState {
-  const walkingDays = toStringValue(record?.walking_days_per_week ?? record?.exercise_days_per_week);
+  const walkingDays = toStringValue(record?.walking_days_per_week);
   const strengthDays = toStringValue(record?.strength_days_per_week);
   return {
     ...emptyForm,
@@ -239,14 +239,14 @@ function formFromRecord(record: HealthRecord | null, userGender?: string | null,
     smoking_status: normalizeCode(
       record?.smoking_status,
       ["NON_SMOKER", "PAST_SMOKER", "CURRENT_SMOKER"],
-      record?.is_smoker ? "CURRENT_SMOKER" : "NON_SMOKER",
+      "NON_SMOKER",
     ),
     drinking_frequency: normalizeCode(
       record?.drinking_frequency,
       ["RARE", "MONTHLY_2_4", "WEEKLY_2_3", "WEEKLY_4_PLUS"],
-      record?.drinks_alcohol ? "WEEKLY_2_3" : "RARE",
+      "RARE",
     ),
-    drinking_amount: toStringValue(record?.drinking_amount) || (record?.drinks_alcohol ? "THREE_TO_SIX" : "NONE"),
+    drinking_amount: toStringValue(record?.drinking_amount),
     walking_days: walkingDays,
     strength_days: strengthDays,
   };

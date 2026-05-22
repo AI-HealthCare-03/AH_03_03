@@ -94,9 +94,6 @@ class HealthRecordResponse(BaseSerializerModel):
     drinking_amount: str | None
     walking_days_per_week: int | None
     strength_days_per_week: int | None
-    is_smoker: bool | None
-    drinks_alcohol: bool | None
-    exercise_days_per_week: int | None
     sleep_hours: Decimal | None
     measured_at: datetime
     created_at: datetime
