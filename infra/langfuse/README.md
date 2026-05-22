@@ -105,6 +105,27 @@ LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 ```
 
+우리 서비스도 Docker compose로 실행하고 Langfuse와 같은 서버에서 통신하려면 external network를 공유한다.
+
+```bash
+docker network create ai-health-shared
+```
+
+`infra/docker/docker-compose.dev.yml`과 `infra/langfuse/docker-compose.yml`은 모두 `ai-health-shared`를 사용하도록 구성되어 있다.
+이 네트워크는 `fastapi`/`ai-worker`가 Langfuse Web에 HTTP로 접근하기 위한 통로일 뿐이며, Postgres/Redis를 공유하지 않는다.
+
+Docker network 내부에서 접근할 때:
+
+```env
+LANGFUSE_HOST=http://langfuse-web:3000
+```
+
+호스트에서 직접 접근할 때:
+
+```env
+LANGFUSE_HOST=http://localhost:3000
+```
+
 현재 작업은 Langfuse 실행 인프라와 문서화까지만 포함한다.
 
 후속 작업에서 `app/` 또는 `ai_worker/`에 Langfuse SDK 연동을 추가한다.

@@ -155,11 +155,38 @@ PR 규칙:
 uv sync --group app --group dev
 ```
 
-Docker Compose로 전체 실행:
+Docker Compose로 기존 루트 스택 실행:
 
 ```bash
 docker compose up -d --build
 ```
+
+개발 서버용 Docker 전체 스택 실행:
+
+```bash
+docker network create ai-health-shared
+docker compose -f infra/docker/docker-compose.dev.yml up -d --build
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+```
+
+접속:
+
+- 웹/Nginx: `http://localhost:8080`
+- API Docs: `http://localhost:8080/api/docs`
+- FastAPI 직접 접근: `http://localhost:8000`
+
+Docker 개발 스택은 `frontend`, `nginx`, `fastapi`, `ai-worker`, `postgres`, `redis`를 포함한다.
+`frontend`는 Docker build 단계에서 정적 파일을 만들고 내부 Nginx로 서빙하며, 바깥 `nginx`가 `/`를 frontend로, `/api/`를 FastAPI로 proxy한다.
+
+Langfuse는 `infra/langfuse/docker-compose.yml`로 별도 실행한다. 우리 서비스와 Langfuse를 같은 Docker 서버에서 연결해야 하면 `ai-health-shared` external network를 공유한다. 이 네트워크는 HTTP 접근용이며, 우리 서비스 Postgres/Redis와 Langfuse Postgres/Redis는 공유하지 않는다.
+
+```bash
+cd infra/langfuse
+cp .env.example .env
+docker compose up -d
+```
+
+Docker network 내부에서 Langfuse를 볼 때는 `LANGFUSE_HOST=http://langfuse-web:3000`, 호스트에서 직접 접근할 때는 `LANGFUSE_HOST=http://localhost:3000`을 사용한다. Langfuse SDK 연동은 후속 작업이다.
 
 FastAPI 로컬 직접 실행:
 

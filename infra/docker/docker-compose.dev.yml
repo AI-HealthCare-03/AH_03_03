@@ -1,12 +1,35 @@
+name: ai-health-dev
+
 services:
-  redis:
-    image: redis:alpine
-    container_name: redis
-    restart: always
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai-health-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ai_health}
+      POSTGRES_USER: ${DB_USER:-ozcoding}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      TZ: Asia/Seoul
+    ports:
+      - "${DB_EXPOSE_PORT:-5432}:5432"
+    volumes:
+      - ai_health_dev_postgres_data:/var/lib/postgresql/data
     networks:
-      - ws
-    expose:
-      - "6379"
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ozcoding} -d ${DB_NAME:-ai_health}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-health-dev-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_EXPOSE_PORT:-6379}:6379"
+    networks:
+      - app
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -14,50 +37,36 @@ services:
       retries: 5
       start_period: 5s
 
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: postgres
-    restart: always
-    environment:
-      POSTGRES_DB: ${DB_NAME:-ai_health}
-      POSTGRES_USER: ${DB_USER:-ozcoding}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
-      TZ: Asia/Seoul
-    networks:
-      - ws
-    expose:
-      - "5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ozcoding} -d ${DB_NAME:-ai_health}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   fastapi:
-    container_name: fastapi
-    image: ${DOCKER_USER:-ozcodingschool}/${DOCKER_REPOSITORY:-ai-health}:app-${APP_VERSION:-v1.0.0}
+    container_name: ai-health-dev-fastapi
+    build:
+      context: ../..
+      dockerfile: app/Dockerfile
+    command: uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
-      ENV: ${ENV:-prod}
+      ENV: ${ENV:-local}
       SECRET_KEY: ${SECRET_KEY:-PLEASE_CHANGE_ME}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-localhost}
-      DB_HOST: ${DB_HOST:-postgres}
-      DB_PORT: ${DB_PORT:-5432}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173}
+      DB_HOST: postgres
+      DB_PORT: 5432
       DB_USER: ${DB_USER:-ozcoding}
       DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
       DB_NAME: ${DB_NAME:-ai_health}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      TWILIO_ENABLED: ${TWILIO_ENABLED:-false}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-    restart: always
-    expose:
-      - "8000"
+    volumes:
+      - ../../app:/app/app
+    ports:
+      - "8000:8000"
     networks:
-      - ws
+      - app
       - ai-health-shared
     depends_on:
       postgres:
@@ -78,26 +87,29 @@ services:
       start_period: 20s
 
   ai-worker:
-    container_name: ai-worker
-    image: ${DOCKER_USER:-ozcodingschool}/${DOCKER_REPOSITORY:-ai-health}:ai-${AI_WORKER_VERSION:-v1.0.0}
+    container_name: ai-health-dev-ai-worker
+    build:
+      context: ../..
+      dockerfile: ai_worker/Dockerfile
     environment:
-      ENV: ${ENV:-prod}
+      ENV: ${ENV:-local}
       SECRET_KEY: ${SECRET_KEY:-PLEASE_CHANGE_ME}
-      DB_HOST: ${DB_HOST:-postgres}
-      DB_PORT: ${DB_PORT:-5432}
+      DB_HOST: postgres
+      DB_PORT: 5432
       DB_USER: ${DB_USER:-ozcoding}
       DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
       DB_NAME: ${DB_NAME:-ai_health}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-    restart: always
-    mem_limit: 4G
+    volumes:
+      - ../../ai_worker:/app/ai_worker
+    restart: unless-stopped
     networks:
-      - ws
+      - app
       - ai-health-shared
     depends_on:
       postgres:
@@ -106,61 +118,43 @@ services:
         condition: service_healthy
 
   frontend:
-    container_name: frontend
-    image: ${DOCKER_USER:-ozcodingschool}/${DOCKER_REPOSITORY:-ai-health}:frontend-${FRONTEND_VERSION:-v1.0.0}
-    restart: always
+    container_name: ai-health-dev-frontend
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
     expose:
       - "80"
     networks:
-      - ws
+      - app
     depends_on:
       fastapi:
         condition: service_healthy
 
   nginx:
-    container_name: nginx
-    image: nginx:latest
+    container_name: ai-health-dev-nginx
+    image: nginx:1.27-alpine
+    restart: unless-stopped
     volumes:
-      - ../nginx/prod_http.conf:/etc/nginx/conf.d/default.conf:ro
-      - static_volume:/vol/web/static
-      - media_volume:/vol/web/media
-      - certbot-conf:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
+      - ../nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "80:80"
+      - "${NGINX_HTTP_PORT:-8080}:80"
     networks:
-      - ws
+      - app
     depends_on:
       frontend:
         condition: service_started
       fastapi:
         condition: service_healthy
 
-  certbot:
-    image: certbot/certbot
-    container_name: auto-certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 48h & wait $${!}; done;'"
-    volumes:
-      - certbot-conf:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-    depends_on:
-      - nginx
-
 volumes:
-  postgres_data:
-    name: postgres_data
-  static_volume:
-    name: static_volume
-  media_volume:
-    name: media_volume
-  certbot-conf:
-    name: certbot-conf
-  certbot-www:
-    name: certbot-www
+  ai_health_dev_postgres_data:
 
 networks:
-  ws:
-    name: ws
+  app:
+    name: ai-health-dev-app
     driver: bridge
   ai-health-shared:
     external: true

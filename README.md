@@ -167,6 +167,82 @@ Seed 포함 데이터:
 
 ### 1. 로컬 및 개발 환경
 
+#### Docker 개발 서버 스택 실행
+
+개발 서버처럼 프론트 정적 빌드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 Docker로 띄우려면 별도 compose 파일을 사용합니다.
+Vite `npm run dev` 로컬 개발 흐름은 계속 사용할 수 있지만, 통합 실행과 배포 전 점검은 아래 구성을 기준으로 합니다.
+
+```bash
+# Langfuse와 통신할 수 있는 공유 네트워크입니다. DB/Redis 공유 용도가 아닙니다.
+docker network create ai-health-shared
+
+# 개발 서버용 전체 스택 실행
+docker compose -f infra/docker/docker-compose.dev.yml up -d --build
+
+# 로컬 DB schema/seed 보강은 호스트에서 실행합니다.
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+```
+
+접속 주소:
+
+- 웹/Nginx: `http://localhost:8080`
+- API Docs: `http://localhost:8080/api/docs`
+- FastAPI 직접 접근: `http://localhost:8000/api/v1/system/health`
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+
+구성:
+
+- `frontend`: `frontend/Dockerfile` multi-stage build로 React/Vite 정적 파일을 생성하고 내부 Nginx로 서빙합니다.
+- `nginx`: `/` 요청은 `frontend`로, `/api/` 요청은 `fastapi:8000`으로 proxy합니다.
+- `fastapi`: Docker 내부에서는 `DB_HOST=postgres`, `REDIS_HOST=redis` 기준으로 실행합니다.
+- `ai-worker`: 현재 큐/모델 로직은 연결하지 않고 worker 컨테이너 생존 구조만 유지합니다.
+- `postgres`, `redis`: 우리 서비스 전용입니다. Langfuse의 Postgres/Redis와 공유하지 않습니다.
+
+운영 compose(`infra/docker/docker-compose.prod.yml`)도 동일한 분리 구조를 따릅니다. 운영에서는 `app`, `ai`, `frontend` 이미지를 각각 빌드/푸시한 뒤 compose가 해당 이미지를 받아 실행하는 방식을 기준으로 합니다.
+
+종료:
+
+```bash
+docker compose -f infra/docker/docker-compose.dev.yml down
+```
+
+볼륨까지 초기화:
+
+```bash
+docker compose -f infra/docker/docker-compose.dev.yml down -v
+```
+
+#### Langfuse 별도 실행
+
+Langfuse는 `infra/langfuse` 아래 별도 compose로 실행합니다. 우리 서비스와 같은 서버에서 Docker로 띄울 수 있지만, Postgres/Redis는 반드시 분리합니다.
+
+```bash
+docker network create ai-health-shared
+cd infra/langfuse
+cp .env.example .env
+docker compose config
+docker compose up -d
+```
+
+접속 주소:
+
+- Langfuse: `http://localhost:3000`
+
+Docker shared network에서 우리 `fastapi`/`ai-worker`가 Langfuse에 접근할 때는 아래 값을 사용합니다.
+
+```env
+LANGFUSE_HOST=http://langfuse-web:3000
+```
+
+호스트에서 직접 FastAPI를 실행하는 경우에는 아래 값을 사용합니다.
+
+```env
+LANGFUSE_HOST=http://localhost:3000
+```
+
+현재는 Langfuse 실행 인프라와 네트워크만 준비되어 있으며, `app/` 또는 `ai_worker/`의 Langfuse SDK 연동은 후속 작업입니다.
+
 #### Docker Compose로 전체 스택 실행
 
 모든 서비스(API, Worker, DB, Redis, Nginx)를 한 번에 실행합니다.
