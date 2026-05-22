@@ -36,8 +36,8 @@ warnings.filterwarnings("ignore")
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-DATA_PATH: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
-MODEL_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs/optuna_DM_FE_v3_age5"
+DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
+MODEL_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "optuna_DM_FE_v3_age5")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────

@@ -189,9 +189,9 @@ def main() -> None:
 
     df = add_clinical_labels(df)
 
-    # 샘플링
-    df = df.sample(n=SAMPLE_N, random_state=SEED).reset_index(drop=True)
-    print(f"\n[2] 샘플링 완료 | {SAMPLE_N:,}명")
+    # # 샘플링 (전체 돌릴땐 주석)
+    # df = df.sample(n=SAMPLE_N, random_state=SEED).reset_index(drop=True)
+    # print(f"\n[2] 샘플링 완료 | {SAMPLE_N:,}명")
 
     # 스케일링
     scaler = StandardScaler()

@@ -29,7 +29,7 @@ plt.rcParams["axes.unicode_minus"] = False
 # ================================================================
 # ★ 경로 설정 — 여기만 수정
 # ================================================================
-DATA_DIR = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data"
+DATA_DIR = str(Path(__file__).parent.parent.parent / "ai_worker" / "data")
 PLOT_DIR = os.path.join(DATA_DIR, "plots")
 os.makedirs(PLOT_DIR, exist_ok=True)
 

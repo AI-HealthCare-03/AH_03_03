@@ -16,8 +16,8 @@ from sklearn.metrics import (
 )
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-BASE_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/LGB18~24/outputs"
-CAT_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT18~24/outputs"
+BASE_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs")
+CAT_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs")
 
 RECALL_MIN: float = 0.87
 THRESHOLD_RANGE: NDArray[np.float64] = np.arange(0.30, 0.71, 0.01)

@@ -17,8 +17,8 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 
 # ── 경로 설정 ─────────────────────────────────────────────────
-BASE_DIR: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/LGB18~24/outputs"
-DATA_PATH: str = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data/hn_all_preprocessed.csv"
+BASE_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs")
+DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
 SEED: int = 42
 
 # ── 타겟별 설정 ───────────────────────────────────────────────

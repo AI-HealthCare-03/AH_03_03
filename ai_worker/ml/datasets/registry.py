@@ -12,7 +12,7 @@ import os
 # 데이터셋 등록
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-_BASE = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/data"
+_BASE = str(Path(__file__).parent.parent.parent / "ai_worker" / "data")
 
 DATASETS: dict[str, str] = {
     "hn_all": os.path.join(_BASE, "hn_all_preprocessed.csv"),  # hn18~24 통합 (현재 실험 기준)
