@@ -7,13 +7,6 @@ from app.core.validators import validate_birthday, validate_password, validate_p
 from app.models.users import Gender
 
 
-def validate_required_text(value: str) -> str:
-    stripped = value.strip()
-    if not stripped:
-        raise ValueError("필수 입력값입니다.")
-    return stripped
-
-
 class SignUpRequest(BaseModel):
     login_id: Annotated[str | None, Field(None, min_length=6, max_length=40)] = None
     email: Annotated[
@@ -26,7 +19,7 @@ class SignUpRequest(BaseModel):
     birth_date: Annotated[date, AfterValidator(validate_birthday)]
     phone_number: Annotated[str, AfterValidator(validate_phone_number)]
     nickname: Annotated[str | None, Field(None, max_length=30)] = None
-    address: Annotated[str, Field(min_length=1, max_length=255), AfterValidator(validate_required_text)]
+    address: Annotated[str | None, Field(None, max_length=255)] = None
     profile_image_url: Annotated[str | None, Field(None, max_length=500)] = None
     sensitive_data_agreed: bool = False
     marketing_agreed: bool = False
