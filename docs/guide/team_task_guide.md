@@ -41,9 +41,23 @@
 
 ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않는다. 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않는다. API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정한다.
 
+## 풀서비스 요구사항 정리 기준
+
+풀서비스 1차 범위는 `docs/design/full_service_scope.md`를 기준으로 관리한다.
+코치님/조교님 피드백 반영 기준은 `docs/design/requirements_refactor_notes.md`를 따른다.
+
+- 요구사항 정의서는 사용자 관점 기능 중심으로 정리한다.
+- NFR, 아키텍처, 재시도, 공통 컴포넌트, worker/queue 같은 구현 세부사항은 별도 설계 문서로 분리한다.
+- 회원가입은 기본정보 중심으로 유지하고, 건강 수치와 모델 입력값은 가입 후 건강정보 입력 화면에서 받는다.
+- 이메일 인증은 유지한다.
+- 소셜 로그인과 웨어러블 연동은 1차 범위 제외/보류로 둔다.
+- 휴대폰 SMS 인증은 Twilio Verify 기반 구현 대상으로 유지한다.
+- 휴대폰 번호 중복확인은 유지 가능하다.
+- RAG, ML, CV, 알림, 가족, 관리자, 모니터링은 풀서비스 구현 대상으로 유지하되 후속 로드맵으로 관리한다.
+
 ## 팀원별 담당 영역
 
-Backend API 담당:
+FastAPI 담당:
 
 - 인증/사용자 API
 - 건강정보 API
@@ -57,25 +71,40 @@ ML 담당:
 - 만성질환 위험도 예측
 - tabular feature 전처리
 - SHAP 또는 feature contribution 계산
+- recall, F1, confusion matrix 중심 평가
+- model version, threshold, feature schema 관리
 
 CV 담당:
 
 - 이미지 분석
 - 식단 OCR 또는 분류 실험
-- MVP 포함 여부에 따른 독립 실험 코드 관리
+- 건강검진표 OCR
+- 복약/처방전 OCR
+- 식단 이미지 기반 간편 분석과 사용자 보정 흐름
 
 LLM/RAG 담당:
 
 - LLM 호출 방식 검토
 - 프롬프트 설계
 - 문서 chunking, embedding, retrieval 실험
-- MVP 범위 밖 기능은 실서비스 DB와 분리해서 관리
+- LangChain/LangGraph, embedding model, pgvector/FAISS/Chroma 후보 검토
+- RAGAS/LangSmith/Langfuse 평가/관측 전략 검토
 
 Pipeline(조장이 주말에 좀 작업좀 할께요)
 
 - 건강위험 분석 전체 흐름 정리
 - ML 결과, SHAP factor, 챌린지 추천 연결
 - Backend와 AI Worker 사이 입출력 형식 조율
+
+Frontend 담당:
+
+- 회원가입/로그인 UX
+- 건강정보 입력 UX
+- 분석 결과/대시보드
+- 챌린지/식단/복약/알림 화면
+- 접근성/반응형 고도화
+
+먼저 완료한 인원은 FastAPI 또는 Frontend 병목 작업을 지원한다.
 
 ## MVP 포함 범위
 
@@ -150,3 +179,41 @@ Lint:
 uv run ruff check .
 uv run ruff format . --check
 ```
+
+## 웹 MVP 로컬 시연 흐름
+
+현재 `feature/kdu-web`의 웹 MVP는 FastAPI가 건강 분석, OCR, 챗봇 응답을 동기 더미 로직으로 처리한다. 실제 ML/CV/LLM 모델은 아직 붙이지 않았고, 프론트 화면 흐름과 API 계약을 확인하기 위한 시연용 구조다.
+
+`Architecture_ver1.drawio`의 `async_jobs`, Redis Stream, AI Worker, SSE, Notification Worker, Report Worker는 후속 모델 연동/운영 단계에서 도입한다. 지금 로컬 MVP 테스트에서는 PostgreSQL, FastAPI, React/Vite만 먼저 띄우면 된다.
+
+로컬 실행 순서:
+
+```bash
+docker compose up -d postgres
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+DB_HOST=localhost uv run uvicorn app.main:app --reload
+cd frontend
+npm install
+npm run dev
+```
+
+데모 계정:
+
+- `demo@example.com` / `Demo1234!`
+- `demo_high@example.com` / `Demo1234!`
+
+Seed 실행 내용:
+
+- `scripts/init_local_dev_db.py`: 로컬 MVP용 Tortoise schema 생성
+- `scripts/seed_mvp_challenges.py`: 챌린지 마스터 생성
+- `scripts/seed_mvp_faqs.py`: FAQ 생성
+- `scripts/seed_demo_users.py`: 데모 사용자와 건강정보/분석/챌린지/식단/복약/알림 데이터 생성
+- `scripts/setup_local_mvp_db.py`: 위 흐름 통합 실행
+
+주의:
+
+- 이 흐름은 로컬 MVP 테스트 전용이다.
+- Aerich migration에 old format 이슈가 있으므로 빈 로컬 DB는 `setup_local_mvp_db.py`로 보강한다.
+- 운영/공유 DB는 migration 파일 정리 후 Aerich 기준으로 적용한다.
+- 루트 `.env`와 `frontend/.env`는 구분해서 관리한다.
+- Firebase Auth와 소셜 로그인은 1차 풀서비스 범위에서 제외/보류한다. 기본 인증은 FastAPI JWT Auth와 이메일 인증이다.
