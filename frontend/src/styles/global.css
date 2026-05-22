@@ -1094,6 +1094,22 @@ pre {
   margin-top: 14px;
 }
 
+.sub-tabs {
+  margin-top: 14px;
+}
+
+.notification-management-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  margin-top: 16px;
+}
+
+.notification-list-section {
+  min-width: 0;
+}
+
 .notification-item {
   align-items: center;
   background: var(--color-surface);
@@ -1136,6 +1152,27 @@ pre {
 .notification-item p {
   color: var(--color-muted);
   margin: 6px 0;
+}
+
+.notification-action-stack {
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+}
+
+.notification-log-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.notification-log-meta {
+  color: var(--color-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 8px 14px;
 }
 
 .mini-card {
@@ -1428,6 +1465,11 @@ pre {
 }
 
 .badge-reference {
+  background: var(--color-muted-surface);
+  color: var(--color-muted);
+}
+
+.badge-muted {
   background: var(--color-muted-surface);
   color: var(--color-muted);
 }
@@ -2483,6 +2525,7 @@ pre {
   .shortcut-grid,
   .todo-card-grid,
   .tracking-grid,
+  .notification-management-grid,
   .metric-grid {
     grid-template-columns: 1fr;
   }
@@ -2536,6 +2579,11 @@ pre {
   .notification-item > button {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .notification-action-stack {
+    grid-column: 2;
+    justify-items: start;
   }
 
   .sidebar {
