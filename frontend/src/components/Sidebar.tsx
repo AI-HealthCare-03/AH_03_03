@@ -21,23 +21,23 @@ const links = [
 export default function Sidebar() {
   const { backendUser } = useAuth();
   const showAdminLink = isAdminConsoleRole(backendUser?.role);
+  const getLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `sidebar-link${isActive ? " sidebar-link-active" : ""}`;
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-title">
-        <span className="sidebar-title-icon">H</span>
-        <span className="sidebar-label">HealthCare</span>
-      </div>
       {links.map((link) => (
-        <NavLink key={link.to} to={link.to}>
-          <span className="sidebar-icon">{link.icon}</span>
-          <span className="sidebar-label">{link.label}</span>
+        <NavLink aria-label={link.label} className={getLinkClass} key={link.to} title={link.label} to={link.to}>
+          <span aria-hidden="true" className="sidebar-active-indicator" />
+          <span className="sidebar-link-icon">{link.icon}</span>
+          <span className="sidebar-link-label">{link.label}</span>
         </NavLink>
       ))}
       {showAdminLink && (
-        <NavLink to="/admin">
-          <span className="sidebar-icon">🛡️</span>
-          <span className="sidebar-label">관리자 콘솔</span>
+        <NavLink aria-label="관리자 콘솔" className={getLinkClass} title="관리자 콘솔" to="/admin">
+          <span aria-hidden="true" className="sidebar-active-indicator" />
+          <span className="sidebar-link-icon">🛡️</span>
+          <span className="sidebar-link-label">관리자 콘솔</span>
         </NavLink>
       )}
     </aside>

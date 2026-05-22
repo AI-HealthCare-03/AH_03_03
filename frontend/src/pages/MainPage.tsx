@@ -138,15 +138,6 @@ const categoryLabel: Record<string, string> = {
   WEIGHT: "체중 관리",
 };
 
-const featureShortcuts = [
-  { icon: "🧭", title: "건강 위험도 분석", description: "입력한 건강정보로 위험도를 확인합니다.", to: "/analysis" },
-  { icon: "📄", title: "검진표 OCR 입력", description: "검진표 수치를 빠르게 정리합니다.", to: "/ocr/exam" },
-  { icon: "🥗", title: "식단 이미지 분석", description: "식단 사진으로 영양 요약을 확인합니다.", to: "/diets" },
-  { icon: "🚶", title: "챌린지", description: "작은 건강 습관을 오늘부터 시작합니다.", to: "/challenges" },
-  { icon: "💊", title: "복약/영양제", description: "복약 정보를 기록하고 확인합니다.", to: "/medications" },
-  { icon: "💬", title: "AI 건강 상담", description: "건강 관리 질문을 바로 남깁니다.", to: "/chatbot" },
-];
-
 function asRecord(value: unknown): AnyRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as AnyRecord) : {};
 }
@@ -372,6 +363,7 @@ export default function MainPage() {
     const latestDietScore = recentDietRecords[0]?.diet_score ?? null;
     const effectiveAnalysisResults =
       analysisResults.length > 0 ? analysisResults : latestAnalysis.analysis_type ? [latestAnalysis] : [];
+    const hasAnalysisResults = effectiveAnalysisResults.length > 0;
     const resultByType = new Map(
       effectiveAnalysisResults.map((result) => [
         String(result.analysis_type ?? ""),
@@ -453,14 +445,6 @@ export default function MainPage() {
             .filter((challenge): challenge is AnyRecord => Boolean(challenge))
             .slice(0, 3)
         : challenges.slice(0, 3);
-    const quickActions = [
-      featureShortcuts[0],
-      featureShortcuts[1],
-      featureShortcuts[2],
-      featureShortcuts[3],
-      featureShortcuts[5],
-    ];
-
     return (
       <div className="page-stack">
         <div className="main-dashboard-hero">
@@ -468,28 +452,28 @@ export default function MainPage() {
             <h1>안녕하세요, {backendUser?.nickname ?? backendUser?.name ?? "회원"}님</h1>
             <p>오늘의 건강 관리 상태를 확인해보세요.</p>
           </div>
-          <div className="button-row">
-            <Link className="button" to={basicReady === false ? "/health" : "/analysis"}>
-              건강 위험도 분석하기
+          <div className="home-action-panel">
+            <Link className="home-action-card" to="/analysis">
+              <span className="home-action-card__icon">🧭</span>
+              <span>
+                <strong className="home-action-card__title">건강위험도 분석하기</strong>
+                <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 위험도 요약을 확인합니다.</em>
+              </span>
             </Link>
-            <Link className="button secondary" to="/diets">
-              식단 이미지 분석하기
+            <Link className="home-action-card" to="/diets">
+              <span className="home-action-card__icon">🥗</span>
+              <span>
+                <strong className="home-action-card__title">식단 이미지 분석하기</strong>
+                <em className="home-action-card__description">식단 이미지를 추가하면 식단 분석 결과를 확인할 수 있습니다.</em>
+              </span>
             </Link>
+            <div className="home-action-links">
+              <Link to="/health">건강정보 입력</Link>
+              <Link to="/ocr/exam">검진표 OCR 추가</Link>
+            </div>
           </div>
         </div>
         {sectionError ? <div className="empty-state">{sectionError}</div> : null}
-
-        <section className="quick-action-section">
-          <span>빠른 실행</span>
-          <div className="quick-action-row">
-            {quickActions.map((feature) => (
-              <Link className="quick-action-chip" key={feature.title} to={feature.to}>
-                <span>{feature.icon}</span>
-                {feature.title.replace("건강 위험도 ", "").replace(" 이미지", "")}
-              </Link>
-            ))}
-          </div>
-        </section>
 
         <section className="main-dashboard-section">
           <div className="section-heading compact">
@@ -690,33 +674,54 @@ export default function MainPage() {
           </Card>
         </div>
 
-        <Card title="위험도 간단 요약">
-          {overallRiskPercent > 0 && (
-            <div className="progress-bar" style={{ marginBottom: 14 }}>
-              <div
-                className={`progress-fill ${overallRiskPercent >= 70 ? "danger-fill" : overallRiskPercent >= 45 ? "warning-fill" : "success-fill"}`}
-                style={toPercentStyle(overallRiskPercent)}
-              />
+        <Card title={hasAnalysisResults ? "위험도 요약" : "간편 분석 시작"}>
+          {hasAnalysisResults ? (
+            <>
+              {overallRiskPercent > 0 && (
+                <div className="progress-bar" style={{ marginBottom: 14 }}>
+                  <div
+                    className={`progress-fill ${overallRiskPercent >= 70 ? "danger-fill" : overallRiskPercent >= 45 ? "warning-fill" : "success-fill"}`}
+                    style={toPercentStyle(overallRiskPercent)}
+                  />
+                </div>
+              )}
+              <div className="metric-grid">
+                <div>
+                  <span>당뇨</span>
+                  <strong>{formatRisk(resultByType.get("DIABETES"))}</strong>
+                </div>
+                <div>
+                  <span>고혈압</span>
+                  <strong>{formatRisk(resultByType.get("HYPERTENSION"))}</strong>
+                </div>
+                <div>
+                  <span>종합 위험도</span>
+                  <strong>{buildOverallRisk(riskLevels)}</strong>
+                </div>
+                <div>
+                  <span>최근 분석일</span>
+                  <strong>{formatDate(latestAnalysis.analyzed_at ?? latestAnalysis.created_at)}</strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state analysis-empty-state">
+              <strong>아직 분석 결과가 없습니다.</strong>
+              <p>건강정보를 입력하고 간편 분석을 실행하면 현재 건강정보 기반 위험도 요약을 볼 수 있습니다.</p>
+              <p>검진표를 추가하면 정밀 분석에 활용할 수 있습니다.</p>
+              <div className="button-row">
+                <Link className="button" to="/analysis">
+                  간편 분석 실행하기
+                </Link>
+                <Link className="button secondary" to="/health">
+                  건강정보 입력하기
+                </Link>
+                <Link className="button secondary" to="/ocr/exam">
+                  검진표 OCR 추가
+                </Link>
+              </div>
             </div>
           )}
-          <div className="metric-grid">
-            <div>
-              <span>당뇨</span>
-              <strong>{formatRisk(resultByType.get("DIABETES"))}</strong>
-            </div>
-            <div>
-              <span>고혈압</span>
-              <strong>{formatRisk(resultByType.get("HYPERTENSION"))}</strong>
-            </div>
-            <div>
-              <span>종합 위험도</span>
-              <strong>{buildOverallRisk(riskLevels)}</strong>
-            </div>
-            <div>
-              <span>최근 분석일</span>
-              <strong>{formatDate(latestAnalysis.analyzed_at ?? latestAnalysis.created_at)}</strong>
-            </div>
-          </div>
         </Card>
 
         <Card
