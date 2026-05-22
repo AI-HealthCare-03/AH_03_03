@@ -14,28 +14,56 @@ BEST_GAMMA = 1.02
 SEED = 42
 
 CONT_COLS = [
-    "신장(5cm단위)", "체중(5kg단위)", "허리둘레",
-    "수축기혈압", "이완기혈압", "식전혈당(공복혈당)",
-    "총콜레스테롤", "트리글리세라이드", "HDL콜레스테롤", "LDL콜레스테롤",
-    "혈색소", "혈청크레아티닌", "혈청지오티(AST)", "혈청지피티(ALT)", "감마지티피",
+    "신장(5cm단위)",
+    "체중(5kg단위)",
+    "허리둘레",
+    "수축기혈압",
+    "이완기혈압",
+    "식전혈당(공복혈당)",
+    "총콜레스테롤",
+    "트리글리세라이드",
+    "HDL콜레스테롤",
+    "LDL콜레스테롤",
+    "혈색소",
+    "혈청크레아티닌",
+    "혈청지오티(AST)",
+    "혈청지피티(ALT)",
+    "감마지티피",
 ]
 CAT_COLS = ["성별코드", "연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
 
 CLINICAL_BOUNDS = {
-    "수축기혈압": (50, 300), "이완기혈압": (20, 200),
-    "식전혈당(공복혈당)": (30, 1000), "총콜레스테롤": (50, 1000),
-    "트리글리세라이드": (10, 6000), "HDL콜레스테롤": (10, 200),
-    "LDL콜레스테롤": (10, 1000), "혈색소": (3, 25),
-    "혈청크레아티닌": (0.1, 50), "혈청지오티(AST)": (5, 5000),
-    "혈청지피티(ALT)": (5, 5000), "감마지티피": (1, 5000),
+    "수축기혈압": (50, 300),
+    "이완기혈압": (20, 200),
+    "식전혈당(공복혈당)": (30, 1000),
+    "총콜레스테롤": (50, 1000),
+    "트리글리세라이드": (10, 6000),
+    "HDL콜레스테롤": (10, 200),
+    "LDL콜레스테롤": (10, 1000),
+    "혈색소": (3, 25),
+    "혈청크레아티닌": (0.1, 50),
+    "혈청지오티(AST)": (5, 5000),
+    "혈청지피티(ALT)": (5, 5000),
+    "감마지티피": (1, 5000),
     "허리둘레": (40, 200),
 }
 
 DROP_COLS = [
-    "치아우식증유무", "결손치 유무", "치아마모증유무", "제3대구치(사랑니) 이상",
-    "치석", "기준년도", "가입자일련번호", "시도코드", "구강검진수검여부",
-    "시력(좌)", "시력(우)", "청력(좌)", "청력(우)",
+    "치아우식증유무",
+    "결손치 유무",
+    "치아마모증유무",
+    "제3대구치(사랑니) 이상",
+    "치석",
+    "기준년도",
+    "가입자일련번호",
+    "시도코드",
+    "구강검진수검여부",
+    "시력(좌)",
+    "시력(우)",
+    "청력(좌)",
+    "청력(우)",
 ]
+
 
 def remove_outliers_clinical(df):
     df = df.copy()
@@ -48,6 +76,7 @@ def remove_outliers_clinical(df):
             print(f"  {col}: {outlier_cnt}개 제거 (허용범위: {lower}~{upper})")
     return df
 
+
 def add_clinical_labels(df):
     df["고혈압_기준"] = ((df["수축기혈압"] >= 140) | (df["이완기혈압"] >= 90)).astype(int)
     df["당뇨_기준"] = (df["식전혈당(공복혈당)"] >= 126).astype(int)
@@ -56,6 +85,7 @@ def add_clinical_labels(df):
     df["비만_기준"] = (df["BMI"] >= 25).astype(int)
     return df
 
+
 def analyze_clusters(df, labels):
     df = df.copy()
     df["cluster"] = labels
@@ -63,6 +93,7 @@ def analyze_clusters(df, labels):
     summary = df.groupby("cluster")[clinical_cols].mean().round(3) * 100
     summary.insert(0, "샘플수", df["cluster"].value_counts().sort_index())
     return summary
+
 
 def main():
     print("[0] 데이터 로드")
@@ -97,8 +128,12 @@ def main():
 
     print(f"\n[최종 군집화] K={K} | gamma={BEST_GAMMA} | 전체 {len(df):,}명")
     kp = KPrototypes(
-        n_clusters=K, init="Huang", n_init=5,
-        gamma=BEST_GAMMA, random_state=SEED, verbose=1,
+        n_clusters=K,
+        init="Huang",
+        n_init=5,
+        gamma=BEST_GAMMA,
+        random_state=SEED,
+        verbose=1,
     )
     df["cluster"] = kp.fit_predict(X, categorical=cat_indices)
 
@@ -112,10 +147,11 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     summary.to_csv(OUTPUT_DIR / "final_cluster_summary.csv")
-    df[["cluster"] + CONT_COLS_FINAL + CAT_COLS + ["고혈압_기준", "당뇨_기준", "이상지질혈증_기준", "비만_기준"]].to_csv(
-        OUTPUT_DIR / "final_clustered_data.csv", index=False
-    )
+    df[
+        ["cluster"] + CONT_COLS_FINAL + CAT_COLS + ["고혈압_기준", "당뇨_기준", "이상지질혈증_기준", "비만_기준"]
+    ].to_csv(OUTPUT_DIR / "final_clustered_data.csv", index=False)
     print(f"\n[저장 완료] → {OUTPUT_DIR}")
+
 
 if __name__ == "__main__":
     main()

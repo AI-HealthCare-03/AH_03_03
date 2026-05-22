@@ -35,7 +35,9 @@ warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
 DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
-MODEL_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "catboost_DL_FE_v2")
+MODEL_DIR: str = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "catboost_DL_FE_v2"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────

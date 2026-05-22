@@ -39,7 +39,9 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # ── 경로 설정 ─────────────────────────────────────────────────
 DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
-MODEL_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs" / "optuna_DL_FE")
+MODEL_DIR: str = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs" / "optuna_DL_FE"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
@@ -100,19 +102,25 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     # 4. 음주위험군
     if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
+        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(
+            float
+        )
         added += ["음주위험군"]
         print("  [ON] 음주위험군: 0=비음주/1=저위험(월1회이하)/2=고위험(월2회이상)")
 
     # 5. 걷기 활동량
     if USE_WALK_LEVEL:
-        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(float)
+        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(
+            float
+        )
         added += ["걷기활동량"]
         print("  [ON] 걷기활동량: 0=비활동/1=저활동(1~3일)/2=활동(4일이상)")
 
     # 6. 근력운동 활동량
     if USE_STRENGTH:
-        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
+        df["근력활동량"] = pd.cut(
+            df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True
+        ).astype(float)
         added += ["근력활동량"]
         print("  [ON] 근력활동량: 0=비활동/1=저활동(1~2일)/2=활동(3일이상)")
 
