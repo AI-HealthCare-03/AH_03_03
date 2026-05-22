@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { createInquiry, listFaqs, listMyInquiries } from "../api/faqs";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
+import ErrorMessage from "../components/ErrorMessage";
 
 type Item = Record<string, unknown>;
 
@@ -15,28 +16,50 @@ export default function FAQPage() {
   const [content, setContent] = useState("");
   const [keyword, setKeyword] = useState("");
   const [category, setCategory] = useState("전체");
+  const [error, setError] = useState("");
+
+  const formatDate = (value: unknown) => {
+    if (!value) {
+      return "-";
+    }
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ko-KR");
+  };
 
   const load = async () => {
-    setFaqs(await listFaqs<Item[]>());
-    if (isAuthenticated) {
-      setInquiries(await listMyInquiries<Item[]>());
+    setError("");
+    try {
+      setFaqs(await listFaqs<Item[]>());
+      if (isAuthenticated) {
+        setInquiries(await listMyInquiries<Item[]>());
+      } else {
+        setInquiries([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "FAQ 또는 문의 내역을 불러오지 못했습니다.");
     }
   };
 
   useEffect(() => {
-    void load().catch(() => undefined);
+    void load();
   }, [isAuthenticated]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await createInquiry({ category: "GENERAL", title, content });
-    setTitle("");
-    setContent("");
-    await load();
+    setError("");
+    try {
+      await createInquiry({ category: "GENERAL", title, content });
+      setTitle("");
+      setContent("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "문의 등록에 실패했습니다.");
+    }
   };
 
   return (
     <div className="page-grid">
+      {error && <ErrorMessage message={error} />}
       <Card title="FAQ">
         <label className="search-box">
           FAQ 검색
@@ -63,6 +86,7 @@ export default function FAQPage() {
                 <p>{String(faq.answer)}</p>
               </details>
             ))}
+          {faqs.length === 0 && <div className="state-box">등록된 FAQ가 없습니다.</div>}
         </div>
       </Card>
       <Card
@@ -82,7 +106,25 @@ export default function FAQPage() {
         </form>
       </Card>
       <Card title="내 문의">
-        <pre>{JSON.stringify(inquiries, null, 2)}</pre>
+        <div className="card-list">
+          {!isAuthenticated && <div className="state-box">로그인 후 내 문의 내역을 확인할 수 있습니다.</div>}
+          {isAuthenticated && inquiries.length === 0 && <div className="state-box">등록된 문의가 없습니다.</div>}
+          {inquiries.map((inquiry) => (
+            <div className="mini-card" key={String(inquiry.id)}>
+              <div className="record-row">
+                <div>
+                  <strong>{String(inquiry.title ?? "문의")}</strong>
+                  <p className="muted">{String(inquiry.category ?? "GENERAL")}</p>
+                </div>
+                <span className="badge badge-reference">{String(inquiry.status ?? "PENDING")}</span>
+              </div>
+              <div className="record-meta-grid">
+                <span>작성일 {formatDate(inquiry.created_at)}</span>
+                <span>{inquiry.answer ? "답변 완료" : "답변 대기"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );

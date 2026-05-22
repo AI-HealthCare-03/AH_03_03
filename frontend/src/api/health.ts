@@ -17,9 +17,15 @@ export type HealthRecordPayload = Record<string, ApiValue> & {
   has_obesity?: boolean;
   has_dyslipidemia?: boolean;
   has_hypertension?: boolean;
-  is_smoker?: boolean;
-  drinks_alcohol?: boolean;
-  exercise_days_per_week?: number;
+  occupation_code?: string;
+  family_htn?: string;
+  family_dm?: string;
+  family_dyslipidemia?: string;
+  smoking_status?: string;
+  drinking_frequency?: string;
+  drinking_amount?: string;
+  walking_days_per_week?: number;
+  strength_days_per_week?: number;
   sleep_hours?: number;
   measured_at: string;
 };
@@ -41,6 +47,10 @@ export async function updateHealthRecord<T>(
   payload: Partial<HealthRecordPayload>,
 ): Promise<T> {
   return apiRequest<T>(`/health/records/${recordId}`, { method: "PATCH", body: payload });
+}
+
+export async function deleteHealthRecord<T>(recordId: number): Promise<T> {
+  return apiRequest<T>(`/health/records/${recordId}`, { method: "DELETE" });
 }
 
 export async function getAnalysisReadiness<T>(): Promise<T> {

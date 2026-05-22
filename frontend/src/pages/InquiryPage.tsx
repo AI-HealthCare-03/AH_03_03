@@ -78,7 +78,7 @@ export default function InquiryPage() {
             <label>
               첨부파일
               <input disabled type="file" />
-              <span className="muted">파일 첨부는 후속 구현 예정입니다.</span>
+              <span className="muted">파일 첨부는 준비 중입니다.</span>
             </label>
             <label className="toggle-row">
               <span>답변 알림 받기</span>
@@ -101,7 +101,7 @@ export default function InquiryPage() {
       </Card>
       <Card title="답변 안내">
         <p>문의 답변은 관리자 확인 후 상태가 변경됩니다.</p>
-        <p className="placeholder">실시간 상담/파일 첨부는 후속 구현 예정입니다.</p>
+        <p className="placeholder">실시간 상담/파일 첨부는 준비 중입니다.</p>
       </Card>
     </div>
   );

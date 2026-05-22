@@ -57,8 +57,12 @@ export default function LoginPage() {
           <button type="submit">로그인</button>
         </form>
         <div className="button-row" style={{ marginTop: 12 }}>
-          <span className="muted">아이디 찾기</span>
-          <span className="muted">비밀번호 찾기</span>
+          <Link className="muted" to="/auth/find-login-id">
+            아이디 찾기
+          </Link>
+          <Link className="muted" to="/auth/password-reset">
+            비밀번호 찾기
+          </Link>
         </div>
         <p className="muted">
           계정이 없다면 <Link to="/signup">회원가입</Link>
