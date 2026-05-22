@@ -2892,6 +2892,54 @@ pre {
   font-weight: 800;
 }
 
+.admin-table-summary {
+  max-width: 520px;
+}
+
+.admin-management-grid {
+  align-items: start;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.admin-list-item {
+  align-items: flex-start;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-list-item.active,
+.admin-list-item:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.admin-list-item small {
+  color: var(--color-muted);
+}
+
+.admin-detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-inquiry-detail h3 {
+  margin: 10px 0 4px;
+}
+
 .admin-access-denied {
   align-items: center;
   background: var(--color-bg);

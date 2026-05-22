@@ -50,7 +50,8 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 - 기존 `is_admin` 필드는 유지하지만 신규 권한 판단에는 사용하지 않는다.
 - FAQ/문의/챌린지 운영성 쓰기 API는 `OPERATOR` 이상으로 보호한다.
 - LLM log 조회는 `MONITOR` 이상으로 보호한다.
-- 관리자 콘솔, audit log, 별도 admin router는 아직 구현하지 않았다.
+- 관리자 콘솔 P0(`AdminRoute`, `AdminLayout`, 운영 대시보드/모니터링/로그 화면)과 `/admin/*` 최소 API를 구현했다.
+- 관리자 콘솔 P1로 `/admin/faqs`, `/admin/inquiries` 화면과 FAQ 생성/수정/비활성화, 문의 목록/상세/답변 API를 구현했다.
 - `X-Request-ID` 기반 요청 추적과 `system_error_logs` 500 서버 예외 저장은 P0 기반으로 1차 구현했다.
 - `sensitive_access_logs`는 건강정보/분석결과/검진표/복약정보/대시보드 조회 접근 기록용으로 1차 구현했다. 관리자 콘솔 조회 UI는 후속 작업이다.
 - 이메일 인증과 비밀번호 재설정은 SMTP 기반 `EmailService`로 분리했다. `/system/health`에서 `email_service` 설정 상태를 확인할 수 있다.
@@ -206,7 +207,7 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 
 권한:
 
-- `ADMIN` 이상 가능
+- `OPERATOR` 이상 가능
 - 추후 `CONTENT_MANAGER`에게 위임 가능
 
 ## 7. 분석 모니터링

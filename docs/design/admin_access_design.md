@@ -185,8 +185,9 @@
 
 - `require_monitor_user`, `require_operator_user`, `require_admin_user`, `require_super_admin_user`를 `app/apis/v1/dependencies.py`에 구현했다.
 - FAQ 생성/수정, 문의 답변, 챌린지 생성은 `OPERATOR` 이상으로 보호한다.
+- 관리자 콘솔 P1로 `/admin/faqs`와 `/admin/inquiries` 화면/API를 구현했다. `MONITOR`는 접근할 수 없고, `OPERATOR` 이상만 FAQ 운영과 문의 답변을 수행한다.
 - LLM log 조회는 `MONITOR` 이상, LLM log 생성은 `OPERATOR` 이상으로 보호한다.
-- 사용자 관리, audit log, 관리자 콘솔 화면, 세분화된 permission table은 후속 작업이다.
+- 사용자 관리, audit log, 세분화된 permission table은 후속 작업이다.
 
 ## 7. 관리자 콘솔 분리 정책
 
