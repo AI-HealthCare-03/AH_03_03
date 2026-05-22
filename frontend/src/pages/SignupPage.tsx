@@ -51,6 +51,8 @@ export default function SignupPage() {
   });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [signupCompleted, setSignupCompleted] = useState(false);
+  const [healthInfoSaved, setHealthInfoSaved] = useState<boolean | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isOccupationHelpOpen, setIsOccupationHelpOpen] = useState(false);
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheck | null>(null);
@@ -64,7 +66,7 @@ export default function SignupPage() {
     "login_id" | "email" | "phone" | "email_send" | "email_verify" | "phone_send" | "phone_verify" | null
   >(null);
 
-  const steps = ["계정 정보", "기본 정보", "생활 습관", "추가 건강 정보"];
+  const steps = ["계정 정보", "기본 정보", "생활 습관", "간편 분석 정보"];
   const bmi =
     extraHealth.height && extraHealth.weight
       ? Number(extraHealth.weight) / (Number(extraHealth.height) / 100) ** 2
@@ -415,15 +417,54 @@ export default function SignupPage() {
       });
       try {
         await createHealthRecord<unknown>(buildInitialHealthPayload());
+        setHealthInfoSaved(true);
       } catch {
-        setNotice("회원가입은 완료되었습니다. 초기 건강정보 저장은 실패했지만, 나중에 건강정보 화면에서 입력할 수 있습니다.");
-        return;
+        setHealthInfoSaved(false);
       }
-      navigate("/");
+      setSignupCompleted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "회원가입에 실패했습니다.");
     }
   };
+
+  if (signupCompleted) {
+    return (
+      <div className="auth-page">
+        <Card title="회원가입 완료">
+          {healthInfoSaved === false && (
+            <div className="state-box">
+              회원가입은 완료되었습니다. 간편 분석 정보 저장은 나중에 건강정보 화면에서 다시 입력할 수 있습니다.
+            </div>
+          )}
+          <div className="signup-complete-panel">
+            <span className="badge badge-saved">가입 완료</span>
+            <h2>간편 건강 분석을 시작할 준비가 되었습니다.</h2>
+            <p>
+              입력하신 x1 기본 정보는 간편 건강 분석과 맞춤 챌린지 추천에 사용됩니다. 검진표 수치나
+              혈액검사 결과는 정밀 분석에서 추가로 반영됩니다.
+            </p>
+          </div>
+          <div className="signup-ocr-choice">
+            <div>
+              <strong>건강검진표 OCR로 정밀 분석 정보 추가</strong>
+              <p>
+                건강검진 결과지가 있다면 OCR로 혈압, 혈당, 콜레스테롤 등 정밀 분석 정보를 자동 입력할 수
+                있습니다. 검진표가 없어도 간편 분석은 바로 이용할 수 있습니다.
+              </p>
+            </div>
+            <div className="button-row">
+              <Link className="button" to="/ocr/exam">
+                건강검진표 OCR로 정밀 분석 정보 추가
+              </Link>
+              <button className="secondary" onClick={() => navigate("/")} type="button">
+                나중에 입력하기
+              </button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">
@@ -678,6 +719,11 @@ export default function SignupPage() {
 
           {step === 2 && (
             <>
+              <div className="state-box signup-analysis-guide">
+                <strong>간편 분석에 필요한 최소 생활습관 정보입니다.</strong>
+                <p>입력하신 정보는 가입 직후 간편 건강 분석과 맞춤 챌린지 추천을 제공하기 위한 최소 항목입니다.</p>
+                <p>검진표 수치나 혈액검사 결과는 정밀 분석에서 추가로 반영됩니다.</p>
+              </div>
               <label>
                 흡연 여부
                 <select
@@ -733,12 +779,17 @@ export default function SignupPage() {
                   <span className="field-error">{fieldErrors.strength_days_per_week}</span>
                 )}
               </label>
-              <p className="placeholder">생활 습관 항목은 회원가입 후 초기 건강정보로 저장됩니다.</p>
+              <p className="placeholder">생활 습관 항목은 간편 분석 정보로 저장됩니다.</p>
             </>
           )}
 
           {step === 3 && (
             <>
+              <div className="state-box signup-analysis-guide">
+                <strong>간편 분석에 필요한 신체계측과 가족력 정보입니다.</strong>
+                <p>혈압, 혈당, 콜레스테롤, 허리둘레 같은 검진값은 회원가입에서 직접 입력하지 않습니다.</p>
+                <p>가입 완료 후 건강검진표 OCR을 선택하면 정밀 분석 정보를 추가할 수 있습니다.</p>
+              </div>
               <label>
                 <span className="field-label-row">
                   <span>직업군</span>
@@ -823,7 +874,7 @@ export default function SignupPage() {
                 </select>
               </label>
               <p className="placeholder">
-                키, 몸무게, BMI 자동 계산값, 직업군, 질병별 가족력은 회원가입 후 초기 건강정보로 저장됩니다.
+                키, 몸무게, BMI 자동 계산값, 직업군, 질병별 가족력은 간편 분석 정보로 저장됩니다.
               </p>
             </>
           )}
