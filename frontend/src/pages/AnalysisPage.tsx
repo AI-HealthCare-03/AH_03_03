@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { getAnalysisResultDetail, getLatestAnalysisResults, runDummyAnalysis } from "../api/analysis";
+import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runDummyAnalysis } from "../api/analysis";
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
@@ -96,11 +96,14 @@ function getOverallScore(results: AnalysisResult[]): number {
 export default function AnalysisPage() {
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [healthRecordId, setHealthRecordId] = useState<number | null>(null);
+  const [basicReady, setBasicReady] = useState(false);
+  const [precisionReady, setPrecisionReady] = useState(false);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [precisionMissingFields, setPrecisionMissingFields] = useState<string[]>([]);
   const [factorsByResultId, setFactorsByResultId] = useState<Record<string, AnalysisFactor[]>>({});
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
   const [error, setError] = useState("");
+  const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
 
   const load = async () => {
     const latestResults = await getLatestAnalysisResults<AnalysisResult[]>();
@@ -119,7 +122,9 @@ export default function AnalysisPage() {
     setFactorsByResultId(Object.fromEntries(detailEntries));
     const readiness = await getAnalysisReadiness<Readiness>();
     setHealthRecordId(readiness.latest_health_record_id);
-    setMissingFields(readiness.is_ready ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
+    setBasicReady(Boolean(readiness.basic_ready ?? readiness.is_ready));
+    setPrecisionReady(Boolean(readiness.precision_ready));
+    setMissingFields((readiness.basic_ready ?? readiness.is_ready) ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
     setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
     const [recommendations, challenges] = await Promise.allSettled([
       listChallengeRecommendations<AnalysisResult[]>({ limit: 3 }),
@@ -139,22 +144,37 @@ export default function AnalysisPage() {
     void load().catch(() => setError("분석 결과를 불러오지 못했습니다."));
   }, []);
 
-  const run = async () => {
+  const run = async (mode: AnalysisMode) => {
     setError("");
-    const readiness = await getAnalysisReadiness<Readiness>();
-    setHealthRecordId(readiness.latest_health_record_id);
-    setMissingFields(readiness.is_ready ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
-    setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
-    if (!readiness.latest_health_record_id) {
-      setError("분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
-      return;
+    setRunningMode(mode);
+    try {
+      const readiness = await getAnalysisReadiness<Readiness>();
+      const currentBasicReady = Boolean(readiness.basic_ready ?? readiness.is_ready);
+      const currentPrecisionReady = Boolean(readiness.precision_ready);
+      setHealthRecordId(readiness.latest_health_record_id);
+      setBasicReady(currentBasicReady);
+      setPrecisionReady(currentPrecisionReady);
+      setMissingFields(currentBasicReady ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
+      setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
+      if (!readiness.latest_health_record_id) {
+        setError("분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
+        return;
+      }
+      if (!currentBasicReady) {
+        setError("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
+        return;
+      }
+      if (mode === "PRECISION" && !currentPrecisionReady) {
+        setError("정밀 분석에 필요한 검진값이 부족해 분석을 실행하지 않았습니다.");
+        return;
+      }
+      await runDummyAnalysis(readiness.latest_health_record_id, mode);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+    } finally {
+      setRunningMode(null);
     }
-    if (!readiness.is_ready) {
-      setError("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
-      return;
-    }
-    await runDummyAnalysis<unknown>(readiness.latest_health_record_id);
-    await load();
   };
 
   const overallLevel = getOverallLevel(results);
@@ -168,7 +188,12 @@ export default function AnalysisPage() {
           <p>당뇨, 고혈압, 비만, 이상지질혈증 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
-          <button onClick={run}>간편 분석 실행</button>
+          <button disabled={!basicReady || runningMode !== null} onClick={() => void run("BASIC")}>
+            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석 실행"}
+          </button>
+          <button disabled={!basicReady || !precisionReady || runningMode !== null} onClick={() => void run("PRECISION")}>
+            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석 실행"}
+          </button>
           <Link className="button secondary" to="/analysis/history">
             전체 결과
           </Link>
@@ -195,8 +220,8 @@ export default function AnalysisPage() {
       {precisionMissingFields.length > 0 && (
         <Card title="정밀 분석 선택 입력">
           <div className="readiness-card">
-            <p>검진/혈액검사 수치를 입력하면 정밀 분석 정확도가 높아집니다.</p>
-            <p>혈압, 혈당, 콜레스테롤 수치는 선택 입력입니다.</p>
+            <p>정밀 분석은 혈압/혈당/지질/허리둘레 등 검진 수치를 함께 반영합니다.</p>
+            <p>부족한 검진값을 입력하면 정밀 분석을 실행할 수 있습니다.</p>
             <div className="chip-list">
               {precisionMissingFields.map((field) => (
                 <span className="badge badge-reference" key={field}>
@@ -204,6 +229,9 @@ export default function AnalysisPage() {
                 </span>
               ))}
             </div>
+            <Link className="button secondary" to="/health/profile">
+              검진값 입력하기
+            </Link>
           </div>
         </Card>
       )}
@@ -231,6 +259,7 @@ export default function AnalysisPage() {
               <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 위험도</span>
               <strong>{score}/100</strong>
               <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
+              <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
             </div>
           );

@@ -3,6 +3,29 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.dtos.health import HealthRecordResponse
+from app.models.analysis import AnalysisMode, AnalysisType, RiskLevel
+
+
+class DashboardAnalysisResultResponse(BaseModel):
+    id: int
+    analysis_type: AnalysisType
+    analysis_mode: AnalysisMode = AnalysisMode.BASIC
+    risk_level: RiskLevel
+    risk_score: float
+    summary: str | None = None
+    analyzed_at: str
+    created_at: str
+
+
+class DashboardRiskFactorResponse(BaseModel):
+    analysis_result_id: int
+    analysis_type: AnalysisType
+    analysis_mode: AnalysisMode = AnalysisMode.BASIC
+    factor_key: str
+    factor_name: str
+    factor_value: str | None = None
+    contribution_score: float | None = None
+    direction: str
 
 
 class DashboardSummaryResponse(BaseModel):
@@ -10,6 +33,10 @@ class DashboardSummaryResponse(BaseModel):
     unread_notification_count: int
     active_challenge_count: int
     active_medication_count: int = 0
+    latest_analysis_results: list[DashboardAnalysisResultResponse] = []
+    top_risk_factors: list[DashboardRiskFactorResponse] = []
+    overall_risk_level: RiskLevel | None = None
+    overall_risk_score: float | None = None
 
 
 class DashboardHealthResponse(BaseModel):

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.analysis import (
@@ -35,7 +35,14 @@ async def run_dummy_analysis(
         "건강 기록을 찾을 수 없습니다.",
     )
     ensure_owner(health_record.user_id, user)
-    return await analysis_service.run_dummy_analysis(user.id, health_record)
+    missing_fields = await analysis_service.get_missing_fields_for_mode(user, health_record, request.mode)
+    if missing_fields:
+        mode_label = "정밀 분석" if request.mode.value == "PRECISION" else "간편 분석"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{mode_label}에 필요한 정보가 부족합니다: {', '.join(missing_fields)}",
+        )
+    return await analysis_service.run_dummy_analysis(user.id, health_record, request.mode)
 
 
 @analysis_router.post("/results", response_model=AnalysisResultResponse, status_code=status.HTTP_201_CREATED)

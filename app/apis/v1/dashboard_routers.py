@@ -14,6 +14,7 @@ from app.dtos.dashboard import (
     DashboardTrendsResponse,
 )
 from app.models.users import User
+from app.services import analysis as analysis_service
 from app.services import challenges as challenge_service
 from app.services import diets as diet_service
 from app.services import health as health_service
@@ -49,6 +50,17 @@ def _in_range(value: date, date_from: date | None, date_to: date) -> bool:
     return value <= date_to
 
 
+def _overall_risk_level(results):
+    levels = [result.risk_level for result in results]
+    if any(level.value == "HIGH" for level in levels):
+        return "HIGH"
+    if any(level.value == "MEDIUM" for level in levels):
+        return "MEDIUM"
+    if levels:
+        return "LOW"
+    return None
+
+
 @dashboard_router.get("/summary", response_model=DashboardSummaryResponse)
 async def get_dashboard_summary(request: Request, user: Annotated[User, Depends(get_request_user)]):
     await safe_record_sensitive_access(
@@ -62,11 +74,49 @@ async def get_dashboard_summary(request: Request, user: Annotated[User, Depends(
     unread_notifications = await notification_service.list_unread_notifications(user.id, limit=1000)
     active_challenge_count = await challenge_service.count_active_user_challenges(user.id)
     active_medications = await medication_service.list_medications(user.id, is_active=True, limit=1000)
+    latest_analysis_results = await analysis_service.list_latest_analysis_results(user.id)
+    top_risk_factors = []
+    for result in latest_analysis_results:
+        for factor in await analysis_service.list_analysis_factors(result.id):
+            top_risk_factors.append(
+                {
+                    "analysis_result_id": result.id,
+                    "analysis_type": result.analysis_type,
+                    "analysis_mode": result.analysis_mode,
+                    "factor_key": factor.factor_key,
+                    "factor_name": factor.factor_name,
+                    "factor_value": factor.factor_value,
+                    "contribution_score": float(factor.contribution_score)
+                    if factor.contribution_score is not None
+                    else None,
+                    "direction": factor.direction.value
+                    if hasattr(factor.direction, "value")
+                    else str(factor.direction),
+                }
+            )
+    top_risk_factors.sort(key=lambda item: item["contribution_score"] or 0, reverse=True)
+    analysis_scores = [float(result.risk_score) for result in latest_analysis_results if result.risk_score is not None]
     return {
         "latest_health_record": latest_health_record,
         "unread_notification_count": len(unread_notifications),
         "active_challenge_count": active_challenge_count,
         "active_medication_count": len(active_medications),
+        "latest_analysis_results": [
+            {
+                "id": result.id,
+                "analysis_type": result.analysis_type,
+                "analysis_mode": result.analysis_mode,
+                "risk_level": result.risk_level,
+                "risk_score": float(result.risk_score),
+                "summary": result.summary,
+                "analyzed_at": result.analyzed_at.isoformat(),
+                "created_at": result.created_at.isoformat(),
+            }
+            for result in latest_analysis_results
+        ],
+        "top_risk_factors": top_risk_factors[:5],
+        "overall_risk_level": _overall_risk_level(latest_analysis_results),
+        "overall_risk_score": max(analysis_scores) if analysis_scores else None,
     }
 
 

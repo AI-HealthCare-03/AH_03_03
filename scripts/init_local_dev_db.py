@@ -20,6 +20,11 @@ from tortoise import Tortoise  # noqa: E402
 
 from app.core.db.databases import TORTOISE_ORM  # noqa: E402
 
+PRE_GENERATE_SAFE_ALTER_SQL = """
+ALTER TABLE IF EXISTS "analysis_results"
+    ADD COLUMN IF NOT EXISTS "analysis_mode" VARCHAR(9) NOT NULL DEFAULT 'BASIC';
+"""
+
 LOCAL_SAFE_ALTER_SQL = """
 ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "occupation_code" VARCHAR(30);
 ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "family_htn" VARCHAR(10);
@@ -33,6 +38,8 @@ ALTER TABLE "health_records" ADD COLUMN IF NOT EXISTS "strength_days_per_week" I
 ALTER TABLE "health_records" DROP COLUMN IF EXISTS "is_smoker";
 ALTER TABLE "health_records" DROP COLUMN IF EXISTS "drinks_alcohol";
 ALTER TABLE "health_records" DROP COLUMN IF EXISTS "exercise_days_per_week";
+ALTER TABLE "analysis_results" ADD COLUMN IF NOT EXISTS "analysis_mode" VARCHAR(9) NOT NULL DEFAULT 'BASIC';
+CREATE INDEX IF NOT EXISTS "idx_analysis_results_mode_1a9f30" ON "analysis_results" ("analysis_mode");
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "failed_login_count" INT NOT NULL DEFAULT 0;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "locked_until" TIMESTAMPTZ;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_login_at" TIMESTAMPTZ;
@@ -213,6 +220,7 @@ CREATE INDEX IF NOT EXISTS "idx_notification_logs_created_11b98d" ON "notificati
 
 async def init_local_dev_db() -> None:
     await Tortoise.init(config=TORTOISE_ORM)
+    await Tortoise.get_connection("default").execute_script(PRE_GENERATE_SAFE_ALTER_SQL)
     await Tortoise.generate_schemas(safe=True)
     # Local-only safety net: generate_schemas(safe=True) creates missing tables
     # but does not add new columns to existing tables. Shared/production DBs

@@ -10,6 +10,11 @@ class AnalysisType(StrEnum):
     HYPERTENSION = "HYPERTENSION"
 
 
+class AnalysisMode(StrEnum):
+    BASIC = "BASIC"
+    PRECISION = "PRECISION"
+
+
 class RiskLevel(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
@@ -28,6 +33,7 @@ class AnalysisResult(models.Model):
     health_record = fields.ForeignKeyField("models.HealthRecord", related_name="analysis_results")
     async_job_id = fields.BigIntField(null=True)
     analysis_type = fields.CharEnumField(enum_type=AnalysisType)
+    analysis_mode = fields.CharEnumField(enum_type=AnalysisMode, default=AnalysisMode.BASIC)
     risk_score = fields.DecimalField(max_digits=6, decimal_places=5)
     risk_level = fields.CharEnumField(enum_type=RiskLevel)
     summary = fields.CharField(max_length=255, null=True)
