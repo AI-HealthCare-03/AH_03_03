@@ -29,6 +29,7 @@ from tortoise import Tortoise  # noqa: E402
 from app.core import config  # noqa: E402
 from app.core.db.databases import TORTOISE_ORM  # noqa: E402
 from app.models.analysis import (  # noqa: E402
+    AnalysisMode,
     AnalysisResult,
     AnalysisResultFactor,
     AnalysisSnapshot,
@@ -205,6 +206,7 @@ async def _seed_analysis(user: User) -> dict[str, int]:
                 user=user,
                 health_record=record,
                 analysis_type=analysis_type,
+                analysis_mode=AnalysisMode.PRECISION,
                 risk_score=score,
                 risk_level=_risk_level(score),
                 summary=_summary(analysis_type, _risk_level(score)),

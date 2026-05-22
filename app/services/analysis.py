@@ -10,6 +10,7 @@ from app.dtos.analysis import (
 )
 from app.dtos.challenges import ChallengeRecommendationCreateRequest
 from app.models.analysis import (
+    AnalysisMode,
     AnalysisResult,
     AnalysisResultFactor,
     AnalysisSnapshot,
@@ -19,8 +20,14 @@ from app.models.analysis import (
 )
 from app.models.challenges import ChallengeCategory
 from app.models.health import HealthRecord
+from app.models.users import User
 from app.repositories import analysis_repository
 from app.services import challenges as challenge_service
+from app.services.health import (
+    REQUIRED_BASIC_ANALYSIS_FIELDS,
+    REQUIRED_PRECISION_ANALYSIS_FIELDS,
+    REQUIRED_USER_ANALYSIS_FIELDS,
+)
 
 
 async def create_analysis_result(user_id: int, request: AnalysisResultCreateRequest) -> AnalysisResult:
@@ -84,26 +91,51 @@ async def get_analysis_result_detail(result_id: int) -> dict[str, Any] | None:
     return {"result": result, "factors": factors, "snapshot": snapshot}
 
 
-async def run_dummy_analysis(user_id: int, health_record: HealthRecord) -> list[dict[str, Any]]:
+async def get_missing_fields_for_mode(user: User, health_record: HealthRecord, mode: AnalysisMode) -> list[str]:
+    missing_fields = [
+        label
+        for field_name, label in REQUIRED_USER_ANALYSIS_FIELDS.items()
+        if _is_missing_value(getattr(user, field_name))
+    ]
+    missing_fields.extend(
+        label
+        for field_name, label in REQUIRED_BASIC_ANALYSIS_FIELDS.items()
+        if _is_missing_health_record_field(health_record, field_name)
+    )
+    if mode == AnalysisMode.PRECISION:
+        missing_fields.extend(
+            label
+            for field_name, label in REQUIRED_PRECISION_ANALYSIS_FIELDS.items()
+            if _is_missing_value(getattr(health_record, field_name))
+        )
+    return missing_fields
+
+
+async def run_dummy_analysis(
+    user_id: int, health_record: HealthRecord, mode: AnalysisMode = AnalysisMode.BASIC
+) -> list[dict[str, Any]]:
     results = []
-    for analysis_type, score in _calculate_dummy_scores(health_record).items():
+    user = await User.get_or_none(id=user_id)
+    for analysis_type, score in _calculate_dummy_scores(health_record, mode, user).items():
         risk_level = _risk_level(score)
         request = AnalysisResultCreateRequest(
             health_record_id=health_record.id,
             analysis_type=analysis_type,
+            analysis_mode=mode,
             risk_score=score,
             risk_level=risk_level,
-            summary=_guide_message(analysis_type, risk_level),
-            model_name="dummy_rule_based",
-            model_version="mvp-demo-v1",
+            summary=_guide_message(analysis_type, risk_level, mode),
+            model_name="rule_based",
+            model_version=f"web-{mode.value.lower()}-v1",
             analyzed_at=datetime.now(config.TIMEZONE),
         )
         result = await create_analysis_result(user_id, request)
-        factors = await create_analysis_factors(result.id, _dummy_factors(analysis_type, health_record, score))
+        factors = await create_analysis_factors(result.id, _dummy_factors(analysis_type, health_record, score, mode))
         await create_analysis_snapshot(
             result.id,
             _dummy_snapshot_request(
                 analysis_type=analysis_type,
+                analysis_mode=mode,
                 health_record=health_record,
                 score=score,
                 risk_level=risk_level,
@@ -116,6 +148,7 @@ async def run_dummy_analysis(user_id: int, health_record: HealthRecord) -> list[
             {
                 "analysis_result_id": result.id,
                 "analysis_type": result.analysis_type,
+                "analysis_mode": result.analysis_mode,
                 "risk_score": result.risk_score,
                 "risk_level": result.risk_level,
                 "guide_message": request.summary,
@@ -126,13 +159,71 @@ async def run_dummy_analysis(user_id: int, health_record: HealthRecord) -> list[
     return results
 
 
-def _calculate_dummy_scores(record: HealthRecord) -> dict[AnalysisType, Decimal]:
+def _calculate_dummy_scores(
+    record: HealthRecord, mode: AnalysisMode = AnalysisMode.BASIC, user: User | None = None
+) -> dict[AnalysisType, Decimal]:
+    if mode == AnalysisMode.PRECISION:
+        return {
+            AnalysisType.DIABETES: max(_basic_diabetes_score(record, user), _diabetes_score(record)),
+            AnalysisType.OBESITY: max(_basic_obesity_score(record, user), _obesity_score(record)),
+            AnalysisType.DYSLIPIDEMIA: max(_basic_dyslipidemia_score(record, user), _dyslipidemia_score(record)),
+            AnalysisType.HYPERTENSION: max(_basic_hypertension_score(record, user), _hypertension_score(record)),
+        }
     return {
-        AnalysisType.DIABETES: _diabetes_score(record),
-        AnalysisType.OBESITY: _obesity_score(record),
-        AnalysisType.DYSLIPIDEMIA: _dyslipidemia_score(record),
-        AnalysisType.HYPERTENSION: _hypertension_score(record),
+        AnalysisType.DIABETES: _basic_diabetes_score(record, user),
+        AnalysisType.OBESITY: _basic_obesity_score(record, user),
+        AnalysisType.DYSLIPIDEMIA: _basic_dyslipidemia_score(record, user),
+        AnalysisType.HYPERTENSION: _basic_hypertension_score(record, user),
     }
+
+
+def _basic_diabetes_score(record: HealthRecord, user: User | None) -> Decimal:
+    score = Decimal("0.20")
+    score += _age_adjustment(user)
+    if record.family_dm == "YES":
+        score += Decimal("0.16")
+    if record.bmi is not None and record.bmi >= Decimal("25"):
+        score += Decimal("0.10")
+    score += _lifestyle_adjustment(record)
+    return min(score, Decimal("0.88"))
+
+
+def _basic_obesity_score(record: HealthRecord, user: User | None) -> Decimal:
+    _ = user
+    score = Decimal("0.18")
+    if record.bmi is not None:
+        if record.bmi >= Decimal("30"):
+            score = Decimal("0.78")
+        elif record.bmi >= Decimal("25"):
+            score = Decimal("0.64")
+        elif record.bmi >= Decimal("23"):
+            score = Decimal("0.46")
+        else:
+            score = Decimal("0.22")
+    score += _lifestyle_adjustment(record)
+    return min(score, Decimal("0.90"))
+
+
+def _basic_dyslipidemia_score(record: HealthRecord, user: User | None) -> Decimal:
+    score = Decimal("0.18")
+    score += _age_adjustment(user)
+    if record.family_dyslipidemia == "YES":
+        score += Decimal("0.14")
+    if record.bmi is not None and record.bmi >= Decimal("25"):
+        score += Decimal("0.10")
+    score += _lifestyle_adjustment(record)
+    return min(score, Decimal("0.82"))
+
+
+def _basic_hypertension_score(record: HealthRecord, user: User | None) -> Decimal:
+    score = Decimal("0.20")
+    score += _age_adjustment(user)
+    if record.family_htn == "YES":
+        score += Decimal("0.16")
+    if record.bmi is not None and record.bmi >= Decimal("25"):
+        score += Decimal("0.10")
+    score += _lifestyle_adjustment(record)
+    return min(score, Decimal("0.86"))
 
 
 def _diabetes_score(record: HealthRecord) -> Decimal:
@@ -211,33 +302,35 @@ def _risk_level(score: Decimal) -> RiskLevel:
     return RiskLevel.LOW
 
 
-def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel) -> str:
+def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: AnalysisMode = AnalysisMode.BASIC) -> str:
     disease_label = {
         AnalysisType.DIABETES: "당뇨",
         AnalysisType.OBESITY: "비만",
         AnalysisType.DYSLIPIDEMIA: "이상지질혈증",
         AnalysisType.HYPERTENSION: "고혈압",
     }[analysis_type]
-    dummy_notice = " 이 결과는 MVP 시연용 더미 룰이며 실제 의료 진단이 아닙니다."
+    mode_label = "정밀" if mode == AnalysisMode.PRECISION else "간편"
+    notice = f" 이 결과는 {mode_label} 분석 참고용 판정이며 의료 진단이 아닙니다."
     if risk_level == RiskLevel.HIGH:
-        return f"{disease_label} 관련 지표가 높게 나타났습니다. 생활습관 기록과 전문가 상담을 함께 고려해 주세요.{dummy_notice}"
+        return f"{disease_label} 관련 위험도가 높게 나타났습니다. 생활습관 기록과 의료기관 상담을 함께 고려해 주세요.{notice}"
     if risk_level == RiskLevel.MEDIUM:
-        return f"{disease_label} 관련 관리가 필요한 구간입니다. 식단과 활동량을 꾸준히 기록해 보세요.{dummy_notice}"
-    return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{dummy_notice}"
+        return f"{disease_label} 관련 관리가 필요한 구간입니다. 식단과 활동량을 꾸준히 기록해 보세요.{notice}"
+    return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
 
 
 def _dummy_factors(
-    analysis_type: AnalysisType, record: HealthRecord, score: Decimal
+    analysis_type: AnalysisType, record: HealthRecord, score: Decimal, mode: AnalysisMode = AnalysisMode.BASIC
 ) -> list[AnalysisResultFactorCreateRequest]:
     common_factor = AnalysisResultFactorCreateRequest(
-        factor_key="dummy_risk_score",
-        factor_name="더미 위험도 점수",
+        factor_key="risk_score",
+        factor_name="위험도 점수",
         factor_value=str(score),
         contribution_score=score,
         direction=FactorDirection.NEUTRAL,
         display_order=0,
     )
-    disease_factor = {
+    basic_factor = _basic_factor(analysis_type, record)
+    precision_factor = {
         AnalysisType.DIABETES: AnalysisResultFactorCreateRequest(
             factor_key="fasting_glucose",
             factor_name="공복혈당",
@@ -273,11 +366,31 @@ def _dummy_factors(
             display_order=1,
         ),
     }[analysis_type]
-    return [common_factor, disease_factor]
+    if mode == AnalysisMode.PRECISION:
+        return [common_factor, precision_factor, basic_factor]
+    return [common_factor, basic_factor]
+
+
+def _basic_factor(analysis_type: AnalysisType, record: HealthRecord) -> AnalysisResultFactorCreateRequest:
+    factor_key, factor_name, factor_value = {
+        AnalysisType.DIABETES: ("family_dm", "당뇨병 가족력", record.family_dm),
+        AnalysisType.OBESITY: ("bmi", "BMI", record.bmi),
+        AnalysisType.DYSLIPIDEMIA: ("family_dyslipidemia", "이상지질혈증 가족력", record.family_dyslipidemia),
+        AnalysisType.HYPERTENSION: ("family_htn", "고혈압 가족력", record.family_htn),
+    }[analysis_type]
+    return AnalysisResultFactorCreateRequest(
+        factor_key=factor_key,
+        factor_name=factor_name,
+        factor_value=str(factor_value) if factor_value is not None else None,
+        contribution_score=Decimal("0.24"),
+        direction=FactorDirection.POSITIVE,
+        display_order=2,
+    )
 
 
 def _dummy_snapshot_request(
     analysis_type: AnalysisType,
+    analysis_mode: AnalysisMode,
     health_record: HealthRecord,
     score: Decimal,
     risk_level: RiskLevel,
@@ -321,6 +434,7 @@ def _dummy_snapshot_request(
         input_payload={
             "input_features": input_features,
             "analysis_type": analysis_type,
+            "analysis_mode": analysis_mode,
         },
         output_payload={
             "model_outputs": {
@@ -331,8 +445,9 @@ def _dummy_snapshot_request(
             "rule_outputs": {
                 "low_threshold": 0.40,
                 "high_threshold": 0.70,
-                "rule_engine": "dummy_rule_based",
-                "note": "MVP 시연용 더미 룰이며 실제 의료 진단 또는 처방이 아닙니다.",
+                "rule_engine": "rule_based",
+                "analysis_mode": analysis_mode,
+                "note": "참고용 룰 기반 분석이며 실제 의료 진단 또는 처방이 아닙니다.",
                 "hypertension_rule": {
                     "high": "systolic_bp >= 140 또는 diastolic_bp >= 90",
                     "medium": "systolic_bp >= 130 또는 diastolic_bp >= 80",
@@ -346,17 +461,18 @@ def _dummy_snapshot_request(
                 "guide_message": guide_message,
             },
             "model_version_info": {
-                "model_name": "dummy_rule_based",
-                "model_version": "mvp-demo-v1",
+                "model_name": "rule_based",
+                "model_version": f"web-{analysis_mode.value.lower()}-v1",
             },
         },
         shap_payload={
-            "note": "실제 SHAP 계산이 아닌 프론트 시연용 더미 factor입니다.",
+            "note": "룰 기반 분석의 주요 요인입니다.",
             "factors": shap_outputs,
         },
         model_payload={
-            "model_name": "dummy_rule_based",
-            "model_version": "mvp-demo-v1",
+            "model_name": "rule_based",
+            "model_version": f"web-{analysis_mode.value.lower()}-v1",
+            "analysis_mode": analysis_mode,
         },
     )
 
@@ -373,6 +489,42 @@ def _blood_pressure_value(record: HealthRecord) -> str | None:
     systolic = record.systolic_bp if record.systolic_bp is not None else "-"
     diastolic = record.diastolic_bp if record.diastolic_bp is not None else "-"
     return f"{systolic}/{diastolic}"
+
+
+def _age_adjustment(user: User | None) -> Decimal:
+    if user is None or user.birthday is None:
+        return Decimal("0.00")
+    age = datetime.now(config.TIMEZONE).date().year - user.birthday.year
+    if age >= 60:
+        return Decimal("0.14")
+    if age >= 45:
+        return Decimal("0.08")
+    return Decimal("0.00")
+
+
+def _lifestyle_adjustment(record: HealthRecord) -> Decimal:
+    score = Decimal("0.00")
+    if record.smoking_status == "CURRENT_SMOKER":
+        score += Decimal("0.08")
+    if record.drinking_frequency in {"WEEKLY_2_3", "WEEKLY_4_PLUS", "DAILY"}:
+        score += Decimal("0.06")
+    if record.drinking_amount in {"FIVE_TO_SIX", "SEVEN_PLUS", "HEAVY"}:
+        score += Decimal("0.06")
+    if record.walking_days_per_week is not None and record.walking_days_per_week <= 2:
+        score += Decimal("0.05")
+    if record.strength_days_per_week is not None and record.strength_days_per_week == 0:
+        score += Decimal("0.04")
+    return score
+
+
+def _is_missing_value(value: object) -> bool:
+    return value is None or value == ""
+
+
+def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bool:
+    if field_name == "bmi" and not _is_missing_value(record.height_cm) and not _is_missing_value(record.weight_kg):
+        return False
+    return _is_missing_value(getattr(record, field_name))
 
 
 async def _create_dummy_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
@@ -396,7 +548,7 @@ async def _create_dummy_challenge_recommendations(user_id: int, result: Analysis
         request=ChallengeRecommendationCreateRequest(
             challenge_id=challenge.id,
             analysis_result_id=result.id,
-            reason=_guide_message(result.analysis_type, result.risk_level),
+            reason=_guide_message(result.analysis_type, result.risk_level, result.analysis_mode),
             priority=1,
             is_selected=False,
         ),

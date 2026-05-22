@@ -53,6 +53,11 @@ Enum analysis_type {
   HYPERTENSION
 }
 
+Enum analysis_mode {
+  BASIC
+  PRECISION
+}
+
 Enum ocr_status {
   PENDING
   PROCESSING
@@ -373,6 +378,7 @@ Table analysis_results {
   // TODO: async_jobs 모델 및 FK 연동은 후속 PR에서 처리한다.
   async_job_id bigint [note: "Nullable BIGINT로 유지. async_jobs 모델/FK 연동은 후속 PR에서 처리한다."]
   analysis_type analysis_type [not null]
+  analysis_mode analysis_mode [not null, default: 'BASIC', note: "BASIC=x1 기본정보 기반, PRECISION=x1+x2 검진/혈액검사 수치 기반"]
   risk_score decimal(6,5) [not null]
   risk_level risk_level [not null]
   summary varchar(255)

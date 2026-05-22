@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
+  DashboardAnalysisResult,
+  DashboardRiskFactor,
+  DashboardSummary,
   getDashboardChallenges,
   getDashboardDiets,
   getDashboardHealth,
@@ -14,6 +17,31 @@ import Card from "../components/Card";
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
+
+const analysisTypeLabels: Record<string, string> = {
+  DIABETES: "당뇨",
+  HYPERTENSION: "고혈압",
+  DYSLIPIDEMIA: "이상지질혈증",
+  OBESITY: "비만",
+};
+
+const riskLevelLabels: Record<string, string> = {
+  LOW: "낮음",
+  MEDIUM: "관리 필요",
+  HIGH: "높음",
+};
+
+function getModeLabel(mode: unknown): string {
+  return String(mode ?? "BASIC").toUpperCase() === "PRECISION" ? "정밀" : "간편";
+}
+
+function getRiskScorePercent(value: unknown): number {
+  const score = Number(value);
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+  return Math.round(score <= 1 ? score * 100 : score);
+}
 
 function latestValue(items: Record<string, unknown>[] | undefined, fallback = "-"): string {
   const item = items?.[0];
@@ -110,7 +138,7 @@ function getExamMeasurement(measurements: AnyRecord[], key: string): AnyRecord |
 }
 
 export default function DashboardPage() {
-  const [summary, setSummary] = useState<DashboardData>({});
+  const [summary, setSummary] = useState<Partial<DashboardSummary>>({});
   const [healthSection, setHealthSection] = useState<DashboardData>({});
   const [challengeSection, setChallengeSection] = useState<DashboardData>({});
   const [dietSection, setDietSection] = useState<DashboardData>({});
@@ -124,7 +152,7 @@ export default function DashboardPage() {
     const load = async () => {
       const [summaryResult, trendsResult, healthResult, challengeResult, dietResult, medicationResult, examList] =
         await Promise.allSettled([
-        getDashboardSummary<DashboardData>(),
+        getDashboardSummary<DashboardSummary>(),
         getDashboardTrends<Record<string, Record<string, unknown>[]>>("week"),
         getDashboardHealth<DashboardData>(),
         getDashboardChallenges<DashboardData>(),
@@ -154,6 +182,12 @@ export default function DashboardPage() {
   }, []);
 
   const latest = (healthSection.latest_health_record ?? summary.latest_health_record ?? {}) as HealthRecord;
+  const latestAnalysisResults = Array.isArray(summary.latest_analysis_results)
+    ? (summary.latest_analysis_results as DashboardAnalysisResult[])
+    : [];
+  const topRiskFactors = Array.isArray(summary.top_risk_factors)
+    ? (summary.top_risk_factors as DashboardRiskFactor[])
+    : [];
   const dashboardDiets = Array.isArray(dietSection.recent_diet_records)
     ? (dietSection.recent_diet_records as AnyRecord[])
     : [];
@@ -172,6 +206,7 @@ export default function DashboardPage() {
     ["혈당", latest.fasting_glucose ?? "-"],
     ["혈압", `${String(latest.systolic_bp ?? "-")}/${String(latest.diastolic_bp ?? "-")}`],
     ["체중", latest.weight_kg ?? "-"],
+    ["종합 위험도", summary.overall_risk_level ? riskLevelLabels[String(summary.overall_risk_level)] : "-"],
     ["챌린지 수행률", challengeRate],
     ["식단 점수", dietScore],
     ["복약/영양제", `${String(dashboardMedications.length || summary.active_medication_count || 0)}개`],
@@ -218,6 +253,59 @@ export default function DashboardPage() {
             <Bars items={activeTrendItems} />
           ) : (
             <div className="state-box">표시할 추적 데이터가 없습니다.</div>
+          )}
+        </Card>
+      </div>
+      <div className="page-grid">
+        <Card title="만성질환 위험도">
+          {latestAnalysisResults.length > 0 ? (
+            <div className="card-list">
+              {latestAnalysisResults.map((result) => {
+                const level = String(result.risk_level ?? "").toUpperCase();
+                const score = getRiskScorePercent(result.risk_score);
+                return (
+                  <div className="mini-card" key={String(result.id)}>
+                    <div className="button-row">
+                      <strong>{analysisTypeLabels[result.analysis_type] ?? result.analysis_type}</strong>
+                      <span className="badge badge-reference">{getModeLabel(result.analysis_mode)}</span>
+                      <span className={`badge risk-${level.toLowerCase()}`}>{riskLevelLabels[level] ?? level}</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${score}%` }} />
+                    </div>
+                    <p className="muted">
+                      {score}/100 · {formatDate(result.analyzed_at)}
+                    </p>
+                    {result.summary && <p>{result.summary}</p>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="state-box">최근 분석 결과가 없습니다. 건강 분석을 실행하면 질환별 위험도가 표시됩니다.</div>
+          )}
+        </Card>
+        <Card title="주요 위험요인">
+          {topRiskFactors.length > 0 ? (
+            <div className="card-list">
+              {topRiskFactors.map((factor) => (
+                <div className="mini-card" key={`${factor.analysis_result_id}-${factor.factor_key}`}>
+                  <div className="button-row">
+                    <strong>{factor.factor_name}</strong>
+                    <span className="badge badge-reference">{analysisTypeLabels[factor.analysis_type] ?? factor.analysis_type}</span>
+                    <span className="badge badge-reference">{getModeLabel(factor.analysis_mode)}</span>
+                  </div>
+                  <p className="muted">
+                    {factor.factor_value ? `값: ${factor.factor_value}` : "기록된 값 없음"}
+                    {factor.contribution_score !== null && factor.contribution_score !== undefined
+                      ? ` · 영향도 ${getRiskScorePercent(factor.contribution_score)}/100`
+                      : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="state-box">최근 분석 위험요인이 없습니다.</div>
           )}
         </Card>
       </div>

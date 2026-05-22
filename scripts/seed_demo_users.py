@@ -27,6 +27,7 @@ from app.core import config  # noqa: E402
 from app.core.db.databases import TORTOISE_ORM  # noqa: E402
 from app.core.utils.security import hash_password  # noqa: E402
 from app.models.analysis import (  # noqa: E402
+    AnalysisMode,
     AnalysisResult,
     AnalysisResultFactor,
     AnalysisSnapshot,
@@ -58,6 +59,15 @@ class DemoUserSeed:
     risk_profile: str
 
 
+@dataclass(frozen=True)
+class AdminDemoSeed:
+    email: str
+    login_id: str
+    name: str
+    role: str
+    phone_number: str
+
+
 DEMO_USERS = [
     DemoUserSeed(
         email="demo@example.com",
@@ -81,6 +91,23 @@ DEMO_USERS = [
     ),
 ]
 
+ADMIN_DEMO_USERS = [
+    AdminDemoSeed(
+        email="admin@example.com",
+        login_id="admin01",
+        name="시스템 관리자",
+        role="SUPER_ADMIN",
+        phone_number="01010000901",
+    ),
+    AdminDemoSeed(
+        email="monitor@example.com",
+        login_id="monitor01",
+        name="모니터링 관리자",
+        role="MONITOR",
+        phone_number="01010000902",
+    ),
+]
+
 
 async def seed_demo_users() -> None:
     await Tortoise.init(config=TORTOISE_ORM)
@@ -95,8 +122,16 @@ async def seed_demo_users() -> None:
         "notifications_created": 0,
         "user_challenges_created": 0,
         "challenge_logs_created": 0,
+        "admin_users_created": 0,
+        "admin_users_skipped": 0,
+        "admin_roles_corrected": 0,
     }
     try:
+        for seed in ADMIN_DEMO_USERS:
+            _admin_user, created, corrected = await _get_or_create_admin_user(seed)
+            stats["admin_users_created" if created else "admin_users_skipped"] += 1
+            stats["admin_roles_corrected"] += int(corrected)
+
         for seed in DEMO_USERS:
             user, created = await _get_or_create_user(seed)
             stats["users_created" if created else "users_skipped"] += 1
@@ -147,6 +182,46 @@ async def _get_or_create_user(seed: DemoUserSeed) -> tuple[User, bool]:
         },
     )
     return user, True
+
+
+async def _get_or_create_admin_user(seed: AdminDemoSeed) -> tuple[User, bool, bool]:
+    existing = await User.get_or_none(email=seed.email)
+    if existing is None:
+        existing = await User.get_or_none(login_id=seed.login_id)
+
+    if existing is not None:
+        needs_update = existing.role != seed.role or not existing.is_active
+        if needs_update:
+            existing.role = seed.role
+            existing.is_active = True
+            existing.email_verified_at = existing.email_verified_at or datetime.now(config.TIMEZONE)
+            await existing.save(update_fields=["role", "is_active", "email_verified_at", "updated_at"])
+        return existing, False, needs_update
+
+    user = await User.create(
+        login_id=seed.login_id,
+        email=seed.email,
+        hashed_password=hash_password(DEMO_PASSWORD),
+        name=seed.name,
+        nickname=seed.name,
+        gender=Gender.MALE,
+        birthday=date(1990, 1, 1),
+        phone_number=seed.phone_number,
+        address="로컬 시연용 관리자 계정",
+        role=seed.role,
+        is_active=True,
+        email_verified_at=datetime.now(config.TIMEZONE),
+    )
+    await UserConsent.get_or_create(
+        user=user,
+        defaults={
+            "terms_agreed": True,
+            "privacy_agreed": True,
+            "sensitive_data_agreed": True,
+            "marketing_agreed": False,
+        },
+    )
+    return user, True, False
 
 
 async def _seed_health_records(user: User, risk_profile: str) -> int:
@@ -243,6 +318,7 @@ async def _seed_analysis_results(user: User) -> int:
                 user=user,
                 health_record=latest_record,
                 analysis_type=analysis_type,
+                analysis_mode=AnalysisMode.PRECISION,
                 risk_score=score,
                 risk_level=risk_level,
                 summary=_demo_guide_message(analysis_type, risk_level),

@@ -5,23 +5,26 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.dtos.base import BaseSerializerModel
-from app.models.analysis import AnalysisType, FactorDirection, RiskLevel
+from app.models.analysis import AnalysisMode, AnalysisType, FactorDirection, RiskLevel
 
 
 class AnalysisRunRequest(BaseModel):
     analysis_type: AnalysisType
     health_record_id: int | None = None
     exam_report_id: int | None = None
+    mode: AnalysisMode = AnalysisMode.BASIC
 
 
 class DummyAnalysisRunRequest(BaseModel):
     health_record_id: int
+    mode: AnalysisMode = AnalysisMode.BASIC
 
 
 class AnalysisResultCreateRequest(BaseModel):
     health_record_id: int
     async_job_id: int | None = None
     analysis_type: AnalysisType
+    analysis_mode: AnalysisMode = AnalysisMode.BASIC
     risk_score: Decimal
     risk_level: RiskLevel
     summary: str | None = None
@@ -36,6 +39,7 @@ class AnalysisResultResponse(BaseSerializerModel):
     health_record_id: int
     async_job_id: int | None
     analysis_type: AnalysisType
+    analysis_mode: AnalysisMode
     risk_score: Decimal
     risk_level: RiskLevel
     summary: str | None
@@ -93,6 +97,7 @@ class AnalysisResultDetailResponse(BaseModel):
 class DummyAnalysisResultResponse(BaseModel):
     analysis_result_id: int
     analysis_type: AnalysisType
+    analysis_mode: AnalysisMode
     risk_score: Decimal
     risk_level: RiskLevel
     guide_message: str
