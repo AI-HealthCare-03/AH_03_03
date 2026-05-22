@@ -1,6 +1,8 @@
 import { Route, Routes } from "react-router-dom";
 
+import AdminRoute from "./auth/AdminRoute";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import AdminLayout from "./components/AdminLayout";
 import Layout from "./components/Layout";
 import AnalysisHistoryPage from "./pages/AnalysisHistoryPage";
 import AnalysisPage from "./pages/AnalysisPage";
@@ -29,6 +31,9 @@ import PasswordResetConfirmPage from "./pages/PasswordResetConfirmPage";
 import PasswordResetRequestPage from "./pages/PasswordResetRequestPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminLogsPage from "./pages/admin/AdminLogsPage";
+import AdminMonitoringPage from "./pages/admin/AdminMonitoringPage";
 
 // Wireframe mapping:
 // public landing -> MainPage, signup 4-step -> SignupPage, login -> LoginPage,
@@ -72,6 +77,13 @@ export default function App() {
           <Route path="/medications" element={<MedicationPage />} />
           <Route path="/notifications" element={<NotificationPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+      </Route>
+      <Route element={<AdminRoute />}>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/monitoring" element={<AdminMonitoringPage />} />
+          <Route path="/admin/logs" element={<AdminLogsPage />} />
         </Route>
       </Route>
     </Routes>
