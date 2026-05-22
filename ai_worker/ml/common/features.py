@@ -71,7 +71,9 @@ def add_walk_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 def add_strength_level(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """근력 운동 활동량 구간화"""
-    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
+    df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(
+        float
+    )
     return df, ["근력활동량"]
 
 

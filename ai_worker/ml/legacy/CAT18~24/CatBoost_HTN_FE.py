@@ -30,7 +30,9 @@ warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
 DATA_PATH: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn_all_preprocessed.csv")
-MODEL_DIR: str = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "catboost_HTN_FE")
+MODEL_DIR: str = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "CAT18~24" / "outputs" / "catboost_HTN_FE"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
@@ -82,17 +84,23 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         added += wt_labels
 
     if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
+        df["음주위험군"] = pd.cut(df["음주빈도"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(
+            float
+        )
         added += ["음주위험군"]
         print("  [ON] 음주위험군")
 
     if USE_WALK_LEVEL:
-        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(float)
+        df["걷기활동량"] = pd.cut(df["걷기일수"], bins=[-np.inf, 0, 3, np.inf], labels=[0, 1, 2], right=True).astype(
+            float
+        )
         added += ["걷기활동량"]
         print("  [ON] 걷기활동량")
 
     if USE_STRENGTH:
-        df["근력활동량"] = pd.cut(df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(float)
+        df["근력활동량"] = pd.cut(
+            df["근력운동일수"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True
+        ).astype(float)
         added += ["근력활동량"]
 
     if USE_FAMILY_SUM:

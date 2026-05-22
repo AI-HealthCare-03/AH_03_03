@@ -32,7 +32,9 @@ warnings.filterwarnings("ignore")
 
 # ── 경로 설정 ─────────────────────────────────────────────────
 DATA_PATH = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "data" / "hn2224_preprocessed.csv")
-MODEL_DIR = str(Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs" / "baseline_lgbm_DM_2224")
+MODEL_DIR = str(
+    Path(__file__).parent.parent.parent.parent / "ai_worker" / "ml" / "LGB18~24" / "outputs" / "baseline_lgbm_DM_2224"
+)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 # ── 설정 ──────────────────────────────────────────────────────
