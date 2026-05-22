@@ -1,7 +1,7 @@
 """
 fe_age_bin.py
 ─────────────
-나이 구간화 피처 추가
+나이 구간화 피처 추가 (4구간)
 
 적용 대상: 고혈압 · 당뇨 · 이상지질혈증 (세 질환 공통)
 
@@ -18,14 +18,14 @@ fe_age_bin.py
 import pandas as pd
 
 
-def add_age_bin(df: pd.DataFrame) -> pd.DataFrame:
+def add_age_bin(df: pd.DataFrame, drop_original: bool = False) -> pd.DataFrame:
     """
-    나이 구간화 피처를 추가한 DataFrame 반환.
+    나이 4구간화 피처를 추가한 DataFrame 반환.
 
     Parameters
     ----------
-    df : pd.DataFrame
-        '나이' 컬럼이 포함된 전처리 완료 데이터프레임
+    df             : '나이' 컬럼이 포함된 전처리 완료 데이터프레임
+    drop_original  : True면 원본 '나이' 컬럼 제거
 
     Returns
     -------
@@ -42,5 +42,9 @@ def add_age_bin(df: pd.DataFrame) -> pd.DataFrame:
     print("[fe_age_bin] '나이_구간' 추가 완료")
     print(f"  분포:\n{df['나이_구간'].value_counts().sort_index().to_string()}")
     print("  (0: 19~39세 / 1: 40~49세 / 2: 50~59세 / 3: 60세 이상)")
+
+    if drop_original:
+        df = df.drop(columns=["나이"])
+        print("[fe_age_bin] 원본 '나이' 컬럼 제거")
 
     return df
