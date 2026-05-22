@@ -101,7 +101,7 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         print("  [ON] 나이 구간화")
 
     if USE_BMI_BIN:
-        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
+        df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, np.inf], labels=[0, 1, 2, 3], right=False).astype(float)
         added += ["BMI_구간"]
         print("  [ON] BMI 구간화")
 

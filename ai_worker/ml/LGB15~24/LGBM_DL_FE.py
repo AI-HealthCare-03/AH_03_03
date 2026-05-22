@@ -72,13 +72,13 @@ if USE_AGE_BIN:
 
 # 2. BMI 구간화 (fe_bmi_bin.py 기준, 한국인 기준)
 if USE_BMI_BIN:
-    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, 999], labels=[0, 1, 2, 3], right=False).astype(float)
+    df["BMI_구간"] = pd.cut(df["BMI"], bins=[0, 23, 25, 30, np.inf], labels=[0, 1, 2, 3], right=False).astype(float)
     added += ["BMI_구간"]
     print("  ✅ BMI 구간화: 0=정상/1=과체중/2=비만1/3=비만2")
 
 # 3. 체중 구간화
 if USE_WEIGHT_BIN:
-    wt_bins = [0, 50, 70, 90, 999]
+    wt_bins = [0, 50, 70, 90, np.inf]
     wt_labels = ["체중_저체중", "체중_정상", "체중_과체중", "체중_비만"]
     df["_체중구간"] = pd.cut(df["체중"], bins=wt_bins, labels=wt_labels, right=False)
     for label in wt_labels:
