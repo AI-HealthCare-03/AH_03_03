@@ -85,6 +85,70 @@ Docker Compose 내부에서 API 서버를 실행하는 경우 `DB_HOST=postgres`
 
 ## 🏃 실행 방법
 
+### 0. 웹 MVP 시연용 빠른 실행
+
+현재 웹 MVP는 **FastAPI에서 건강 분석, OCR, 챗봇 응답을 동기 더미 로직으로 처리하는 시연용 구조**입니다.
+실제 ML/CV/LLM 모델 호출은 아직 연결하지 않았고, 프론트 화면 흐름과 API 계약을 확인하기 위한 단순 응답을 사용합니다.
+
+> `Architecture_ver1.drawio`에 정리된 `async_jobs`, Redis Stream, AI Worker, SSE, Notification Worker, Report Worker 구조는
+> 후속 모델 연동/운영 단계에서 도입할 예정입니다. 현재 로컬 MVP 실행에는 필수 구성요소가 아닙니다.
+
+로컬에서 프론트와 백엔드를 같이 확인할 때는 아래 순서로 실행합니다.
+
+```bash
+# 1. PostgreSQL(pgvector) 컨테이너 실행
+docker compose up -d postgres
+
+# 2. 로컬 MVP 테스트용 테이블 생성 및 seed 실행
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+
+# 3. FastAPI 실행
+DB_HOST=localhost uv run uvicorn app.main:app --reload
+
+# 4. React/Vite 프론트 실행
+cd frontend
+npm install
+npm run dev
+```
+
+접속 주소:
+
+- FastAPI Swagger: `http://localhost:8000/docs`
+- FastAPI healthcheck: `http://localhost:8000/api/v1/system/health`
+- React/Vite: `http://localhost:5173`
+
+데모 계정:
+
+- `demo@example.com` / `Demo1234!`
+- `demo_high@example.com` / `Demo1234!`
+
+Seed 포함 데이터:
+
+- FAQ
+- 챌린지 마스터
+- 데모 사용자
+- 건강정보, 분석 결과, 챌린지 참여/로그, 식단, 복약, 알림, 검진표 OCR 시연 데이터
+
+주의:
+
+- `scripts/setup_local_mvp_db.py`는 로컬 MVP 테스트 전용입니다.
+- Aerich migration에 old format 이슈가 남아 있어 로컬 빈 DB는 `setup_local_mvp_db.py`로 보강합니다.
+- 운영/공유 DB는 migration 파일 정리 후 Aerich 기준으로 적용해야 합니다.
+- 루트 `.env`는 백엔드/공용 환경변수용이고, `frontend/.env`는 Vite 프론트용입니다.
+- Firebase Auth와 소셜 로그인은 1차 풀서비스 범위에서 제외/보류합니다. 현재 로그인/회원가입은 FastAPI JWT Auth와 이메일 인증 기준이며, Firebase 전용 사용자 컬럼은 사용하지 않습니다.
+- 향후 소셜 로그인을 재도입할 경우 `users` 테이블에 provider 정보를 직접 넣지 않고 별도 OAuth 계정 연결 테이블을 설계합니다.
+- 로컬 회원가입 이메일 인증은 실제 SMTP 발송 대신 `/api/v1/auth/email-verifications/send` 응답의 `debug_code`로 확인합니다. 프론트는 로컬 테스트 편의를 위해 이 값을 인증코드 입력칸에 자동 반영합니다. 운영 전환 시에는 `debug_code` 응답을 제거하고 실제 이메일 발송으로 교체해야 합니다.
+- 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. 실제 SMTP/메일 발송은 후속 구현 대상입니다.
+- 휴대폰 SMS 인증은 Twilio Verify 기반 구현 대상으로 유지합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용하고, 운영 secret은 환경변수로만 주입합니다.
+- 회원가입 주소는 초기 서비스 지역 확인용 필수 기본정보입니다. 상세주소 수집 범위와 보관 정책은 운영 전 개인정보 최소수집 원칙에 따라 재검토합니다.
+- 풀서비스 관리자 권한은 `users.role`을 기준으로 판단합니다. `is_admin`은 legacy 호환 필드로만 남기고, 관리자 role은 `USER/MONITOR/OPERATOR/ADMIN/SUPER_ADMIN` 구조로 설계합니다. 운영 단계에서는 관리자 서브도메인, 2FA, audit log를 추가해야 합니다.
+- 로그인 실패가 5회 이상 누적되면 CAPTCHA 등 추가 확인을 요구하는 soft-lock 정책을 적용합니다. CAPTCHA 도입 전에는 짧은 제한과 일반화된 안내 메시지를 사용합니다. `/api/v1/system/health`는 DB/Redis 상태를 포함하고, 모든 응답은 `X-Request-ID` 헤더로 요청 추적값을 반환합니다.
+- 로그인 시각은 `last_login_at`을 표준 필드로 사용하고, `last_login`은 legacy 호환 필드로만 유지합니다.
+- 비밀번호 해싱은 Argon2id 단일 방식입니다. 이전 로컬 계정의 예전 해시는 호환하지 않으므로 로그인되지 않으면 재가입하거나 비밀번호 재설정을 진행하세요. 운영 전환 시에는 별도 재설정/전환 정책이 필요합니다.
+- AI Worker, `async_jobs`, Redis queue 기반 비동기 모델 처리 연결은 후속 ML/CV/LLM 운영 연동 단계에서 진행합니다.
+- 풀서비스 1차 범위는 [Full Service Scope](docs/design/full_service_scope.md)를 기준으로 관리합니다. 1차 제외/보류 항목은 소셜 로그인, 웨어러블 연동 2개이며, 휴대폰 SMS 인증은 Twilio Verify 기반 구현 대상으로 유지합니다.
+- 코치님/조교님 피드백 반영 기준은 [Requirements Refactor Notes](docs/design/requirements_refactor_notes.md)에 정리합니다. 요구사항 정의서는 사용자 기능 중심으로 유지하고, NFR/아키텍처/재시도/공통 컴포넌트는 별도 설계 문서로 분리합니다.
+
 ### 1. 로컬 및 개발 환경
 
 #### Docker Compose로 전체 스택 실행
@@ -112,7 +176,7 @@ uv run --group app aerich upgrade
 
 **FastAPI 서버 실행:**
 ```bash
-uv run uvicorn app.main:app --reload
+DB_HOST=localhost uv run uvicorn app.main:app --reload
 # or
 docker compose up -d --build app
 ```
@@ -130,7 +194,7 @@ docker compose up -d --build ai_worker
 
 ```bash
 docker compose up -d postgres
-uv run python scripts/setup_local_mvp_db.py
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 ```
 
 생성되는 데모 계정:

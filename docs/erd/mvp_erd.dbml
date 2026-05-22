@@ -103,19 +103,29 @@ Enum rag_disease_type {
 
 Table users {
   id bigint [pk, increment]
+  login_id varchar(40) [unique]
   email varchar(40) [not null, unique]
-  hashed_password varchar(128) [not null]
+  hashed_password varchar(255) [not null]
   name varchar(20) [not null]
+  nickname varchar(30)
   gender gender [not null]
   birthday date [not null]
   phone_number varchar(11) [not null, unique]
+  address varchar(255)
+  profile_image_url varchar(500)
+  role varchar(20) [not null, default: 'USER']
   is_active boolean [not null, default: true]
   is_admin boolean [not null, default: false]
   last_login timestamptz
+  last_login_at timestamptz
+  failed_login_count int [not null, default: 0]
+  locked_until timestamptz
+  deactivated_at timestamptz
+  email_verified_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "AUTH / USER 기준 테이블. 현재 MVP에서는 일반 사용자 기능 중심으로 사용한다."
+  Note: "AUTH / USER 기준 테이블. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이며 last_login은 legacy 호환 필드로 유지한다."
 }
 
 Table health_records {
@@ -137,6 +147,15 @@ Table health_records {
   has_obesity boolean
   has_dyslipidemia boolean
   has_hypertension boolean
+  occupation_code varchar(30)
+  family_htn varchar(10)
+  family_dm varchar(10)
+  family_dyslipidemia varchar(10)
+  smoking_status varchar(20)
+  drinking_frequency varchar(30)
+  drinking_amount varchar(30)
+  walking_days_per_week int
+  strength_days_per_week int
   is_smoker boolean
   drinks_alcohol boolean
   exercise_days_per_week int
@@ -149,7 +168,7 @@ Table health_records {
     (user_id, measured_at)
   }
 
-  Note: "사용자의 건강정보 입력 이력. 당뇨/비만/이상지질혈증 분석 입력 기준으로 사용하며, 혈압/고혈압 항목은 참고 위험요인으로 유지한다."
+  Note: "사용자의 건강정보 입력 이력. x1 기본 분석 입력은 직업군/질병별 가족력/흡연/음주/걷기/근력운동을 포함하며, BMI는 신장/체중 기반 자동 계산값으로 저장한다. 교육수준/소득수준은 기본 필수 입력에서 제외한다."
 }
 
 Table exam_reports {
