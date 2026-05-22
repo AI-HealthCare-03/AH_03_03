@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.exams import (
@@ -15,6 +15,7 @@ from app.dtos.exams import (
 )
 from app.models.users import User
 from app.services import exams as exam_service
+from app.services.sensitive_access_logs import safe_record_sensitive_access
 
 exam_router = APIRouter(prefix="/exams", tags=["exams"])
 
@@ -25,14 +26,34 @@ async def create_exam_report(request: ExamReportCreateRequest, user: Annotated[U
 
 
 @exam_router.get("", response_model=list[ExamReportResponse])
-async def list_exam_reports(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
+async def list_exam_reports(
+    request: Request,
+    user: Annotated[User, Depends(get_request_user)],
+    limit: int = 20,
+    offset: int = 0,
+):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="EXAM_REPORT",
+        access_reason="exam_reports.list",
+    )
     return await exam_service.list_exam_reports(user.id, limit=limit, offset=offset)
 
 
 @exam_router.get("/{exam_id}", response_model=ExamReportResponse)
-async def get_exam_report(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_exam_report(exam_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
     ensure_owner(report.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=report.user_id,
+        resource_type="EXAM_REPORT",
+        resource_id=report.id,
+        access_reason="exam_reports.detail",
+    )
     return report
 
 
@@ -84,9 +105,17 @@ async def create_exam_measurements(
 
 
 @exam_router.get("/{exam_id}/measurements", response_model=list[ExamMeasurementResponse])
-async def list_exam_measurements(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def list_exam_measurements(exam_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
     ensure_owner(report.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=report.user_id,
+        resource_type="EXAM_MEASUREMENT",
+        resource_id=report.id,
+        access_reason="exam_measurements.list",
+    )
     return await exam_service.list_exam_measurements(exam_id)
 
 

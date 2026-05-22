@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.apis.v1.dependencies import get_request_user
 from app.core import config
@@ -19,6 +19,7 @@ from app.services import diets as diet_service
 from app.services import health as health_service
 from app.services import medications as medication_service
 from app.services import notifications as notification_service
+from app.services.sensitive_access_logs import safe_record_sensitive_access
 
 dashboard_router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -49,7 +50,14 @@ def _in_range(value: date, date_from: date | None, date_to: date) -> bool:
 
 
 @dashboard_router.get("/summary", response_model=DashboardSummaryResponse)
-async def get_dashboard_summary(user: Annotated[User, Depends(get_request_user)]):
+async def get_dashboard_summary(request: Request, user: Annotated[User, Depends(get_request_user)]):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="DASHBOARD",
+        access_reason="dashboard.summary",
+    )
     latest_health_record = await health_service.get_latest_health_record(user.id)
     unread_notifications = await notification_service.list_unread_notifications(user.id, limit=1000)
     active_challenge_count = await challenge_service.count_active_user_challenges(user.id)
@@ -63,7 +71,14 @@ async def get_dashboard_summary(user: Annotated[User, Depends(get_request_user)]
 
 
 @dashboard_router.get("/health", response_model=DashboardHealthResponse)
-async def get_dashboard_health(user: Annotated[User, Depends(get_request_user)]):
+async def get_dashboard_health(request: Request, user: Annotated[User, Depends(get_request_user)]):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="DASHBOARD",
+        access_reason="dashboard.health",
+    )
     return {
         "latest_health_record": await health_service.get_latest_health_record(user.id),
         "recent_health_records": await health_service.list_health_records(user.id, limit=5),
@@ -92,7 +107,18 @@ async def get_dashboard_medications(user: Annotated[User, Depends(get_request_us
 
 
 @dashboard_router.get("/trends", response_model=DashboardTrendsResponse)
-async def get_dashboard_trends(user: Annotated[User, Depends(get_request_user)], period: str = "week"):
+async def get_dashboard_trends(
+    request: Request,
+    user: Annotated[User, Depends(get_request_user)],
+    period: str = "week",
+):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="DASHBOARD",
+        access_reason="dashboard.trends",
+    )
     normalized_period, date_from, date_to = _normalize_period(period)
     query_limit = 1000 if date_from is None else TREND_PERIOD_DAYS[period] or 1000
     health_records = [

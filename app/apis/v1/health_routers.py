@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.health import (
@@ -11,6 +11,7 @@ from app.dtos.health import (
 )
 from app.models.users import User
 from app.services import health as health_service
+from app.services.sensitive_access_logs import safe_record_sensitive_access
 
 health_router = APIRouter(prefix="/health", tags=["health"])
 
@@ -21,12 +22,31 @@ async def create_health_record(request: HealthRecordCreateRequest, user: Annotat
 
 
 @health_router.get("/records", response_model=list[HealthRecordResponse])
-async def list_health_records(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
+async def list_health_records(
+    request: Request,
+    user: Annotated[User, Depends(get_request_user)],
+    limit: int = 20,
+    offset: int = 0,
+):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="HEALTH_RECORD",
+        access_reason="health_records.list",
+    )
     return await health_service.list_health_records(user.id, limit=limit, offset=offset)
 
 
 @health_router.get("/records/latest", response_model=HealthRecordResponse | None)
-async def get_latest_health_record(user: Annotated[User, Depends(get_request_user)]):
+async def get_latest_health_record(request: Request, user: Annotated[User, Depends(get_request_user)]):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="HEALTH_RECORD",
+        access_reason="health_records.latest",
+    )
     return await health_service.get_latest_health_record(user.id)
 
 
@@ -36,9 +56,17 @@ async def get_analysis_readiness(user: Annotated[User, Depends(get_request_user)
 
 
 @health_router.get("/records/{record_id}", response_model=HealthRecordResponse)
-async def get_health_record(record_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_health_record(record_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     record = ensure_found(await health_service.get_health_record(record_id), "건강 기록을 찾을 수 없습니다.")
     ensure_owner(record.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=record.user_id,
+        resource_type="HEALTH_RECORD",
+        resource_id=record.id,
+        access_reason="health_records.detail",
+    )
     return record
 
 

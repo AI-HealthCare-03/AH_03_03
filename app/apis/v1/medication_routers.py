@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.medications import (
@@ -17,6 +17,7 @@ from app.dtos.medications import (
 )
 from app.models.users import User
 from app.services import medications as medication_service
+from app.services.sensitive_access_logs import safe_record_sensitive_access
 
 medication_router = APIRouter(prefix="/medications", tags=["medications"])
 
@@ -28,12 +29,20 @@ async def create_medication(request: MedicationCreateRequest, user: Annotated[Us
 
 @medication_router.get("", response_model=list[MedicationResponse])
 async def list_medications(
+    request: Request,
     user: Annotated[User, Depends(get_request_user)],
     is_active: bool | None = None,
     medication_type: str | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="MEDICATION",
+        access_reason="medications.list",
+    )
     return await medication_service.list_medications(
         user_id=user.id,
         is_active=is_active,
@@ -65,11 +74,19 @@ async def confirm_medication_ocr(
 
 
 @medication_router.get("/{medication_id}", response_model=MedicationResponse)
-async def get_medication(medication_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_medication(medication_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     medication = ensure_found(
         await medication_service.get_medication(medication_id), "복약/영양제 정보를 찾을 수 없습니다."
     )
     ensure_owner(medication.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=medication.user_id,
+        resource_type="MEDICATION",
+        resource_id=medication.id,
+        access_reason="medications.detail",
+    )
     return medication
 
 
@@ -125,6 +142,7 @@ async def create_medication_record(
 @medication_router.get("/{medication_id}/records", response_model=list[MedicationRecordResponse])
 async def list_medication_records(
     medication_id: int,
+    request: Request,
     user: Annotated[User, Depends(get_request_user)],
     status: str | None = None,
     limit: int = 20,
@@ -134,6 +152,14 @@ async def list_medication_records(
         await medication_service.get_medication(medication_id), "복약/영양제 정보를 찾을 수 없습니다."
     )
     ensure_owner(medication.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=medication.user_id,
+        resource_type="MEDICATION",
+        resource_id=medication.id,
+        access_reason="medication_records.list",
+    )
     return await medication_service.list_medication_records(
         user_id=user.id,
         medication_id=medication_id,
