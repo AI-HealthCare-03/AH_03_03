@@ -202,12 +202,24 @@ npm run dev
 - `demo@example.com` / `Demo1234!`
 - `demo_high@example.com` / `Demo1234!`
 
+관리자 콘솔 로컬 계정:
+
+- `admin@example.com` / `Demo1234!` (`SUPER_ADMIN`)
+- `monitor@example.com` / `Demo1234!` (`MONITOR`)
+
+관리자 콘솔 진입:
+
+1. `DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py`로 로컬 seed를 실행한다.
+2. 관리자 계정으로 로그인한다.
+3. 좌측 사이드바의 “관리자 콘솔”을 클릭하거나 `/admin`에 직접 접속한다.
+4. `MONITOR` 계정은 시스템 상태와 오류 로그 조회 중심이며, 민감정보 접근 로그는 `ADMIN` 이상 정책에 따라 제한될 수 있다.
+
 Seed 실행 내용:
 
 - `scripts/init_local_dev_db.py`: 로컬 MVP용 Tortoise schema 생성
 - `scripts/seed_mvp_challenges.py`: 챌린지 마스터 생성
 - `scripts/seed_mvp_faqs.py`: FAQ 생성
-- `scripts/seed_demo_users.py`: 데모 사용자와 건강정보/분석/챌린지/식단/복약/알림 데이터 생성
+- `scripts/seed_demo_users.py`: 데모 사용자와 건강정보/분석/챌린지/식단/복약/알림 데이터, 로컬 관리자 콘솔 계정 생성
 - `scripts/setup_local_mvp_db.py`: 위 흐름 통합 실행
 
 주의:

@@ -122,6 +122,18 @@ npm run dev
 - `demo@example.com` / `Demo1234!`
 - `demo_high@example.com` / `Demo1234!`
 
+관리자 콘솔 로컬 계정:
+
+- SUPER_ADMIN: `admin@example.com` / `Demo1234!`
+- MONITOR: `monitor@example.com` / `Demo1234!`
+
+관리자 콘솔 접속:
+
+1. 위 로컬 실행 순서대로 DB seed, 백엔드, 프론트를 실행합니다.
+2. `admin@example.com` 또는 `monitor@example.com`으로 로그인합니다.
+3. 좌측 사이드바의 “관리자 콘솔”을 클릭하거나 `/admin`으로 이동합니다.
+4. `monitor@example.com`은 시스템 상태와 오류 로그 조회 중심으로 접근하며, 민감정보 접근 로그는 `ADMIN` 이상 정책에 따라 제한될 수 있습니다.
+
 Seed 포함 데이터:
 
 - FAQ
@@ -204,6 +216,8 @@ DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 생성되는 데모 계정:
 - `demo@example.com` / `Demo1234!`
 - `demo_high@example.com` / `Demo1234!`
+- `admin@example.com` / `Demo1234!` (`SUPER_ADMIN`)
+- `monitor@example.com` / `Demo1234!` (`MONITOR`)
 
 ### 2. EC2 배포 환경 (Production)
 
