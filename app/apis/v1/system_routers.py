@@ -3,6 +3,7 @@ from redis.asyncio import Redis
 from tortoise import Tortoise
 
 from app.core import config
+from app.services.email_service import EmailService
 
 system_router = APIRouter(prefix="/system", tags=["system"])
 
@@ -15,6 +16,7 @@ async def get_system_health():
         "redis": "unknown",
         "request_id": "ok",
         "system_error_logging": "ok",
+        "email_service": EmailService().status(),
     }
     details: dict[str, str] = {}
 
@@ -48,7 +50,7 @@ async def get_system_health():
 
     if checks["database"] == "error":
         overall_status = "error"
-    elif any(value in {"degraded", "error", "not_configured"} for value in checks.values()):
+    elif any(value in {"degraded", "error", "not_configured", "misconfigured"} for value in checks.values()):
         overall_status = "degraded"
     else:
         overall_status = "ok"

@@ -137,8 +137,8 @@ Seed 포함 데이터:
 - 루트 `.env`는 백엔드/공용 환경변수용이고, `frontend/.env`는 Vite 프론트용입니다.
 - Firebase Auth와 소셜 로그인은 1차 풀서비스 범위에서 제외/보류합니다. 현재 로그인/회원가입은 FastAPI JWT Auth와 이메일 인증 기준이며, Firebase 전용 사용자 컬럼은 사용하지 않습니다.
 - 향후 소셜 로그인을 재도입할 경우 `users` 테이블에 provider 정보를 직접 넣지 않고 별도 OAuth 계정 연결 테이블을 설계합니다.
-- 로컬 회원가입 이메일 인증은 실제 SMTP 발송 대신 `/api/v1/auth/email-verifications/send` 응답의 `debug_code`로 확인합니다. 프론트는 로컬 테스트 편의를 위해 이 값을 인증코드 입력칸에 자동 반영합니다. 운영 전환 시에는 `debug_code` 응답을 제거하고 실제 이메일 발송으로 교체해야 합니다.
-- 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. 실제 SMTP/메일 발송은 후속 구현 대상입니다.
+- 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 대신 `/api/v1/auth/email-verifications/send` 응답의 `debug_code`로 확인합니다. 프론트는 로컬 테스트 편의를 위해 이 값을 인증코드 입력칸에 자동 반영합니다.
+- 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. `EMAIL_ENABLED=true`와 SMTP 환경변수를 설정하면 실제 인증코드/비밀번호 재설정 링크를 발송합니다.
 - 휴대폰 SMS 인증은 Twilio Verify 기반 구현 대상으로 유지합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용하고, 운영 secret은 환경변수로만 주입합니다.
 - 회원가입 주소는 초기 서비스 지역 확인용 필수 기본정보입니다. 상세주소 수집 범위와 보관 정책은 운영 전 개인정보 최소수집 원칙에 따라 재검토합니다.
 - 풀서비스 관리자 권한은 `users.role`을 기준으로 판단합니다. `is_admin`은 legacy 호환 필드로만 남기고, 관리자 role은 `USER/MONITOR/OPERATOR/ADMIN/SUPER_ADMIN` 구조로 설계합니다. 운영 단계에서는 관리자 서브도메인, 2FA, audit log를 추가해야 합니다.
