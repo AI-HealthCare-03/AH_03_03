@@ -1,9 +1,36 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 
+import { listUnreadNotifications } from "../api/notifications";
 import { useAuth } from "../auth/AuthContext";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
   const { backendUser, isAuthenticated, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return undefined;
+    }
+
+    const loadUnreadCount = async () => {
+      try {
+        const unreadItems = await listUnreadNotifications<unknown[]>();
+        setUnreadCount(Array.isArray(unreadItems) ? unreadItems.length : 0);
+      } catch {
+        setUnreadCount(0);
+      }
+    };
+
+    void loadUnreadCount();
+    const intervalId = window.setInterval(() => {
+      void loadUnreadCount();
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isAuthenticated]);
 
   return (
     <header className="topbar">
@@ -12,12 +39,14 @@ export default function Navbar() {
         HealthCare
       </Link>
       <div className="navbar-actions">
+        <ThemeToggle />
         {isAuthenticated ? (
           <>
             <Link className="icon-button" to="/notifications" aria-label="알림">
               알림
+              {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
             </Link>
-            <Link className="icon-button" to="/inquiries" aria-label="채팅">
+            <Link className="icon-button" to="/chatbot" aria-label="AI 건강 상담">
               상담
             </Link>
             <Link className="user-chip" to="/mypage">

@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
-import { getDashboardSummary, getDashboardTrends } from "../api/dashboard";
+import {
+  getDashboardChallenges,
+  getDashboardDiets,
+  getDashboardHealth,
+  getDashboardMedications,
+  getDashboardSummary,
+  getDashboardTrends,
+} from "../api/dashboard";
+import { listExams, listMeasurements } from "../api/exams";
 import Card from "../components/Card";
 
 type DashboardData = Record<string, unknown>;
@@ -46,30 +55,129 @@ function Bars({ items }: { items: Record<string, unknown>[] }) {
   );
 }
 
+const analysisMetrics = [
+  {
+    key: "blood",
+    label: "혈당/혈압 변화",
+    description: "최근 입력된 건강 기록을 기준으로 혈당과 혈압 변화를 확인합니다.",
+    trendKeys: ["glucose", "blood_pressure"],
+    ready: true,
+  },
+  {
+    key: "weight",
+    label: "체중/BMI 변화",
+    description: "최근 체중과 BMI 변화를 확인합니다.",
+    trendKeys: ["weight", "bmi"],
+    ready: true,
+  },
+  {
+    key: "exercise",
+    label: "운동 수행률",
+    description: "걷기와 근력운동 입력값을 기준으로 활동 상태를 확인합니다.",
+    trendKeys: ["exercise"],
+    ready: true,
+  },
+  {
+    key: "diet",
+    label: "식단 점수 변화",
+    description: "최근 식단 기록의 점수 변화를 확인합니다.",
+    trendKeys: ["diet_score"],
+    ready: true,
+  },
+  {
+    key: "medication",
+    label: "복약/영양제 수행률",
+    description: "등록된 복약/영양제 기록을 기준으로 수행 상태를 확인합니다.",
+    trendKeys: ["medication"],
+    ready: true,
+  },
+] as const;
+
+type AnyRecord = Record<string, unknown>;
+
+function formatDate(value: unknown): string {
+  if (!value) return "-";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return "-";
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}.${mo}.${day}`;
+}
+
+function getExamMeasurement(measurements: AnyRecord[], key: string): AnyRecord | null {
+  return measurements.find((m) => String(m.measurement_key) === key) ?? null;
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardData>({});
+  const [healthSection, setHealthSection] = useState<DashboardData>({});
+  const [challengeSection, setChallengeSection] = useState<DashboardData>({});
+  const [dietSection, setDietSection] = useState<DashboardData>({});
+  const [medicationSection, setMedicationSection] = useState<DashboardData>({});
   const [trends, setTrends] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [activeMetricKey, setActiveMetricKey] = useState<(typeof analysisMetrics)[number]["key"]>("blood");
+  const [latestExam, setLatestExam] = useState<AnyRecord | null>(null);
+  const [examMeasurements, setExamMeasurements] = useState<AnyRecord[]>([]);
 
   useEffect(() => {
     const load = async () => {
-      setSummary(await getDashboardSummary<DashboardData>());
-      setTrends(await getDashboardTrends<Record<string, Record<string, unknown>[]>>("week"));
+      const [summaryResult, trendsResult, healthResult, challengeResult, dietResult, medicationResult, examList] =
+        await Promise.allSettled([
+        getDashboardSummary<DashboardData>(),
+        getDashboardTrends<Record<string, Record<string, unknown>[]>>("week"),
+        getDashboardHealth<DashboardData>(),
+        getDashboardChallenges<DashboardData>(),
+        getDashboardDiets<DashboardData>(),
+        getDashboardMedications<DashboardData>(),
+        listExams<AnyRecord[]>({ limit: 1 }),
+      ]);
+      if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
+      if (trendsResult.status === "fulfilled") setTrends(trendsResult.value);
+      if (healthResult.status === "fulfilled") setHealthSection(healthResult.value);
+      if (challengeResult.status === "fulfilled") setChallengeSection(challengeResult.value);
+      if (dietResult.status === "fulfilled") setDietSection(dietResult.value);
+      if (medicationResult.status === "fulfilled") setMedicationSection(medicationResult.value);
+      const examRecords = examList.status === "fulfilled" && Array.isArray(examList.value) ? examList.value : [];
+      const firstExam = examRecords[0] && typeof examRecords[0] === "object" ? (examRecords[0] as AnyRecord) : null;
+      setLatestExam(firstExam);
+      if (firstExam?.id) {
+        try {
+          const measurements = await listMeasurements(Number(firstExam.id));
+          setExamMeasurements(measurements as unknown as AnyRecord[]);
+        } catch {
+          setExamMeasurements([]);
+        }
+      }
     };
     void load().catch(() => undefined);
   }, []);
 
-  const latest = (summary.latest_health_record ?? {}) as HealthRecord;
+  const latest = (healthSection.latest_health_record ?? summary.latest_health_record ?? {}) as HealthRecord;
+  const dashboardDiets = Array.isArray(dietSection.recent_diet_records)
+    ? (dietSection.recent_diet_records as AnyRecord[])
+    : [];
+  const dashboardMedications = Array.isArray(medicationSection.active_medications)
+    ? (medicationSection.active_medications as AnyRecord[])
+    : [];
+  const dashboardMedicationRecords = Array.isArray(medicationSection.recent_medication_records)
+    ? (medicationSection.recent_medication_records as AnyRecord[])
+    : [];
+  const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
+    ? (challengeSection.user_challenges as AnyRecord[])
+    : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
-  const dietScore = latestValue(trends.diet_score);
+  const dietScore = dashboardDiets[0]?.diet_score ? String(dashboardDiets[0].diet_score) : latestValue(trends.diet_score);
   const metrics = [
     ["혈당", latest.fasting_glucose ?? "-"],
     ["혈압", `${String(latest.systolic_bp ?? "-")}/${String(latest.diastolic_bp ?? "-")}`],
     ["체중", latest.weight_kg ?? "-"],
     ["챌린지 수행률", challengeRate],
     ["식단 점수", dietScore],
-    ["복약/영양제", `${String(summary.active_medication_count ?? 0)}개`],
-    ["수면 시간", latest.sleep_hours ?? "-"],
+    ["복약/영양제", `${String(dashboardMedications.length || summary.active_medication_count || 0)}개`],
   ];
+  const activeMetric = analysisMetrics.find((metric) => metric.key === activeMetricKey) ?? analysisMetrics[0];
+  const activeTrendItems = activeMetric.trendKeys.flatMap((key) => trends[key] ?? []);
 
   return (
     <div className="page-stack">
@@ -90,17 +198,27 @@ export default function DashboardPage() {
       <div className="dashboard-grid">
         <Card title="분석 항목">
           <div className="card-list">
-            {["혈당/혈압 변화", "체중/BMI 변화", "수면 변화", "운동 수행률", "식단 점수 변화", "복약/영양제 수행률", "수분 섭취 수행률"].map(
-              (item, index) => (
-                <span className={index === 0 ? "filter-tab active" : "filter-tab"} key={item}>
-                  {item}
-                </span>
-              ),
-            )}
+            {analysisMetrics.map((item) => (
+              <button
+                className={activeMetricKey === item.key ? "filter-tab active" : "filter-tab"}
+                disabled={!item.ready}
+                key={item.key}
+                onClick={() => setActiveMetricKey(item.key)}
+                type="button"
+              >
+                {item.label}
+                {!item.ready && <span className="badge badge-reference">준비 중</span>}
+              </button>
+            ))}
           </div>
         </Card>
-        <Card title="혈당/혈압 변화">
-          <div className="mock-chart" />
+        <Card title={activeMetric.label}>
+          <p className="muted">{activeMetric.description}</p>
+          {activeTrendItems.length > 0 ? (
+            <Bars items={activeTrendItems} />
+          ) : (
+            <div className="state-box">표시할 추적 데이터가 없습니다.</div>
+          )}
         </Card>
       </div>
       <div className="page-grid">
@@ -120,7 +238,80 @@ export default function DashboardPage() {
           <Bars items={trends.diet_score ?? []} />
         </Card>
         <Card title="추천 챌린지">
-          <p>식후 산책, 물 마시기, 혈압 기록하기 같은 기본 챌린지를 먼저 시작해보세요.</p>
+          {dashboardChallenges.length > 0 ? (
+            <div className="card-list">
+              {dashboardChallenges.slice(0, 3).map((challenge) => (
+                <div className="mini-card" key={String(challenge.id)}>
+                  <strong>{String((challenge.challenge as AnyRecord | undefined)?.title ?? "참여 중인 챌린지")}</strong>
+                  <p className="muted">{String(challenge.status ?? "진행 중")}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>식후 산책, 물 마시기, 혈압 기록하기 같은 기본 챌린지를 먼저 시작해보세요.</p>
+          )}
+        </Card>
+        <Card title="복약 수행 요약">
+          {dashboardMedicationRecords.length > 0 ? (
+            <div className="card-list">
+              {dashboardMedicationRecords.slice(0, 3).map((record) => (
+                <div className="mini-card" key={String(record.id)}>
+                  <strong>{record.is_taken ? "복용 완료" : "복용 대기"}</strong>
+                  <p className="muted">{String(record.scheduled_at ?? record.created_at ?? "-")}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="state-box">최근 복약 기록이 없습니다.</div>
+          )}
+        </Card>
+        <Card
+          title="최근 검진표"
+          actions={
+            <Link className="button secondary" to="/ocr/exam">
+              검진표 입력
+            </Link>
+          }
+        >
+          {latestExam ? (
+            <div className="metric-grid">
+              <div>
+                <span>검진일</span>
+                <strong>{formatDate(latestExam.exam_date ?? latestExam.uploaded_at)}</strong>
+              </div>
+              <div>
+                <span>혈압</span>
+                <strong>
+                  {(() => {
+                    const sys = getExamMeasurement(examMeasurements, "systolic_bp");
+                    const dia = getExamMeasurement(examMeasurements, "diastolic_bp");
+                    if (sys?.value && dia?.value) return `${String(sys.value)}/${String(dia.value)} mmHg`;
+                    return "-";
+                  })()}
+                </strong>
+              </div>
+              <div>
+                <span>공복혈당</span>
+                <strong>
+                  {(() => {
+                    const m = getExamMeasurement(examMeasurements, "fasting_glucose");
+                    return m?.value ? `${String(m.value)} mg/dL` : "-";
+                  })()}
+                </strong>
+              </div>
+              <div>
+                <span>총콜레스테롤</span>
+                <strong>
+                  {(() => {
+                    const m = getExamMeasurement(examMeasurements, "total_cholesterol");
+                    return m?.value ? `${String(m.value)} mg/dL` : "-";
+                  })()}
+                </strong>
+              </div>
+            </div>
+          ) : (
+            <div className="state-box">등록된 검진표가 없습니다. 검진표를 업로드하면 주요 수치를 자동으로 정리합니다.</div>
+          )}
         </Card>
       </div>
     </div>
