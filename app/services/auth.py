@@ -30,6 +30,7 @@ from app.dtos.settings import UserSettingCreateRequest
 from app.models.users import User
 from app.repositories import setting_repository
 from app.repositories.user_repository import UserRepository
+from app.services.email_service import EmailConfigurationError, EmailDeliveryError, EmailService
 from app.services.jwt import JwtService
 
 VERIFICATION_CODE_TTL_MINUTES = 10
@@ -43,6 +44,7 @@ class AuthService:
     def __init__(self):
         self.user_repo = UserRepository()
         self.jwt_service = JwtService()
+        self.email_service = EmailService()
 
     async def signup(self, data: SignUpRequest) -> User:
         login_id = data.login_id or self._default_login_id(str(data.email))
@@ -164,6 +166,7 @@ class AuthService:
         )
 
     async def send_email_verification_code(self, email: str | EmailStr) -> str:
+        self._ensure_email_delivery_available()
         code = f"{randint(0, 999999):06d}"
         expires_at = datetime.now(config.TIMEZONE) + timedelta(minutes=VERIFICATION_CODE_TTL_MINUTES)
         await self.user_repo.create_verification_code(
@@ -171,6 +174,18 @@ class AuthService:
             code_hash=self._digest(code),
             expires_at=expires_at,
         )
+        try:
+            await self.email_service.send_email_verification_code(str(email), code)
+        except EmailConfigurationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="이메일 발송 설정이 필요합니다.",
+            ) from exc
+        except EmailDeliveryError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="이메일 발송을 처리할 수 없습니다.",
+            ) from exc
         return code
 
     async def send_phone_verification_code(self, phone_number: str) -> str | None:
@@ -226,6 +241,7 @@ class AuthService:
         return True
 
     async def request_password_reset(self, email: str | EmailStr) -> str:
+        self._ensure_email_delivery_available()
         user = await self.user_repo.get_user_by_email(str(email))
         token = secrets.token_urlsafe(32)
         if user is not None:
@@ -235,6 +251,19 @@ class AuthService:
                 token_hash=self._digest(token),
                 expires_at=expires_at,
             )
+            reset_url = self._password_reset_url(token)
+            try:
+                await self.email_service.send_password_reset_email(str(email), reset_url)
+            except EmailConfigurationError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="이메일 발송 설정이 필요합니다.",
+                ) from exc
+            except EmailDeliveryError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="이메일 발송을 처리할 수 없습니다.",
+                ) from exc
         return token
 
     async def confirm_password_reset(self, data: PasswordResetConfirmRequest) -> None:
@@ -285,6 +314,19 @@ class AuthService:
 
     def _phone_verification_key(self, phone_number: str) -> str:
         return f"phone:{phone_number}"
+
+    def _password_reset_url(self, token: str) -> str:
+        base_url = config.FRONTEND_BASE_URL.rstrip("/")
+        encoded_token = urllib.parse.quote(token, safe="")
+        return f"{base_url}/password-reset/confirm?token={encoded_token}"
+
+    def _ensure_email_delivery_available(self) -> None:
+        email_status = self.email_service.status()
+        if email_status == "misconfigured" or (config.is_production and email_status != "configured"):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="이메일 발송 설정이 필요합니다.",
+            )
 
     def _to_e164_kr(self, phone_number: str) -> str:
         normalized = normalize_phone_number(phone_number)

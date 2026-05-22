@@ -39,6 +39,15 @@ class Config(BaseSettings):
     TWILIO_ACCOUNT_SID: str | None = None
     TWILIO_AUTH_TOKEN: str | None = None
     TWILIO_VERIFY_SERVICE_SID: str | None = None
+    EMAIL_ENABLED: bool = False
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str | None = None
+    SMTP_FROM_NAME: str = "AI HealthCare"
+    SMTP_USE_TLS: bool = True
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
 
     COOKIE_DOMAIN: str = "localhost"
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
