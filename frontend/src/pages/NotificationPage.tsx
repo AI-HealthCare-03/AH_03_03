@@ -16,6 +16,7 @@ import {
   type ReminderType,
 } from "../api/notifications";
 import Card from "../components/Card";
+import { formatDateTime, formatRelativeTime } from "../utils/format";
 
 type Notification = {
   id: number;
@@ -86,33 +87,6 @@ const emptyScheduleDraft: ReminderSchedulePayload = {
 
 function getNotificationType(item: Notification): string {
   return String(item.notification_type ?? item.type ?? "SYSTEM").toUpperCase();
-}
-
-function formatDateTime(value: unknown): string {
-  if (!value) return "날짜 없음";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "날짜 없음";
-  return date.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-
-function formatRelativeTime(value: unknown): string {
-  if (!value) return "날짜 없음";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "날짜 없음";
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
-  if (diffMinutes < 1) return "방금 전";
-  if (diffMinutes < 60) return `${diffMinutes}분 전`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}시간 전`;
-  return formatDateTime(value);
 }
 
 export default function NotificationPage() {
@@ -563,9 +537,9 @@ function LogSection({ logs }: { logs: NotificationLog[] }) {
           <p className="muted">{log.message_summary ?? "요약 메시지가 없습니다."}</p>
           <div className="notification-log-meta">
             <span>유형: {notificationTypeLabel[log.notification_type] ?? reminderTypeLabels[log.notification_type] ?? log.notification_type}</span>
-            <span>생성: {formatDateTime(log.created_at)}</span>
-            <span>발송: {formatDateTime(log.sent_at)}</span>
-            <span>실패: {formatDateTime(log.failed_at)}</span>
+            <span title={formatDateTime(log.created_at)}>생성: {formatRelativeTime(log.created_at)}</span>
+            <span title={formatDateTime(log.sent_at)}>발송: {formatRelativeTime(log.sent_at)}</span>
+            <span title={formatDateTime(log.failed_at)}>실패: {formatRelativeTime(log.failed_at)}</span>
           </div>
           {log.status === "FAILED" && <div className="state-box">발송 처리 중 오류가 발생했습니다. 잠시 후 다시 확인해주세요.</div>}
         </article>
