@@ -60,6 +60,7 @@ ai_worker/ml/LGB18~24/outputs/
 
 # Dataset / model artifacts
 *.csv
+!docs/data/challenges/*.csv
 *.parquet
 *.pkl
 *.joblib
