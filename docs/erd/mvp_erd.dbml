@@ -4,17 +4,25 @@
 // - AUTH / USER
 // - MAIN / MYPAGE
 // - HEALTH
+// - EXAM / OCR Dummy
 // - ANALYSIS + SHAP
 // - CHALLENGE
+// - RAG 공식 문서/청크 메타데이터 관리
 // - DASHBOARD 조회/집계
 // - NOTIFICATION 최소기능
+// - DIET 최소 기록
+// - MEDICATION/SUPPLEMENT 최소 기록
+// - FAQ
+// - SETTINGS
 //
 // 제외:
-// - DIET 실서비스 DB
+// - DIET 실서비스 DB 상세 테이블
 // - LLM 실서비스 DB
 // - FAMILY
 // - QNA
-// - MEDICATION
+// - MEDICATION/SUPPLEMENT 실서비스 DB 상세 테이블
+// - FAQ 실서비스 DB 상세 테이블
+// - SETTINGS 실서비스 DB 상세 테이블
 // - ADMIN
 // - 운영 로그 상세
 // - 외부 알림 SMS/Email/Push/Kakao
@@ -43,7 +51,16 @@ Enum async_job_status {
 
 Enum analysis_type {
   DIABETES
-  HYPERTENSION
+  OBESITY
+  DYSLIPIDEMIA
+}
+
+Enum ocr_status {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CONFIRMED
 }
 
 Enum risk_level {
@@ -79,6 +96,13 @@ Enum user_challenge_status {
   CANCELED
 }
 
+Enum rag_disease_type {
+  DIABETES
+  OBESITY
+  DYSLIPIDEMIA
+  COMMON
+}
+
 Enum notification_type {
   ANALYSIS_COMPLETED
   CHALLENGE_RECOMMENDED
@@ -107,12 +131,19 @@ Table health_records {
   user_id bigint [not null, ref: > users.id]
   height_cm decimal(5,2)
   weight_kg decimal(5,2)
+  waist_cm decimal(5,2)
   bmi decimal(5,2)
   systolic_bp int
   diastolic_bp int
   fasting_glucose int
   hba1c decimal(4,2)
+  total_cholesterol int
+  ldl_cholesterol int
+  hdl_cholesterol int
+  triglyceride int
   has_diabetes boolean
+  has_obesity boolean
+  has_dyslipidemia boolean
   has_hypertension boolean
   is_smoker boolean
   drinks_alcohol boolean
@@ -126,7 +157,49 @@ Table health_records {
     (user_id, measured_at)
   }
 
-  Note: "사용자의 건강정보 입력 이력. Main/Mypage와 분석 입력 기준으로 사용한다."
+  Note: "사용자의 건강정보 입력 이력. 당뇨/비만/이상지질혈증 분석 입력 기준으로 사용하며, 혈압/고혈압 항목은 참고 위험요인으로 유지한다."
+}
+
+Table exam_reports {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  original_filename varchar(255) [not null]
+  file_path varchar(500) [not null]
+  exam_date date
+  ocr_status ocr_status [not null, default: 'PENDING']
+  is_confirmed boolean [not null, default: false]
+  uploaded_at timestamptz [not null]
+  confirmed_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, uploaded_at)
+    (user_id, exam_date)
+    (ocr_status)
+  }
+
+  Note: "건강검진표 업로드 파일과 OCR 처리 상태를 관리하는 MVP Dummy 테이블."
+}
+
+Table exam_measurements {
+  id bigint [pk, increment]
+  exam_report_id bigint [not null, ref: > exam_reports.id]
+  measurement_key varchar(100) [not null]
+  measurement_name varchar(100) [not null]
+  value varchar(100)
+  unit varchar(30)
+  ocr_confidence decimal(5,4)
+  is_user_confirmed boolean [not null, default: false]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (exam_report_id)
+    (measurement_key)
+  }
+
+  Note: "OCR로 추출된 검진 수치 원본. 사용자 확인 전까지 value는 문자열로 보관한다."
 }
 
 Table async_jobs {
@@ -155,7 +228,8 @@ Table analysis_results {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
   health_record_id bigint [not null, ref: > health_records.id]
-  async_job_id bigint [ref: > async_jobs.id]
+  // TODO: async_jobs 모델 및 FK 연동은 후속 PR에서 처리한다.
+  async_job_id bigint [note: "Nullable BIGINT로 유지. async_jobs 모델/FK 연동은 후속 PR에서 처리한다."]
   analysis_type analysis_type [not null]
   risk_score decimal(6,5) [not null]
   risk_level risk_level [not null]
@@ -171,7 +245,7 @@ Table analysis_results {
     (health_record_id, analysis_type)
   }
 
-  Note: "당뇨/고혈압 위험도 분석 최종 결과."
+  Note: "당뇨/비만/이상지질혈증 위험도 분석 최종 결과."
 }
 
 Table analysis_result_factors {
@@ -242,6 +316,22 @@ Table user_challenges {
   Note: "사용자 챌린지 참여/완료 상태."
 }
 
+Table challenge_logs {
+  id bigint [pk, increment]
+  user_challenge_id bigint [not null, ref: > user_challenges.id]
+  log_date date [not null]
+  is_completed boolean [not null, default: false]
+  memo varchar(255)
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_challenge_id, log_date)
+  }
+
+  Note: "사용자 챌린지 일별 수행 기록."
+}
+
 Table challenge_recommendations {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
@@ -258,6 +348,79 @@ Table challenge_recommendations {
   }
 
   Note: "분석 결과와 주요 위험요인 기반 추천 챌린지."
+}
+
+Table rag_sources {
+  id bigint [pk, increment]
+  name varchar(100) [not null]
+  organization varchar(100)
+  source_type varchar(30) [not null]
+  base_url varchar(500)
+  description text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: "RAG 공식 근거 문서 출처 관리. pgvector embedding 컬럼은 후속 PR에서 추가한다."
+}
+
+Table rag_documents {
+  id bigint [pk, increment]
+  source_id bigint [not null, ref: > rag_sources.id]
+  title varchar(255) [not null]
+  disease_type rag_disease_type [not null]
+  document_url varchar(500)
+  published_at date
+  fetched_at timestamptz
+  version varchar(50)
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (source_id)
+    (disease_type, is_active)
+  }
+
+  Note: "RAG 공식 문서 메타데이터. 문서 원문/청크 검색 API는 이번 PR 범위에서 제외한다."
+}
+
+Table rag_chunks {
+  id bigint [pk, increment]
+  document_id bigint [not null, ref: > rag_documents.id]
+  chunk_index int [not null]
+  section_title varchar(255)
+  content text [not null]
+  disease_type rag_disease_type [not null]
+  keywords text
+  embedding_model varchar(100)
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (document_id, chunk_index)
+    (disease_type)
+  }
+
+  Note: "RAG 문서 chunk 메타데이터와 텍스트 본문. pgvector embedding 값은 아직 저장하지 않는다."
+}
+
+Table rag_retrieval_logs {
+  id bigint [pk, increment]
+  user_id bigint [ref: > users.id]
+  analysis_result_id bigint [ref: > analysis_results.id]
+  query_text text [not null]
+  disease_type rag_disease_type
+  retrieved_chunk_ids jsonb
+  top_k int
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at)
+    (analysis_result_id)
+  }
+
+  Note: "향후 RAG 검색 결과 추적용 로그. 실제 검색 로직과 vector search는 이번 PR 범위에서 제외한다."
 }
 
 Table notifications {
