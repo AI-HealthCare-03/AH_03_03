@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.analysis import (
@@ -16,6 +16,7 @@ from app.dtos.analysis import (
 from app.models.users import User
 from app.services import analysis as analysis_service
 from app.services import health as health_service
+from app.services.sensitive_access_logs import safe_record_sensitive_access
 
 analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -45,26 +46,63 @@ async def create_analysis_result(
 
 
 @analysis_router.get("/results", response_model=list[AnalysisResultResponse])
-async def list_analysis_results(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
+async def list_analysis_results(
+    request: Request,
+    user: Annotated[User, Depends(get_request_user)],
+    limit: int = 20,
+    offset: int = 0,
+):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="ANALYSIS_RESULT",
+        access_reason="analysis_results.list",
+    )
     return await analysis_service.list_analysis_results(user.id, limit=limit, offset=offset)
 
 
 @analysis_router.get("/results/latest", response_model=list[AnalysisResultResponse])
-async def list_latest_analysis_results(user: Annotated[User, Depends(get_request_user)]):
+async def list_latest_analysis_results(request: Request, user: Annotated[User, Depends(get_request_user)]):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="ANALYSIS_RESULT",
+        access_reason="analysis_results.latest",
+    )
     return await analysis_service.list_latest_analysis_results(user.id)
 
 
 @analysis_router.get("/results/{result_id}", response_model=AnalysisResultResponse)
-async def get_analysis_result(result_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_analysis_result(result_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     result = ensure_found(await analysis_service.get_analysis_result(result_id), "분석 결과를 찾을 수 없습니다.")
     ensure_owner(result.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=result.user_id,
+        resource_type="ANALYSIS_RESULT",
+        resource_id=result.id,
+        access_reason="analysis_results.detail",
+    )
     return result
 
 
 @analysis_router.get("/results/{result_id}/detail")
-async def get_analysis_result_detail(result_id: int, user: Annotated[User, Depends(get_request_user)]):
+async def get_analysis_result_detail(
+    result_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]
+):
     result = ensure_found(await analysis_service.get_analysis_result(result_id), "분석 결과를 찾을 수 없습니다.")
     ensure_owner(result.user_id, user)
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=result.user_id,
+        resource_type="ANALYSIS_RESULT",
+        resource_id=result.id,
+        access_reason="analysis_results.detail_with_factors",
+    )
     detail = await analysis_service.get_analysis_result_detail(result_id)
     return ensure_found(detail, "분석 결과를 찾을 수 없습니다.")
 

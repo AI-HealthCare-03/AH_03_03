@@ -52,6 +52,7 @@ MVP에서는 프론트 시연과 기본 API 흐름 확인이 중심이므로 관
 - LLM log 조회는 `MONITOR` 이상으로 보호한다.
 - 관리자 콘솔, audit log, 별도 admin router는 아직 구현하지 않았다.
 - `X-Request-ID` 기반 요청 추적과 `system_error_logs` 500 서버 예외 저장은 P0 기반으로 1차 구현했다.
+- `sensitive_access_logs`는 건강정보/분석결과/검진표/복약정보/대시보드 조회 접근 기록용으로 1차 구현했다. 관리자 콘솔 조회 UI는 후속 작업이다.
 
 ## 3. 관리자 주요 화면
 
