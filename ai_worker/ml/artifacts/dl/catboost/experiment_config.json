@@ -1,10 +1,10 @@
 {
-  "experiment_id": "dm_catboost_final",
-  "disease": "DM",
-  "target_column": "당뇨유병",
+  "experiment_id": "dl_catboost_final",
+  "disease": "DL",
+  "target_column": "이상지질혈증유병",
   "dataset_name": "hn_all",
   "model_type": "catboost",
-  "artifact_dir": "ai_worker/ml/artifacts/dm/catboost",
+  "artifact_dir": "ai_worker/ml/artifacts/dl/catboost",
   "feature_columns": [
     "성별",
     "나이",
@@ -35,23 +35,36 @@
     "직업_작업미상"
   ],
   "categorical_columns": [],
-  "fe_keys": ["age_bin", "bmi_bin", "family_sum", "bmi_x_age"],
+  "fe_keys": [
+    "age_bin",
+    "bmi_bin",
+    "family_sum",
+    "bmi_x_age"
+  ],
   "folds": 5,
   "random_seed": 42,
   "test_size": 0.2,
   "class_weight": "balanced",
   "threshold_strategy": {
     "name": "recall_min_f1",
-    "recall_min": 0.86,
-    "range": [0.3, 0.7, 0.01]
+    "recall_min": 0.87,
+    "range": [
+      0.3,
+      0.7,
+      0.01
+    ]
   },
-  "primary_metrics": ["recall", "f1", "auc"],
+  "primary_metrics": [
+    "recall",
+    "f1",
+    "auc"
+  ],
   "model_params": {
-    "iterations": 427,
-    "learning_rate": 0.02884897588823726,
+    "iterations": 500,
+    "learning_rate": 0.03,
     "depth": 5,
-    "l2_leaf_reg": 4.504403807882317,
-    "bagging_temperature": 0.16590134861646655,
-    "random_strength": 0.9331797514790412
+    "l2_leaf_reg": 4.0,
+    "bagging_temperature": 0.2,
+    "random_strength": 0.8
   }
 }
