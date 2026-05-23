@@ -5,6 +5,10 @@ dist/
 .vite/
 node_modules/
 *.tsbuildinfo
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/
+frontend/tsconfig.tsbuildinfo
 wheels/
 *.egg-info
 .venv
@@ -51,6 +55,8 @@ ai_worker/ml/artifacts/*
 !ai_worker/ml/artifacts/.gitkeep
 ML/artifacts/*
 !ML/artifacts/.gitkeep
+etc/ml/ML/artifacts/*
+!etc/ml/ML/artifacts/.gitkeep
 ai_worker/ml/LGB18~24/outputs/
 **/outputs/
 
@@ -67,6 +73,7 @@ ai_worker/ml/LGB18~24/outputs/
 *.csv
 !docs/data/challenges/*.csv
 !ML/models/report/*.csv
+!etc/ml/ML/models/report/*.csv
 *.parquet
 *.pkl
 *.joblib

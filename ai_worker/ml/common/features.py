@@ -106,6 +106,7 @@ _FE_REGISTRY = {
 def apply_feature_engineering(
     df: pd.DataFrame,
     disease: str,
+    fe_keys_override: list[str] | None = None,
     extra_fe: list[str] | None = None,
     verbose: bool = True,
 ) -> pd.DataFrame:
@@ -128,7 +129,7 @@ def apply_feature_engineering(
     if disease not in DISEASE_FE_MAP:
         raise ValueError(f"disease는 {list(DISEASE_FE_MAP.keys())} 중 하나여야 합니다. 입력값: {disease}")
 
-    fe_keys = DISEASE_FE_MAP[disease][:]
+    fe_keys = fe_keys_override[:] if fe_keys_override is not None else DISEASE_FE_MAP[disease][:]
     if extra_fe:
         fe_keys += [k for k in extra_fe if k not in fe_keys]
 
