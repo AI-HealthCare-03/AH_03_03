@@ -21,6 +21,17 @@ ai_worker/data/
 # Vision 평가 데이터 (로컬 전용)
 ai_worker/vision/data/images/
 ai_worker/vision/data/results/
+
+# CLOVA OCR PoC local inputs/outputs
+ai_worker/vision/clova_ocr/data/images/*
+!ai_worker/vision/clova_ocr/data/images/.gitkeep
+ai_worker/vision/clova_ocr/data/pdfs/*
+!ai_worker/vision/clova_ocr/data/pdfs/.gitkeep
+ai_worker/vision/clova_ocr/outputs/*
+ai_worker/vision/clova_ocr/outputs/**/*
+!ai_worker/vision/clova_ocr/outputs/.gitkeep
+ai_worker/vision/clova_ocr/ground_truth/*
+!ai_worker/vision/clova_ocr/ground_truth/.gitkeep
 .venv-ocr/
 .venv-ocr2/
 .venv-easyocr/
