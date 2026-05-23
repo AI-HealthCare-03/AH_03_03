@@ -109,6 +109,8 @@
 - 서비스 import 영역: `ai_worker/ml/X2`, `ai_worker/ml/common`, `ai_worker/ml/datasets`, `ai_worker/ml/training`, `ai_worker/ml/inference`, `ai_worker/ml/final_models`, `ai_worker/ml/experiments/configs`, `ai_worker/ml/artifacts/.gitkeep`
 - 보존 archive 영역: `etc/ml/ML`, `etc/ml/ai_worker/ml/* legacy/experiment folders`, `etc/ml/ai_worker/data`
 - 학습 dataset registry는 `etc/ml/ai_worker/data`를 기본 위치로 봅니다.
+- `etc/ml/ai_worker/data`는 로컬 학습 재현용 데이터 배치 경로이며 서비스 런타임 import 대상이 아닙니다.
+- CSV/전처리 데이터는 민감/대용량 가능성이 있어 git 추적에서 제외하고, 필요 시 `git rm --cached etc/ml/ai_worker/data/*` 후 별도 archive 저장소에서 배포하는 방향을 권장합니다.
 
 ## 다음 작업 순서
 

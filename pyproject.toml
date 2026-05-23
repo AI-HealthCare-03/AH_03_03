@@ -24,6 +24,7 @@ dependencies = [
     "uvicorn>=0.40.0",
     "anthropic>=0.102.0",
     "firebase-admin>=7.4.0",
+    "catboost>=1.2.10",
 ]
 
 [dependency-groups]
@@ -71,6 +72,7 @@ src_folder = "./."
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+pythonpath = ["."]
 
 [tool.ruff]
 # 기본 라인 길이 설정

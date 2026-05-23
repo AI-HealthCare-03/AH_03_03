@@ -372,3 +372,20 @@ chmod +x scripts/certbot.sh
 - 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않습니다.
 - API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정합니다.
 - `pyproject.toml`, `uv.lock`, `docker-compose.yml`, env example, `app/core` 같은 공용 설정 파일은 팀장 승인 없이 수정하지 않습니다.
+
+### ML 학습/추론 실행 기준
+
+- 서비스 DB/ORM 필드명은 모델 학습 feature명에 직접 맞추지 않습니다.
+- 서비스 입력값은 `ai_worker/ml/inference/feature_mapper.py`에서 CatBoost 학습 당시 한글 feature schema로 변환합니다.
+- 학습/검증 스크립트는 파일 직접 실행 대신 모듈 방식으로 실행합니다.
+
+```bash
+uv run python -m ai_worker.ml.training.run_experiment --config ai_worker/ml/experiments/configs/dm_catboost_final.json --dry-run
+uv run python -m ai_worker.ml.training.run_experiment --config ai_worker/ml/experiments/configs/htn_catboost_final.json --dry-run
+uv run python -m ai_worker.ml.training.run_experiment --config ai_worker/ml/experiments/configs/dl_catboost_final.json --dry-run
+```
+
+- `python ai_worker/ml/training/run_experiment.py` 방식은 repo root package import가 깨질 수 있으므로 사용하지 않습니다.
+- 모델 artifact는 `ai_worker/ml/artifacts/{disease}/catboost` 아래에 두되 `.cbm`, `.npy`, `.pkl`, `.joblib` 산출물은 git에 커밋하지 않습니다.
+- 로컬 학습 CSV는 `etc/ml/ai_worker/data/`에 배치합니다. 서비스 런타임은 이 경로를 import하거나 직접 참조하지 않고, 학습 loader만 `dataset_name` 기준으로 읽습니다.
+- 학습 CSV와 전처리 데이터는 민감/대용량 가능성이 있으므로 git 커밋 대상이 아닙니다. 공유가 필요하면 별도 Drive/S3/archive 저장소에서 받아 `etc/ml/ai_worker/data/`에 내려받아 사용합니다.

@@ -7,6 +7,10 @@ from ai_worker.ml.common.artifacts import read_json
 from ai_worker.ml.inference.schemas import DiseasePrediction
 
 
+class FeatureSchemaError(ValueError):
+    pass
+
+
 class CatBoostDiseasePredictor:
     def __init__(self, disease: str, artifact_dir: str | Path):
         self.disease = disease
@@ -34,6 +38,8 @@ class CatBoostDiseasePredictor:
         if not feature_columns:
             return None
 
+        _validate_feature_schema(features, feature_columns)
+
         try:
             import pandas as pd
             from catboost import CatBoostClassifier
@@ -47,8 +53,12 @@ class CatBoostDiseasePredictor:
                 model.load_model(str(model_path))
                 self._models.append(model)
 
-        row = {column: features.get(column) for column in feature_columns}
+        row = {column: features[column] for column in feature_columns}
         frame = pd.DataFrame([row], columns=feature_columns)
+        if frame.shape[1] != len(feature_columns):
+            raise FeatureSchemaError(
+                f"{self.disease} feature column 개수 불일치: expected={len(feature_columns)}, actual={frame.shape[1]}"
+            )
         probabilities = [float(model.predict_proba(frame)[0][1]) for model in self._models]
         probability = sum(probabilities) / max(len(probabilities), 1)
         threshold_payload = read_json(self.threshold_path)
@@ -88,3 +98,18 @@ def _top_factors(metrics_path: Path) -> list[dict[str, Any]]:
     if not isinstance(feature_importance, list):
         return []
     return feature_importance[:5]
+
+
+def _validate_feature_schema(features: dict[str, Any], feature_columns: list[str]) -> None:
+    missing = [column for column in feature_columns if column not in features]
+    if missing:
+        raise FeatureSchemaError(f"feature_columns.json 기준 누락 feature가 있습니다: {missing}")
+
+    unexpected = [column for column in features if column not in feature_columns]
+    if unexpected:
+        raise FeatureSchemaError(f"feature_columns.json 기준 허용되지 않은 feature가 있습니다: {unexpected}")
+
+    expected = len(feature_columns)
+    actual = len(features)
+    if actual != expected:
+        raise FeatureSchemaError(f"feature column 개수 불일치: expected={expected}, actual={actual}")
