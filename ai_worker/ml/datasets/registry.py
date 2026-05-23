@@ -13,7 +13,7 @@ from pathlib import Path
 # 데이터셋 등록
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-_BASE = str(Path(__file__).parent.parent.parent / "ai_worker" / "data")
+_BASE = str(Path(__file__).resolve().parents[2] / "data")
 
 DATASETS: dict[str, str] = {
     "hn_all": os.path.join(_BASE, "hn_all_preprocessed.csv"),  # hn18~24 통합 (현재 실험 기준)
