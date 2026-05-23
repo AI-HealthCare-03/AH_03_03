@@ -449,31 +449,70 @@ async function analyze(t) {
 }
 
 // ── 렌더러 ──
-function renderDiet(data, el) {
-  const ok = data.analysis_status === 'success';
 
-  let foodsHTML = (data.foods || []).map(f => {
+// 용량 기반 영양성분 재계산
+function recalcNutrition(idx, baseAmount, baseNutrition) {
+  const input = document.getElementById('amount-input-' + idx);
+  if (!input) return;
+  const inputVal = parseFloat(input.value);
+  const ratio = (inputVal > 0 && baseAmount > 0) ? inputVal / baseAmount : 1;
+
+  const fields = [
+    { key: '칼로리', unit: 'kcal', id: 'n-kcal-' + idx },
+    { key: '탄수화물', unit: 'g', id: 'n-carb-' + idx },
+    { key: '당류', unit: 'g', id: 'n-sugar-' + idx },
+    { key: '단백질', unit: 'g', id: 'n-prot-' + idx },
+    { key: '지방', unit: 'g', id: 'n-fat-' + idx },
+    { key: '포화지방', unit: 'g', id: 'n-sfat-' + idx },
+    { key: '식이섬유', unit: 'g', id: 'n-fiber-' + idx },
+    { key: '나트륨', unit: 'mg', id: 'n-na-' + idx },
+  ];
+
+  fields.forEach(({ key, unit, id }) => {
+    const el = document.getElementById(id);
+    if (!el || baseNutrition[key] == null) return;
+    const val = Math.round(baseNutrition[key] * ratio * 10) / 10;
+    el.textContent = val + unit;
+  });
+
+  // 용량 표시 업데이트
+  const amountLabel = document.getElementById('amount-label-' + idx);
+  if (amountLabel) {
+    amountLabel.textContent = inputVal > 0 ? `${inputVal}g 기준` : '1인분 기준';
+  }
+}
+
+// g 단위 파싱 (예: "300g", "10조각(300g)" → 300)
+function parseBaseAmount(estimated_amount) {
+  if (!estimated_amount) return 0;
+  const match = estimated_amount.match(/(\d+(?:\.\d+)?)\s*g/);
+  return match ? parseFloat(match[1]) : 0;
+}
+
+function renderDiet(data, el) {
+  const ok = data.analysis_status === 'success' || data.analysis_status === 'low_confidence';
+
+  let foodsHTML = (data.foods || []).map((f, idx) => {
     const conf = Math.round((f.confidence ?? 0) * 100);
     const cls  = conf >= 80 ? '' : conf >= 60 ? 'medium' : 'low';
     const n    = f.nutrition || {};
+    const baseAmount = parseBaseAmount(f.estimated_amount);
 
-    // 영양성분 표시
-    const nutritionHTML = f.nutrition ? `
+    const nutritionHTML = `
     <div style="margin-top:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;">
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
-        📊 영양성분 추정
-        ${f.estimated_amount ? `<span style="margin-left:6px;color:var(--accent);">(${f.estimated_amount} 기준)</span>` : ''}
-        <span style="margin-left:6px;color:var(--accent3);">※ 추정값 · 식약처 DB 매칭 전</span>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+        <span>📊 영양성분 추정 <span id="amount-label-${idx}" style="color:var(--accent);">1인분 기준</span></span>
+        <span style="color:var(--accent3);">※ 추정값</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-        ${n.칼로리   != null ? `<div style="font-size:12px;">🔥 칼로리 <b>${n.칼로리}kcal</b></div>` : ''}
-        ${n.탄수화물 != null ? `<div style="font-size:12px;">🍚 탄수화물 <b>${n.탄수화물}g</b></div>` : ''}
-        ${n.당류     != null ? `<div style="font-size:12px;">🍬 당류 <b>${n.당류}g</b></div>` : ''}
-        ${n.단백질   != null ? `<div style="font-size:12px;">🥩 단백질 <b>${n.단백질}g</b></div>` : ''}
-        ${n.지방     != null ? `<div style="font-size:12px;">🧈 지방 <b>${n.지방}g</b></div>` : ''}
-        ${n.포화지방 != null ? `<div style="font-size:12px;">⚠️ 포화지방 <b>${n.포화지방}g</b></div>` : ''}
-        ${n.식이섬유 != null ? `<div style="font-size:12px;">🥦 식이섬유 <b>${n.식이섬유}g</b></div>` : ''}
-        ${n.나트륨   != null ? `<div style="font-size:12px;">🧂 나트륨 <b>${n.나트륨}mg</b></div>` : ''}
+        ${n.칼로리   != null ? `<div style="font-size:12px;">🔥 칼로리 <b id="n-kcal-${idx}">${n.칼로리}kcal</b></div>` : ''}
+        ${n.탄수화물 != null ? `<div style="font-size:12px;">🍚 탄수화물 <b id="n-carb-${idx}">${n.탄수화물}g</b></div>` : ''}
+        ${n.당류     != null ? `<div style="font-size:12px;">🍬 당류 <b id="n-sugar-${idx}">${n.당류}g</b></div>` : ''}
+        ${n.단백질   != null ? `<div style="font-size:12px;">🥩 단백질 <b id="n-prot-${idx}">${n.단백질}g</b></div>` : ''}
+        ${n.지방     != null ? `<div style="font-size:12px;">🧈 지방 <b id="n-fat-${idx}">${n.지방}g</b></div>` : ''}
+        ${n.포화지방 != null ? `<div style="font-size:12px;">⚠️ 포화지방 <b id="n-sfat-${idx}">${n.포화지방}g</b></div>` : ''}
+        ${n.식이섬유 != null ? `<div style="font-size:12px;">🥦 식이섬유 <b id="n-fiber-${idx}">${n.식이섬유}g</b></div>` : ''}
+        ${n.나트륨   != null ? `<div style="font-size:12px;">🧂 나트륨 <b id="n-na-${idx}">${n.나트륨}mg</b></div>` : ''}
       </div>
       ${n.영양성분_신뢰도 != null ? `
       <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">
@@ -485,20 +524,41 @@ function renderDiet(data, el) {
           <span>${Math.round(n.영양성분_신뢰도*100)}%</span>
         </div>
       </div>` : ''}
-    </div>` : '';
+    </div>`;
 
-    // 용량 입력창 (추정 불가 시)
-    const amountHTML = f.amount_requires_input ? `
-    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-      <span style="font-size:12px;color:var(--text-muted);">용량 직접 입력</span>
-      <input type="number" placeholder="g" min="0"
-        style="width:80px;background:var(--surface2);border:1px solid var(--border);
-               border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;"
-        oninput="this.dataset.value=this.value">
-      <span style="font-size:12px;color:var(--text-muted);">g</span>
-    </div>` : `
-    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-      📦 ${f.estimated_amount || '용량 정보 없음'}
+    // 용량 입력 (1인분 기준 표시 + 직접 입력 시 재계산)
+    const amountHTML = `
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">
+        📦 1인분 기준: <b style="color:var(--text);">${f.estimated_amount || '정보 없음'}</b>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:var(--text-muted);">용량 조절</span>
+        <input type="number" id="amount-input-${idx}" placeholder="${baseAmount || 100}" min="1"
+          style="width:80px;background:var(--surface2);border:1px solid var(--border);
+                 border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;outline:none;"
+          oninput="recalcNutrition(${idx}, ${baseAmount}, ${JSON.stringify(n)})">
+        <span style="font-size:12px;color:var(--text-muted);">g</span>
+      </div>
+    </div>`;
+
+    // 음식명/조리법 수정 입력칸
+    const editHTML = `
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--text-muted);width:44px;">음식명</span>
+        <input type="text" value="${f.name}"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);
+                 border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;outline:none;"
+          onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--text-muted);width:44px;">조리법</span>
+        <input type="text" value="${f.cooking_method || ''}" placeholder="예: 튀김, 구이, 찜"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);
+                 border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;outline:none;"
+          onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
     </div>`;
 
     return `<div class="food-item" style="flex-direction:column;align-items:flex-start;gap:8px;">
@@ -513,6 +573,7 @@ function renderDiet(data, el) {
           </div>
         </div>
       </div>
+      ${editHTML}
       ${amountHTML}
       ${nutritionHTML}
     </div>`;
@@ -539,11 +600,12 @@ function renderCheckup(data, el) {
     {k:'systolic_bp',      l:'수축기 혈압',  u:'mmHg'},
     {k:'diastolic_bp',     l:'이완기 혈압',  u:'mmHg'},
     {k:'fasting_glucose',  l:'공복혈당',      u:'mg/dL'},
-    {k:'hba1c',            l:'당화혈색소',    u:'%'},
+    {k:'hb',               l:'혈색소',        u:'g/dL'},
     {k:'total_cholesterol',l:'총콜레스테롤', u:'mg/dL'},
     {k:'triglyceride',     l:'중성지방',      u:'mg/dL'},
     {k:'hdl',              l:'HDL',           u:'mg/dL'},
     {k:'ldl',              l:'LDL',           u:'mg/dL'},
+    {k:'height_cm',        l:'키',             u:'cm'},
     {k:'weight_kg',        l:'체중',           u:'kg'},
     {k:'bmi',              l:'BMI',            u:''},
     {k:'waist_cm',         l:'허리둘레',       u:'cm'},
