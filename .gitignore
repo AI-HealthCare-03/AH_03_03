@@ -54,6 +54,8 @@ ai_worker/vision/clova_ocr/ground_truth/*
 ai_worker/ml/outputs/
 ai_worker/ml/artifacts/*
 !ai_worker/ml/artifacts/.gitkeep
+!ai_worker/ml/artifacts/*/
+!ai_worker/ml/artifacts/*/catboost/
 ML/artifacts/*
 !ML/artifacts/.gitkeep
 etc/ml/ML/artifacts/*
@@ -84,6 +86,16 @@ ai_worker/ml/LGB18~24/outputs/
 *.pth
 *.onnx
 *.h5
+
+# Final CatBoost inference artifacts for local demo/runtime
+!ai_worker/ml/artifacts/*/catboost/*.cbm
+!ai_worker/ml/artifacts/*/catboost/feature_columns.json
+!ai_worker/ml/artifacts/*/catboost/threshold.json
+!ai_worker/ml/artifacts/*/catboost/metrics.json
+!ai_worker/ml/artifacts/*/catboost/model_params.json
+!ai_worker/ml/artifacts/*/catboost/experiment_config.json
+ai_worker/ml/artifacts/**/oof_*.npy
+ai_worker/ml/artifacts/**/threshold_tuning.csv
 
 # OS files
 .DS_Store
