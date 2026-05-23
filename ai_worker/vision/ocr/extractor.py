@@ -274,6 +274,14 @@ def parse_from_text_lines(text_lines):
     bmi = parse_bmi(text_lines)
     if bmi is not None:
         extracted["bmi"] = bmi
+        # BMI 교차검증: 키/몸무게로 계산한 값과 비교
+        if extracted.get("height_cm") and extracted.get("weight_kg"):
+            calculated = calculate_bmi(extracted["height_cm"], extracted["weight_kg"])
+            if calculated is not None:
+                diff = abs(bmi - calculated)
+                if diff > 1.0:  # 1.0 이상 차이나면 계산값으로 대체
+                    logger.warning("BMI 교차검증 불일치 | 추출=%.1f 계산=%.1f → 계산값 사용", bmi, calculated)
+                    extracted["bmi"] = calculated
 
     # ── BMI 처리 ──────────────────────────────────────────────────────────────
     # 검진표에 BMI 수치 있으면 그대로, 없으면 키·몸무게로 자체 계산

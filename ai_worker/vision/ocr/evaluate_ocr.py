@@ -1,5 +1,5 @@
 """
-ai_worker/vision/ocr/eval/evaluate_ocr.py
+ai_worker/vision/ocr/evaluate_ocr.py
 
 GPT Vision 정확도 평가 스크립트.
 
@@ -25,6 +25,7 @@ GPT Vision 정확도 평가 스크립트.
 
 import asyncio
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -32,16 +33,16 @@ import httpx
 
 # ── 경로 설정 ─────────────────────────────────────────────────────────────────
 
-BASE_DIR = Path(r"C:\Users\82106\Desktop\PycharmProjects\AH_03_03\ai_worker\vision\ocr\eval")
+BASE_DIR = Path(__file__).parent / "eval"
 IMAGES_DIR = BASE_DIR / "images"
 PDFS_DIR = BASE_DIR / "pdfs"
 GT_PATH = BASE_DIR / "ground_truth.json"
 RESULTS_DIR = BASE_DIR / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-SERVER_URL = "http://localhost:8001"
-IMG_ENDPOINT = f"{SERVER_URL}/api/v1/cv/checkup"  # GPT Vision
-PDF_ENDPOINT = f"{SERVER_URL}/api/v1/ocr/checkup/pdf"  # PaddleOCR
+SERVER_URL = os.getenv("OCR_SERVER_URL", "http://localhost:8001")
+IMG_ENDPOINT = f"{SERVER_URL}/api/v1/cv/checkup"
+PDF_ENDPOINT = f"{SERVER_URL}/api/v1/ocr/checkup/pdf"
 
 TIMEOUT = 60.0
 
