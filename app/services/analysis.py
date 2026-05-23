@@ -116,8 +116,13 @@ async def run_dummy_analysis(
 ) -> list[dict[str, Any]]:
     results = []
     user = await User.get_or_none(id=user_id)
-    for analysis_type, score in _calculate_dummy_scores(health_record, mode, user).items():
+    ml_predictions = _predict_ml_outputs(user, health_record) if mode == AnalysisMode.PRECISION else {}
+    for analysis_type, fallback_score in _calculate_dummy_scores(health_record, mode, user).items():
+        prediction = ml_predictions.get(analysis_type)
+        score = Decimal(str(round(prediction.probability, 5))) if prediction is not None else fallback_score
         risk_level = _risk_level(score)
+        model_name = prediction.model_name if prediction is not None else "rule_based"
+        model_version = prediction.model_version if prediction is not None else f"web-{mode.value.lower()}-v1"
         request = AnalysisResultCreateRequest(
             health_record_id=health_record.id,
             analysis_type=analysis_type,
@@ -125,8 +130,8 @@ async def run_dummy_analysis(
             risk_score=score,
             risk_level=risk_level,
             summary=_guide_message(analysis_type, risk_level, mode),
-            model_name="rule_based",
-            model_version=f"web-{mode.value.lower()}-v1",
+            model_name=model_name,
+            model_version=model_version,
             analyzed_at=datetime.now(config.TIMEZONE),
         )
         result = await create_analysis_result(user_id, request)
@@ -141,6 +146,9 @@ async def run_dummy_analysis(
                 risk_level=risk_level,
                 guide_message=request.summary or "",
                 factors=factors,
+                model_name=model_name,
+                model_version=model_version,
+                model_prediction=prediction.to_dict() if prediction is not None else None,
             ),
         )
         recommendation_ids = await _create_dummy_challenge_recommendations(user_id, result)
@@ -157,6 +165,29 @@ async def run_dummy_analysis(
             }
         )
     return results
+
+
+def _predict_ml_outputs(user: User | None, health_record: HealthRecord) -> dict[AnalysisType, Any]:
+    if user is None:
+        return {}
+    try:
+        from ai_worker.ml.inference.disease_risk_service import predict_chronic_disease_risks
+    except Exception:
+        return {}
+
+    try:
+        raw_predictions = predict_chronic_disease_risks(user, health_record, diseases=["DM", "HTN", "DL"])
+    except Exception:
+        return {}
+
+    disease_map = {
+        "DM": AnalysisType.DIABETES,
+        "HTN": AnalysisType.HYPERTENSION,
+        "DL": AnalysisType.DYSLIPIDEMIA,
+    }
+    return {
+        disease_map[disease]: prediction for disease, prediction in raw_predictions.items() if disease in disease_map
+    }
 
 
 def _calculate_dummy_scores(
@@ -396,7 +427,11 @@ def _dummy_snapshot_request(
     risk_level: RiskLevel,
     guide_message: str,
     factors: list[AnalysisResultFactor],
+    model_name: str = "rule_based",
+    model_version: str | None = None,
+    model_prediction: dict[str, Any] | None = None,
 ) -> AnalysisSnapshotCreateRequest:
+    model_version = model_version or f"web-{analysis_mode.value.lower()}-v1"
     input_features = {
         "height_cm": _to_json_value(health_record.height_cm),
         "weight_kg": _to_json_value(health_record.weight_kg),
@@ -461,8 +496,8 @@ def _dummy_snapshot_request(
                 "guide_message": guide_message,
             },
             "model_version_info": {
-                "model_name": "rule_based",
-                "model_version": f"web-{analysis_mode.value.lower()}-v1",
+                "model_name": model_name,
+                "model_version": model_version,
             },
         },
         shap_payload={
@@ -470,9 +505,10 @@ def _dummy_snapshot_request(
             "factors": shap_outputs,
         },
         model_payload={
-            "model_name": "rule_based",
-            "model_version": f"web-{analysis_mode.value.lower()}-v1",
+            "model_name": model_name,
+            "model_version": model_version,
             "analysis_mode": analysis_mode,
+            "prediction": model_prediction,
         },
     )
 
