@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -57,3 +59,34 @@ def save_artifacts(
         optuna_trials.to_csv(os.path.join(model_dir, "optuna_trials.csv"), index=False)
 
     print(f"\n[저장] 완료 → {model_dir}")
+
+
+def ensure_artifact_dir(path: str | Path) -> Path:
+    artifact_dir = Path(path)
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    return artifact_dir
+
+
+def write_json(path: str | Path, payload: Any) -> None:
+    with Path(path).open("w", encoding="utf-8") as file:
+        json.dump(payload, file, indent=2, ensure_ascii=False, default=str)
+
+
+def read_json(path: str | Path) -> Any:
+    with Path(path).open(encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_training_metadata(
+    artifact_dir: str | Path,
+    *,
+    feature_columns: list[str],
+    threshold: dict[str, Any],
+    metrics: dict[str, Any],
+    experiment_config: dict[str, Any],
+) -> None:
+    output_dir = ensure_artifact_dir(artifact_dir)
+    write_json(output_dir / "feature_columns.json", feature_columns)
+    write_json(output_dir / "threshold.json", threshold)
+    write_json(output_dir / "metrics.json", metrics)
+    write_json(output_dir / "experiment_config.json", experiment_config)
