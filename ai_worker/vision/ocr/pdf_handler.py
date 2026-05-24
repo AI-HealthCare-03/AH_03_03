@@ -7,7 +7,7 @@ PDF 파일 처리 모듈.
 
 import io
 import logging
-from enum import Enum
+from enum import StrEnum
 
 import pdf2image
 import pdfplumber
@@ -18,7 +18,7 @@ MIN_TEXT_LENGTH = 50
 MAX_PAGES = 5
 
 
-class PdfType(str, Enum):
+class PdfType(StrEnum):
     TEXT = "text"
     SCAN = "scan"
 

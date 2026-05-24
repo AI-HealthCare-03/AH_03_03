@@ -3,12 +3,12 @@ ai_worker/vision/ocr/schemas.py
 건강검진표 OCR 응답 스키마 (MVP).
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ImageQualityStatus(str, Enum):
+class ImageQualityStatus(StrEnum):
     GOOD = "good"
     BLURRY = "blurry"
     DARK = "dark"
@@ -51,7 +51,7 @@ QUALITY_GUIDE: dict[str, dict] = {
 }
 
 
-class OcrStatus(str, Enum):
+class OcrStatus(StrEnum):
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILED = "failed"
