@@ -85,13 +85,13 @@ Docker Compose 내부에서 API 서버를 실행하는 경우 `DB_HOST=postgres`
 
 ## 🏃 실행 방법
 
-### 0. 웹 MVP 시연용 빠른 실행
+### 0. 웹 MVP 로컬 실행
 
-현재 웹 MVP는 **FastAPI에서 건강 분석, OCR, 챗봇 응답을 동기 더미 로직으로 처리하는 시연용 구조**입니다.
-실제 ML/CV/LLM 모델 호출은 아직 연결하지 않았고, 프론트 화면 흐름과 API 계약을 확인하기 위한 단순 응답을 사용합니다.
+현재 MVP 범위는 축소 데모가 아니라 **풀서비스 1차 범위에서 소셜 로그인과 웨어러블 연동만 제외한 기준**입니다.
+로컬 실행은 FastAPI, React/Vite, PostgreSQL을 우선 띄워 전체 사용자 흐름과 API 계약을 확인합니다.
 
 > `Architecture_ver1.drawio`에 정리된 `async_jobs`, Redis Stream, AI Worker, SSE, Notification Worker, Report Worker 구조는
-> 후속 모델 연동/운영 단계에서 도입할 예정입니다. 현재 로컬 MVP 실행에는 필수 구성요소가 아닙니다.
+> MVP 범위 안의 후속 구현 단계입니다. 현재 로컬 실행에는 필수 구성요소가 아니며, 동기 API와 준비된 AI Worker 모듈을 기준으로 확인합니다.
 
 로컬에서 프론트와 백엔드를 같이 확인할 때는 아래 순서로 실행합니다.
 
@@ -164,7 +164,7 @@ Seed 포함 데이터:
 - 모든 응답은 `X-Request-ID`를 포함합니다. 처리되지 않은 500 서버 예외는 `system_error_logs`에 최소 추적 정보만 저장하며, request body와 민감정보 원문은 저장하지 않습니다.
 - 건강정보/분석결과/검진표/복약정보/대시보드 조회는 `sensitive_access_logs`에 접근 사실을 남깁니다. 건강 수치 원문, 토큰, 인증코드, request body는 저장하지 않습니다.
 - 비밀번호 해싱은 Argon2id 단일 방식입니다. 이전 로컬 계정의 예전 해시는 호환하지 않으므로 로그인되지 않으면 재가입하거나 비밀번호 재설정을 진행하세요. 운영 전환 시에는 별도 재설정/전환 정책이 필요합니다.
-- AI Worker, `async_jobs`, Redis queue 기반 비동기 모델 처리 연결은 후속 ML/CV/LLM 운영 연동 단계에서 진행합니다.
+- AI Worker, `async_jobs`, Redis queue 기반 비동기 모델 처리 연결은 MVP 범위 안의 후속 ML/CV/LLM 운영 연동 단계에서 진행합니다.
 - 풀서비스 1차 범위는 [Full Service Scope](docs/design/full_service_scope.md)를 기준으로 관리합니다. 1차 제외/보류 항목은 소셜 로그인, 웨어러블 연동 2개이며, 휴대폰 SMS 인증은 Twilio Verify 기반 구현 대상으로 유지합니다.
 - 코치님/조교님 피드백 반영 기준은 [Requirements Refactor Notes](docs/design/requirements_refactor_notes.md)에 정리합니다. 요구사항 정의서는 사용자 기능 중심으로 유지하고, NFR/아키텍처/재시도/공통 컴포넌트는 별도 설계 문서로 분리합니다.
 

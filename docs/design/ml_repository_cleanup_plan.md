@@ -21,9 +21,9 @@
 | `ai_worker/ml/training/` | 유지 | 최종 모델 재현용 최소 학습 진입점입니다. |
 | `ai_worker/ml/inference/` | 유지 | FastAPI 분석 서비스에서 optional import하는 서비스 추론 adapter입니다. |
 | `ai_worker/ml/experiments/configs/*_catboost_final.json` | 유지 | DM/HTN/DL 최종 CatBoost 학습 재현 config입니다. |
-| `ai_worker/ml/final_models/` | 유지 | 기존 최종 학습 스크립트 reference입니다. 새 training pipeline 안정화 전까지 보존합니다. |
 | `ai_worker/ml/X2/` | 유지 | ML artifact 부재 시 사용할 룰 기반 fallback 후보입니다. |
 | `ai_worker/ml/artifacts/.gitkeep` | 유지 | artifact 디렉터리 placeholder입니다. 실제 artifact는 gitignore 대상입니다. |
+| `etc/ml/ai_worker/ml/final_models/` | 보존 | 기존 Optuna 최종 학습 스크립트 reference입니다. 서비스 import 대상이 아니므로 archive 영역에 보존합니다. |
 | `etc/ml/ML/models/final/` | 보존 | 팀원이 정리한 최종 노트북 reference입니다. 서비스 import 영역 밖에서 보존합니다. |
 | `etc/ml/ML/models/report/` | 보존 | 모델별 최종 보고서 문서입니다. README/발표/검증 근거로 사용 가능합니다. |
 | `etc/ml/ML/features/*.py` | 보존 | 노트북에서 분리된 feature engineering 실험 코드입니다. `ai_worker/ml/common/features.py`와 통합 가능성을 확인한 뒤 정리합니다. |
@@ -106,7 +106,7 @@
 
 ## 이동 후 현재 구조
 
-- 서비스 import 영역: `ai_worker/ml/X2`, `ai_worker/ml/common`, `ai_worker/ml/datasets`, `ai_worker/ml/training`, `ai_worker/ml/inference`, `ai_worker/ml/final_models`, `ai_worker/ml/experiments/configs`, `ai_worker/ml/artifacts/.gitkeep`
+- 서비스 import 영역: `ai_worker/ml/X2`, `ai_worker/ml/common`, `ai_worker/ml/datasets`, `ai_worker/ml/training`, `ai_worker/ml/inference`, `ai_worker/ml/experiments/configs`, `ai_worker/ml/artifacts/.gitkeep`
 - 보존 archive 영역: `etc/ml/ML`, `etc/ml/ai_worker/ml/* legacy/experiment folders`, `etc/ml/ai_worker/data`
 - 학습 dataset registry는 `etc/ml/ai_worker/data`를 기본 위치로 봅니다.
 - `etc/ml/ai_worker/data`는 로컬 학습 재현용 데이터 배치 경로이며 서비스 런타임 import 대상이 아닙니다.
