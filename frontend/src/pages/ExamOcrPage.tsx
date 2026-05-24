@@ -14,7 +14,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
 export default function ExamOcrPage() {
-  const [selectedFileName, setSelectedFileName] = useState("health-exam-sample.pdf");
+  const [selectedFileName, setSelectedFileName] = useState("health-exam-upload.pdf");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [exam, setExam] = useState<ExamReport | null>(null);
   const [measurements, setMeasurements] = useState<ExamMeasurement[]>([]);
