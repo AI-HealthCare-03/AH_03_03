@@ -1,32 +1,35 @@
 // AI Healthcare MVP ERD
 //
 // 범위:
+// - MVP는 풀서비스 1차 범위를 기준으로 하며, 소셜 로그인과 웨어러블 연동만 제외한다.
 // - AUTH / USER
 // - MAIN / MYPAGE
 // - HEALTH
-// - EXAM / OCR Dummy
-// - ANALYSIS + SHAP
+// - EXAM / OCR
+// - ANALYSIS + SHAP / ML inference
 // - CHALLENGE
 // - RAG 공식 문서/청크 메타데이터 관리
 // - DASHBOARD 조회/집계
-// - NOTIFICATION 최소기능
+// - NOTIFICATION / reminder_schedules / notification_logs
 // - SETTINGS
 // - QNA / FAQ
-// - DIET 분석 더미/최소 기록
-// - MEDICATION/SUPPLEMENT 최소 기록
-// - LLM 더미/생성 로그
+// - DIET 기록/분석
+// - MEDICATION/SUPPLEMENT
+// - LLM 생성 로그
 // - FAMILY 1차 DB/API
+// - ADMIN / 운영 모니터링 / 시스템 로그 / 민감정보 접근 로그
 //
 // 제외:
-// - ADMIN
 // - WEARABLE 연동
-// - 운영 로그 상세
-// - 외부 알림 SMS/Email/Push/Kakao
-// - pgvector
+// - 소셜 로그인
+//
+// MVP 범위 안의 후속 구현 단계:
+// - 외부 알림 SMS/Email/Push/Kakao 발송 worker
+// - pgvector / RAG 검색 고도화
 
 Project ai_health_mvp {
   database_type: "PostgreSQL"
-  Note: "FastAPI + AI Worker MVP schema. Dashboard와 MyPage는 별도 테이블 없이 관련 테이블을 조회/집계한다."
+  Note: "FastAPI + AI Worker MVP schema. MVP는 풀서비스 1차 기준이며 소셜 로그인과 웨어러블 연동만 제외한다. Dashboard와 MyPage는 별도 테이블 없이 관련 테이블을 조회/집계한다."
 }
 
 Enum gender {

@@ -29,20 +29,19 @@ serviceAccountKey.json
 ai_worker/outputs/
 ai_worker/data/
 etc/ml/ai_worker/data/
-# Vision 평가 데이터 (로컬 전용)
-ai_worker/vision/data/images/
-ai_worker/vision/data/results/
+# CV 평가 데이터 (로컬 전용)
+ai_worker/cv/data/
 
 # CLOVA OCR PoC local inputs/outputs
-ai_worker/vision/clova_ocr/data/images/*
-!ai_worker/vision/clova_ocr/data/images/.gitkeep
-ai_worker/vision/clova_ocr/data/pdfs/*
-!ai_worker/vision/clova_ocr/data/pdfs/.gitkeep
-ai_worker/vision/clova_ocr/outputs/*
-ai_worker/vision/clova_ocr/outputs/**/*
-!ai_worker/vision/clova_ocr/outputs/.gitkeep
-ai_worker/vision/clova_ocr/ground_truth/*
-!ai_worker/vision/clova_ocr/ground_truth/.gitkeep
+ai_worker/ocr/providers/clova_ocr/data/images/*
+!ai_worker/ocr/providers/clova_ocr/data/images/.gitkeep
+ai_worker/ocr/providers/clova_ocr/data/pdfs/*
+!ai_worker/ocr/providers/clova_ocr/data/pdfs/.gitkeep
+ai_worker/ocr/providers/clova_ocr/outputs/*
+ai_worker/ocr/providers/clova_ocr/outputs/**/*
+!ai_worker/ocr/providers/clova_ocr/outputs/.gitkeep
+ai_worker/ocr/providers/clova_ocr/ground_truth/*
+!ai_worker/ocr/providers/clova_ocr/ground_truth/.gitkeep
 .venv-ocr/
 .venv-ocr2/
 

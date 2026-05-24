@@ -36,7 +36,7 @@
 - Backend API: `app/`
 - ML: `ai_worker/ml/`
 - CV: `ai_worker/cv/`
-- LLM/RAG: `ai_worker/llm/`, `ai_worker/rag/`
+- LLM/RAG: `ai_worker/llm/`, `ai_worker/llm/rag/`
 - Pipeline: `ai_worker/pipelines/`
 
 ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않는다. 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않는다. API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정한다.
@@ -108,24 +108,28 @@ Frontend 담당:
 
 ## MVP 포함 범위
 
-- AUTH / USER
-- MAIN / MYPAGE
-- HEALTH
-- ANALYSIS + SHAP
-- CHALLENGE
-- DASHBOARD 조회/집계
-- NOTIFICATION 최소기능
+- 이번 프로젝트의 MVP는 축소 데모가 아니라 풀서비스 1차 범위를 기준으로 한다.
+- 제외 항목은 소셜 로그인과 웨어러블 연동 2개로 고정한다.
+- AUTH / USER / MAIN / MYPAGE
+- HEALTH / EXAM / OCR / ANALYSIS / ML inference
+- DIET / CHALLENGE / DASHBOARD / NOTIFICATION
+- MEDICATION / FAMILY / QNA / FAQ
+- ADMIN / 운영 모니터링 / request_id / system_error_logs / sensitive_access_logs
+- LLM/RAG 준비 구조와 결과 설명/상담 응답
+- Docker 기반 개발 서버 실행 구조
 
 ## MVP 제외 범위
 
-- DIET 실서비스 DB
-- LLM 실서비스 DB
-- FAMILY
-- QNA
-- MEDICATION
-- ADMIN
-- 운영 로그 상세
-- 외부 알림 SMS/Email/Push/Kakao
+- 소셜 로그인
+- 웨어러블 연동
+
+## MVP 범위 안의 후속 구현 단계
+
+- Redis Stream / async_jobs / AI Worker 비동기 실행
+- 외부 Push/SMS/Email/Kakao 발송 worker
+- RAG 검색/임베딩/vector DB 실서비스 고도화
+- Langfuse 운영 관측 고도화
+- 관리자 고급 기능과 세분화된 audit log
 
 ## PR/커밋 규칙
 
@@ -209,9 +213,9 @@ uv run ruff format . --check
 
 ## 웹 MVP 로컬 시연 흐름
 
-현재 `feature/kdu-web`의 웹 MVP는 FastAPI가 건강 분석, OCR, 챗봇 응답을 동기 더미 로직으로 처리한다. 실제 ML/CV/LLM 모델은 아직 붙이지 않았고, 프론트 화면 흐름과 API 계약을 확인하기 위한 시연용 구조다.
+현재 MVP는 축소 데모가 아니라 풀서비스 1차 범위에서 소셜 로그인과 웨어러블 연동만 제외한 기준이다. 로컬 시연은 PostgreSQL, FastAPI, React/Vite를 먼저 띄워 전체 사용자 흐름과 API 계약을 확인한다.
 
-`Architecture_ver1.drawio`의 `async_jobs`, Redis Stream, AI Worker, SSE, Notification Worker, Report Worker는 후속 모델 연동/운영 단계에서 도입한다. 지금 로컬 MVP 테스트에서는 PostgreSQL, FastAPI, React/Vite만 먼저 띄우면 된다.
+`Architecture_ver1.drawio`의 `async_jobs`, Redis Stream, AI Worker, SSE, Notification Worker, Report Worker는 MVP 범위 안의 후속 구현 단계다. 지금 로컬 MVP 테스트에서는 PostgreSQL, FastAPI, React/Vite를 먼저 띄우고, 비동기 처리 구조는 별도 브랜치에서 연결한다.
 
 로컬 실행 순서:
 
