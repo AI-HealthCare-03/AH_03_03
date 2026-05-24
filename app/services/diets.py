@@ -1,5 +1,7 @@
 from typing import Any
 
+from ai_worker.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
+from ai_worker.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
 from app.dtos.diets import (
     DietDummyAnalyzeRequest,
     DietPhotoResultCreateRequest,
@@ -8,6 +10,9 @@ from app.dtos.diets import (
 )
 from app.models.diets import DietPhotoResult, DietRecord
 from app.repositories import diet_repository
+
+SCORING_SOURCE = "nutrition_rule_table"
+FOOD_DETECTION_SOURCE = "rule_based_food_detection"
 
 
 async def create_diet_record(user_id: int, request: DietRecordCreateRequest) -> DietRecord:
@@ -50,8 +55,14 @@ async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: 
 
 
 async def run_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> dict[str, object]:
-    # TODO: connect the production food-image provider; keep this rule fallback shape-compatible.
+    # TODO: replace rule-based food detection with the production CV provider.
     case = _select_rule_based_diet_case(request)
+    scoring_result = build_nutrition_scoring_result(case["detected_foods"])
+    nutrition_summary = {
+        **case["nutrition_summary"],
+        "disease_scores": scoring_result["disease_scores"],
+        "scoring_source": scoring_result["scoring_source"],
+    }
     diet_record = await create_diet_record(
         user_id,
         DietRecordCreateRequest(
@@ -60,7 +71,7 @@ async def run_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> d
             description=request.description or "간편 식단 분석 기록",
             image_path=request.image_path,
             detected_foods=case["detected_foods"],
-            nutrition_summary=case["nutrition_summary"],
+            nutrition_summary=nutrition_summary,
             diet_score=case["diet_score"],
             diet_feedback=case["diet_feedback"],
             analysis_method="IMAGE_ANALYSIS",
@@ -71,9 +82,20 @@ async def run_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> d
         diet_record.id,
         DietPhotoResultCreateRequest(
             detected_foods=case["detected_foods"],
-            confidence_payload={"method": "rule_stub", "average_confidence": case["average_confidence"]},
-            raw_output={"source": "image_analysis_stub", "case": case["case_name"], "foods": case["detected_foods"]},
-            is_dummy=True,
+            confidence_payload={
+                "method": FOOD_DETECTION_SOURCE,
+                "average_confidence": case["average_confidence"],
+                "scoring_source": scoring_result["scoring_source"],
+            },
+            raw_output={
+                "source": FOOD_DETECTION_SOURCE,
+                "case": case["case_name"],
+                "foods": case["detected_foods"],
+                "disease_scores": scoring_result["disease_scores"],
+                "food_score_details": scoring_result["food_score_details"],
+                "scoring_source": scoring_result["scoring_source"],
+            },
+            is_dummy=False,
         ),
     )
     return {
@@ -81,11 +103,89 @@ async def run_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> d
         "diet_record": diet_record,
         "photo_result": photo_result,
         "detected_foods": case["detected_foods"],
-        "nutrition_summary": case["nutrition_summary"],
+        "nutrition_summary": nutrition_summary,
         "diet_score": case["diet_score"],
         "diet_feedback": case["diet_feedback"],
+        "disease_scores": scoring_result["disease_scores"],
+        "food_score_details": scoring_result["food_score_details"],
+        "scoring_source": scoring_result["scoring_source"],
         "warnings": case["warnings"],
         "recommended_actions": case["recommended_actions"],
+    }
+
+
+def build_nutrition_scoring_result(
+    detected_foods: list[dict[str, Any]],
+    scorer: DiseaseFoodScorer | None = None,
+) -> dict[str, Any]:
+    scorer = scorer or DiseaseFoodScorer()
+    runtime_scores = scorer.load_runtime_scores()
+    details = [_build_food_score_detail(food, runtime_scores) for food in detected_foods]
+    matched_scores = [detail["scores"] for detail in details if detail["scores"] is not None]
+    return {
+        "detected_foods": [_food_name(food) for food in detected_foods],
+        "disease_scores": _average_disease_scores(matched_scores),
+        "food_score_details": details,
+        "scoring_source": SCORING_SOURCE,
+    }
+
+
+def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseFoodScoreRecord]) -> dict[str, Any]:
+    food_name = _food_name(food)
+    matched = _match_food_score(food_name, runtime_scores)
+    if matched is None:
+        return {
+            "food_name": food_name,
+            "matched_food_name": None,
+            "scores": None,
+            "match_status": "unmatched",
+        }
+    return {
+        "food_name": food_name,
+        "matched_food_name": matched.food_name,
+        "scores": _record_disease_scores(matched),
+        "match_status": "matched",
+    }
+
+
+def _food_name(food: dict[str, Any]) -> str:
+    return str(food.get("name") or food.get("food_name") or "").strip()
+
+
+def _match_food_score(food_name: str, runtime_scores: list[DiseaseFoodScoreRecord]) -> DiseaseFoodScoreRecord | None:
+    normalized_name = _normalize_food_name(food_name)
+    if not normalized_name:
+        return None
+    for record in runtime_scores:
+        if _normalize_food_name(record.food_name) == normalized_name:
+            return record
+    for record in runtime_scores:
+        record_name = _normalize_food_name(record.food_name)
+        if normalized_name in record_name or record_name in normalized_name:
+            return record
+    return None
+
+
+def _normalize_food_name(value: str) -> str:
+    return value.replace(" ", "").lower()
+
+
+def _record_disease_scores(record: DiseaseFoodScoreRecord) -> dict[str, float]:
+    return {
+        "DM": record.dm_score,
+        "HTN": record.htn_score,
+        "DL": record.dl_score,
+        "OBE": record.obe_score,
+        "ANEM": record.anem_score,
+    }
+
+
+def _average_disease_scores(scores: list[dict[str, float] | None]) -> dict[str, float | None]:
+    if not scores:
+        return {code: None for code in DISEASE_CODES}
+    return {
+        code: round(sum(score[code] for score in scores if score is not None) / len(scores), 1)
+        for code in DISEASE_CODES
     }
 
 

@@ -100,6 +100,9 @@ class DietDummyAnalyzeResponse(BaseModel):
     nutrition_summary: dict[str, Any]
     diet_score: float
     diet_feedback: str
+    disease_scores: dict[str, float | None] | None = None
+    food_score_details: list[dict[str, Any]] = []
+    scoring_source: str | None = None
     warnings: list[str] = []
     recommended_actions: list[str] = []
 
