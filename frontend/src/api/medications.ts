@@ -15,6 +15,7 @@ export type MedicationOcrRequest = {
   source_type?: "PRESCRIPTION" | "MEDICATION_BAG" | "SUPPLEMENT" | string;
   image_filename?: string;
   memo?: string;
+  raw_text?: string;
 };
 
 export type MedicationOcrResponse = {
@@ -23,6 +24,9 @@ export type MedicationOcrResponse = {
   ocr_confidence: number;
   items: MedicationOcrItem[];
   message: string;
+  source?: string;
+  raw_text?: string | null;
+  parser_warnings?: string[];
 };
 
 export type MedicationOcrConfirmRequest = {

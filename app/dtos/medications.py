@@ -48,6 +48,7 @@ class MedicationOCRRequest(BaseModel):
     source_type: str | None = "PRESCRIPTION"
     image_filename: str | None = None
     memo: str | None = None
+    raw_text: str | None = None
 
 
 class MedicationOCRItem(BaseModel):
@@ -62,11 +63,14 @@ class MedicationOCRItem(BaseModel):
 
 
 class MedicationOCRResponse(BaseModel):
-    is_dummy: bool = True
+    is_dummy: bool = False
     source_type: str
     ocr_confidence: float
     items: list[MedicationOCRItem]
     message: str
+    source: str = "rule_based_medication_ocr"
+    raw_text: str | None = None
+    parser_warnings: list[str] = Field(default_factory=list)
 
 
 class MedicationOCRConfirmItem(BaseModel):
