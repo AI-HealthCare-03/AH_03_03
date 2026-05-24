@@ -11,12 +11,12 @@ async def get_public_main() -> dict:
     return {
         "service_title": "AI Health Manager",
         "service_description": "건강정보와 생활습관 기록을 바탕으로 만성질환 위험 관리와 실천 챌린지를 돕는 서비스입니다.",
-        "sample_health_cards": [
-            {"title": "혈당 관리", "value": "공복혈당 추적", "status": "sample"},
-            {"title": "체중 관리", "value": "BMI/허리둘레 확인", "status": "sample"},
-            {"title": "지질 관리", "value": "콜레스테롤 지표 확인", "status": "sample"},
+        "health_highlights": [
+            {"title": "혈당 관리", "value": "공복혈당 추적", "status": "login_required"},
+            {"title": "체중 관리", "value": "BMI/허리둘레 확인", "status": "login_required"},
+            {"title": "지질 관리", "value": "콜레스테롤 지표 확인", "status": "login_required"},
         ],
-        "sample_challenges": [
+        "challenge_highlights": [
             {"title": "식후 10분 걷기", "category": "EXERCISE"},
             {"title": "물 6잔 마시기", "category": "HABIT"},
             {"title": "야식 줄이기", "category": "DIET"},

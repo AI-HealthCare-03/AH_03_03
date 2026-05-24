@@ -44,14 +44,10 @@ class MedicationListResponse(BaseModel):
     total: int
 
 
-class MedicationOCRDummyRequest(BaseModel):
+class MedicationOCRRequest(BaseModel):
     source_type: str | None = "PRESCRIPTION"
     image_filename: str | None = None
     memo: str | None = None
-
-
-class MedicationOCRRequest(MedicationOCRDummyRequest):
-    pass
 
 
 class MedicationOCRItem(BaseModel):
@@ -65,16 +61,12 @@ class MedicationOCRItem(BaseModel):
     confidence: float | None = None
 
 
-class MedicationOCRDummyResponse(BaseModel):
+class MedicationOCRResponse(BaseModel):
     is_dummy: bool = True
     source_type: str
     ocr_confidence: float
     items: list[MedicationOCRItem]
     message: str
-
-
-class MedicationOCRResponse(MedicationOCRDummyResponse):
-    pass
 
 
 class MedicationOCRConfirmItem(BaseModel):

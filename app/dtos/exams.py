@@ -88,10 +88,6 @@ class ExamConfirmRequest(BaseModel):
     measurements: list[ExamConfirmMeasurementRequest] | None = None
 
 
-class ExamDummyOCRResponse(BaseModel):
+class ExamOCRResponse(BaseModel):
     message: str
     measurements: list[ExamMeasurementResponse]
-
-
-class ExamOCRResponse(ExamDummyOCRResponse):
-    pass

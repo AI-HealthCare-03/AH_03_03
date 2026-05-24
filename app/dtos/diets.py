@@ -80,7 +80,7 @@ class DietRecordDetailResponse(DietRecordResponse):
     photo_results: list[DietPhotoResultResponse]
 
 
-class DietDummyAnalyzeRequest(BaseModel):
+class DietAnalyzeRequest(BaseModel):
     meal_type: str | None = None
     meal_time: datetime | None = None
     description: str | None = None
@@ -88,11 +88,7 @@ class DietDummyAnalyzeRequest(BaseModel):
     memo: str | None = None
 
 
-class DietAnalyzeRequest(DietDummyAnalyzeRequest):
-    pass
-
-
-class DietDummyAnalyzeResponse(BaseModel):
+class DietAnalyzeResponse(BaseModel):
     message: str
     diet_record: DietRecordResponse
     photo_result: DietPhotoResultResponse
@@ -105,7 +101,3 @@ class DietDummyAnalyzeResponse(BaseModel):
     scoring_source: str | None = None
     warnings: list[str] = []
     recommended_actions: list[str] = []
-
-
-class DietAnalyzeResponse(DietDummyAnalyzeResponse):
-    pass

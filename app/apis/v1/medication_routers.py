@@ -7,8 +7,6 @@ from app.dtos.medications import (
     MedicationCreateRequest,
     MedicationOCRConfirmRequest,
     MedicationOCRConfirmResponse,
-    MedicationOCRDummyRequest,
-    MedicationOCRDummyResponse,
     MedicationOCRRequest,
     MedicationOCRResponse,
     MedicationRecordCreateRequest,
@@ -54,7 +52,7 @@ async def list_medications(
     )
 
 
-async def _run_medication_ocr(request: MedicationOCRDummyRequest, user: User) -> MedicationOCRDummyResponse:
+async def _run_medication_ocr(request: MedicationOCRRequest, user: User) -> MedicationOCRResponse:
     _ = user
     return await medication_service.run_medication_ocr(request)
 
@@ -67,9 +65,9 @@ async def run_medication_ocr(
     return await _run_medication_ocr(request, user)
 
 
-@medication_router.post("/dummy-ocr", response_model=MedicationOCRDummyResponse, deprecated=True)
+@medication_router.post("/dummy-ocr", response_model=MedicationOCRResponse, deprecated=True)
 async def run_legacy_medication_ocr(
-    request: MedicationOCRDummyRequest,
+    request: MedicationOCRRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):
     return await _run_medication_ocr(request, user)

@@ -7,9 +7,9 @@ from app.core import config
 from app.dtos.exams import (
     ExamConfirmMeasurementRequest,
     ExamConfirmRequest,
-    ExamDummyOCRResponse,
     ExamMeasurementCreateRequest,
     ExamMeasurementUpdateRequest,
+    ExamOCRResponse,
     ExamReportCreateRequest,
     ExamReportUpdateRequest,
 )
@@ -236,7 +236,7 @@ def _coerce_health_record_value(field_name: str, value: Decimal) -> int | Decima
     return value
 
 
-async def run_exam_ocr(exam_report_id: int) -> ExamDummyOCRResponse:
+async def run_exam_ocr(exam_report_id: int) -> ExamOCRResponse:
     # TODO: connect the OCR provider pipeline; keep this fallback response shape-compatible.
     existing_measurements = await list_exam_measurements(exam_report_id)
     existing_by_key = {measurement.measurement_key: measurement for measurement in existing_measurements}
@@ -260,7 +260,7 @@ async def run_exam_ocr(exam_report_id: int) -> ExamDummyOCRResponse:
         saved_measurements.append(updated or existing)
 
     await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS))
-    return ExamDummyOCRResponse(
+    return ExamOCRResponse(
         message="자동 인식 측정값이 생성되었습니다. 검진 수치를 확인한 뒤 저장해주세요.",
         measurements=saved_measurements,
     )

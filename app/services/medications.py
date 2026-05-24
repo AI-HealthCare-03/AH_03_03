@@ -5,9 +5,9 @@ from app.dtos.medications import (
     MedicationCreateRequest,
     MedicationOCRConfirmRequest,
     MedicationOCRConfirmResponse,
-    MedicationOCRDummyRequest,
-    MedicationOCRDummyResponse,
     MedicationOCRItem,
+    MedicationOCRRequest,
+    MedicationOCRResponse,
     MedicationRecordCreateRequest,
     MedicationRecordUpdateRequest,
     MedicationUpdateRequest,
@@ -89,10 +89,10 @@ async def delete_medication(medication_id: int) -> int:
     return await medication_repository.delete_medication(medication_id)
 
 
-async def run_medication_ocr(request: MedicationOCRDummyRequest) -> MedicationOCRDummyResponse:
+async def run_medication_ocr(request: MedicationOCRRequest) -> MedicationOCRResponse:
     # TODO: connect prescription/package OCR provider; keep this fallback response shape-compatible.
     source_type = request.source_type or "PRESCRIPTION"
-    return MedicationOCRDummyResponse(
+    return MedicationOCRResponse(
         source_type=source_type,
         ocr_confidence=0.93,
         items=_FALLBACK_OCR_ITEMS,

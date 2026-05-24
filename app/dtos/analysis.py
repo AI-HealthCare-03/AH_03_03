@@ -15,13 +15,9 @@ class AnalysisRunRequest(BaseModel):
     mode: AnalysisMode = AnalysisMode.BASIC
 
 
-class DummyAnalysisRunRequest(BaseModel):
+class AnalysisRunByHealthRecordRequest(BaseModel):
     health_record_id: int
     mode: AnalysisMode = AnalysisMode.BASIC
-
-
-class AnalysisRunByHealthRecordRequest(DummyAnalysisRunRequest):
-    pass
 
 
 class AnalysisResultCreateRequest(BaseModel):
@@ -98,7 +94,7 @@ class AnalysisResultDetailResponse(BaseModel):
     snapshot: AnalysisSnapshotResponse | None = None
 
 
-class DummyAnalysisResultResponse(BaseModel):
+class AnalysisRunResultResponse(BaseModel):
     analysis_result_id: int
     analysis_type: AnalysisType
     analysis_mode: AnalysisMode
@@ -107,7 +103,3 @@ class DummyAnalysisResultResponse(BaseModel):
     guide_message: str
     challenge_recommendation_ids: list[int]
     factor_count: int = 0
-
-
-class AnalysisRunResultResponse(DummyAnalysisResultResponse):
-    pass
