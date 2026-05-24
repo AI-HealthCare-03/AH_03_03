@@ -123,6 +123,7 @@ make langfuse-down
 - 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
 - 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck 용도입니다. Redis Stream, `async_jobs`, AI Worker consumer, retry/dead-letter queue는 P2 운영 확장 범위입니다.
 - 시연 설명은 “현재 MVP는 동기 처리, 운영 확장 시 Redis Stream 기반 비동기 worker로 전환”으로 통일합니다.
+- 현재 로컬 모델 artifact는 만성질환 정밀분석용 DM/HTN/DL CatBoost 3종입니다. OBESITY는 rule-based, ANEM은 X2/식단 참고 분류로 설명합니다.
 
 ### 0. 웹 MVP 로컬 실행
 
