@@ -192,7 +192,7 @@
   - `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`
   - `ai_worker/cv/food/nutrition/rules/disease_score_rules.json`
 - 원본 엑셀은 런타임에서 직접 읽지 않는다.
-  - `etc/ai_worker/cv/food/nutrition/raw/food_nutrition_db.xlsx`
+  - `etc/ai/cv/food/nutrition/raw/food_nutrition_db.xlsx`
 - GPT Vision은 fallback provider 후보로 반영하되, 실제 자동 호출은 보류 또는 사용자 확인 후 호출 정책으로 구분한다.
 
 ### 챌린지/데이터
