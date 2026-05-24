@@ -15,13 +15,25 @@
     "id": "diabetes",
     "disease_type": "DIABETES",
     "title": "당뇨 및 공복혈당 관리 후보 지식",
-    "source_org": "대한당뇨병학회",
-    "source_url": "https://www.diabetes.or.kr",
+    "source_org": "대한당뇨병학회, 질병관리청 국가건강정보포털",
+    "source_url": "https://www.diabetes.or.kr/bbs/?code=guide&mode=view&number=2078&page=1&code=guide",
     "year": null,
     "source_type": "official_society",
     "runtime_use": "keyword_rag_poc_candidate",
     "status": "candidate_unreviewed",
     "notes": "시연용 keyword RAG 후보. 혈당 수치 해석은 진단이 아니라 상담 권고 중심으로만 사용한다."
+  },
+  {
+    "id": "diabetes_guideline_2025",
+    "disease_type": "DIABETES",
+    "title": "2025 당뇨병 진료지침 후보 지식",
+    "source_org": "대한당뇨병학회",
+    "source_url": "https://www.diabetes.or.kr/bbs/?code=guide&mode=view&number=2078&page=1&code=guide",
+    "year": 2025,
+    "source_type": "clinical_guideline",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "업로드된 2025 당뇨병 진료지침 PDF의 RAG raw source 후보. 원문 PDF는 repo에 넣지 않고 공식 페이지 URL과 짧은 요약만 유지한다."
   },
   {
     "id": "dyslipidemia",
