@@ -45,6 +45,35 @@ class RecommendationMessageOutput(BaseModel):
     is_safe: bool = True
 
 
+class ExplanationOutput(BaseModel):
+    summary: str
+    caution: str
+    recommended_action: str
+    safety_notice: str
+    source: str = "rule_based_explanation"
+
+
+class AnalysisExplanationInput(BaseModel):
+    disease_type: str
+    risk_score: float | int | str | None = None
+    risk_level: str
+    model_name: str | None = None
+    model_version: str | None = None
+    factors: list[HealthRiskFactor] = Field(default_factory=list)
+
+
+class DietScoreExplanationInput(BaseModel):
+    disease_scores: dict[str, float | int | None] = Field(default_factory=dict)
+
+
+class RetrievedContext(BaseModel):
+    title: str | None = None
+    content: str
+    source_name: str | None = None
+    url: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
 class ResultChatbotInput(BaseModel):
     user_message: str
     risk_factors: list[HealthRiskFactor] = Field(default_factory=list)

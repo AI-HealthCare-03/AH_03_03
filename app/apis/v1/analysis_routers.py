@@ -57,6 +57,7 @@ async def run_analysis(
     response_model=list[AnalysisRunResultResponse],
     status_code=status.HTTP_201_CREATED,
     deprecated=True,
+    include_in_schema=False,
 )
 async def run_legacy_analysis(
     request: AnalysisRunByHealthRecordRequest,

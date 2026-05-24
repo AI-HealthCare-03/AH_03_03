@@ -92,6 +92,7 @@ class AnalysisResultDetailResponse(BaseModel):
     result: AnalysisResultResponse
     factors: list[AnalysisResultFactorResponse]
     snapshot: AnalysisSnapshotResponse | None = None
+    explanation: dict[str, Any] | None = None
 
 
 class AnalysisRunResultResponse(BaseModel):
@@ -101,5 +102,6 @@ class AnalysisRunResultResponse(BaseModel):
     risk_score: Decimal
     risk_level: RiskLevel
     guide_message: str
+    explanation: dict[str, Any] | None = None
     challenge_recommendation_ids: list[int]
     factor_count: int = 0

@@ -33,6 +33,21 @@ const riskFallbackScores: Record<string, number> = {
   LOW: 25,
 };
 
+function modelLabel(result: AnalysisResult): string | null {
+  const modelName = result.model_name ? String(result.model_name) : "";
+  const modelVersion = result.model_version ? String(result.model_version) : "";
+  if (!modelName && !modelVersion) {
+    return null;
+  }
+  if (modelName.toLowerCase() === "catboost") {
+    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
+  }
+  if (modelName) {
+    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
+  }
+  return modelVersion;
+}
+
 const missingFieldLabels: Record<string, string> = {
   height_cm: "키",
   weight_kg: "몸무게",
@@ -259,6 +274,7 @@ export default function AnalysisPage() {
               <strong>{score}/100</strong>
               <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
             </div>
           );
