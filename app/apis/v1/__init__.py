@@ -11,6 +11,7 @@ from app.apis.v1.exam_routers import exam_router
 from app.apis.v1.family_routers import family_router
 from app.apis.v1.faq_routers import faq_router
 from app.apis.v1.health_routers import health_router
+from app.apis.v1.job_routers import job_router
 from app.apis.v1.llm_log_routers import llm_log_router
 from app.apis.v1.main_routers import main_router
 from app.apis.v1.medication_routers import medication_router
@@ -40,3 +41,4 @@ v1_routers.include_router(medication_router)
 v1_routers.include_router(llm_log_router)
 v1_routers.include_router(dashboard_router)
 v1_routers.include_router(mypage_router)
+v1_routers.include_router(job_router)

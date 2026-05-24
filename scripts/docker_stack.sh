@@ -16,12 +16,16 @@ usage() {
   cat <<'USAGE'
 Usage:
   ./scripts/docker_stack.sh app up
+  ./scripts/docker_stack.sh app up-full
+  ./scripts/docker_stack.sh app worker-up
   ./scripts/docker_stack.sh app build
+  ./scripts/docker_stack.sh app worker-build
   ./scripts/docker_stack.sh app rebuild
   ./scripts/docker_stack.sh app clean-image
   ./scripts/docker_stack.sh app down
   ./scripts/docker_stack.sh app ps
   ./scripts/docker_stack.sh app logs
+  ./scripts/docker_stack.sh app worker-logs
   ./scripts/docker_stack.sh dev up
   ./scripts/docker_stack.sh dev down
   ./scripts/docker_stack.sh dev ps
@@ -31,7 +35,7 @@ Usage:
   ./scripts/docker_stack.sh langfuse logs
 
 Stacks:
-  app       Root docker-compose.yml. Starts postgres, redis, fastapi only.
+  app       Root docker-compose.yml. Starts postgres, redis, fastapi by default.
   dev       infra/docker/docker-compose.dev.yml. Starts the full dev stack.
   langfuse  infra/langfuse/docker-compose.yml. Starts the Langfuse-only stack.
 USAGE
@@ -50,8 +54,17 @@ run_app() {
     up)
       docker compose -f "${APP_COMPOSE}" up -d --build postgres redis fastapi
       ;;
+    up-full)
+      docker compose -f "${APP_COMPOSE}" up -d --build postgres redis fastapi ai-worker
+      ;;
+    worker-up)
+      docker compose -f "${APP_COMPOSE}" up -d --build ai-worker
+      ;;
     build)
       docker compose -f "${APP_COMPOSE}" build fastapi
+      ;;
+    worker-build)
+      docker compose -f "${APP_COMPOSE}" build ai-worker
       ;;
     rebuild)
       docker compose -f "${APP_COMPOSE}" build --no-cache fastapi
@@ -67,6 +80,9 @@ run_app() {
       ;;
     logs)
       docker compose -f "${APP_COMPOSE}" logs --tail=100 fastapi
+      ;;
+    worker-logs)
+      docker compose -f "${APP_COMPOSE}" logs --tail=100 ai-worker
       ;;
     *)
       usage

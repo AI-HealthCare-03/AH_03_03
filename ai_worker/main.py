@@ -1,22 +1,30 @@
+from __future__ import annotations
+
+import asyncio
+import logging
 import signal
-import time
 
-_running = True
+from ai_worker.jobs.consumer import run_consumer_forever
 
-
-def _handle_shutdown(_signum: int, _frame: object) -> None:
-    global _running
-    _running = False
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
-def main() -> None:
-    signal.signal(signal.SIGINT, _handle_shutdown)
-    signal.signal(signal.SIGTERM, _handle_shutdown)
-    print("AI Worker started. Queue/OCR/ML/LLM jobs are not wired yet.", flush=True)
-    while _running:
-        time.sleep(30)
-    print("AI Worker stopped.", flush=True)
+async def _main() -> None:
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    def request_shutdown() -> None:
+        logger.info("AI Worker shutdown requested")
+        stop_event.set()
+
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(signum, request_shutdown)
+
+    logger.info("AI Worker started. Redis Stream DEMO_ECHO consumer is enabled.")
+    await run_consumer_forever(stop_event)
+    logger.info("AI Worker stopped.")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(_main())
