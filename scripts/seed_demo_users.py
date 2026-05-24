@@ -42,7 +42,7 @@ from app.models.health import HealthRecord  # noqa: E402
 from app.models.medications import Medication, MedicationRecord  # noqa: E402
 from app.models.notifications import Notification  # noqa: E402
 from app.models.users import Gender, User, UserConsent  # noqa: E402
-from app.services.exams import DUMMY_OCR_MEASUREMENTS  # noqa: E402
+from app.services.exams import FALLBACK_OCR_MEASUREMENTS  # noqa: E402
 
 DEMO_PASSWORD = "Demo1234!"
 
@@ -600,7 +600,7 @@ async def _seed_exam_report(user: User) -> int:
             "confirmed_at": datetime.now(config.TIMEZONE),
         },
     )
-    for key, name, value, unit in DUMMY_OCR_MEASUREMENTS:
+    for key, name, value, unit in FALLBACK_OCR_MEASUREMENTS:
         await ExamMeasurement.get_or_create(
             exam_report=report,
             measurement_key=key,
