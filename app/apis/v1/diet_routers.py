@@ -6,8 +6,6 @@ from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_use
 from app.dtos.diets import (
     DietAnalyzeRequest,
     DietAnalyzeResponse,
-    DietDummyAnalyzeRequest,
-    DietDummyAnalyzeResponse,
     DietPhotoResultCreateRequest,
     DietPhotoResultResponse,
     DietRecordCreateRequest,
@@ -41,9 +39,9 @@ async def list_diet_records(
 
 
 async def _run_diet_analysis(
-    request: DietDummyAnalyzeRequest,
+    request: DietAnalyzeRequest,
     user: User,
-) -> DietDummyAnalyzeResponse:
+) -> DietAnalyzeResponse:
     return await diet_service.run_diet_analysis(user.id, request)
 
 
@@ -57,12 +55,12 @@ async def run_diet_analysis(
 
 @diet_router.post(
     "/dummy-analyze",
-    response_model=DietDummyAnalyzeResponse,
+    response_model=DietAnalyzeResponse,
     status_code=status.HTTP_201_CREATED,
     deprecated=True,
 )
 async def run_legacy_diet_analysis(
-    request: DietDummyAnalyzeRequest,
+    request: DietAnalyzeRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):
     return await _run_diet_analysis(request, user)

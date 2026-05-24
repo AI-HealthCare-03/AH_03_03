@@ -3,7 +3,7 @@ from typing import Any
 from ai_worker.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_worker.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
 from app.dtos.diets import (
-    DietDummyAnalyzeRequest,
+    DietAnalyzeRequest,
     DietPhotoResultCreateRequest,
     DietRecordCreateRequest,
     DietRecordUpdateRequest,
@@ -54,7 +54,7 @@ async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: 
     return await diet_repository.list_diet_photo_results(diet_record_id, limit=limit, offset=offset)
 
 
-async def run_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> dict[str, object]:
+async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[str, object]:
     # TODO: replace rule-based food detection with the production CV provider.
     case = _select_rule_based_diet_case(request)
     scoring_result = build_nutrition_scoring_result(case["detected_foods"])
@@ -189,7 +189,7 @@ def _average_disease_scores(scores: list[dict[str, float] | None]) -> dict[str, 
     }
 
 
-def _select_rule_based_diet_case(request: DietDummyAnalyzeRequest) -> dict[str, Any]:
+def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
     text = f"{request.meal_type or ''} {request.description or ''}".lower()
     if "breakfast" in text or "아침" in text:
         return _diet_case(

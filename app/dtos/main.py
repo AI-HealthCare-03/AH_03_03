@@ -6,8 +6,8 @@ from pydantic import BaseModel
 class MainPublicResponse(BaseModel):
     service_title: str
     service_description: str
-    sample_health_cards: list[dict[str, Any]]
-    sample_challenges: list[dict[str, Any]]
+    health_highlights: list[dict[str, Any]]
+    challenge_highlights: list[dict[str, Any]]
     locked_features: list[dict[str, Any]]
     cta_buttons: list[dict[str, str]]
 

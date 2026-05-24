@@ -12,8 +12,6 @@ from app.dtos.analysis import (
     AnalysisRunResultResponse,
     AnalysisSnapshotCreateRequest,
     AnalysisSnapshotResponse,
-    DummyAnalysisResultResponse,
-    DummyAnalysisRunRequest,
 )
 from app.models.users import User
 from app.services import analysis as analysis_service
@@ -24,9 +22,9 @@ analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 
 async def _run_analysis(
-    request: DummyAnalysisRunRequest,
+    request: AnalysisRunByHealthRecordRequest,
     user: User,
-) -> list[DummyAnalysisResultResponse]:
+) -> list[AnalysisRunResultResponse]:
     health_record = ensure_found(
         await health_service.get_health_record(request.health_record_id),
         "건강 기록을 찾을 수 없습니다.",
@@ -56,12 +54,12 @@ async def run_analysis(
 
 @analysis_router.post(
     "/dummy-run",
-    response_model=list[DummyAnalysisResultResponse],
+    response_model=list[AnalysisRunResultResponse],
     status_code=status.HTTP_201_CREATED,
     deprecated=True,
 )
 async def run_legacy_analysis(
-    request: DummyAnalysisRunRequest,
+    request: AnalysisRunByHealthRecordRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):
     return await _run_analysis(request, user)

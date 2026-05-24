@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, status
@@ -49,6 +49,10 @@ def _refresh_cookie_settings() -> dict[str, object]:
 def _refresh_cookie_max_age(refresh_token_exp: int) -> int:
     expires_at = datetime.fromtimestamp(refresh_token_exp, tz=config.TIMEZONE)
     return max(0, int((expires_at - datetime.now(config.TIMEZONE)).total_seconds()))
+
+
+def _refresh_cookie_expires(refresh_token_exp: int) -> datetime:
+    return datetime.fromtimestamp(refresh_token_exp, tz=UTC)
 
 
 def _allow_auth_debug_response() -> bool:
@@ -182,7 +186,7 @@ async def login(
         **_refresh_cookie_settings(),
         value=str(tokens["refresh_token"]),
         max_age=_refresh_cookie_max_age(tokens["refresh_token"].payload["exp"]),
-        expires=datetime.fromtimestamp(tokens["refresh_token"].payload["exp"], tz=config.TIMEZONE),
+        expires=_refresh_cookie_expires(tokens["refresh_token"].payload["exp"]),
     )
     return resp
 

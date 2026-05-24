@@ -1,5 +1,7 @@
+import logging
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from app.core import config
@@ -28,6 +30,8 @@ from app.services.health import (
     REQUIRED_PRECISION_ANALYSIS_FIELDS,
     REQUIRED_USER_ANALYSIS_FIELDS,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def create_analysis_result(user_id: int, request: AnalysisResultCreateRequest) -> AnalysisResult:
@@ -173,11 +177,19 @@ def _predict_ml_outputs(user: User | None, health_record: HealthRecord) -> dict[
     try:
         from ai_worker.ml.inference.disease_risk_service import predict_chronic_disease_risks
     except Exception:
+        logger.exception(
+            "ML prediction import failed; falling back to rule-based precision analysis",
+            extra={"health_record_id": health_record.id},
+        )
         return {}
 
     try:
         raw_predictions = predict_chronic_disease_risks(user, health_record, diseases=["DM", "HTN", "DL"])
     except Exception:
+        logger.exception(
+            "ML prediction failed; falling back to rule-based precision analysis",
+            extra={"user_id": user.id, "health_record_id": health_record.id},
+        )
         return {}
 
     disease_map = {
@@ -466,56 +478,70 @@ def _analysis_snapshot_request(
         for factor in factors
     ]
     return AnalysisSnapshotCreateRequest(
-        input_payload={
-            "input_features": input_features,
-            "analysis_type": analysis_type,
-            "analysis_mode": analysis_mode,
-        },
-        output_payload={
-            "model_outputs": {
-                analysis_type: {
-                    "risk_score": _to_json_value(score),
-                }
-            },
-            "rule_outputs": {
-                "low_threshold": 0.40,
-                "high_threshold": 0.70,
-                "rule_engine": "rule_based",
+        input_payload=_to_json_value(
+            {
+                "input_features": input_features,
+                "analysis_type": analysis_type,
                 "analysis_mode": analysis_mode,
-                "note": "참고용 룰 기반 분석이며 실제 의료 진단 또는 처방이 아닙니다.",
-                "hypertension_rule": {
-                    "high": "systolic_bp >= 140 또는 diastolic_bp >= 90",
-                    "medium": "systolic_bp >= 130 또는 diastolic_bp >= 80",
-                    "low": "그 외",
-                }
-                if analysis_type == AnalysisType.HYPERTENSION
-                else None,
-            },
-            "final_outputs": {
-                "risk_level": risk_level,
-                "guide_message": guide_message,
-            },
-            "model_version_info": {
+            }
+        ),
+        output_payload=_to_json_value(
+            {
+                "model_outputs": {
+                    analysis_type: {
+                        "risk_score": _to_json_value(score),
+                    }
+                },
+                "rule_outputs": {
+                    "low_threshold": 0.40,
+                    "high_threshold": 0.70,
+                    "rule_engine": "rule_based",
+                    "analysis_mode": analysis_mode,
+                    "note": "참고용 룰 기반 분석이며 실제 의료 진단 또는 처방이 아닙니다.",
+                    "hypertension_rule": {
+                        "high": "systolic_bp >= 140 또는 diastolic_bp >= 90",
+                        "medium": "systolic_bp >= 130 또는 diastolic_bp >= 80",
+                        "low": "그 외",
+                    }
+                    if analysis_type == AnalysisType.HYPERTENSION
+                    else None,
+                },
+                "final_outputs": {
+                    "risk_level": risk_level,
+                    "guide_message": guide_message,
+                },
+                "model_version_info": {
+                    "model_name": model_name,
+                    "model_version": model_version,
+                },
+            }
+        ),
+        shap_payload=_to_json_value(
+            {
+                "note": "룰 기반 분석의 주요 요인입니다.",
+                "factors": shap_outputs,
+            }
+        ),
+        model_payload=_to_json_value(
+            {
                 "model_name": model_name,
                 "model_version": model_version,
-            },
-        },
-        shap_payload={
-            "note": "룰 기반 분석의 주요 요인입니다.",
-            "factors": shap_outputs,
-        },
-        model_payload={
-            "model_name": model_name,
-            "model_version": model_version,
-            "analysis_mode": analysis_mode,
-            "prediction": model_prediction,
-        },
+                "analysis_mode": analysis_mode,
+                "prediction": model_prediction,
+            }
+        ),
     )
 
 
 def _to_json_value(value: Any) -> Any:
     if isinstance(value, Decimal):
         return float(value)
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {str(_to_json_value(key)): _to_json_value(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_to_json_value(item) for item in value]
     return value
 
 
