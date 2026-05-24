@@ -48,6 +48,8 @@ class Config(BaseSettings):
     SMTP_FROM_NAME: str = "AI HealthCare"
     SMTP_USE_TLS: bool = True
     FRONTEND_BASE_URL: str = "http://localhost:5173"
+    CHECKUP_OCR_PRIMARY_PROVIDER: str = "paddle"
+    ENABLE_CLOVA_OCR: bool = False
     GPT_VISION_FALLBACK_ENABLED: bool = False
     FOOD_CV_CONFIDENCE_THRESHOLD: float = 0.75
 

@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 로컬 모델 artifact | DM/HTN/DL CatBoost 3종 | FastAPI 컨테이너에 포함되어 정밀분석에서 사용 가능 |
 | Rule-based 로직 | OBESITY, ANEM 참고 분류, X2 classifier, 식단 nutrition scorer | 모델 파일 없이 규칙/점수표 기반으로 동작 |
-| 외부 provider/API 코드 | GPT Vision, Clova OCR, OpenAI LLM | 코드 구조는 있으나 실제 호출은 env/provider 설정과 정책에 따라 활성화 |
+| 외부 provider/API 코드 | GPT Vision, Clova OCR, OpenAI LLM | GPT Vision/OpenAI는 정책과 env에 따라 활성화 후보, Clova OCR은 현재 공식 실행 경로에서 제외된 deferred provider |
 | Skeleton/parser | 약봉투 OCR parser, 건강검진 OCR 처리 구조, 처방전 OCR 준비 구조 | MVP에서는 구조와 parser 중심, 실제 provider 연결은 일부 미완성 |
 | P2 보류 | 자체 식단 CV 모델, vector RAG, Redis Stream/async_jobs/consumer, LLM/RAG 운영 고도화 | 시연 전 미구현이 아니라 운영 확장 단계로 의도적 보류 |
 
@@ -46,11 +46,13 @@ ANEM을 공식 분석 결과에 포함하려면 `AnalysisType` enum, DB schema, 
 
 | 기능 | 경로 | 현재 상태 | 주의사항 |
 | --- | --- | --- | --- |
-| GPT Vision 식단 이미지 분석 후보 | `ai_worker/cv/providers/gpt_vision.py` | provider 코드 존재 | 기본 식단 분석 경로는 유료 호출을 켜지 않고 rule-based food detection + nutrition scorer를 사용 |
-| Clova OCR provider | `ai_worker/ocr/providers/clova_ocr/` | provider/extractor/parser 구조 존재 | 실제 호출에는 API URL/secret과 provider 설정 필요 |
+| GPT Vision 식단 이미지 분석 후보 | `ai_worker/cv/providers/gpt_vision.py` | provider 코드 존재 | 기본값은 off이며 `GPT_VISION_FALLBACK_ENABLED=true`와 사용자 확인 정책이 있을 때만 fallback 후보 |
+| Clova OCR provider | `ai_worker/ocr/providers/clova_ocr/` | PoC/deferred provider로 보존 | 공식 건강검진 OCR 시연 경로에서는 호출하지 않으며 `ENABLE_CLOVA_OCR=false`가 기본 |
 | OpenAI LLM | `ai_worker/llm/` | 챗봇, 설명 생성, fallback/rewrite 구조 존재 | 기본은 rule-based/fallback 설명이며 실제 LLM 호출은 설정에 따라 제한적으로 사용 |
 
 외부 provider는 API key, 비용, 개인정보 처리 정책이 연결되므로 기본 시연 경로에서 무조건 호출하지 않는다.
+
+건강검진 OCR 공식 방향은 PaddleOCR/local OCR 1차 처리와 GPT Vision fallback 후보 구조다. Clova OCR은 삭제하지 않고 legacy/PoC provider로 보존하지만, 시연 준비 검증이나 공식 API 기본 경로의 필수 조건으로 보지 않는다.
 
 ## 5. Skeleton / Parser
 
@@ -88,7 +90,8 @@ uv run python scripts/audit_ai_worker_capabilities.py
 - X2 health stage classifier import 가능 여부
 - 식단 nutrition scorer import 가능 여부와 runtime CSV record 개수
 - GPT Vision, Clova OCR, OpenAI LLM provider 코드 import 가능 여부
-- `OPENAI_API_KEY`, `CLOVA_OCR_SECRET_KEY`, `CLOVA_OCR_API_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` 설정 여부
+- `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` 설정 여부
+- Clova OCR이 deferred provider로 표시되는지 여부
 - LLM prompt 관련 코드 위치와 line number
 - 약봉투 OCR parser sample parse 가능 여부
 - 건강검진 OCR checkup extractor import 가능 여부
@@ -98,6 +101,8 @@ uv run python scripts/audit_ai_worker_capabilities.py
 - 외부 API를 실제 호출하지 않는다.
 - 환경변수 값과 API key 원문은 출력하지 않는다.
 - LLM prompt 원문 전문은 출력하지 않고 파일 경로와 line number만 출력한다.
+- 감사 결과는 "현재 구현/Provider 코드/Backlog 상태"를 함께 보여준다. `NOT_IMPLEMENTED`, `P1_BACKLOG`, `P2_BACKLOG`는 전체 프로젝트 실패가 아니라 MVP 범위에서 의도적으로 보류한 항목일 수 있다.
+- `READY_*` 항목이 많더라도 자체 식단 CV 모델, vector RAG, Redis Stream 기반 worker 같은 운영 확장 항목이 완료되었다는 뜻은 아니다.
 - CatBoost 모델 로드 시간이 부담되면 아래처럼 warmup을 생략할 수 있다.
 
 ```bash

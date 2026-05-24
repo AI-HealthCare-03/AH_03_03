@@ -18,8 +18,6 @@ ARTIFACTS = {
 }
 ENV_KEYS = [
     "OPENAI_API_KEY",
-    "CLOVA_OCR_SECRET_KEY",
-    "CLOVA_OCR_API_URL",
     "LANGFUSE_PUBLIC_KEY",
     "LANGFUSE_SECRET_KEY",
 ]
@@ -46,7 +44,9 @@ class AuditRow:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Audit ai_worker runtime capability wiring without external API calls.")
+    parser = argparse.ArgumentParser(
+        description="Audit ai_worker runtime capability wiring without external API calls."
+    )
     parser.add_argument(
         "--skip-warmup",
         action="store_true",
@@ -60,6 +60,7 @@ def main() -> None:
     rows.extend(_audit_external_provider_code())
     rows.extend(_audit_llm_prompt_locations())
     rows.extend(_audit_ocr_parsers())
+    rows.extend(_audit_intentional_backlog())
 
     _print_table(rows)
     _print_summary(rows)
@@ -209,9 +210,16 @@ def _audit_external_provider_code() -> list[AuditRow]:
         ),
         _import_row(
             area="provider",
-            item="Clova OCR client",
+            item="Clova OCR client import",
             module="ai_worker.ocr.providers.clova_ocr.clova_client",
-            ready_category="READY_PROVIDER_CODE_ONLY",
+            ready_category="DEFERRED_PROVIDER",
+        ),
+        AuditRow(
+            area="provider",
+            item="Clova OCR runtime status",
+            status="DEFERRED",
+            detail="preserved as PoC/deferred provider; official demo path does not call Clova OCR",
+            category="DEFERRED_PROVIDER",
         ),
         _import_row(
             area="provider",
@@ -316,6 +324,46 @@ def _audit_ocr_parsers() -> list[AuditRow]:
     return rows
 
 
+def _audit_intentional_backlog() -> list[AuditRow]:
+    return [
+        AuditRow(
+            area="backlog",
+            item="자체 식단 CV 모델 artifact",
+            status="P2",
+            detail="no local food CV model artifact; MVP uses rule_based_food_detection + nutrition scorer",
+            category="P2_BACKLOG",
+        ),
+        AuditRow(
+            area="backlog",
+            item="vector RAG / embedding search",
+            status="P2",
+            detail="RAG-ready interfaces exist, but vector DB retrieval/embedding search is not implemented",
+            category="P2_BACKLOG",
+        ),
+        AuditRow(
+            area="backlog",
+            item="Redis Stream / async_jobs / AI Worker consumer",
+            status="P2",
+            detail="Redis infrastructure exists for health/infrastructure checks; stream worker orchestration is deferred",
+            category="P2_BACKLOG",
+        ),
+        AuditRow(
+            area="backlog",
+            item="약봉투/처방전 OCR 실제 provider 연결",
+            status="P1",
+            detail="medication parser skeleton exists; real provider integration for medication/prescription OCR is not wired",
+            category="P1_BACKLOG",
+        ),
+        AuditRow(
+            area="backlog",
+            item="실제 LLM/RAG 운영 연결 고도화",
+            status="P2",
+            detail="provider code and rule-based fallback exist; production RAG grounding/observability policy is deferred",
+            category="P2_BACKLOG",
+        ),
+    ]
+
+
 def _import_row(area: str, item: str, module: str, ready_category: str) -> AuditRow:
     try:
         importlib.import_module(module)
@@ -341,10 +389,7 @@ def _import_row(area: str, item: str, module: str, ready_category: str) -> Audit
 def _print_table(rows: list[AuditRow]) -> None:
     headers = ["Area", "Item", "Status", "Detail", "Category"]
     values = [[row.area, row.item, row.status, row.detail, row.category] for row in rows]
-    widths = [
-        min(max(len(str(row[index])) for row in [headers, *values]), 110)
-        for index in range(len(headers))
-    ]
+    widths = [min(max(len(str(row[index])) for row in [headers, *values]), 110) for index in range(len(headers))]
     print(_format_row(headers, widths))
     print(_format_row(["-" * width for width in widths], widths))
     for value in values:
@@ -369,11 +414,18 @@ def _print_summary(rows: list[AuditRow]) -> None:
         "NEEDS_ENV",
         "NEEDS_DEPENDENCY",
         "NOT_IMPLEMENTED",
+        "DEFERRED_PROVIDER",
+        "P1_BACKLOG",
+        "P2_BACKLOG",
     ]
     print("\nSummary")
     for category in categories:
         count = sum(1 for row in rows if row.category == category)
         print(f"- {category}: {count}")
+    print(
+        "\nThis audit reports current implemented/provider/backlog status. "
+        "NOT_IMPLEMENTED/P2_BACKLOG items may be intentional MVP exclusions."
+    )
 
 
 def _rel(path: Path) -> str:
