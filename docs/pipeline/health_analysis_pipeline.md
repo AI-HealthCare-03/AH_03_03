@@ -107,7 +107,17 @@ uv run python -m ai_worker.cv.food.nutrition.scoring.disease_food_scorer
 
 생성되는 CSV는 `DM`, `HTN`, `DL`, `OBE`, `ANEM` 5개 질병군에 대해 0~100점 범위의 참고용 식품 적합도 점수를 포함한다. 높은 점수는 해당 질병군 관리 맥락에서 상대적으로 활용하기 쉬운 식품이라는 의미이며, 의료 진단이나 영양 처방이 아니다.
 
-현재 `/api/v1/diets/analyze` 공식 경로는 자체 식단 CV 모델을 아직 호출하지 않는다. 대신 기존 음식명 후보 생성 흐름에서 나온 음식명을 `DiseaseFoodScorer`의 런타임 CSV와 매칭해 `disease_scores`, `food_score_details`, `scoring_source=nutrition_rule_table`을 응답과 `DietPhotoResult.raw_output`에 포함한다. 추후 자체 CV 모델 또는 GPT Vision fallback이 붙으면 해당 provider가 음식명 후보를 공급하고, 동일한 nutrition scorer가 질병군별 점수를 계산하는 구조로 확장한다.
+현재 `/api/v1/diets/analyze` 공식 경로는 자체 식단 CV 모델을 아직 호출하지 않는다. 대신 기존 음식명 후보 생성 흐름에서 나온 음식명을 `DiseaseFoodScorer`의 런타임 CSV와 매칭해 `disease_scores`, `food_score_details`, `scoring_source=nutrition_rule_table`을 응답과 `DietRecord.nutrition_summary`, `DietPhotoResult.raw_output`에 포함한다. 공식 저장 payload의 source는 `rule_based_food_detection`으로 기록하며 `rule_stub`, `image_analysis_stub` 같은 개발용 표현은 노출하지 않는다.
+
+식단 이미지 provider 결과는 `ai_worker/cv/food/schemas.py`의 `FoodDetectionCandidateSet` 형태로 정규화하는 방향을 기준으로 한다. provider 우선순위는 자체 CV 모델 -> GPT Vision -> rule-based food detection이다. 자체 CV confidence가 `CV_CONFIDENCE_THRESHOLD` 이상이고 음식명 후보가 충분하면 바로 nutrition scorer로 이동한다. confidence가 낮거나 음식명 후보가 부족하면 GPT Vision fallback 후보가 되지만, 비용 발생 API이므로 현재 정책은 `user_confirmation_required`이다. 어떤 provider를 쓰더라도 최종적으로 `detected_foods: list[str]`를 `DiseaseFoodScorer` 입력으로 넘기는 구조를 유지한다.
+
+정규화 필드 기준:
+
+- `provider`: `cv_model` | `gpt_vision` | `rule_based_food_detection`
+- `confidence`: `float | null`
+- `detected_foods`: `list[str]`
+- `needs_review`: `bool`
+- `fallback_reason`: `string | null`
 
 ## MVP 범위 기준
 

@@ -295,13 +295,15 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 왜 필요한가: 비용이 발생하는 GPT Vision을 언제 호출할지, 자체 CV 결과를 언제 신뢰할지 정책이 필요하다.
 - 현재 문제:
   - 아직 식단 CV 모델은 미완성이다.
-  - GPT Vision API는 fallback 후보이나 자동 호출 여부가 정해지지 않았다.
+  - GPT Vision API는 fallback 후보이며, 현재 정책은 비용 보호를 위해 사용자 확인 후 호출하는 방향이다.
 - 해야 할 일:
   - 1차: 자체 식단 CV 모델
-  - 2차: 자체 CV 모델 confidence 부족 시 GPT Vision API
+  - 2차: 자체 CV 모델 confidence 부족 또는 음식명 후보 부족 시 GPT Vision API
   - 3차: GPT Vision 실패 시 수동 입력 또는 `needs_review`
   - confidence threshold, timeout, retry, provider 로그 정책을 문서화한다.
-  - fallback이 항상 자동 호출될지, 사용자 확인 후 호출될지 정책을 결정한다.
+  - provider 결과는 `ai_worker/cv/food/schemas.py`의 `FoodDetectionCandidateSet` 기준으로 정규화한다.
+  - fallback 호출 정책은 `GPT_VISION_FALLBACK_POLICY=user_confirmation_required`를 기본으로 둔다.
+  - 최종 `DiseaseFoodScorer` 입력은 provider와 무관하게 음식명 후보 `list[str]`로 통일한다.
 - 건드릴 파일 후보:
   - `ai_worker/cv/`
   - `ai_worker/cv/food/`
@@ -309,7 +311,8 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `app/services/diets.py`
 - 완료 기준:
   - provider priority와 fallback 조건이 문서화되어 있다.
-  - fallback source가 `cv_model`, `gpt_vision_fallback`, `manual_input`, `needs_review` 등으로 구분된다.
+  - fallback source가 `cv_model`, `gpt_vision`, `rule_based_food_detection`, `manual_input`, `needs_review` 등으로 구분된다.
+  - 정규화 필드 `provider`, `confidence`, `detected_foods`, `needs_review`, `fallback_reason`이 타입 또는 문서에 명시되어 있다.
 - 검증 명령:
   ```bash
   rg -n "provider|confidence|gpt_vision|needs_review" ai_worker app/services/diets.py
@@ -330,6 +333,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `provider` 필드를 남긴다.
   - `raw_output` 저장 여부와 보관 범위를 정한다.
   - 비용 발생 API이므로 호출 조건을 명확히 한다.
+  - GPT Vision 결과도 `FoodDetectionCandidateSet`으로 정규화한 뒤 nutrition scorer에 전달한다.
 - 건드릴 파일 후보:
   - `ai_worker/cv/providers/gpt_vision.py`
   - `ai_worker/cv/router.py`
@@ -338,6 +342,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 완료 기준:
   - 식단 분석 서비스에서 자체 CV 실패/저신뢰 시 GPT Vision fallback을 호출할 수 있다.
   - fallback 호출 여부와 provider가 응답/로그에서 구분된다.
+  - 자동 호출인지 사용자 확인 후 호출인지 정책이 화면/API에서 일관되게 표현된다.
 - 검증 명령:
   ```bash
   uv run pytest tests
