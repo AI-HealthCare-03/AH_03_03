@@ -91,7 +91,7 @@ async def delete_medication(medication_id: int) -> int:
 
 
 async def run_medication_ocr(request: MedicationOCRRequest) -> MedicationOCRResponse:
-    # TODO: connect prescription/package OCR provider; keep this fallback response shape-compatible.
+    # Current demo path parses raw text or fallback candidates; real OCR providers are not wired by default.
     source_type = request.source_type or "PRESCRIPTION"
     raw_text = request.raw_text or request.memo or ""
     parsed = parse_medication_text(raw_text)
@@ -103,7 +103,7 @@ async def run_medication_ocr(request: MedicationOCRRequest) -> MedicationOCRResp
         source_type=source_type,
         ocr_confidence=_average_confidence(items),
         items=items,
-        message="자동 인식 결과입니다. 복약 정보를 확인한 뒤 저장해주세요.",
+        message="복약 정보 후보입니다. 실제 처방전/약봉투 내용과 대조한 뒤 저장해주세요.",
         source=parsed.source,
         raw_text=parsed.raw_text or None,
         parser_warnings=parsed.warnings,
