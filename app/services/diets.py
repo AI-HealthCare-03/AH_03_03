@@ -49,8 +49,9 @@ async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: 
     return await diet_repository.list_diet_photo_results(diet_record_id, limit=limit, offset=offset)
 
 
-async def run_dummy_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> dict[str, object]:
-    case = _select_dummy_diet_case(request)
+async def run_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest) -> dict[str, object]:
+    # TODO: connect the production food-image provider; keep this rule fallback shape-compatible.
+    case = _select_rule_based_diet_case(request)
     diet_record = await create_diet_record(
         user_id,
         DietRecordCreateRequest(
@@ -88,7 +89,7 @@ async def run_dummy_diet_analysis(user_id: int, request: DietDummyAnalyzeRequest
     }
 
 
-def _select_dummy_diet_case(request: DietDummyAnalyzeRequest) -> dict[str, Any]:
+def _select_rule_based_diet_case(request: DietDummyAnalyzeRequest) -> dict[str, Any]:
     text = f"{request.meal_type or ''} {request.description or ''}".lower()
     if "breakfast" in text or "아침" in text:
         return _diet_case(
