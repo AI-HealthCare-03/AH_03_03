@@ -1,5 +1,5 @@
 """
-    ai_worker/llm/providers/gpt_vision.py
+    ai_worker/cv/providers/gpt_vision.py
 
 GPT Vision API 호출 클라이언트.
 프롬프트 관리 및 이미지 분석 요청을 담당합니다.
