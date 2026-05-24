@@ -122,8 +122,8 @@ make langfuse-down
 - `docker compose up/build` 중 로컬에 없는 base image나 service image는 registry에서 pull될 수 있습니다.
 - 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
 - Langfuse는 RAG 엔진이 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다. Cloud와 Docker self-host를 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿔야 합니다.
-- 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck 용도입니다. Redis Stream, `async_jobs`, AI Worker consumer, retry/dead-letter queue는 P2 운영 확장 범위입니다.
-- 시연 설명은 “현재 MVP는 동기 처리, 운영 확장 시 Redis Stream 기반 비동기 worker로 전환”으로 통일합니다.
+- 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck, `DEMO_ECHO` Redis Stream skeleton 용도입니다. 실제 OCR/CV/ML/LLM 비동기 작업, retry/dead-letter queue, heartbeat는 P2 운영 확장 범위입니다.
+- 시연 설명은 “현재 MVP 핵심 흐름은 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 연결되어 있다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환”으로 통일합니다.
 - 현재 로컬 모델 artifact는 만성질환 정밀분석용 DM/HTN/DL CatBoost 3종입니다. OBESITY는 rule-based, ANEM은 X2/식단 참고 분류로 설명합니다.
 - 건강검진 OCR 공식 시연 경로는 Clova OCR을 호출하지 않습니다. 현재 기준은 `CHECKUP_OCR_PRIMARY_PROVIDER=paddle`, `ENABLE_CLOVA_OCR=false`, `GPT_VISION_FALLBACK_ENABLED=false`이며, Clova OCR 코드는 PoC/deferred provider로 보존합니다.
 
@@ -242,8 +242,10 @@ DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 - `frontend`: `frontend/Dockerfile` multi-stage build로 React/Vite 정적 파일을 생성하고 내부 Nginx로 서빙합니다.
 - `nginx`: `/` 요청은 `frontend`로, `/api/` 요청은 `fastapi:8000`으로 proxy합니다.
 - `fastapi`: Docker 내부에서는 `DB_HOST=postgres`, `REDIS_HOST=redis` 기준으로 실행합니다.
-- `ai-worker`: 현재 큐/모델 로직은 연결하지 않고 worker 컨테이너 생존 구조만 유지합니다.
+- `ai-worker`: `ai_worker/main.py`가 Redis Stream consumer를 실행합니다. 현재 처리 job은 `DEMO_ECHO`뿐이며, OCR/CV/ML/LLM 작업은 아직 큐로 넘기지 않습니다.
 - `postgres`, `redis`: 우리 서비스 전용입니다. Langfuse의 Postgres/Redis와 공유하지 않습니다.
+
+현재 FastAPI 라우터와 Tortoise/asyncpg 기반 DB I/O는 async 기반입니다. 다만 OCR/CV/ML/LLM workflow는 시연 전까지 동기 API 흐름을 유지합니다. Redis는 health/infrastructure와 `DEMO_ECHO` job skeleton 용도이며, retry/dead-letter queue, heartbeat, 실제 OCR/CV/ML/LLM 비동기화는 운영 확장용 P2입니다. `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs` 연동을 위한 reserved field입니다.
 
 운영 compose(`infra/docker/docker-compose.prod.yml`)도 동일한 분리 구조를 따릅니다. 운영에서는 `app`, `ai`, `frontend` 이미지를 각각 빌드/푸시한 뒤 compose가 해당 이미지를 받아 실행하는 방식을 기준으로 합니다.
 

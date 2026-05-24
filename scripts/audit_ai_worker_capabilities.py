@@ -5,6 +5,7 @@ import importlib
 import os
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,6 +63,7 @@ def main() -> None:
     rows.extend(_audit_llm_prompt_locations())
     rows.extend(_audit_keyword_rag_poc())
     rows.extend(_audit_ocr_parsers())
+    rows.extend(_audit_async_runtime_scope())
     rows.extend(_audit_intentional_backlog())
 
     _print_table(rows)
@@ -465,7 +467,23 @@ def _audit_keyword_rag_poc() -> list[AuditRow]:
     ]
     try:
         from ai_worker.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts
+        from ai_worker.llm.rag.source_loader import load_rag_source_index
         from ai_worker.llm.rag.tracing import build_keyword_rag_trace_metadata
+
+        source_index = load_rag_source_index()
+        status_counts = Counter(metadata.status for metadata in source_index)
+        rows.append(
+            AuditRow(
+                area="rag_poc",
+                item="RAG source registry",
+                status="OK" if source_index else "FAIL",
+                detail=(
+                    f"source_count={len(source_index)}, "
+                    f"status_distribution={','.join(f'{status}:{count}' for status, count in sorted(status_counts.items())) or '-'}"
+                ),
+                category="READY_RAG_POC" if source_index else "NOT_IMPLEMENTED",
+            )
+        )
 
         contexts = retrieve_keyword_rag_contexts(
             user_message="공복혈당 관리",
@@ -535,9 +553,9 @@ def _audit_intentional_backlog() -> list[AuditRow]:
         ),
         AuditRow(
             area="backlog",
-            item="Redis Stream / async_jobs / AI Worker consumer",
+            item="OCR/CV/ML/LLM production async workflow",
             status="P2",
-            detail="Redis infrastructure exists for health/infrastructure checks; stream worker orchestration is deferred",
+            detail="DEMO_ECHO Redis Stream skeleton exists; real OCR/CV/ML/LLM jobs, retry/DLQ, heartbeat are deferred",
             category="P2_BACKLOG",
         ),
         AuditRow(
@@ -552,6 +570,53 @@ def _audit_intentional_backlog() -> list[AuditRow]:
             item="실제 LLM/RAG 운영 연결 고도화",
             status="P2",
             detail="provider code and rule-based fallback exist; production RAG grounding/observability policy is deferred",
+            category="P2_BACKLOG",
+        ),
+    ]
+
+
+def _audit_async_runtime_scope() -> list[AuditRow]:
+    return [
+        AuditRow(
+            area="async_scope",
+            item="FastAPI router and DB I/O",
+            status="INFO",
+            detail="FastAPI handlers and Tortoise/asyncpg DB access are async-based",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="async_scope",
+            item="Redis runtime use",
+            status="DEMO_QUEUE",
+            detail="Redis is used for health checks and the DEMO_ECHO Redis Stream skeleton",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="async_scope",
+            item="OCR/CV/ML/LLM workflow",
+            status="SYNC",
+            detail="official MVP workflows remain synchronous API flows before demo",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="async_scope",
+            item="AI Worker consumer",
+            status="DEMO_ECHO",
+            detail="ai_worker/main.py runs a Redis Stream consumer for DEMO_ECHO only",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="async_scope",
+            item="async_jobs table/API",
+            status="DEMO_ECHO",
+            detail="async_jobs model and /api/v1/jobs demo/status API exist for DEMO_ECHO only",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="async_scope",
+            item="AnalysisResult.async_job_id",
+            status="RESERVED",
+            detail="reserved nullable field for future analysis job linkage; not wired to /analysis/run yet",
             category="P2_BACKLOG",
         ),
     ]

@@ -40,13 +40,19 @@
 
 로컬 시연에서 FastAPI, PostgreSQL, Redis만 띄운다. `ai-worker`, `frontend`, `nginx`는 기본으로 올리지 않는다.
 
+이 스택의 Redis는 FastAPI health check와 `DEMO_ECHO` Redis Stream skeleton 용도다. `async_jobs` 모델/API와 AI Worker consumer는 존재하지만, 현재 처리 job은 `DEMO_ECHO`뿐이다. retry/dead-letter queue, heartbeat, OCR/CV/ML/LLM 비동기 처리는 아직 구현하지 않는다. FastAPI 라우터와 DB I/O는 async 기반이지만 `/analysis/run`, `/diets/analyze`, OCR confirm 같은 MVP 공식 workflow는 시연 전까지 동기 API 흐름으로 유지한다.
+
 ```bash
 ./scripts/docker_stack.sh app up
+./scripts/docker_stack.sh app up-full
+./scripts/docker_stack.sh app worker-up
 ./scripts/docker_stack.sh app build
+./scripts/docker_stack.sh app worker-build
 ./scripts/docker_stack.sh app rebuild
 ./scripts/docker_stack.sh app clean-image
 ./scripts/docker_stack.sh app ps
 ./scripts/docker_stack.sh app logs
+./scripts/docker_stack.sh app worker-logs
 ./scripts/docker_stack.sh app down
 ```
 
@@ -54,11 +60,15 @@ Makefile:
 
 ```bash
 make app-up
+make app-up-full
+make app-worker-up
 make app-build
+make app-worker-build
 make app-rebuild
 make app-clean-image
 make app-ps
 make app-logs
+make app-worker-logs
 make app-down
 ```
 
@@ -86,6 +96,8 @@ make app-clean-image # 알려진 로컬 app/test 이미지를 삭제
 ### dev 스택
 
 frontend, Nginx, FastAPI, AI Worker 자리, PostgreSQL, Redis를 모두 올린다.
+
+`ai-worker` service는 `ai_worker/main.py`를 통해 Redis Stream consumer를 실행한다. 현재 처리 범위는 `DEMO_ECHO` job뿐이다. `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs` 테이블을 연결하기 위한 reserved field이며, 현재 `/analysis/run` 결과와 연결되어 있지 않다.
 
 ```bash
 ./scripts/docker_stack.sh dev up
