@@ -16,6 +16,7 @@ COPY pyproject.toml uv.lock ./
 
 # 3. FastAPI 앱과 ML 추론에 필요한 의존성 패키지를 설치합니다.
 RUN uv sync --group app --group ai --no-dev --frozen
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 4. 로컬 소스 코드를 컨테이너 내부로 복사합니다.
 COPY ./app ./app
