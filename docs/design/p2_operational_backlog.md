@@ -38,11 +38,16 @@
 ### 1. Redis Stream / async_jobs / AI Worker consumer
 
 - 현재 상태:
+  - Redis 컨테이너와 compose healthcheck는 존재한다.
+  - FastAPI는 `REDIS_HOST`, `REDIS_PORT` 설정으로 compose 내부 Redis에 연결할 수 있다.
+  - `/api/v1/system/health`는 Redis 연결 상태를 확인한다.
+  - 현재 Redis는 health check와 향후 인프라 준비 용도이며, 작업 큐로 사용하지 않는다.
   - `ai_worker/jobs/`, `ai_worker/pipelines/`는 향후 구조 후보로 존재한다.
-  - 실제 Redis Stream producer/consumer, `async_jobs` 테이블, worker orchestration은 구현하지 않는다.
+  - 실제 Redis Stream `XADD`/`XREADGROUP`, producer/consumer, `async_jobs` 테이블, worker orchestration은 구현하지 않는다.
 - 왜 시연 전 P0가 아닌지:
   - 현재 핵심 시연 흐름은 FastAPI 동기 API로 검증 가능하다.
   - queue/worker를 넣으면 상태 전이, retry, timeout, idempotency까지 함께 설계해야 해 시연 리스크가 커진다.
+  - MVP 시연 설명은 "현재는 동기 처리, 운영 확장 시 Redis Stream 기반 비동기 worker로 전환"으로 통일한다.
 - 운영 진입 전 필요한 이유:
   - OCR, CV, GPT Vision, LLM, 대용량 ML 추론은 요청 시간이 길어질 수 있다.
   - 작업 상태 조회, 실패 재시도, dead-letter queue, worker heartbeat가 필요하다.
@@ -52,6 +57,7 @@
   - `ai_worker/jobs/`
   - `ai_worker/pipelines/`
   - Redis Stream producer/consumer 모듈
+  - retry/dead-letter queue 모듈
 - 우선순위: P2
 
 ### 2. vector RAG / pgvector embedding search

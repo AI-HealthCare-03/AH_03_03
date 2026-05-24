@@ -92,6 +92,38 @@ Docker Compose 내부에서 API 서버를 실행하는 경우 `DB_HOST=postgres`
 
 ## 🏃 실행 방법
 
+### Docker 스택 선택 요약
+
+Docker Compose 구성은 용도별로 분리되어 있습니다. 자세한 내용은 [Docker Stacks](docs/ops/docker_stacks.md)를 참고하세요.
+
+```bash
+# 로컬 FastAPI/ML 시연용: postgres, redis, fastapi만 실행
+make app-up
+make app-ps
+make app-logs
+make app-down
+
+# frontend 포함 dev 전체 스택
+make dev-up
+make dev-ps
+make dev-down
+
+# Langfuse 관측 실험 전용 스택
+make langfuse-up
+make langfuse-ps
+make langfuse-logs
+make langfuse-down
+```
+
+주의:
+
+- `docker compose config` 전체 출력에는 `.env` 값이 평문으로 펼쳐질 수 있으므로 화면 공유/문서 공유에 사용하지 마세요.
+- `docker compose up`과 `docker compose build`는 원격 저장소에 이미지를 올리지 않습니다. 원격 업로드는 `docker push`를 실행할 때만 발생합니다.
+- `docker compose up/build` 중 로컬에 없는 base image나 service image는 registry에서 pull될 수 있습니다.
+- 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
+- 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck 용도입니다. Redis Stream, `async_jobs`, AI Worker consumer, retry/dead-letter queue는 P2 운영 확장 범위입니다.
+- 시연 설명은 “현재 MVP는 동기 처리, 운영 확장 시 Redis Stream 기반 비동기 worker로 전환”으로 통일합니다.
+
 ### 0. 웹 MVP 로컬 실행
 
 현재 MVP 범위는 축소 데모가 아니라 **풀서비스 1차 범위에서 소셜 로그인과 웨어러블 연동만 제외한 기준**입니다.
