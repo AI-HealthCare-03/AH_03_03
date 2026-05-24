@@ -14,6 +14,7 @@
   - `OPENAI_API_KEY`
   - `LANGFUSE_SECRET_KEY`
   - `LANGFUSE_PUBLIC_KEY`
+  - `LANGFUSE_BASE_URL` 자체는 secret은 아니지만 key와 함께 출력하면 사용 환경이 드러날 수 있으므로 공유 전 확인한다.
   - `CLOVA_OCR_SECRET_KEY`
   - Twilio/SMTP/DB password 등 외부 서비스 또는 계정 비밀값
 - 아래처럼 값을 직접 찍는 명령 금지
@@ -139,6 +140,34 @@ git log -S "sk-proj" --oneline -- . ':!uv.lock'
 - GitHub Actions에서는 실제 키를 workflow YAML에 직접 쓰지 않고 GitHub Actions Secrets 또는 배포 환경 secret store를 사용한다.
 - 외부에 공유된 키는 노출 여부가 애매해도 revoke/rotate를 우선한다.
 - 발표 전에는 로컬 데모용 키와 운영키를 분리하고, 운영키는 재발급한 뒤 배포 환경에만 주입하는 것을 권장한다.
+
+## 4.1 Langfuse key/base URL 전환 주의
+
+Langfuse는 RAG 엔진이 아니라 trace, prompt, evaluation metadata를 관리하는 관측 도구다. vector DB나 retrieval store로 사용하지 않는다.
+
+Cloud Langfuse와 Docker self-host Langfuse는 project key가 서로 호환되지 않는다. 전환할 때는 key와 base URL을 같이 바꾼다.
+
+```env
+# Cloud 예시
+LANGFUSE_ENABLED=true
+LANGFUSE_PUBLIC_KEY=<cloud-public-key>
+LANGFUSE_SECRET_KEY=<cloud-secret-key>
+LANGFUSE_BASE_URL=https://jp.cloud.langfuse.com
+
+# Docker self-host, FastAPI를 호스트에서 실행
+LANGFUSE_ENABLED=true
+LANGFUSE_PUBLIC_KEY=<self-host-public-key>
+LANGFUSE_SECRET_KEY=<self-host-secret-key>
+LANGFUSE_BASE_URL=http://localhost:3000
+
+# Docker self-host, FastAPI 컨테이너에서 host port로 접근
+LANGFUSE_BASE_URL=http://host.docker.internal:3000
+
+# Docker self-host, 같은 Docker network의 service name으로 접근
+LANGFUSE_BASE_URL=http://langfuse-web:3000
+```
+
+example env 파일에는 실제 Langfuse key를 넣지 않는다. Cloud key와 self-host URL을 섞거나, self-host key와 Cloud URL을 섞으면 trace 전송이 인증 실패하거나 잘못된 인스턴스로 향할 수 있다.
 
 ## 5. 발표/화면공유 전 체크리스트
 
