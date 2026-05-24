@@ -121,6 +121,7 @@ make langfuse-down
 - `docker compose up`과 `docker compose build`는 원격 저장소에 이미지를 올리지 않습니다. 원격 업로드는 `docker push`를 실행할 때만 발생합니다.
 - `docker compose up/build` 중 로컬에 없는 base image나 service image는 registry에서 pull될 수 있습니다.
 - 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
+- Langfuse는 RAG 엔진이 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다. Cloud와 Docker self-host를 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿔야 합니다.
 - 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck 용도입니다. Redis Stream, `async_jobs`, AI Worker consumer, retry/dead-letter queue는 P2 운영 확장 범위입니다.
 - 시연 설명은 “현재 MVP는 동기 처리, 운영 확장 시 Redis Stream 기반 비동기 worker로 전환”으로 통일합니다.
 - 현재 로컬 모델 artifact는 만성질환 정밀분석용 DM/HTN/DL CatBoost 3종입니다. OBESITY는 rule-based, ANEM은 X2/식단 참고 분류로 설명합니다.
@@ -260,7 +261,7 @@ docker compose -f infra/docker/docker-compose.dev.yml down -v
 
 #### Langfuse 별도 실행
 
-Langfuse는 `infra/langfuse` 아래 별도 compose로 실행합니다. 우리 서비스와 같은 서버에서 Docker로 띄울 수 있지만, Postgres/Redis는 반드시 분리합니다.
+Langfuse는 `infra/langfuse` 아래 별도 compose로 실행합니다. 우리 서비스와 같은 서버에서 Docker로 띄울 수 있지만, Postgres/Redis는 반드시 분리합니다. Langfuse는 RAG 엔진이나 vector DB가 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다.
 
 ```bash
 docker network create ai-health-shared
@@ -274,19 +275,31 @@ docker compose up -d
 
 - Langfuse: `http://localhost:3000`
 
-Docker shared network에서 우리 `fastapi`/`ai-worker`가 Langfuse에 접근할 때는 아래 값을 사용합니다.
+Cloud Langfuse를 사용할 때는 Cloud 프로젝트에서 발급한 key와 Cloud base URL을 함께 사용합니다.
 
 ```env
-LANGFUSE_HOST=http://langfuse-web:3000
+LANGFUSE_ENABLED=true
+LANGFUSE_PUBLIC_KEY=<cloud-public-key>
+LANGFUSE_SECRET_KEY=<cloud-secret-key>
+LANGFUSE_BASE_URL=https://jp.cloud.langfuse.com
 ```
 
-호스트에서 직접 FastAPI를 실행하는 경우에는 아래 값을 사용합니다.
+Docker self-host Langfuse를 사용할 때는 self-host 프로젝트에서 발급한 key와 FastAPI 실행 위치에서 접근 가능한 base URL을 함께 사용합니다.
 
 ```env
-LANGFUSE_HOST=http://localhost:3000
+# FastAPI를 호스트 터미널에서 실행하는 경우
+LANGFUSE_BASE_URL=http://localhost:3000
+
+# FastAPI 컨테이너가 Langfuse와 같은 Docker network에 붙어 있는 경우
+LANGFUSE_BASE_URL=http://langfuse-web:3000
+
+# FastAPI 컨테이너가 Langfuse network에 붙어 있지 않고 host port로 접근하는 경우
+LANGFUSE_BASE_URL=http://host.docker.internal:3000
 ```
 
-현재는 Langfuse 실행 인프라와 네트워크만 준비되어 있으며, `app/` 또는 `ai_worker/`의 Langfuse SDK 연동은 후속 작업입니다.
+Cloud key와 self-host key는 서로 호환되지 않습니다. Cloud와 self-host를 전환할 때는 key만 바꾸지 말고 `LANGFUSE_BASE_URL`도 함께 바꾸세요. example env 파일에는 실제 key를 넣지 말고, 설정 확인을 위해 `docker compose config` 전체 출력을 공유하지 마세요.
+
+현재 root `docker-compose.yml`의 `fastapi`는 앱 전용 Docker network에 붙습니다. `http://langfuse-web:3000` service name을 쓰려면 FastAPI도 Langfuse의 `ai-health-shared` network에 연결해야 합니다. 네트워크를 추가하지 않을 때는 Docker Desktop 기준 `http://host.docker.internal:3000`을 사용합니다.
 
 #### Docker Compose로 전체 스택 실행
 
