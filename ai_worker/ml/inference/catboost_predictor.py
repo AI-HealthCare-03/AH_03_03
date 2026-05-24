@@ -31,6 +31,23 @@ class CatBoostDiseasePredictor:
             return []
         return list(read_json(self.feature_columns_path))
 
+    def warmup(self) -> int:
+        if not self.available:
+            return 0
+
+        try:
+            from catboost import CatBoostClassifier
+        except ImportError:
+            return 0
+
+        if self._models is None:
+            self._models = []
+            for model_path in self.model_paths:
+                model = CatBoostClassifier()
+                model.load_model(str(model_path))
+                self._models.append(model)
+        return len(self._models)
+
     def predict(self, features: dict[str, Any]) -> DiseasePrediction | None:
         if not self.available:
             return None
@@ -42,16 +59,10 @@ class CatBoostDiseasePredictor:
 
         try:
             import pandas as pd
-            from catboost import CatBoostClassifier
         except ImportError:
             return None
 
-        if self._models is None:
-            self._models = []
-            for model_path in self.model_paths:
-                model = CatBoostClassifier()
-                model.load_model(str(model_path))
-                self._models.append(model)
+        self.warmup()
 
         row = {column: features[column] for column in feature_columns}
         frame = pd.DataFrame([row], columns=feature_columns)
