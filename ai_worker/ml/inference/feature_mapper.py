@@ -268,6 +268,7 @@ def _family_sum(row: dict[str, Any], prefix: str) -> float:
 def _drinking_frequency(value: Any) -> float | None:
     mapping = {
         "NONE": 0.0,
+        "RARE": 0.0,
         "MONTHLY_1": 1.0,
         "MONTHLY_2_4": 2.0,
         "WEEKLY_2_3": 3.0,

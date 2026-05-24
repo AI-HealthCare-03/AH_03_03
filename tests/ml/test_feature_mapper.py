@@ -131,6 +131,12 @@ def test_mapper_supports_final_feature_counts() -> None:
     assert len(map_service_features(_user(), _health_record(), dl_columns).features) == 38
 
 
+def test_mapper_accepts_service_drinking_frequency_rare() -> None:
+    result = map_service_features(_user(), _health_record(drinking_frequency="RARE"), ["음주빈도"])
+
+    assert result.features["음주빈도"] == 0.0
+
+
 def _user(**overrides):
     today = date.today()
     values = {
