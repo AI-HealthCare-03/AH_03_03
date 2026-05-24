@@ -1,12 +1,21 @@
-.PHONY: app-up app-build app-rebuild app-clean-image app-down app-ps app-logs
+.PHONY: app-up app-up-full app-worker-up app-build app-worker-build app-rebuild app-clean-image app-down app-ps app-logs app-worker-logs
 .PHONY: dev-up dev-down dev-ps
 .PHONY: langfuse-up langfuse-down langfuse-ps langfuse-logs
 
 app-up:
 	./scripts/docker_stack.sh app up
 
+app-up-full:
+	./scripts/docker_stack.sh app up-full
+
+app-worker-up:
+	./scripts/docker_stack.sh app worker-up
+
 app-build:
 	./scripts/docker_stack.sh app build
+
+app-worker-build:
+	./scripts/docker_stack.sh app worker-build
 
 app-rebuild:
 	./scripts/docker_stack.sh app rebuild
@@ -22,6 +31,9 @@ app-ps:
 
 app-logs:
 	./scripts/docker_stack.sh app logs
+
+app-worker-logs:
+	./scripts/docker_stack.sh app worker-logs
 
 dev-up:
 	./scripts/docker_stack.sh dev up
