@@ -11,6 +11,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from argparse import ArgumentParser
 from typing import Any
 
 API_BASE_URL = os.getenv("VERIFY_API_BASE_URL", "http://localhost:8000/api/v1").rstrip("/")
@@ -25,6 +26,10 @@ EXPECTED_CATBOOST = {
 
 
 def main() -> int:
+    args = _parse_args()
+    if args.warmup_ml:
+        _warmup_ml_models()
+
     token = _login()
     readiness = _request_json("GET", "/health/analysis-readiness", token=token)
     if not readiness.get("precision_ready"):
@@ -56,6 +61,34 @@ def main() -> int:
             )
         )
     return 0
+
+
+def _parse_args():
+    parser = ArgumentParser(description="Verify PRECISION analysis API path.")
+    parser.add_argument(
+        "--warmup-ml",
+        action="store_true",
+        help="Load CatBoost artifacts before calling the API. No external API call is made.",
+    )
+    return parser.parse_args()
+
+
+def _warmup_ml_models() -> None:
+    from ai_worker.ml.inference.disease_risk_service import warmup_chronic_disease_models
+
+    results = warmup_chronic_disease_models()
+    failed = [disease for disease, result in results.items() if result.get("status") == "failed"]
+    for disease, result in results.items():
+        print(
+            "warmup {disease}: status={status}, models={models}, features={features}".format(
+                disease=disease,
+                status=result.get("status"),
+                models=result.get("model_count", "-"),
+                features=result.get("feature_count", "-"),
+            )
+        )
+    if failed:
+        _fail(f"ML warmup failed: {failed}")
 
 
 def _login() -> str:
