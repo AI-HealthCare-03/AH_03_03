@@ -68,7 +68,7 @@ async def run_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_u
     return await _run_exam_ocr(exam_id, user)
 
 
-@exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamOCRResponse, deprecated=True)
+@exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamOCRResponse, deprecated=True, include_in_schema=False)
 async def run_legacy_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
     return await _run_exam_ocr(exam_id, user)
 
