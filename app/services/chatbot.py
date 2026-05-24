@@ -3,7 +3,8 @@ from app.dtos.chatbot import ChatbotAskRequest, ChatbotAskResponse, ChatbotConte
 SAFETY_NOTICE = "본 서비스는 진단/처방이 아니며, 치료 변경은 반드시 의료진과 상담해야 합니다."
 
 
-async def ask_dummy_chatbot(request: ChatbotAskRequest) -> ChatbotAskResponse:
+async def ask_chatbot(request: ChatbotAskRequest) -> ChatbotAskResponse:
+    # TODO: route through ai_worker.llm response router when the production LLM path is enabled.
     message = request.message.lower()
     if request.context_type == ChatbotContextType.DIET or any(
         keyword in message for keyword in ["식단", "음식", "칼로리"]

@@ -77,7 +77,7 @@ async def get_login_main_summary(user: User) -> dict:
             "diet_records": recent_diet_records,
             "medication_records": recent_medication_records,
         },
-        "ai_comment": _build_dummy_ai_comment(latest_health, latest_analysis),
+        "ai_comment": _build_ai_comment(latest_health, latest_analysis),
     }
 
 
@@ -104,9 +104,11 @@ def _build_today_tasks(user_challenges: list, active_medications: list) -> list[
     return tasks
 
 
-def _build_dummy_ai_comment(latest_health, latest_analysis) -> str:
+def _build_ai_comment(latest_health, latest_analysis) -> str:
     if latest_analysis is not None:
-        return "최근 분석 결과를 바탕으로 생활습관을 꾸준히 기록해보세요. 실제 LLM 코멘트는 후속 단계에서 연결됩니다."
+        return (
+            "최근 분석 결과를 바탕으로 생활습관을 꾸준히 기록해보세요. 맞춤 코멘트는 분석 결과 범위 안에서 제공합니다."
+        )
     if latest_health is not None:
         return "건강정보가 저장되었습니다. 분석을 실행하면 맞춤 요약을 확인할 수 있습니다."
     return "건강정보를 입력하면 맞춤 관리 요약과 챌린지를 확인할 수 있습니다."

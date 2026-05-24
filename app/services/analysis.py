@@ -111,13 +111,13 @@ async def get_missing_fields_for_mode(user: User, health_record: HealthRecord, m
     return missing_fields
 
 
-async def run_dummy_analysis(
+async def run_analysis(
     user_id: int, health_record: HealthRecord, mode: AnalysisMode = AnalysisMode.BASIC
 ) -> list[dict[str, Any]]:
     results = []
     user = await User.get_or_none(id=user_id)
     ml_predictions = _predict_ml_outputs(user, health_record) if mode == AnalysisMode.PRECISION else {}
-    for analysis_type, fallback_score in _calculate_dummy_scores(health_record, mode, user).items():
+    for analysis_type, fallback_score in _calculate_analysis_scores(health_record, mode, user).items():
         prediction = ml_predictions.get(analysis_type)
         score = Decimal(str(round(prediction.probability, 5))) if prediction is not None else fallback_score
         risk_level = _risk_level(score)
@@ -135,10 +135,10 @@ async def run_dummy_analysis(
             analyzed_at=datetime.now(config.TIMEZONE),
         )
         result = await create_analysis_result(user_id, request)
-        factors = await create_analysis_factors(result.id, _dummy_factors(analysis_type, health_record, score, mode))
+        factors = await create_analysis_factors(result.id, _analysis_factors(analysis_type, health_record, score, mode))
         await create_analysis_snapshot(
             result.id,
-            _dummy_snapshot_request(
+            _analysis_snapshot_request(
                 analysis_type=analysis_type,
                 analysis_mode=mode,
                 health_record=health_record,
@@ -151,7 +151,7 @@ async def run_dummy_analysis(
                 model_prediction=prediction.to_dict() if prediction is not None else None,
             ),
         )
-        recommendation_ids = await _create_dummy_challenge_recommendations(user_id, result)
+        recommendation_ids = await _create_challenge_recommendations(user_id, result)
         results.append(
             {
                 "analysis_result_id": result.id,
@@ -190,7 +190,7 @@ def _predict_ml_outputs(user: User | None, health_record: HealthRecord) -> dict[
     }
 
 
-def _calculate_dummy_scores(
+def _calculate_analysis_scores(
     record: HealthRecord, mode: AnalysisMode = AnalysisMode.BASIC, user: User | None = None
 ) -> dict[AnalysisType, Decimal]:
     if mode == AnalysisMode.PRECISION:
@@ -349,7 +349,7 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
     return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
 
 
-def _dummy_factors(
+def _analysis_factors(
     analysis_type: AnalysisType, record: HealthRecord, score: Decimal, mode: AnalysisMode = AnalysisMode.BASIC
 ) -> list[AnalysisResultFactorCreateRequest]:
     common_factor = AnalysisResultFactorCreateRequest(
@@ -419,7 +419,7 @@ def _basic_factor(analysis_type: AnalysisType, record: HealthRecord) -> Analysis
     )
 
 
-def _dummy_snapshot_request(
+def _analysis_snapshot_request(
     analysis_type: AnalysisType,
     analysis_mode: AnalysisMode,
     health_record: HealthRecord,
@@ -563,7 +563,7 @@ def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bo
     return _is_missing_value(getattr(record, field_name))
 
 
-async def _create_dummy_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
+async def _create_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
     active_challenges = await challenge_service.list_active_challenges(limit=100)
     target_category = {
         AnalysisType.DIABETES: ChallengeCategory.BLOOD_GLUCOSE,

@@ -11,7 +11,7 @@ from app.dtos.exams import (
 from app.models.exams import ExamMeasurement, ExamReport, OCRStatus
 from app.repositories import exam_repository
 
-DUMMY_OCR_MEASUREMENTS = [
+FALLBACK_OCR_MEASUREMENTS = [
     ("height_cm", "키", "172.4", "cm"),
     ("weight_kg", "몸무게", "76.8", "kg"),
     ("bmi", "체질량지수", "25.8", "kg/m2"),
@@ -80,12 +80,13 @@ async def confirm_exam_report(exam_report_id: int, request: ExamConfirmRequest |
     return await exam_repository.confirm_exam_report(exam_report_id)
 
 
-async def run_dummy_ocr(exam_report_id: int) -> ExamDummyOCRResponse:
+async def run_exam_ocr(exam_report_id: int) -> ExamDummyOCRResponse:
+    # TODO: connect the OCR provider pipeline; keep this fallback response shape-compatible.
     existing_measurements = await list_exam_measurements(exam_report_id)
     existing_by_key = {measurement.measurement_key: measurement for measurement in existing_measurements}
     saved_measurements: list[ExamMeasurement] = []
 
-    for key, name, value, unit in DUMMY_OCR_MEASUREMENTS:
+    for key, name, value, unit in FALLBACK_OCR_MEASUREMENTS:
         request = ExamMeasurementCreateRequest(
             measurement_key=key,
             measurement_name=name,

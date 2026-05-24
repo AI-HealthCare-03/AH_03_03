@@ -16,4 +16,4 @@ async def ask_chatbot(
     user: Annotated[User, Depends(get_request_user)],
 ):
     _ = user
-    return await chatbot_service.ask_dummy_chatbot(request)
+    return await chatbot_service.ask_chatbot(request)

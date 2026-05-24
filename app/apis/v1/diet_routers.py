@@ -44,7 +44,7 @@ async def _run_diet_analysis(
     request: DietDummyAnalyzeRequest,
     user: User,
 ) -> DietDummyAnalyzeResponse:
-    return await diet_service.run_dummy_diet_analysis(user.id, request)
+    return await diet_service.run_diet_analysis(user.id, request)
 
 
 @diet_router.post("/analyze", response_model=DietAnalyzeResponse, status_code=status.HTTP_201_CREATED)
@@ -61,7 +61,7 @@ async def run_diet_analysis(
     status_code=status.HTTP_201_CREATED,
     deprecated=True,
 )
-async def run_dummy_diet_analysis(
+async def run_legacy_diet_analysis(
     request: DietDummyAnalyzeRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):

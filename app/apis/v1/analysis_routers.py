@@ -39,7 +39,7 @@ async def _run_analysis(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"{mode_label}에 필요한 정보가 부족합니다: {', '.join(missing_fields)}",
         )
-    return await analysis_service.run_dummy_analysis(user.id, health_record, request.mode)
+    return await analysis_service.run_analysis(user.id, health_record, request.mode)
 
 
 @analysis_router.post(
@@ -60,7 +60,7 @@ async def run_analysis(
     status_code=status.HTTP_201_CREATED,
     deprecated=True,
 )
-async def run_dummy_analysis(
+async def run_legacy_analysis(
     request: DummyAnalysisRunRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):
