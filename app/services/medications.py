@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from starlette import status
 
+from ai_worker.ocr.medication import MedicationOcrItem, parse_medication_text
 from app.dtos.medications import (
     MedicationCreateRequest,
     MedicationOCRConfirmRequest,
@@ -92,11 +93,20 @@ async def delete_medication(medication_id: int) -> int:
 async def run_medication_ocr(request: MedicationOCRRequest) -> MedicationOCRResponse:
     # TODO: connect prescription/package OCR provider; keep this fallback response shape-compatible.
     source_type = request.source_type or "PRESCRIPTION"
+    raw_text = request.raw_text or request.memo or ""
+    parsed = parse_medication_text(raw_text)
+    items = _parsed_ocr_items(parsed.items)
+    if not items:
+        items = _FALLBACK_OCR_ITEMS
     return MedicationOCRResponse(
+        is_dummy=False,
         source_type=source_type,
-        ocr_confidence=0.93,
-        items=_FALLBACK_OCR_ITEMS,
+        ocr_confidence=_average_confidence(items),
+        items=items,
         message="자동 인식 결과입니다. 복약 정보를 확인한 뒤 저장해주세요.",
+        source=parsed.source,
+        raw_text=parsed.raw_text or None,
+        parser_warnings=parsed.warnings,
     )
 
 
@@ -198,6 +208,39 @@ def _build_ocr_medication_memo(duration_days: int | None, time_slots: list[str],
     if memo:
         memo_parts.append(memo)
     return " / ".join(memo_parts) if memo_parts else None
+
+
+def _parsed_ocr_items(items: list[MedicationOcrItem]) -> list[MedicationOCRItem]:
+    return [
+        MedicationOCRItem(
+            temp_id=f"med-ocr-{index:03d}",
+            name=item.medication_name,
+            dosage=item.dosage,
+            frequency=item.frequency,
+            time_slots=_instruction_time_slots(item.instruction),
+            duration_days=item.duration_days,
+            memo=item.instruction,
+            confidence=item.confidence,
+        )
+        for index, item in enumerate(items, start=1)
+    ]
+
+
+def _instruction_time_slots(instruction: str | None) -> list[str]:
+    if not instruction:
+        return []
+    slots = []
+    for label in ("아침", "점심", "저녁", "취침"):
+        if label in instruction:
+            slots.append(label)
+    return slots
+
+
+def _average_confidence(items: list[MedicationOCRItem]) -> float:
+    scores = [item.confidence for item in items if item.confidence is not None]
+    if not scores:
+        return 0.0
+    return round(sum(scores) / len(scores), 2)
 
 
 async def _get_owned_medication_or_raise(medication_id: int, user_id: int) -> Medication:

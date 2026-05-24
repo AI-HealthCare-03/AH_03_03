@@ -65,7 +65,7 @@ async def run_medication_ocr(
     return await _run_medication_ocr(request, user)
 
 
-@medication_router.post("/dummy-ocr", response_model=MedicationOCRResponse, deprecated=True)
+@medication_router.post("/dummy-ocr", response_model=MedicationOCRResponse, deprecated=True, include_in_schema=False)
 async def run_legacy_medication_ocr(
     request: MedicationOCRRequest,
     user: Annotated[User, Depends(get_request_user)],
