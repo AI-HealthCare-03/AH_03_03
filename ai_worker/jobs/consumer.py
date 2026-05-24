@@ -15,6 +15,7 @@ from ai_worker.jobs.redis_stream import (
     parse_stream_fields,
 )
 from app.core.db.databases import TORTOISE_ORM
+from app.services import async_jobs as async_job_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,17 @@ async def _initialize_db() -> None:
 async def _close_db() -> None:
     if Tortoise._inited:
         await Tortoise.close_connections()
+
+
+async def process_stream_message(stream_id: str, fields: dict) -> None:
+    job_id: int | None = None
+    try:
+        job_id, job_type, payload = parse_stream_fields(fields)
+        await handle_stream_job(job_id, job_type, payload)
+    except Exception as exc:
+        logger.exception("Failed to process async job stream message", extra={"stream_id": stream_id, "job_id": job_id})
+        if job_id is not None:
+            await async_job_service.mark_failed(job_id, f"handler_failed: {exc.__class__.__name__}")
 
 
 async def run_consumer_forever(stop_event: asyncio.Event, consumer_name: str = DEFAULT_CONSUMER_NAME) -> None:
@@ -50,15 +62,8 @@ async def run_consumer_forever(stop_event: asyncio.Event, consumer_name: str = D
                         continue
                     for _stream_name, messages in response:
                         for stream_id, fields in messages:
-                            try:
-                                job_id, job_type, payload = parse_stream_fields(fields)
-                                await handle_stream_job(job_id, job_type, payload)
-                            except Exception:
-                                logger.exception(
-                                    "Failed to process async job stream message", extra={"stream_id": stream_id}
-                                )
-                            finally:
-                                await redis_client.xack(ASYNC_JOB_STREAM, ASYNC_JOB_GROUP, stream_id)
+                            await process_stream_message(stream_id, fields)
+                            await redis_client.xack(ASYNC_JOB_STREAM, ASYNC_JOB_GROUP, stream_id)
             except Exception:
                 logger.exception("AI Worker Redis Stream consumer connection failed; retrying")
                 await asyncio.sleep(5)
