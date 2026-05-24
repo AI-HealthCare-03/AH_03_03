@@ -1,7 +1,11 @@
 from typing import Any
 
+from ai_worker.cv.food.fallback_policy import select_food_detection_candidate
 from ai_worker.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_worker.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
+from ai_worker.llm.explanation_service import generate_diet_score_explanation
+from ai_worker.llm.schemas import DietScoreExplanationInput
+from app.core import config
 from app.dtos.diets import (
     DietAnalyzeRequest,
     DietPhotoResultCreateRequest,
@@ -55,13 +59,23 @@ async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: 
 
 
 async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[str, object]:
-    # TODO: replace rule-based food detection with the production CV provider.
     case = _select_rule_based_diet_case(request)
-    scoring_result = build_nutrition_scoring_result(case["detected_foods"])
+    food_candidate = select_food_detection_candidate(
+        cv_result=None,
+        rule_based_foods=case["detected_foods"],
+        gpt_vision_fallback_enabled=config.GPT_VISION_FALLBACK_ENABLED,
+        confidence_threshold=config.FOOD_CV_CONFIDENCE_THRESHOLD,
+    )
+    detected_foods = food_candidate.to_scorer_foods()
+    scoring_result = build_nutrition_scoring_result(detected_foods)
+    explanation = generate_diet_score_explanation(
+        DietScoreExplanationInput(disease_scores=scoring_result["disease_scores"])
+    ).model_dump()
     nutrition_summary = {
         **case["nutrition_summary"],
         "disease_scores": scoring_result["disease_scores"],
         "scoring_source": scoring_result["scoring_source"],
+        "explanation": explanation,
     }
     diet_record = await create_diet_record(
         user_id,
@@ -70,7 +84,7 @@ async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[s
             meal_time=request.meal_time,
             description=request.description or "간편 식단 분석 기록",
             image_path=request.image_path,
-            detected_foods=case["detected_foods"],
+            detected_foods=detected_foods,
             nutrition_summary=nutrition_summary,
             diet_score=case["diet_score"],
             diet_feedback=case["diet_feedback"],
@@ -81,19 +95,30 @@ async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[s
     photo_result = await create_diet_photo_result(
         diet_record.id,
         DietPhotoResultCreateRequest(
-            detected_foods=case["detected_foods"],
+            detected_foods=detected_foods,
             confidence_payload={
-                "method": FOOD_DETECTION_SOURCE,
-                "average_confidence": case["average_confidence"],
+                "method": food_candidate.provider,
+                "average_confidence": food_candidate.confidence,
+                "needs_review": food_candidate.needs_review,
+                "fallback_reason": food_candidate.fallback_reason,
                 "scoring_source": scoring_result["scoring_source"],
+                "gpt_vision_called": False,
             },
             raw_output={
-                "source": FOOD_DETECTION_SOURCE,
+                "source": food_candidate.provider,
                 "case": case["case_name"],
-                "foods": case["detected_foods"],
+                "foods": detected_foods,
+                "provider_result": {
+                    "provider": food_candidate.provider,
+                    "confidence": food_candidate.confidence,
+                    "needs_review": food_candidate.needs_review,
+                    "fallback_reason": food_candidate.fallback_reason,
+                    "raw_output": food_candidate.raw_output,
+                },
                 "disease_scores": scoring_result["disease_scores"],
                 "food_score_details": scoring_result["food_score_details"],
                 "scoring_source": scoring_result["scoring_source"],
+                "explanation": explanation,
             },
             is_dummy=False,
         ),
@@ -102,13 +127,14 @@ async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[s
         "message": "식단 분석이 완료되었습니다.",
         "diet_record": diet_record,
         "photo_result": photo_result,
-        "detected_foods": case["detected_foods"],
+        "detected_foods": detected_foods,
         "nutrition_summary": nutrition_summary,
         "diet_score": case["diet_score"],
         "diet_feedback": case["diet_feedback"],
         "disease_scores": scoring_result["disease_scores"],
         "food_score_details": scoring_result["food_score_details"],
         "scoring_source": scoring_result["scoring_source"],
+        "explanation": explanation,
         "warnings": case["warnings"],
         "recommended_actions": case["recommended_actions"],
     }

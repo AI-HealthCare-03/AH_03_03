@@ -29,6 +29,14 @@ type NutritionDraft = {
   sodium_mg: string;
 };
 
+const diseaseScoreLabels: Record<string, string> = {
+  DM: "당뇨",
+  HTN: "고혈압",
+  DL: "이상지질혈증",
+  OBE: "비만",
+  ANEM: "빈혈",
+};
+
 const mealTypeOptions = [
   { value: "BREAKFAST", label: "아침" },
   { value: "LUNCH", label: "점심" },
@@ -67,6 +75,17 @@ function buildNutritionSummary(draft: NutritionDraft): DietNutritionSummary | nu
     sodium_mg: parseOptionalNumber(draft.sodium_mg),
   };
   return Object.values(nutrition).some((value) => value !== null) ? nutrition : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
+  const scores = asRecord(value);
+  return Object.entries(diseaseScoreLabels)
+    .map(([code, label]) => [label, scores[code]] as [string, unknown])
+    .filter(([, score]) => score !== null && score !== undefined && score !== "");
 }
 
 export default function DietPage() {
@@ -156,6 +175,10 @@ export default function DietPage() {
     analysisResult?.nutrition_summary && typeof analysisResult.nutrition_summary === "object"
       ? (analysisResult.nutrition_summary as Record<string, unknown>)
       : {};
+  const diseaseScores = diseaseScoreEntries(analysisResult?.disease_scores ?? nutrition.disease_scores);
+  const foodScoreDetails = Array.isArray(analysisResult?.food_score_details)
+    ? (analysisResult.food_score_details as Record<string, unknown>[])
+    : [];
   const warnings = Array.isArray(analysisResult?.warnings) ? (analysisResult.warnings as string[]) : [];
   const recommendedActions = Array.isArray(analysisResult?.recommended_actions)
     ? (analysisResult.recommended_actions as string[])
@@ -368,6 +391,32 @@ export default function DietPage() {
                 </span>
               ))}
             </div>
+            {diseaseScores.length > 0 && (
+              <div className="nutrition-grid">
+                {diseaseScores.map(([label, score]) => (
+                  <div key={label}>
+                    <span>{label} 식단 점수</span>
+                    <strong>{Math.round(Number(score))}점</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+            {foodScoreDetails.length > 0 && (
+              <div className="card-list">
+                {foodScoreDetails.slice(0, 3).map((detail, index) => {
+                  const matched = detail.matched_food_name ? String(detail.matched_food_name) : "매칭 정보 없음";
+                  return (
+                    <div className="mini-card" key={`${String(detail.food_name ?? "food")}-${index}`}>
+                      <strong>{String(detail.food_name ?? "음식")}</strong>
+                      <span className="muted">점수 기준: {matched}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {Boolean(analysisResult.scoring_source) && (
+              <span className="badge badge-reference">점수 기준: {String(analysisResult.scoring_source)}</span>
+            )}
             {warnings.length > 0 && (
               <div className="warning-card card-list">
                 {warnings.map((warning) => (

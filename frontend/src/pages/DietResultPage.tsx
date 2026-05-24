@@ -8,6 +8,14 @@ import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format"
 
 type Item = Record<string, unknown>;
 
+const diseaseScoreLabels: Record<string, string> = {
+  DM: "당뇨",
+  HTN: "고혈압",
+  DL: "이상지질혈증",
+  OBE: "비만",
+  ANEM: "빈혈",
+};
+
 function analysisMethodLabel(value: unknown): string {
   const method = String(value ?? "").toUpperCase();
   if (method === "MANUAL") {
@@ -24,6 +32,17 @@ function analysisMethodLabel(value: unknown): string {
 
 function isManualRecord(record: Item | null): boolean {
   return String(record?.analysis_method ?? "").toUpperCase() === "MANUAL";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
+  const scores = asRecord(value);
+  return Object.entries(diseaseScoreLabels)
+    .map(([code, label]) => [label, scores[code]] as [string, unknown])
+    .filter(([, score]) => score !== null && score !== undefined && score !== "");
 }
 
 export default function DietResultPage() {
@@ -58,6 +77,11 @@ export default function DietResultPage() {
     photoResults[0]?.confidence_payload && typeof photoResults[0].confidence_payload === "object"
       ? (photoResults[0].confidence_payload as Record<string, unknown>)
       : {};
+  const rawOutput = asRecord(photoResults[0]?.raw_output);
+  const diseaseScores = diseaseScoreEntries(nutrition.disease_scores ?? rawOutput.disease_scores);
+  const foodScoreDetails = Array.isArray(rawOutput.food_score_details)
+    ? (rawOutput.food_score_details as Item[])
+    : [];
 
   useEffect(() => {
     const load = async () => {
@@ -184,6 +208,36 @@ export default function DietResultPage() {
           </div>
         )}
       </Card>
+      {!isManual && (
+        <Card title="질병군별 식단 점수">
+          <div className="card-list">
+            {diseaseScores.length === 0 && <div className="state-box">표시할 식단 점수가 없습니다.</div>}
+            {diseaseScores.length > 0 && (
+              <div className="nutrition-grid">
+                {diseaseScores.map(([label, score]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <strong>{Math.round(Number(score))}점</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+            {foodScoreDetails.slice(0, 4).map((detail, index) => (
+              <div className="mini-card" key={`${String(detail.food_name ?? "food")}-${index}`}>
+                <strong>{String(detail.food_name ?? "음식")}</strong>
+                <span className="muted">
+                  점수 기준: {String(detail.matched_food_name ?? "매칭 정보 없음")}
+                </span>
+              </div>
+            ))}
+            {Boolean(nutrition.scoring_source || rawOutput.scoring_source) && (
+              <span className="badge badge-reference">
+                점수 기준: {String(nutrition.scoring_source ?? rawOutput.scoring_source)}
+              </span>
+            )}
+          </div>
+        </Card>
+      )}
       <Card title="추천 액션">
         <div className="button-row">
           <button onClick={() => navigate("/diets/history")}>기록 완료</button>

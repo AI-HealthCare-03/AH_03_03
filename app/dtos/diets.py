@@ -99,5 +99,6 @@ class DietAnalyzeResponse(BaseModel):
     disease_scores: dict[str, float | None] | None = None
     food_score_details: list[dict[str, Any]] = []
     scoring_source: str | None = None
+    explanation: dict[str, Any] | None = None
     warnings: list[str] = []
     recommended_actions: list[str] = []
