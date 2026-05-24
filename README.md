@@ -125,7 +125,7 @@ make langfuse-down
 - 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck, `DEMO_ECHO` Redis Stream skeleton 용도입니다. 실제 OCR/CV/ML/LLM 비동기 작업, retry/dead-letter queue, heartbeat는 P2 운영 확장 범위입니다.
 - 시연 설명은 “현재 MVP 핵심 흐름은 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 연결되어 있다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환”으로 통일합니다.
 - 현재 로컬 모델 artifact는 만성질환 정밀분석용 DM/HTN/DL CatBoost 3종입니다. OBESITY는 rule-based, ANEM은 X2/식단 참고 분류로 설명합니다.
-- 건강검진 OCR 공식 시연 경로는 Clova OCR을 호출하지 않습니다. 현재 기준은 `CHECKUP_OCR_PRIMARY_PROVIDER=paddle`, `ENABLE_CLOVA_OCR=false`, `GPT_VISION_FALLBACK_ENABLED=false`이며, Clova OCR 코드는 PoC/deferred provider로 보존합니다.
+- 건강검진 OCR 공식 시연 경로는 Clova OCR을 호출하지 않습니다. 현재 화면은 완성된 OCR provider 결과가 아니라 provider/fallback 기반 측정값 후보를 보여주고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조입니다. 현재 기준은 `CHECKUP_OCR_PRIMARY_PROVIDER=paddle`, `ENABLE_CLOVA_OCR=false`, `GPT_VISION_FALLBACK_ENABLED=false`이며, Clova OCR 코드는 PoC/deferred provider로 보존합니다.
 
 ### 0. 웹 MVP 로컬 실행
 

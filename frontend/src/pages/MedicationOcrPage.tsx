@@ -41,9 +41,9 @@ export default function MedicationOcrPage() {
         memo: "medication ocr request",
       });
       setItems(response.items);
-      setMessage(`${toUserMessage(response.message)} 저장 전 약 이름과 복용 정보를 확인해주세요.`);
+      setMessage(`${toUserMessage(response.message)} 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.`);
     } catch (err) {
-      setError(err instanceof Error ? toUserMessage(err.message) : "복약정보 자동 인식에 실패했습니다.");
+      setError(err instanceof Error ? toUserMessage(err.message) : "복약정보 후보 생성에 실패했습니다.");
     } finally {
       setIsRunning(false);
     }
@@ -60,9 +60,9 @@ export default function MedicationOcrPage() {
     try {
       const response = await confirmMedicationOcr({
         items: items.map((item) => ({
-            name: item.name,
-            dosage: item.dosage,
-            frequency: item.frequency,
+          name: item.name,
+          dosage: item.dosage,
+          frequency: item.frequency,
           time_slots: item.time_slots,
           duration_days: item.duration_days,
           memo: item.memo,
@@ -80,8 +80,8 @@ export default function MedicationOcrPage() {
     <div className="page-stack">
       <div className="page-header">
         <div>
-          <h1>복약/처방전 OCR</h1>
-          <p>처방전 또는 약봉투 이미지에서 복약 정보를 자동 인식합니다.</p>
+          <h1>복약/처방전 정보 확인</h1>
+          <p>처방전 또는 약봉투 이미지/텍스트 기반 복약 정보 후보를 생성합니다.</p>
         </div>
         <Link className="button secondary" to="/ocr">
           OCR 선택으로 돌아가기
@@ -93,7 +93,7 @@ export default function MedicationOcrPage() {
         <Card title="처방전/약봉투 업로드">
           <div className="upload-box">
             <strong>이미지 업로드 영역</strong>
-            <span>촬영/업로드 후 자동 인식 결과를 확인하고 저장해주세요.</span>
+            <span>촬영/업로드 후 생성된 후보 정보를 확인하고 저장해주세요.</span>
             <div className="upload-action-grid">
               <label className="upload-action-button">
                 파일에서 선택
@@ -128,7 +128,7 @@ export default function MedicationOcrPage() {
             </select>
           </label>
           <button disabled={isRunning} onClick={runMedicationRecognition} type="button">
-            {isRunning ? "자동 인식 실행 중..." : "자동 인식 실행"}
+            {isRunning ? "후보 생성 중..." : "복약 정보 후보 생성"}
           </button>
         </Card>
         <Card title="확인 안내">
@@ -141,7 +141,7 @@ export default function MedicationOcrPage() {
           </Link>
         </Card>
       </div>
-      <Card title="자동 인식 결과">
+      <Card title="복약 정보 후보">
         <div className="ocr-result-table">
           {items.length === 0 && <div className="state-box">아직 추출 결과가 없습니다.</div>}
           {items.map((item, index) => (

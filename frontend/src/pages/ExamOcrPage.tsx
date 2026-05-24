@@ -48,7 +48,7 @@ export default function ExamOcrPage() {
       setMeasurements(result.measurements);
       setMessage(toUserMessage(result.message));
     } catch (err) {
-      setError(err instanceof Error ? toUserMessage(err.message) : "자동 인식 실행에 실패했습니다.");
+      setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
     }
   };
 
@@ -60,7 +60,7 @@ export default function ExamOcrPage() {
 
   const saveAndConfirm = async () => {
     if (!exam) {
-      setError("먼저 자동 인식을 실행해주세요.");
+      setError("먼저 측정값 후보를 생성해주세요.");
       return;
     }
     setError("");
@@ -76,9 +76,9 @@ export default function ExamOcrPage() {
       );
       await confirmExam(exam.id);
       setMeasurements(await listMeasurements(exam.id));
-      setMessage("OCR 결과를 확인 처리했습니다. 건강정보에 반영하려면 필수 건강정보 관리 화면에서 값을 확인해주세요.");
+      setMessage("측정값 후보를 확인 처리했습니다. confirm 후 HealthRecord 정밀분석 필드에 반영됩니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "OCR 결과 저장에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "측정값 후보 저장에 실패했습니다.");
     }
   };
 
@@ -86,8 +86,8 @@ export default function ExamOcrPage() {
     <div className="page-stack">
       <div className="page-header">
         <div>
-          <h1>건강검진표 OCR</h1>
-          <p>검진표 이미지/PDF에서 주요 건강 측정값을 자동 인식합니다.</p>
+          <h1>건강검진표 측정값 확인</h1>
+          <p>검진표 이미지/PDF 기반 측정값 후보를 생성하고 확인 후 건강정보에 반영합니다.</p>
         </div>
         <Link className="button secondary" to="/ocr">
           OCR 선택으로 돌아가기
@@ -99,7 +99,7 @@ export default function ExamOcrPage() {
         <Card title="파일 업로드">
           <div className="upload-box">
             <strong>검진표 이미지/PDF 업로드</strong>
-            <span>촬영/업로드 후 자동 인식 결과를 확인하고 저장해주세요.</span>
+            <span>촬영/업로드 후 생성된 후보 값을 확인하고 저장해주세요.</span>
             <div className="upload-action-grid">
               <label className="upload-action-button">
                 파일에서 선택
@@ -126,11 +126,11 @@ export default function ExamOcrPage() {
             <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
           </div>
           <button onClick={startExamOcr} type="button">
-            자동 인식 실행
+            측정값 후보 생성
           </button>
         </Card>
         <Card title="저장 전 확인">
-          <p className="warning-text">자동 인식 결과입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
+          <p className="warning-text">현재는 provider/fallback 기반 후보 값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
           <button disabled={measurements.length === 0} onClick={saveAndConfirm} type="button">
             확인/저장
           </button>
@@ -144,9 +144,9 @@ export default function ExamOcrPage() {
           </div>
         </Card>
       </div>
-      <Card title="OCR 결과 측정값">
+      <Card title="측정값 후보">
         <div className="ocr-result-table">
-          {measurements.length === 0 && <div className="state-box">아직 OCR 결과가 없습니다.</div>}
+          {measurements.length === 0 && <div className="state-box">아직 측정값 후보가 없습니다.</div>}
           {measurements.map((measurement) => (
             <label className="ocr-result-row" key={measurement.id}>
               <span>

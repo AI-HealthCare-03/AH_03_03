@@ -9,7 +9,7 @@
 - 민감키가 보이는 `.env` 또는 `docker compose config` 전체 출력 화면은 공유하지 않는다.
 - 발표 설명 기준: 현재 `ai_worker`의 로컬 모델 artifact는 DM/HTN/DL CatBoost 3종이다. OBESITY는 rule-based, ANEM은 공식 분석 결과가 아닌 X2/식단 참고 분류이며, 식단 CV/GPT Vision/OCR/LLM은 provider 또는 skeleton 구조를 갖춘 상태에서 기본 시연 경로는 비용 없는 rule/fallback 중심으로 동작한다.
 - LLM/RAG 설명 기준: 공식 API에서 현재 직접 호출되는 LLM runtime은 분석/식단 결과 설명 생성(`ai_worker.llm.explanation_service`)과 keyword RAG reference source 첨부다. 메인 챗봇 LLM 라우터, 추천/챌린지 문구 모듈, 기존 RAG generator는 준비/PoC 영역이며 공식 runtime 연결은 후속 작업으로 설명한다.
-- 건강검진 OCR 공식 시연 경로에서는 Clova OCR을 호출하지 않는다. 현재 설명 기준은 PaddleOCR/local OCR 1차 + GPT Vision fallback 후보이며, GPT Vision fallback은 기본 off 상태에서 정책/env가 켜진 경우에만 후보가 된다.
+- 건강검진 OCR 공식 시연 경로에서는 Clova OCR을 호출하지 않는다. 현재 화면은 완성된 OCR provider 결과가 아니라 provider/fallback 기반 측정값 후보를 보여주고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조로 설명한다. PaddleOCR/local OCR 1차와 GPT Vision fallback은 후속 provider 후보이며, GPT Vision fallback은 기본 off 상태에서 정책/env가 켜진 경우에만 후보가 된다.
 - 비동기 처리 설명 기준: 현재 FastAPI 라우터와 DB I/O는 async 기반이지만 OCR/CV/ML/LLM workflow는 기존 동기 API 흐름을 유지한다. Redis Stream 기반 `async_jobs` skeleton은 `DEMO_ECHO` job만 처리한다. retry/DLQ, heartbeat, 실제 OCR/CV/ML/LLM 비동기화는 운영 확장용 P2로 설명한다. `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs` 연동을 위한 reserved field다.
 
 안전한 확인 명령:
@@ -43,9 +43,10 @@ curl http://localhost:8000/api/v1/system/health
   - `POST /api/v1/exams/{exam_id}/ocr`
   - `POST /api/v1/exams/{exam_id}/confirm`
 - 기대 결과:
-  - OCR 측정값이 `ExamMeasurement`에 저장된다.
+  - provider/fallback 기반 측정값 후보가 `ExamMeasurement`에 저장된다.
   - confirm 후 `HealthRecord` X2 필드에 혈압, 혈당, 지질 수치 등이 반영된다.
   - Clova OCR provider는 PoC/deferred 상태이므로 이 경로에서 호출되지 않는다.
+  - 발표 시에는 “자동 판독 완료”가 아니라 “후보값 확인 후 반영” 흐름으로 설명한다.
 
 ## 4. 정밀분석 실행
 

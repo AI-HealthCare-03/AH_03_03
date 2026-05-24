@@ -54,14 +54,14 @@ ANEM을 공식 분석 결과에 포함하려면 `AnalysisType` enum, DB schema, 
 
 외부 provider는 API key, 비용, 개인정보 처리 정책이 연결되므로 기본 시연 경로에서 무조건 호출하지 않는다.
 
-건강검진 OCR 공식 방향은 PaddleOCR/local OCR 1차 처리와 GPT Vision fallback 후보 구조다. Clova OCR은 삭제하지 않고 legacy/PoC provider로 보존하지만, 시연 준비 검증이나 공식 API 기본 경로의 필수 조건으로 보지 않는다.
+건강검진 OCR 공식 시연 경로는 완성된 OCR provider 결과를 보장하는 구조가 아니라 provider/fallback 기반 측정값 후보를 만들고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조다. PaddleOCR/local OCR 1차 처리와 GPT Vision fallback은 후속 provider 후보이며, GPT Vision은 기본 off 상태를 유지한다. Clova OCR은 삭제하지 않고 legacy/PoC provider로 보존하지만, 시연 준비 검증이나 공식 API 기본 경로의 필수 조건으로 보지 않는다.
 
 ## 5. Skeleton / Parser
 
 | 기능 | 경로 | 현재 상태 | 시연 설명 기준 |
 | --- | --- | --- | --- |
 | 약봉투 OCR parser | `ai_worker/ocr/medication/` | raw text parser와 schema 중심 구조 | 실제 OCR provider 호출 없이 parser skeleton으로 준비 |
-| 건강검진 OCR 처리 구조 | `ai_worker/ocr/checkup/`, `app/services/exams.py` | OCR 결과 confirm 후 `HealthRecord` X2 필드 반영 흐름 존재 | provider 연결/문서 인식 품질은 별도 검증 필요 |
+| 건강검진 OCR 처리 구조 | `ai_worker/ocr/checkup/`, `app/services/exams.py` | 측정값 후보 confirm 후 `HealthRecord` X2 필드 반영 흐름 존재 | provider 연결/문서 인식 품질은 별도 검증 필요 |
 | 처방전 OCR | `ai_worker/ocr/` 및 medication domain 확장 후보 | 실제 provider 연결 미완성 | P1/P2에서 약봉투/처방전 스키마를 분리 고도화 |
 
 ## 6. P2 보류

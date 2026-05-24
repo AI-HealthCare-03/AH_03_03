@@ -237,7 +237,7 @@ def _coerce_health_record_value(field_name: str, value: Decimal) -> int | Decima
 
 
 async def run_exam_ocr(exam_report_id: int) -> ExamOCRResponse:
-    # TODO: connect the OCR provider pipeline; keep this fallback response shape-compatible.
+    # Current demo path creates provider/fallback candidates; confirm syncs reviewed values into HealthRecord.
     existing_measurements = await list_exam_measurements(exam_report_id)
     existing_by_key = {measurement.measurement_key: measurement for measurement in existing_measurements}
     saved_measurements: list[ExamMeasurement] = []
@@ -261,6 +261,6 @@ async def run_exam_ocr(exam_report_id: int) -> ExamOCRResponse:
 
     await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS))
     return ExamOCRResponse(
-        message="자동 인식 측정값이 생성되었습니다. 검진 수치를 확인한 뒤 저장해주세요.",
+        message="측정값 후보가 생성되었습니다. 현재 provider/fallback 기반 결과이므로 검진 수치를 확인한 뒤 저장해주세요.",
         measurements=saved_measurements,
     )
