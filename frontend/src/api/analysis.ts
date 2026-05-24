@@ -15,6 +15,15 @@ export type AnalysisRunResponse = {
     recommended_action?: string;
     safety_notice?: string;
     source?: string;
+    reference_summary?: string | null;
+    reference_sources?: Array<{
+      id?: string | null;
+      title?: string | null;
+      source_org?: string | null;
+      source_url?: string | null;
+      year?: number | null;
+      status?: string | null;
+    }>;
   } | null;
   challenge_recommendation_ids: number[];
   factor_count: number;

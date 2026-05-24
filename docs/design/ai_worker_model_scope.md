@@ -12,6 +12,8 @@
 | Skeleton/parser | 약봉투 OCR parser, 건강검진 OCR 처리 구조, 처방전 OCR 준비 구조 | MVP에서는 구조와 parser 중심, 실제 provider 연결은 일부 미완성 |
 | P2 보류 | 자체 식단 CV 모델, vector RAG, Redis Stream/async_jobs/consumer, LLM/RAG 운영 고도화 | 시연 전 미구현이 아니라 운영 확장 단계로 의도적 보류 |
 
+LLM/RAG의 공식 runtime 범위는 [LLM/RAG Runtime Scope](llm_runtime_scope.md)를 기준으로 설명한다. 현재 공식 API에서 직접 호출되는 LLM runtime은 분석/식단 설명 생성 중심이며, 메인 챗봇 LLM 라우터와 추천 문구 모듈은 준비됐지만 아직 공식 runtime에 직접 연결되지 않은 영역으로 구분한다.
+
 ## 2. 로컬 모델 Artifact 있음
 
 | 기능 | 질환/코드 | 경로 | 현재 상태 | 비고 |
@@ -93,6 +95,7 @@ uv run python scripts/audit_ai_worker_capabilities.py
 - `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` 설정 여부
 - Clova OCR이 deferred provider로 표시되는지 여부
 - LLM prompt 관련 코드 위치와 line number
+- LLM/RAG 공식 runtime, keyword RAG PoC, provider-only, prepared-not-wired, P2 backlog 분류
 - 약봉투 OCR parser sample parse 가능 여부
 - 건강검진 OCR checkup extractor import 가능 여부
 
@@ -103,6 +106,7 @@ uv run python scripts/audit_ai_worker_capabilities.py
 - LLM prompt 원문 전문은 출력하지 않고 파일 경로와 line number만 출력한다.
 - 감사 결과는 "현재 구현/Provider 코드/Backlog 상태"를 함께 보여준다. `NOT_IMPLEMENTED`, `P1_BACKLOG`, `P2_BACKLOG`는 전체 프로젝트 실패가 아니라 MVP 범위에서 의도적으로 보류한 항목일 수 있다.
 - `READY_*` 항목이 많더라도 자체 식단 CV 모델, vector RAG, Redis Stream 기반 worker 같은 운영 확장 항목이 완료되었다는 뜻은 아니다.
+- `READY_RUNTIME`은 현재 공식 API에서 실제 호출되는 경로를 뜻한다. `PREPARED_NOT_WIRED`는 코드가 준비되어도 공식 runtime에 아직 연결되지 않았다는 뜻이다.
 - CatBoost 모델 로드 시간이 부담되면 아래처럼 warmup을 생략할 수 있다.
 
 ```bash

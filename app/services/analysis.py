@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from ai_worker.llm.explanation_service import generate_analysis_explanation
+from ai_worker.llm.explanation_service import generate_explanation_with_context, retrieve_health_context
 from ai_worker.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
 from app.core import config
 from app.dtos.analysis import (
@@ -370,26 +370,36 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
 
 
 def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
-    explanation = generate_analysis_explanation(
-        AnalysisExplanationInput(
+    input_data = AnalysisExplanationInput(
+        disease_type=result.analysis_type.value,
+        risk_score=str(result.risk_score),
+        risk_level=result.risk_level.value,
+        model_name=result.model_name,
+        model_version=result.model_version,
+        factors=[
+            HealthRiskFactor(
+                name=factor.factor_name,
+                value=factor.factor_value,
+                reason=factor.direction.value
+                if isinstance(factor.direction, FactorDirection)
+                else str(factor.direction),
+            )
+            for factor in factors
+        ],
+    )
+    explanation = generate_explanation_with_context(
+        input_data,
+        contexts=retrieve_health_context(
+            _analysis_reference_query(input_data),
             disease_type=result.analysis_type.value,
-            risk_score=str(result.risk_score),
-            risk_level=result.risk_level.value,
-            model_name=result.model_name,
-            model_version=result.model_version,
-            factors=[
-                HealthRiskFactor(
-                    name=factor.factor_name,
-                    value=factor.factor_value,
-                    reason=factor.direction.value
-                    if isinstance(factor.direction, FactorDirection)
-                    else str(factor.direction),
-                )
-                for factor in factors
-            ],
-        )
+        ),
     )
     return explanation.model_dump()
+
+
+def _analysis_reference_query(input_data: AnalysisExplanationInput) -> str:
+    factor_names = " ".join(factor.name for factor in input_data.factors)
+    return f"{input_data.disease_type} {input_data.risk_level} {factor_names}".strip()
 
 
 def _analysis_factors(

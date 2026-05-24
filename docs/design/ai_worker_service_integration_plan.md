@@ -39,7 +39,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 | 5 | 건강검진 OCR -> 정밀검사 연결 확인/보강 | P0 | OCR 결과가 PRECISION 분석 입력으로 실제 반영되게 한다 | OCR 결과와 `HealthRecord` X2 필드 연결 검증 필요 | OCR/검진값 confirm 후 precision readiness true 가능, PRECISION 분석 실행 가능 | `app/services/exams.py`, `app/services/analysis.py`, `ai_worker/ocr/`, `ai_worker/ml/` | 일부 구현 |
 | 6 | CV 모델 fallback 정책 정의 | P0 | 자체 식단 CV와 GPT Vision fallback 경계를 정한다 | 자체 CV 모델 미완성, fallback 정책 미정 | confidence threshold, timeout, retry, provider log 정책 문서화 | `ai_worker/cv/`, `ai_worker/cv/providers/gpt_vision.py` | 미구현 |
 | 7 | GPT Vision fallback 연결 | P0 | 자체 CV 실패/저신뢰 시 GPT Vision 보조 분석을 연결한다 | GPT Vision provider는 있으나 식단 API 흐름 연결 검증 필요 | CV 결과 schema와 GPT Vision 결과 schema 통일, provider/source 기록 | `ai_worker/cv/providers/gpt_vision.py`, `app/services/diets.py` | 미구현 |
-| 8 | LLM/RAG 설명 생성 붙이기 | P1 | 분석/식단/OCR 결과를 사용자 친화적 설명으로 변환한다 | LLM/RAG 준비 모듈은 있으나 운영 경로 연결은 제한적 | rule template + LLM rewrite 또는 RAG 기반 설명 생성 경로 확정 | `ai_worker/llm/`, `app/services/rag.py` | 일부 구현 |
+| 8 | LLM/RAG 설명 생성 붙이기 | P1 | 분석/식단/OCR 결과를 사용자 친화적 설명으로 변환한다 | 분석/식단 설명은 `explanation_service`로 공식 runtime 연결. keyword RAG PoC와 Langfuse trace metadata가 붙어 있으나 챗봇 라우터/추천문구 모듈은 아직 공식 runtime 미연결 | 공식 runtime과 prepared-not-wired 범위 문서화, 챗봇/추천문구 연결 여부 별도 결정 | `ai_worker/llm/`, `ai_worker/llm/rag/`, `app/services/analysis.py`, `app/services/diets.py` | 일부 구현 |
 | 9 | Docker ML 빌드 검증 | P0 | 시연/배포 컨테이너에서 ML import와 artifact loading을 검증한다 | 로컬 검증 중심. Docker 빌드 검증 필요 | fastapi 컨테이너에서 CatBoost import 및 `predict_chronic_disease_risks` import 성공 | `Dockerfile`, `.dockerignore`, `infra/docker/`, `ai_worker/ml/artifacts/` | 미구현 |
 | 10 | Redis Stream / async_jobs / worker 구조 | P2 | 운영용 비동기 AI 작업 처리 기반을 만든다 | 현재 구현 범위 밖. queue/stream 없음 | async job 상태 추적, retry, DLQ, worker heartbeat 설계/구현 | `ai_worker/jobs/`, `ai_worker/pipelines/`, future DB model | 미구현 |
 
@@ -357,17 +357,23 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 목적: 식단 점수 결과, 건강검진 분석 결과, OCR 결과를 기반으로 사용자가 이해할 수 있는 설명 문장을 생성한다.
 - 왜 필요한가: ML/CV/OCR 결과만으로는 사용자가 무엇을 실천해야 하는지 이해하기 어렵다.
 - 현재 문제:
-  - RAG는 아직 완성된 운영 경로가 아니다.
-  - LLM/RAG 설명 생성은 P1 또는 P2로 둔다.
+  - 분석/식단 설명은 rule-based explanation으로 공식 runtime에 연결되어 있다.
+  - keyword RAG PoC는 markdown source 기반으로 reference source를 붙인다.
+  - 메인 챗봇의 `response_router.py`, `health_chatbot.py`, `rule_engine.py`, `llm_generator.py`는 준비됐지만 `app/services/chatbot.py` 공식 경로에는 아직 직접 연결되지 않았다.
+  - vector RAG, LangChain/LangGraph, 운영형 평가 파이프라인은 아직 완성된 운영 경로가 아니다.
 - 해야 할 일:
-  - 초기에는 rule-based template + LLM rewrite를 사용할 수 있다.
-  - RAG는 질병/영양/복약 주의사항 근거 문서가 준비된 뒤 붙인다.
+  - 공식 runtime 범위는 `docs/design/llm_runtime_scope.md`를 기준으로 유지한다.
+  - 챗봇 공식 API를 `ai_worker.llm.response_router`로 연결할지 별도 작업에서 결정한다.
+  - 추천/챌린지 문구 모듈을 DB challenge recommendation 흐름과 통합할지 결정한다.
+  - 운영형 RAG는 질병/영양/복약 주의사항 근거 문서가 준비된 뒤 붙인다.
   - 입력에 없는 질환/수치/챌린지를 LLM이 생성하지 않도록 grounding 검사를 유지한다.
 - 건드릴 파일 후보:
   - `ai_worker/llm/`
   - `ai_worker/llm/rag/`
-  - `ai_worker/llm/rag_generator.py`
-  - `ai_worker/llm/llm_generator.py`
+  - `ai_worker/llm/explanation_service.py`
+  - `ai_worker/llm/response_router.py`
+  - `ai_worker/llm/recommendation_message.py`
+  - `app/services/chatbot.py`
 - 완료 기준:
   - 분석 결과를 기반으로 안전한 설명 문구를 생성한다.
   - 진단/치료/처방 단정 표현을 하지 않는다.

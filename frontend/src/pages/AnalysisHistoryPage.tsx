@@ -6,10 +6,28 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
 type AnalysisResult = Record<string, unknown>;
+type ReferenceSource = {
+  id?: string | null;
+  title?: string | null;
+  source_org?: string | null;
+  source_url?: string | null;
+  year?: number | null;
+  status?: string | null;
+};
+type AnalysisExplanation = {
+  summary?: string;
+  caution?: string;
+  recommended_action?: string;
+  safety_notice?: string;
+  source?: string;
+  reference_summary?: string | null;
+  reference_sources?: ReferenceSource[];
+};
 type AnalysisDetail = {
   result?: AnalysisResult;
   factors?: AnalysisResult[];
   snapshot?: AnalysisResult | null;
+  explanation?: AnalysisExplanation | null;
 };
 
 const labels: Record<string, string> = {
@@ -117,10 +135,11 @@ export default function AnalysisHistoryPage() {
     detail?.snapshot?.input_payload && typeof detail.snapshot.input_payload === "object"
       ? (detail.snapshot.input_payload as Record<string, unknown>)
       : {};
-  const snapshotOutput =
-    detail?.snapshot?.output_payload && typeof detail.snapshot.output_payload === "object"
-      ? (detail.snapshot.output_payload as Record<string, unknown>)
-      : {};
+    const snapshotOutput =
+      detail?.snapshot?.output_payload && typeof detail.snapshot.output_payload === "object"
+        ? (detail.snapshot.output_payload as Record<string, unknown>)
+        : {};
+  const referenceSources = detail?.explanation?.reference_sources ?? [];
 
   useEffect(() => {
     const load = async () => {
@@ -177,6 +196,32 @@ export default function AnalysisHistoryPage() {
             ))}
           </div>
         </Card>
+        {detail?.explanation && (
+          <Card title="분석 설명">
+            <div className="card-list">
+              <div className="mini-card">
+                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
+                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
+                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
+                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
+                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
+              </div>
+              {referenceSources.length > 0 && (
+                <div className="mini-card">
+                  <strong>참고 출처</strong>
+                  <div className="chip-list">
+                    {referenceSources.map((source) => (
+                      <span className="badge badge-reference" key={String(source.id ?? source.title)}>
+                        {String(source.source_org ?? source.title ?? "참고 출처")}
+                        {source.status ? ` · ${String(source.status)}` : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
         <Card title="분석 입력 요약">
           <div className="record-table">
             {[

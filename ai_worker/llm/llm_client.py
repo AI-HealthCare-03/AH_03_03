@@ -127,6 +127,46 @@ def create_openai_response(
                 pass
 
 
+def record_langfuse_event(
+    *,
+    name: str,
+    input_payload: dict[str, Any] | str | None = None,
+    output_payload: dict[str, Any] | str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> bool:
+    """Record a lightweight non-generation event when Langfuse is configured.
+
+    This helper is intentionally best-effort. It never raises into service code
+    and it does not expose secret values in metadata.
+    """
+    langfuse = build_langfuse_client()
+    if langfuse is None:
+        return False
+
+    try:
+        observation_context = langfuse.start_as_current_observation(
+            name=name,
+            as_type="span",
+            input=input_payload,
+            metadata=metadata,
+        )
+        observation = observation_context.__enter__()
+    except Exception:
+        return False
+
+    try:
+        try:
+            observation.update(output=output_payload)
+        except Exception:
+            pass
+        return True
+    finally:
+        try:
+            observation_context.__exit__(None, None, None)
+        except Exception:
+            pass
+
+
 def build_openai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -141,7 +181,7 @@ def build_openai_client():
 
 
 def build_langfuse_client():
-    if not has_langfuse_config():
+    if not is_langfuse_enabled():
         return None
 
     try:
@@ -161,6 +201,13 @@ def build_langfuse_client():
 
 def has_langfuse_config() -> bool:
     return all(os.getenv(key) for key in LANGFUSE_ENV_KEYS)
+
+
+def is_langfuse_enabled() -> bool:
+    enabled_value = os.getenv("LANGFUSE_ENABLED")
+    if enabled_value is not None and enabled_value.strip().lower() in {"0", "false", "no", "off"}:
+        return False
+    return has_langfuse_config()
 
 
 def build_langfuse_observation_name(metadata: dict | None) -> str:
