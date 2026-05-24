@@ -1,0 +1,86 @@
+[
+  {
+    "id": "hypertension",
+    "disease_type": "HYPERTENSION",
+    "title": "고혈압 생활습관 관리 후보 지식",
+    "source_org": "대한고혈압학회",
+    "source_url": "https://www.koreanhypertension.org",
+    "year": null,
+    "source_type": "official_society",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "시연용 keyword RAG 후보. 원문 대조와 의료진 검토 전까지 운영 RAG에 사용하지 않는다."
+  },
+  {
+    "id": "diabetes",
+    "disease_type": "DIABETES",
+    "title": "당뇨 및 공복혈당 관리 후보 지식",
+    "source_org": "대한당뇨병학회",
+    "source_url": "https://www.diabetes.or.kr",
+    "year": null,
+    "source_type": "official_society",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "시연용 keyword RAG 후보. 혈당 수치 해석은 진단이 아니라 상담 권고 중심으로만 사용한다."
+  },
+  {
+    "id": "dyslipidemia",
+    "disease_type": "DYSLIPIDEMIA",
+    "title": "이상지질혈증 생활습관 관리 후보 지식",
+    "source_org": "대한지질·동맥경화학회",
+    "source_url": "https://www.lipid.or.kr",
+    "year": null,
+    "source_type": "official_society",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "공식 도메인과 원문 범위 확인 필요. 검토 전에는 후보 지식으로만 유지한다."
+  },
+  {
+    "id": "obesity",
+    "disease_type": "OBESITY",
+    "title": "비만, BMI, 허리둘레 관리 후보 지식",
+    "source_org": "대한비만학회",
+    "source_url": "https://www.kosso.or.kr",
+    "year": null,
+    "source_type": "official_society",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "공식 도메인과 원문 범위 확인 필요. 체중 감량 처방이 아닌 생활습관 안내 후보로만 사용한다."
+  },
+  {
+    "id": "diet_nutrition",
+    "disease_type": "DIET_NUTRITION",
+    "title": "식단 및 영양 관리 후보 지식",
+    "source_org": "질병관리청 국가건강정보포털",
+    "source_url": "https://health.kdca.go.kr",
+    "year": null,
+    "source_type": "government_health_portal",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "식단 점수 설명의 짧은 근거 후보. 개별 식단 처방처럼 보이지 않게 사용한다."
+  },
+  {
+    "id": "food_nutrition_api",
+    "disease_type": "FOOD_NUTRITION_API",
+    "title": "식품영양성분 API 후보",
+    "source_org": "공공데이터포털",
+    "source_url": "https://www.data.go.kr",
+    "year": null,
+    "source_type": "public_data_portal",
+    "runtime_use": "provider_metadata_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "식품명과 영양성분 정규화 provider 후보. API 상세 endpoint와 라이선스 검토 필요."
+  },
+  {
+    "id": "safety_disclaimer",
+    "disease_type": "SAFETY",
+    "title": "평가 제외, 진단 불가, 의료 면책 문구",
+    "source_org": "질병관리청 국가건강정보포털",
+    "source_url": "https://health.kdca.go.kr",
+    "year": null,
+    "source_type": "government_health_portal",
+    "runtime_use": "safety_prompt_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "모든 건강 설명에 공통 적용할 안전 문구 후보. 법률 자문 문서가 아니다."
+  }
+]

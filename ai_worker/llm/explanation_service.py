@@ -1,5 +1,8 @@
 from typing import Any
 
+from ai_worker.llm.rag import retrieve_keyword_rag_contexts
+from ai_worker.llm.rag.rag_context_builder import build_reference_sources, build_reference_summary
+from ai_worker.llm.rag.tracing import trace_keyword_rag_retrieval
 from ai_worker.llm.schemas import (
     AnalysisExplanationInput,
     DietScoreExplanationInput,
@@ -84,9 +87,23 @@ def generate_diet_score_explanation(input_data: DietScoreExplanationInput) -> Ex
 
 
 def retrieve_health_context(query: str, disease_type: str | None = None) -> list[RetrievedContext]:
-    """RAG-ready hook. Retrieval is intentionally disabled in the MVP path."""
-    _ = (query, disease_type)
-    return []
+    """Keyword RAG PoC hook backed by reviewed-local candidate source files."""
+    top_k = 2
+    include_safety_disclaimer = True
+    contexts = retrieve_keyword_rag_contexts(
+        user_message=query,
+        disease_type=disease_type,
+        top_k=top_k,
+        include_safety_disclaimer=include_safety_disclaimer,
+    )
+    trace_keyword_rag_retrieval(
+        query=query,
+        disease_type=disease_type,
+        contexts=contexts,
+        top_k=top_k,
+        include_safety_disclaimer=include_safety_disclaimer,
+    )
+    return contexts
 
 
 def generate_explanation_with_context(
@@ -94,9 +111,18 @@ def generate_explanation_with_context(
     contexts: list[RetrievedContext] | None = None,
     use_real_llm: bool = False,
 ) -> ExplanationOutput:
-    """RAG-ready generation hook that currently falls back to rule-based text."""
-    _ = (contexts, use_real_llm)
-    return generate_analysis_explanation(input_data)
+    """RAG-ready generation hook that keeps rule-based text as the default path."""
+    _ = use_real_llm
+    explanation = generate_analysis_explanation(input_data)
+    reference_contexts = contexts or []
+    if not reference_contexts:
+        return explanation
+    return explanation.model_copy(
+        update={
+            "reference_summary": build_reference_summary(reference_contexts),
+            "reference_sources": build_reference_sources(reference_contexts),
+        }
+    )
 
 
 def _disease_label(disease_type: str) -> str:

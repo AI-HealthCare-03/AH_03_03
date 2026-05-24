@@ -58,7 +58,9 @@ def main() -> None:
     rows.extend(_audit_local_model_artifacts(skip_warmup=args.skip_warmup))
     rows.extend(_audit_rule_based_and_scorers())
     rows.extend(_audit_external_provider_code())
+    rows.extend(_audit_llm_runtime_scope())
     rows.extend(_audit_llm_prompt_locations())
+    rows.extend(_audit_keyword_rag_poc())
     rows.extend(_audit_ocr_parsers())
     rows.extend(_audit_intentional_backlog())
 
@@ -282,6 +284,122 @@ def _audit_llm_prompt_locations() -> list[AuditRow]:
     return rows
 
 
+def _audit_llm_runtime_scope() -> list[AuditRow]:
+    rows: list[AuditRow] = [
+        _import_row(
+            area="llm_runtime",
+            item="Analysis/Diet explanation service",
+            module="ai_worker.llm.explanation_service",
+            ready_category="READY_RUNTIME",
+        ),
+        _import_row(
+            area="llm_runtime",
+            item="LLM shared schemas",
+            module="ai_worker.llm.schemas",
+            ready_category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="llm_runtime",
+            item="Official analysis runtime wiring",
+            status="OK",
+            detail="app/services/analysis.py calls explanation_service + keyword RAG context",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="llm_runtime",
+            item="Official diet runtime wiring",
+            status="OK",
+            detail="app/services/diets.py calls generate_diet_score_explanation",
+            category="READY_RUNTIME",
+        ),
+        AuditRow(
+            area="llm_runtime",
+            item="Official chatbot runtime wiring",
+            status="INFO",
+            detail="app/services/chatbot.py uses local rule-based responses; ai_worker.llm.response_router is not wired yet",
+            category="PREPARED_NOT_WIRED",
+        ),
+    ]
+    rows.extend(
+        [
+            _import_row(
+                area="llm_prepared",
+                item="response_router",
+                module="ai_worker.llm.response_router",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_prepared",
+                item="health_chatbot",
+                module="ai_worker.llm.health_chatbot",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_prepared",
+                item="rule_engine",
+                module="ai_worker.llm.rule_engine",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_prepared",
+                item="llm_generator",
+                module="ai_worker.llm.llm_generator",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_prepared",
+                item="recommendation_message",
+                module="ai_worker.llm.recommendation_message",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_prepared",
+                item="risk_mapper",
+                module="ai_worker.llm.risk_mapper",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_legacy_poc",
+                item="rag_generator",
+                module="ai_worker.llm.rag_generator",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+            _import_row(
+                area="llm_legacy_poc",
+                item="rag_sources",
+                module="ai_worker.llm.rag_sources",
+                ready_category="PREPARED_NOT_WIRED",
+            ),
+        ]
+    )
+    rows.extend(
+        [
+            AuditRow(
+                area="llm_backlog",
+                item="Vector RAG / pgvector embedding search",
+                status="P2",
+                detail="keyword RAG PoC is ready; vector retrieval is intentionally deferred",
+                category="P2_BACKLOG",
+            ),
+            AuditRow(
+                area="llm_backlog",
+                item="LangChain / LangGraph orchestration",
+                status="P2",
+                detail="not introduced for MVP; direct service functions remain the runtime boundary",
+                category="P2_BACKLOG",
+            ),
+            AuditRow(
+                area="llm_backlog",
+                item="Operating LLM/RAG evaluation pipeline",
+                status="P2",
+                detail="Langfuse trace metadata exists; evaluation dataset/workflow is deferred",
+                category="P2_BACKLOG",
+            ),
+        ]
+    )
+    return rows
+
+
 def _audit_ocr_parsers() -> list[AuditRow]:
     rows = [
         _import_row(
@@ -316,6 +434,81 @@ def _audit_ocr_parsers() -> list[AuditRow]:
             AuditRow(
                 area="ocr_parser",
                 item="Medication parser sample",
+                status="FAIL",
+                detail=exc.__class__.__name__,
+                category="NEEDS_DEPENDENCY",
+            )
+        )
+    return rows
+
+
+def _audit_keyword_rag_poc() -> list[AuditRow]:
+    rows: list[AuditRow] = [
+        _import_row(
+            area="rag_poc",
+            item="Keyword RAG retriever",
+            module="ai_worker.llm.rag.keyword_retriever",
+            ready_category="READY_RAG_POC",
+        ),
+        _import_row(
+            area="rag_poc",
+            item="RAG source loader",
+            module="ai_worker.llm.rag.source_loader",
+            ready_category="READY_RAG_POC",
+        ),
+        _import_row(
+            area="rag_trace",
+            item="Keyword RAG Langfuse trace module",
+            module="ai_worker.llm.rag.tracing",
+            ready_category="READY_LANGFUSE_TRACE",
+        ),
+    ]
+    try:
+        from ai_worker.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts
+        from ai_worker.llm.rag.tracing import build_keyword_rag_trace_metadata
+
+        contexts = retrieve_keyword_rag_contexts(
+            user_message="공복혈당 관리",
+            disease_type="DIABETES",
+            include_safety_disclaimer=True,
+        )
+        source_ids = [str(context.metadata.get("id")) for context in contexts]
+        rows.append(
+            AuditRow(
+                area="rag_poc",
+                item="Keyword RAG demo retrieval",
+                status="OK" if {"diabetes", "safety_disclaimer"}.issubset(source_ids) else "FAIL",
+                detail=f"sources={','.join(source_ids) or '-'}",
+                category="READY_RAG_POC" if contexts else "NOT_IMPLEMENTED",
+            )
+        )
+        metadata = build_keyword_rag_trace_metadata(
+            query="공복혈당 관리",
+            disease_type="DIABETES",
+            contexts=contexts,
+            top_k=3,
+            include_safety_disclaimer=True,
+        )
+        rows.append(
+            AuditRow(
+                area="rag_trace",
+                item="Keyword RAG trace metadata shape",
+                status="OK"
+                if {"prompt_version", "retrieved_source_ids", "source_status", "top_k", "fallback"}.issubset(metadata)
+                else "FAIL",
+                detail=(
+                    f"prompt_version={metadata.get('prompt_version')}, "
+                    f"sources={','.join(metadata.get('retrieved_source_ids', [])) or '-'}, "
+                    f"fallback={metadata.get('fallback')}"
+                ),
+                category="READY_LANGFUSE_TRACE",
+            )
+        )
+    except Exception as exc:
+        rows.append(
+            AuditRow(
+                area="rag_poc",
+                item="Keyword RAG demo retrieval",
                 status="FAIL",
                 detail=exc.__class__.__name__,
                 category="NEEDS_DEPENDENCY",
@@ -408,9 +601,13 @@ def _format_row(values: list[str], widths: list[int]) -> str:
 
 def _print_summary(rows: list[AuditRow]) -> None:
     categories = [
+        "READY_RUNTIME",
         "READY_LOCAL_MODEL",
         "READY_RULE_BASED",
+        "READY_RAG_POC",
+        "READY_LANGFUSE_TRACE",
         "READY_PROVIDER_CODE_ONLY",
+        "PREPARED_NOT_WIRED",
         "NEEDS_ENV",
         "NEEDS_DEPENDENCY",
         "NOT_IMPLEMENTED",

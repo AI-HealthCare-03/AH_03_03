@@ -9,6 +9,27 @@ import ErrorMessage from "../components/ErrorMessage";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
+type ReferenceSource = {
+  id?: string | null;
+  title?: string | null;
+  source_org?: string | null;
+  source_url?: string | null;
+  year?: number | null;
+  status?: string | null;
+};
+type AnalysisExplanation = {
+  summary?: string;
+  caution?: string;
+  recommended_action?: string;
+  safety_notice?: string;
+  source?: string;
+  reference_summary?: string | null;
+  reference_sources?: ReferenceSource[];
+};
+type AnalysisDetailPreview = {
+  factors?: AnalysisFactor[];
+  explanation?: AnalysisExplanation | null;
+};
 type Readiness = {
   is_ready: boolean;
   basic_ready?: boolean;
@@ -116,6 +137,7 @@ export default function AnalysisPage() {
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [precisionMissingFields, setPrecisionMissingFields] = useState<string[]>([]);
   const [factorsByResultId, setFactorsByResultId] = useState<Record<string, AnalysisFactor[]>>({});
+  const [explanationsByResultId, setExplanationsByResultId] = useState<Record<string, AnalysisExplanation>>({});
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
   const [error, setError] = useState("");
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
@@ -126,14 +148,23 @@ export default function AnalysisPage() {
     const detailEntries = await Promise.all(
       latestResults.map(async (result) => {
         try {
-          const detail = await getAnalysisResultDetail<{ factors?: AnalysisFactor[] }>(Number(result.id));
-          return [String(result.id), detail.factors ?? []] as const;
+          const detail = await getAnalysisResultDetail<AnalysisDetailPreview>(Number(result.id));
+          return [String(result.id), detail] as const;
         } catch {
-          return [String(result.id), []] as const;
+          return [String(result.id), { factors: [] as AnalysisFactor[], explanation: null }] as const;
         }
       }),
     );
-    setFactorsByResultId(Object.fromEntries(detailEntries));
+    setFactorsByResultId(Object.fromEntries(detailEntries.map(([id, detail]) => [id, detail.factors ?? []])));
+    setExplanationsByResultId(
+      Object.fromEntries(
+        detailEntries
+          .filter((entry): entry is readonly [string, AnalysisDetailPreview & { explanation: AnalysisExplanation }] =>
+            Boolean(entry[1].explanation),
+          )
+          .map(([id, detail]) => [id, detail.explanation]),
+      ),
+    );
     const readiness = await getAnalysisReadiness<Readiness>();
     setHealthRecordId(readiness.latest_health_record_id);
     setBasicReady(Boolean(readiness.basic_ready ?? readiness.is_ready));
@@ -268,6 +299,8 @@ export default function AnalysisPage() {
         {results.map((result) => {
           const level = getRiskLevel(result);
           const score = getRiskScore(result);
+          const explanation = explanationsByResultId[String(result.id)];
+          const referenceSources = explanation?.reference_sources ?? [];
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 위험도</span>
@@ -276,6 +309,16 @@ export default function AnalysisPage() {
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
+              {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
+              {referenceSources.length > 0 && (
+                <div className="chip-list">
+                  {referenceSources.slice(0, 2).map((source) => (
+                    <span className="badge badge-reference" key={String(source.id ?? source.title)}>
+                      {String(source.source_org ?? source.title ?? "참고 출처")}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

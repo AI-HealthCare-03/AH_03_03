@@ -24,6 +24,7 @@ def test_analysis_explanation_is_rule_based_and_safe() -> None:
     assert "공복혈당" in explanation.caution
     assert "진단이 아니" in explanation.safety_notice
     assert "의료진 상담" in explanation.safety_notice
+    assert explanation.reference_sources == []
 
 
 def test_diet_score_explanation_mentions_lowest_disease_score() -> None:
@@ -38,7 +39,7 @@ def test_diet_score_explanation_mentions_lowest_disease_score() -> None:
     assert "의료진 상담" in explanation.safety_notice
 
 
-def test_rag_ready_interface_uses_empty_context_fallback() -> None:
+def test_rag_ready_interface_adds_keyword_context_references() -> None:
     contexts = retrieve_health_context("혈당 관리", disease_type="DIABETES")
     explanation = generate_explanation_with_context(
         AnalysisExplanationInput(disease_type="DIABETES", risk_level="LOW"),
@@ -46,6 +47,10 @@ def test_rag_ready_interface_uses_empty_context_fallback() -> None:
         use_real_llm=False,
     )
 
-    assert contexts == []
+    source_ids = [context.metadata["id"] for context in contexts]
+    assert "diabetes" in source_ids
+    assert "safety_disclaimer" in source_ids
     assert explanation.source == "rule_based_explanation"
+    assert explanation.reference_summary
+    assert explanation.reference_sources
     assert "진단이 아니" in explanation.safety_notice

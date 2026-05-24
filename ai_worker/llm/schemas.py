@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -51,6 +53,8 @@ class ExplanationOutput(BaseModel):
     recommended_action: str
     safety_notice: str
     source: str = "rule_based_explanation"
+    reference_summary: str | None = None
+    reference_sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AnalysisExplanationInput(BaseModel):
