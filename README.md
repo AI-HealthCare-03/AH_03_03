@@ -454,7 +454,8 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - ML 담당자는 `ai_worker/ml/` 하위에서 작업합니다.
 - CV 담당자는 `ai_worker/cv/` 하위에서 작업합니다.
 - LLM 담당자는 `ai_worker/llm/` 하위에서 작업합니다.
-- RAG 담당자는 `ai_worker/rag/` 하위에서 작업합니다.
+- RAG 담당자는 `ai_worker/llm/rag/` 하위에서 작업합니다.
+- 현재 공식 API에서 직접 호출되는 LLM runtime은 분석/식단 결과 설명 생성과 keyword RAG reference source 첨부입니다. 메인 챗봇 LLM 라우터와 추천/챌린지 문구 모듈은 준비되어 있지만 공식 runtime 연결은 후속 작업입니다. 자세한 기준은 [LLM/RAG Runtime Scope](docs/design/llm_runtime_scope.md)를 따릅니다.
 - 여러 AI 처리 흐름을 묶는 파이프라인은 `ai_worker/pipelines/`에서 관리합니다.
 - ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않습니다.
 - 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않습니다.

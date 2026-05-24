@@ -8,6 +8,7 @@
 - 필요 시 로컬/시연 seed를 실행한다.
 - 민감키가 보이는 `.env` 또는 `docker compose config` 전체 출력 화면은 공유하지 않는다.
 - 발표 설명 기준: 현재 `ai_worker`의 로컬 모델 artifact는 DM/HTN/DL CatBoost 3종이다. OBESITY는 rule-based, ANEM은 공식 분석 결과가 아닌 X2/식단 참고 분류이며, 식단 CV/GPT Vision/OCR/LLM은 provider 또는 skeleton 구조를 갖춘 상태에서 기본 시연 경로는 비용 없는 rule/fallback 중심으로 동작한다.
+- LLM/RAG 설명 기준: 공식 API에서 현재 직접 호출되는 LLM runtime은 분석/식단 결과 설명 생성(`ai_worker.llm.explanation_service`)과 keyword RAG reference source 첨부다. 메인 챗봇 LLM 라우터, 추천/챌린지 문구 모듈, 기존 RAG generator는 준비/PoC 영역이며 공식 runtime 연결은 후속 작업으로 설명한다.
 - 건강검진 OCR 공식 시연 경로에서는 Clova OCR을 호출하지 않는다. 현재 설명 기준은 PaddleOCR/local OCR 1차 + GPT Vision fallback 후보이며, GPT Vision fallback은 기본 off 상태에서 정책/env가 켜진 경우에만 후보가 된다.
 
 안전한 확인 명령:
