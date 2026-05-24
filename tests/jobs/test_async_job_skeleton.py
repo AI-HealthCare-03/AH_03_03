@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai_worker.jobs import handlers
+from ai_worker.jobs import consumer, handlers
 from ai_worker.jobs.redis_stream import build_stream_fields, parse_stream_fields
 
 
@@ -51,3 +51,22 @@ async def test_unknown_job_type_is_marked_failed(monkeypatch) -> None:
     await handlers.handle_stream_job(9, "UNKNOWN", {})
 
     assert calls == [(9, "unsupported_job_type: UNKNOWN")]
+
+
+@pytest.mark.asyncio
+async def test_consumer_marks_job_failed_when_handler_raises(monkeypatch) -> None:
+    calls: list[tuple[int, str]] = []
+
+    async def fake_handle_stream_job(job_id: int, job_type: str, payload: dict):
+        raise RuntimeError("boom")
+
+    async def fake_mark_failed(job_id: int, error_message: str):
+        calls.append((job_id, error_message))
+
+    monkeypatch.setattr(consumer, "handle_stream_job", fake_handle_stream_job)
+    monkeypatch.setattr(consumer.async_job_service, "mark_failed", fake_mark_failed)
+
+    fields = build_stream_fields(job_id=11, job_type="DEMO_ECHO", payload={"message": "fail"})
+    await consumer.process_stream_message("1-0", fields)
+
+    assert calls == [(11, "handler_failed: RuntimeError")]
