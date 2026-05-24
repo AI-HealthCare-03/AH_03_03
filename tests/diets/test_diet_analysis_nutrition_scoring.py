@@ -77,14 +77,19 @@ async def test_run_diet_analysis_adds_nutrition_scoring_and_service_sources(monk
     assert set(response["disease_scores"]) == {"DM", "HTN", "DL", "OBE", "ANEM"}
     assert response["scoring_source"] == "nutrition_rule_table"
     assert response["food_score_details"]
+    assert response["explanation"]["source"] == "rule_based_explanation"
+    assert "진단이 아니" in response["explanation"]["safety_notice"]
+    assert "의료진 상담" in response["explanation"]["safety_notice"]
     assert created_record_payload["nutrition_summary"]["scoring_source"] == "nutrition_rule_table"
     assert set(created_record_payload["nutrition_summary"]["disease_scores"]) == {"DM", "HTN", "DL", "OBE", "ANEM"}
+    assert created_record_payload["nutrition_summary"]["explanation"]["source"] == "rule_based_explanation"
     assert created_photo_payload["is_dummy"] is False
     assert created_photo_payload["confidence_payload"]["method"] == "rule_based_food_detection"
     assert created_photo_payload["raw_output"]["source"] == "rule_based_food_detection"
     assert set(created_photo_payload["raw_output"]["disease_scores"]) == {"DM", "HTN", "DL", "OBE", "ANEM"}
     assert created_photo_payload["raw_output"]["food_score_details"]
     assert created_photo_payload["raw_output"]["scoring_source"] == "nutrition_rule_table"
+    assert created_photo_payload["raw_output"]["explanation"]["source"] == "rule_based_explanation"
     assert "rule_stub" not in str(response)
     assert "image_analysis_stub" not in str(response)
     assert "rule_stub" not in str(created_photo_payload)

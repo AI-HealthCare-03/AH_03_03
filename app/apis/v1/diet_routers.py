@@ -58,6 +58,7 @@ async def run_diet_analysis(
     response_model=DietAnalyzeResponse,
     status_code=status.HTTP_201_CREATED,
     deprecated=True,
+    include_in_schema=False,
 )
 async def run_legacy_diet_analysis(
     request: DietAnalyzeRequest,

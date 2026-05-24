@@ -12,6 +12,25 @@ export type DietNutritionSummary = {
   protein_g?: number | null;
   fat_g?: number | null;
   sodium_mg?: number | null;
+  disease_scores?: Record<string, number | null>;
+  scoring_source?: string | null;
+  explanation?: Record<string, ApiValue> | null;
+};
+
+export type DietAnalyzeResponse = {
+  message: string;
+  diet_record: Record<string, ApiValue>;
+  photo_result: Record<string, ApiValue>;
+  detected_foods: Array<Record<string, ApiValue>>;
+  nutrition_summary: DietNutritionSummary;
+  diet_score: number;
+  diet_feedback: string;
+  disease_scores?: Record<string, number | null> | null;
+  food_score_details?: Array<Record<string, ApiValue>>;
+  scoring_source?: string | null;
+  explanation?: Record<string, ApiValue> | null;
+  warnings?: string[];
+  recommended_actions?: string[];
 };
 
 export type DietRecordPayload = {
