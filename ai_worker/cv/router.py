@@ -15,7 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from ai_worker.llm.providers.gpt_vision import AnalysisType, VisionClient
+from ai_worker.cv.providers.gpt_vision import AnalysisType, VisionClient
 
 from .schemas import (
     ERROR_MAP,
