@@ -14,13 +14,15 @@
 - 관리자 콘솔/FAQ/문의
 - Docker compose 기반 FastAPI 구동
 
+현재 FastAPI 라우터와 Tortoise/asyncpg 기반 DB I/O는 `async`로 동작한다. 다만 OCR/CV/ML/LLM workflow 자체는 요청 안에서 동기적으로 처리한다. Redis는 현재 health check와 인프라 준비 용도이며, Redis Stream 기반 작업 큐로는 사용하지 않는다.
+
 운영 진입 단계에서는 아래 P1/P2 항목을 순차적으로 구현한다.
 
 ## 1. 전체 항목 요약
 
 | 번호 | 항목 | 우선순위 | 현재 상태 | 시연 전 P0 제외 사유 | 운영 진입 전 필요한 이유 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Redis Stream / async_jobs / AI Worker consumer | P2 | 구조 후보만 존재 | 시연은 동기 API로 충분하며 queue 도입 시 장애 지점이 늘어남 | OCR/CV/LLM 장시간 작업의 retry, status tracking, DLQ 필요 |
+| 1 | Redis Stream / async_jobs / AI Worker consumer | P2 | DEMO_ECHO skeleton만 존재 | 시연 핵심 흐름은 동기 API로 충분하며 실제 OCR/CV/ML/LLM queue 전환은 장애 지점이 늘어남 | OCR/CV/LLM 장시간 작업의 retry, status tracking, DLQ 필요 |
 | 2 | vector RAG / pgvector embedding search | P2 | RAG-ready interface 수준 | 신뢰 문서 수집/임베딩/검증 없이 붙이면 의료 답변 위험 증가 | 근거 기반 건강정보 답변, 출처 추적, 검색 품질 개선 필요 |
 | 3 | wearable 연동 | P2 | 요구사항 보류 | 외부 계정/OAuth/device API 범위가 크고 시연 핵심 흐름이 아님 | 연속 건강 데이터 기반 추세 분석과 리마인더 자동화에 필요 |
 | 4 | 외부 알림 worker | P2 | reminder/log UI와 스키마 중심 | SMS/Push/Kakao/Email 발송은 비용/인증/실패처리 이슈가 큼 | 실제 리마인더 발송, 재시도, 발송 이력 관리 필요 |
@@ -41,20 +43,26 @@
   - Redis 컨테이너와 compose healthcheck는 존재한다.
   - FastAPI는 `REDIS_HOST`, `REDIS_PORT` 설정으로 compose 내부 Redis에 연결할 수 있다.
   - `/api/v1/system/health`는 Redis 연결 상태를 확인한다.
-  - 현재 Redis는 health check와 향후 인프라 준비 용도이며, 작업 큐로 사용하지 않는다.
-  - `ai_worker/jobs/`, `ai_worker/pipelines/`는 향후 구조 후보로 존재한다.
-  - 실제 Redis Stream `XADD`/`XREADGROUP`, producer/consumer, `async_jobs` 테이블, worker orchestration은 구현하지 않는다.
+  - `async_jobs` 모델과 `/api/v1/jobs/demo`, `/api/v1/jobs/{job_id}` 상태 조회 API가 추가되어 있다.
+  - `ai_worker/main.py`는 Redis Stream consumer로 실행되며 현재 `DEMO_ECHO` job만 처리한다.
+  - 현재 Redis Stream 사용 범위는 demo skeleton 검증용이다.
+  - FastAPI 라우터와 DB I/O는 async 기반이지만, OCR/CV/ML/LLM workflow는 현재 동기 API 요청 안에서 처리한다.
+  - `/analysis/run`, `/diets/analyze`, 건강검진 OCR confirm은 아직 Redis Stream으로 넘기지 않는다.
+  - `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs`를 연결하기 위한 reserved nullable field다. 현재 공식 분석 결과와는 연결하지 않는다.
+  - retry, dead-letter queue, worker heartbeat, idempotency key는 아직 구현하지 않는다.
 - 왜 시연 전 P0가 아닌지:
   - 현재 핵심 시연 흐름은 FastAPI 동기 API로 검증 가능하다.
+  - `/analysis/run`, `/diets/analyze`, 건강검진 OCR confirm 흐름은 시연 전까지 동기 처리로 유지하는 것이 안전하다.
   - queue/worker를 넣으면 상태 전이, retry, timeout, idempotency까지 함께 설계해야 해 시연 리스크가 커진다.
-  - MVP 시연 설명은 "현재는 동기 처리, 운영 확장 시 Redis Stream 기반 비동기 worker로 전환"으로 통일한다.
+  - MVP 시연 설명은 "현재는 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 존재한다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환한다"로 통일한다.
 - 운영 진입 전 필요한 이유:
   - OCR, CV, GPT Vision, LLM, 대용량 ML 추론은 요청 시간이 길어질 수 있다.
   - 작업 상태 조회, 실패 재시도, dead-letter queue, worker heartbeat가 필요하다.
+  - 운영 전에는 `async_jobs` DB 모델, Redis Stream producer/consumer, consumer group, retry/DLQ, heartbeat, idempotency key를 한 묶음으로 설계해야 한다.
 - 예상 변경 파일/모듈:
-  - `app/models/async_jobs.py`
-  - `app/apis/v1/job_routers.py`
-  - `ai_worker/jobs/`
+  - `app/models/async_jobs.py` 고도화
+  - `app/apis/v1/job_routers.py` 실제 job type 확장
+  - `ai_worker/jobs/` retry/DLQ/heartbeat 확장
   - `ai_worker/pipelines/`
   - Redis Stream producer/consumer 모듈
   - retry/dead-letter queue 모듈
