@@ -90,6 +90,23 @@ Dashboard는 별도 저장 테이블을 만들지 않고 다음 테이블을 실
 - 추천 챌린지: `challenge_recommendations`
 - 읽지 않은 알림 수: `notifications`
 
+## Nutrition Scoring 데이터 기준
+
+식단 이미지 분석 이후 영양 DB와 매칭할 수 있도록 식품별 질병군 점수 테이블을 별도 모듈로 분리한다.
+
+- 원본 엑셀 위치: `etc/ai_worker/cv/food/nutrition/raw/food_nutrition_db.xlsx`
+- 런타임 점수 CSV: `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`
+- 점수 규칙: `ai_worker/cv/food/nutrition/rules/disease_score_rules.json`
+- 스코어러: `ai_worker/cv/food/nutrition/scoring/disease_food_scorer.py`
+
+원본 엑셀은 서비스 런타임에서 직접 읽지 않는다. 원본 엑셀을 수정하거나 교체한 경우 아래 명령으로 런타임 CSV를 재생성한다.
+
+```bash
+uv run python -m ai_worker.cv.food.nutrition.scoring.disease_food_scorer
+```
+
+생성되는 CSV는 `DM`, `HTN`, `DL`, `OBE`, `ANEM` 5개 질병군에 대해 0~100점 범위의 참고용 식품 적합도 점수를 포함한다. 높은 점수는 해당 질병군 관리 맥락에서 상대적으로 활용하기 쉬운 식품이라는 의미이며, 의료 진단이나 영양 처방이 아니다.
+
 ## MVP 범위 기준
 
 이번 프로젝트의 MVP는 풀서비스 1차 범위를 기준으로 하며, 소셜 로그인과 웨어러블 연동만 제외한다.

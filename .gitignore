@@ -76,6 +76,7 @@ ai_worker/ml/LGB18~24/outputs/
 !docs/data/challenges/*.csv
 !ML/models/report/*.csv
 !etc/ml/ML/models/report/*.csv
+!ai_worker/cv/food/nutrition/data/food_disease_scores.csv
 *.parquet
 *.pkl
 *.joblib
