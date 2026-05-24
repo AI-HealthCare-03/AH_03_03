@@ -9,6 +9,13 @@ export type AnalysisRunResponse = {
   risk_score: string | number;
   risk_level: string;
   guide_message: string;
+  explanation?: {
+    summary?: string;
+    caution?: string;
+    recommended_action?: string;
+    safety_notice?: string;
+    source?: string;
+  } | null;
   challenge_recommendation_ids: number[];
   factor_count: number;
 };

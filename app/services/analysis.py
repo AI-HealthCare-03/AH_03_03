@@ -4,6 +4,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from ai_worker.llm.explanation_service import generate_analysis_explanation
+from ai_worker.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
 from app.core import config
 from app.dtos.analysis import (
     AnalysisResultCreateRequest,
@@ -92,7 +94,12 @@ async def get_analysis_result_detail(result_id: int) -> dict[str, Any] | None:
 
     factors = await list_analysis_factors(result_id)
     snapshot = await get_analysis_snapshot(result_id)
-    return {"result": result, "factors": factors, "snapshot": snapshot}
+    return {
+        "result": result,
+        "factors": factors,
+        "snapshot": snapshot,
+        "explanation": _analysis_explanation(result, factors),
+    }
 
 
 async def get_missing_fields_for_mode(user: User, health_record: HealthRecord, mode: AnalysisMode) -> list[str]:
@@ -164,6 +171,7 @@ async def run_analysis(
                 "risk_score": result.risk_score,
                 "risk_level": result.risk_level,
                 "guide_message": request.summary,
+                "explanation": _analysis_explanation(result, factors),
                 "challenge_recommendation_ids": recommendation_ids,
                 "factor_count": len(factors),
             }
@@ -359,6 +367,29 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
     if risk_level == RiskLevel.MEDIUM:
         return f"{disease_label} 관련 관리가 필요한 구간입니다. 식단과 활동량을 꾸준히 기록해 보세요.{notice}"
     return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
+
+
+def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
+    explanation = generate_analysis_explanation(
+        AnalysisExplanationInput(
+            disease_type=result.analysis_type.value,
+            risk_score=str(result.risk_score),
+            risk_level=result.risk_level.value,
+            model_name=result.model_name,
+            model_version=result.model_version,
+            factors=[
+                HealthRiskFactor(
+                    name=factor.factor_name,
+                    value=factor.factor_value,
+                    reason=factor.direction.value
+                    if isinstance(factor.direction, FactorDirection)
+                    else str(factor.direction),
+                )
+                for factor in factors
+            ],
+        )
+    )
+    return explanation.model_dump()
 
 
 def _analysis_factors(

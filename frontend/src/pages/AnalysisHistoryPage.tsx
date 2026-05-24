@@ -29,6 +29,21 @@ const tabToType: Record<string, string | null> = {
   "종합 위험도": "OVERALL",
 };
 
+function modelLabel(result: AnalysisResult | undefined): string | null {
+  const modelName = result?.model_name ? String(result.model_name) : "";
+  const modelVersion = result?.model_version ? String(result.model_version) : "";
+  if (!modelName && !modelVersion) {
+    return null;
+  }
+  if (modelName.toLowerCase() === "catboost") {
+    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
+  }
+  if (modelName) {
+    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
+  }
+  return modelVersion;
+}
+
 export default function AnalysisHistoryPage() {
   const { analysisId } = useParams();
   const [results, setResults] = useState<AnalysisResult[]>([]);
@@ -140,6 +155,8 @@ export default function AnalysisHistoryPage() {
             <span>{labels[String(result?.analysis_type)] ?? String(result?.analysis_type ?? "분석")}</span>
             <strong>{String(result?.risk_level ?? "-")}</strong>
             <span className="badge badge-reference">{scoreLabel(result?.risk_score)}</span>
+            <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+            {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
             <p>{String(result?.summary ?? "")}</p>
           </div>
         </Card>
@@ -218,6 +235,7 @@ export default function AnalysisHistoryPage() {
             </div>
             <span>{scoreLabel(result.risk_score)}</span>
             <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
+            <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
             <span className="badge badge-reference">{isOverall ? "요약" : "상세보기"}</span>
             </>
           );
