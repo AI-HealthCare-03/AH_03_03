@@ -28,6 +28,14 @@ checkpoints
 *.pth
 *.onnx
 
+# Final CatBoost inference artifacts required by FastAPI ML runtime
+!ai_worker/ml/artifacts/**/*.cbm
+!ai_worker/ml/artifacts/**/feature_columns.json
+!ai_worker/ml/artifacts/**/threshold.json
+!ai_worker/ml/artifacts/**/metrics.json
+!ai_worker/ml/artifacts/**/model_params.json
+!ai_worker/ml/artifacts/**/experiment_config.json
+
 .env
 envs/.local.env
 envs/.prod.env
