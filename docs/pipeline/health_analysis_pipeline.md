@@ -107,6 +107,8 @@ uv run python -m ai_worker.cv.food.nutrition.scoring.disease_food_scorer
 
 생성되는 CSV는 `DM`, `HTN`, `DL`, `OBE`, `ANEM` 5개 질병군에 대해 0~100점 범위의 참고용 식품 적합도 점수를 포함한다. 높은 점수는 해당 질병군 관리 맥락에서 상대적으로 활용하기 쉬운 식품이라는 의미이며, 의료 진단이나 영양 처방이 아니다.
 
+현재 `/api/v1/diets/analyze` 공식 경로는 자체 식단 CV 모델을 아직 호출하지 않는다. 대신 기존 음식명 후보 생성 흐름에서 나온 음식명을 `DiseaseFoodScorer`의 런타임 CSV와 매칭해 `disease_scores`, `food_score_details`, `scoring_source=nutrition_rule_table`을 응답과 `DietPhotoResult.raw_output`에 포함한다. 추후 자체 CV 모델 또는 GPT Vision fallback이 붙으면 해당 provider가 음식명 후보를 공급하고, 동일한 nutrition scorer가 질병군별 점수를 계산하는 구조로 확장한다.
+
 ## MVP 범위 기준
 
 이번 프로젝트의 MVP는 풀서비스 1차 범위를 기준으로 하며, 소셜 로그인과 웨어러블 연동만 제외한다.

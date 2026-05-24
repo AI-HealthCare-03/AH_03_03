@@ -35,7 +35,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 | 1 | AI worker 정리 커밋 완료 확인 | P0 | 구조 정리 작업의 기준점을 확정한다 | 구조는 나뉘어 있으나 git status상 변경사항이 남아 있어 커밋 완료 여부 확인 필요 | AI Worker 구조 정리 커밋 hash 확인, 남은 변경사항 분리 | `ai_worker/`, `docs/design/ai_worker_structure.md` | 미구현 |
 | 2 | dummy/stub 공식 경로 정리 | P0 | 공식 API/서비스 경로에서 개발용 명칭 노출과 호출을 줄인다 | 일부 서비스에 dummy/stub/is_dummy 표현 잔존 | 공식 endpoint는 `run_analysis`, `run_diet_analysis` 등 공식 함수명 호출. 내부 fallback source만 명확히 유지 | `app/services/*`, `app/apis/v1/*`, `ai_worker/llm/*` | 일부 구현 |
 | 3 | 식단 질병군별 점수 엑셀 작성 | P0 | 음식별 질병군 점수 기준표를 팀 공통 rule source로 만든다 | 질병군별 식단 점수 기준표 필요 | `docs/rules/diet_score_matrix.xlsx` 작성 및 리뷰 완료 | `docs/rules/` | 미구현 |
-| 4 | 식단 점수 계산 모듈 구현 | P0 | CV/GPT Vision 음식 결과를 질병군별 점수로 변환한다 | 후보 구조만 논의됨. 런타임 모듈 연결 필요 | 음식명 입력 -> DM/HTN/DL/OBE/ANEM 점수, 사유, 추천 메시지 반환 | `ai_worker/cv/food/` | 미구현 |
+| 4 | 식단 점수 계산 모듈 구현 | P0 | CV/GPT Vision 음식 결과를 질병군별 점수로 변환한다 | 공식 `/diets/analyze`에 음식명 후보 기반 nutrition scorer 연결. 자체 CV/GPT Vision 공급자는 미연결 | 음식명 입력 -> DM/HTN/DL/OBE/ANEM 점수, 상세 매칭 결과, `nutrition_rule_table` source 반환 | `ai_worker/cv/food/nutrition/`, `app/services/diets.py` | 일부 구현 |
 | 5 | 건강검진 OCR -> 정밀검사 연결 확인/보강 | P0 | OCR 결과가 PRECISION 분석 입력으로 실제 반영되게 한다 | OCR 결과와 `HealthRecord` X2 필드 연결 검증 필요 | OCR/검진값 confirm 후 precision readiness true 가능, PRECISION 분석 실행 가능 | `app/services/exams.py`, `app/services/analysis.py`, `ai_worker/ocr/`, `ai_worker/ml/` | 일부 구현 |
 | 6 | CV 모델 fallback 정책 정의 | P0 | 자체 식단 CV와 GPT Vision fallback 경계를 정한다 | 자체 CV 모델 미완성, fallback 정책 미정 | confidence threshold, timeout, retry, provider log 정책 문서화 | `ai_worker/cv/`, `ai_worker/cv/providers/gpt_vision.py` | 미구현 |
 | 7 | GPT Vision fallback 연결 | P0 | 자체 CV 실패/저신뢰 시 GPT Vision 보조 분석을 연결한다 | GPT Vision provider는 있으나 식단 API 흐름 연결 검증 필요 | CV 결과 schema와 GPT Vision 결과 schema 통일, provider/source 기록 | `ai_worker/cv/providers/gpt_vision.py`, `app/services/diets.py` | 미구현 |
@@ -230,25 +230,23 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 
 - 목적: CV 또는 GPT Vision 결과로 나온 음식명을 질병군별 식단 점수로 변환한다.
 - 왜 필요한가: 음식 이미지 분석 결과만으로는 사용자가 이해할 수 있는 만성질환 관리 점수가 나오지 않는다.
-- 현재 문제: 식단 점수 계산 모듈은 아직 공식 경로로 연결되어 있지 않다.
+- 현재 문제: 식단 점수 계산 모듈은 공식 `/diets/analyze` 경로에 연결되었지만, 음식명 후보는 아직 자체 CV 모델이 아니라 rule-based 후보 생성 흐름에서 나온다.
 - 해야 할 일:
-  - 구현 후보 경로를 아래처럼 정리한다.
-    - `ai_worker/cv/food/`
-    - `ai_worker/cv/food/diet_score_calculator.py`
-    - `ai_worker/cv/food/diet_score_schemas.py`
-    - `ai_worker/cv/food/diet_score_loader.py`
-  - CV 또는 GPT Vision 결과로 나온 음식명을 입력받는다.
-  - `diet_score_matrix.xlsx` 또는 변환된 JSON/CSV rule table을 읽는다.
+  - 현재는 `app/services/diets.py`의 음식명 후보를 입력받는다.
+  - `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`와 `disease_score_rules.json`을 읽는다.
   - 사용자 질병군별 점수를 계산한다.
-  - 총점, 질병별 점수, 감점 사유, 추천 메시지를 반환한다.
+  - `disease_scores`, `food_score_details`, `scoring_source`를 응답과 `DietPhotoResult.raw_output`에 포함한다.
+  - 추후 CV 또는 GPT Vision 결과로 나온 음식명을 같은 scorer 입력으로 연결한다.
 - 건드릴 파일 후보:
-  - `ai_worker/cv/food/diet_score_calculator.py`
-  - `ai_worker/cv/food/diet_score_schemas.py`
-  - `ai_worker/cv/food/diet_score_loader.py`
+  - `ai_worker/cv/food/nutrition/scoring/disease_food_scorer.py`
+  - `ai_worker/cv/food/nutrition/scoring/schemas.py`
+  - `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`
+  - `ai_worker/cv/food/nutrition/rules/disease_score_rules.json`
   - `app/services/diets.py`
 - 완료 기준:
-  - 음식명 배열 입력 시 질병군별 score와 reason을 반환한다.
+  - 음식명 배열 입력 시 DM/HTN/DL/OBE/ANEM 점수와 음식별 매칭 상세를 반환한다.
   - 런타임에서는 엑셀 원본이 아니라 변환된 CSV/JSON rule table을 읽는다.
+  - 자체 CV 모델과 GPT Vision fallback은 아직 미연결임을 사용자/문서에서 혼동하지 않게 유지한다.
 - 검증 명령:
   ```bash
   uv run pytest tests
