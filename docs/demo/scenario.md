@@ -8,6 +8,7 @@
 - 필요 시 로컬/시연 seed를 실행한다.
 - 민감키가 보이는 `.env` 또는 `docker compose config` 전체 출력 화면은 공유하지 않는다.
 - 발표 설명 기준: 현재 `ai_worker`의 로컬 모델 artifact는 DM/HTN/DL CatBoost 3종이다. OBESITY는 rule-based, ANEM은 공식 분석 결과가 아닌 X2/식단 참고 분류이며, 식단 CV/GPT Vision/OCR/LLM은 provider 또는 skeleton 구조를 갖춘 상태에서 기본 시연 경로는 비용 없는 rule/fallback 중심으로 동작한다.
+- 건강검진 OCR 공식 시연 경로에서는 Clova OCR을 호출하지 않는다. 현재 설명 기준은 PaddleOCR/local OCR 1차 + GPT Vision fallback 후보이며, GPT Vision fallback은 기본 off 상태에서 정책/env가 켜진 경우에만 후보가 된다.
 
 안전한 확인 명령:
 
@@ -42,6 +43,7 @@ curl http://localhost:8000/api/v1/system/health
 - 기대 결과:
   - OCR 측정값이 `ExamMeasurement`에 저장된다.
   - confirm 후 `HealthRecord` X2 필드에 혈압, 혈당, 지질 수치 등이 반영된다.
+  - Clova OCR provider는 PoC/deferred 상태이므로 이 경로에서 호출되지 않는다.
 
 ## 4. 정밀분석 실행
 

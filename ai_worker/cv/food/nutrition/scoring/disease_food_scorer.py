@@ -12,9 +12,7 @@ from ai_worker.cv.food.nutrition.scoring.schemas import DiseaseFoodScoreRecord, 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 NUTRITION_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_RAW_EXCEL_PATH = (
-    REPO_ROOT / "etc" / "ai" / "cv" / "food" / "nutrition" / "raw" / "food_nutrition_db.xlsx"
-)
+DEFAULT_RAW_EXCEL_PATH = REPO_ROOT / "etc" / "ai" / "cv" / "food" / "nutrition" / "raw" / "food_nutrition_db.xlsx"
 DEFAULT_RULE_PATH = NUTRITION_DIR / "rules" / "disease_score_rules.json"
 DEFAULT_SCORE_CSV_PATH = NUTRITION_DIR / "data" / "food_disease_scores.csv"
 

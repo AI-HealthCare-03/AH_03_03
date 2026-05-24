@@ -41,8 +41,6 @@ REQUIRED_ENV_KEYS = (
 
 OPTIONAL_PROVIDER_ENV_KEYS = (
     "OPENAI_API_KEY",
-    "CLOVA_OCR_API_URL",
-    "CLOVA_OCR_SECRET_KEY",
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
     "TWILIO_VERIFY_SERVICE_SID",
@@ -68,6 +66,7 @@ def main() -> int:
         _check_disease_score_load(),
         _check_environment_keys(),
         _check_optional_provider_keys(),
+        _check_deferred_provider_policy(),
         _check_system_health_if_running(),
     ]
 
@@ -192,6 +191,14 @@ def _check_optional_provider_keys() -> CheckResult:
             "not configured: " + ", ".join(missing) + " (no external API call is made)",
         )
     return CheckResult("External provider environment", "OK", "optional provider keys are configured")
+
+
+def _check_deferred_provider_policy() -> CheckResult:
+    return CheckResult(
+        "Deferred provider policy",
+        "OK",
+        "Clova OCR is excluded from official demo readiness; GPT Vision fallback remains off unless explicitly enabled",
+    )
 
 
 def _check_system_health_if_running() -> CheckResult:
