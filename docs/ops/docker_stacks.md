@@ -42,6 +42,9 @@
 
 ```bash
 ./scripts/docker_stack.sh app up
+./scripts/docker_stack.sh app build
+./scripts/docker_stack.sh app rebuild
+./scripts/docker_stack.sh app clean-image
 ./scripts/docker_stack.sh app ps
 ./scripts/docker_stack.sh app logs
 ./scripts/docker_stack.sh app down
@@ -51,6 +54,9 @@ Makefile:
 
 ```bash
 make app-up
+make app-build
+make app-rebuild
+make app-clean-image
 make app-ps
 make app-logs
 make app-down
@@ -61,6 +67,21 @@ make app-down
 ```bash
 docker compose -f docker-compose.yml up -d postgres redis fastapi
 ```
+
+`app up`은 구버전 FastAPI 이미지가 남아 최신 `ai_worker` 파일이 반영되지 않는 상황을 피하기 위해 `--build`를 함께 실행한다. `ai_worker` 코드, CatBoost artifact, FastAPI Dockerfile, `pyproject.toml`, `uv.lock`이 바뀐 뒤에는 아래 명령 중 하나를 실행한다.
+
+```bash
+make app-build       # fastapi 이미지만 일반 재빌드
+make app-rebuild     # fastapi 이미지를 no-cache로 재빌드
+make app-clean-image # 알려진 로컬 app/test 이미지를 삭제
+```
+
+`make app-clean-image`는 아래 이미지를 대상으로 한다.
+
+- `ozcodingschool/ai-health:app-v1.0.0`
+- `test-ai-health:latest`
+
+이미지가 없으면 건너뛴다. 실행 중인 컨테이너가 이미지를 사용 중이면 Docker가 삭제를 거부할 수 있으므로 먼저 `make app-down`으로 컨테이너를 내린 뒤 다시 실행한다.
 
 ### dev 스택
 
