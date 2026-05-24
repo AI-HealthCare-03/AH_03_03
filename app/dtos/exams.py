@@ -74,8 +74,18 @@ class ExamReportDetailResponse(ExamReportResponse):
     measurements: list[ExamMeasurementResponse]
 
 
+class ExamConfirmMeasurementRequest(BaseModel):
+    key: str | None = None
+    measurement_key: str | None = None
+    measurement_name: str | None = None
+    value: str | int | float | Decimal | None = None
+    unit: str | None = None
+    ocr_confidence: Decimal | None = None
+    is_user_confirmed: bool | None = True
+
+
 class ExamConfirmRequest(BaseModel):
-    measurements: list[ExamMeasurementUpdateRequest] | None = None
+    measurements: list[ExamConfirmMeasurementRequest] | None = None
 
 
 class ExamDummyOCRResponse(BaseModel):
