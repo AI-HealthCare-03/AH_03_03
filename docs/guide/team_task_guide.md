@@ -159,10 +159,37 @@ PR 규칙:
 uv sync --group app --group dev
 ```
 
-Docker Compose로 기존 루트 스택 실행:
+### 로컬 Docker 실행
 
 ```bash
-docker compose up -d --build
+docker compose up -d postgres redis fastapi
+docker compose ps
+```
+
+확인 주소:
+
+- Swagger: `http://localhost:8000/docs`
+- System health: `http://localhost:8000/api/v1/system/health`
+
+DB migration을 직접 적용해야 하는 환경에서는 아래 명령을 사용한다.
+
+```bash
+DB_HOST=localhost uv run --group app aerich upgrade
+```
+
+로컬 시연 DB는 통합 스크립트를 기본으로 준비한다. DB volume을 지우는 `docker compose down -v`는 공유 DB나 시연 DB에서는 사용하지 않는다.
+
+```bash
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+```
+
+통합 스크립트가 실패하거나 일부 seed만 재실행해야 할 때는 아래 순서로 확인한다.
+
+```bash
+DB_HOST=localhost uv run python scripts/seed_mvp_challenges.py
+DB_HOST=localhost uv run python scripts/seed_mvp_faqs.py
+DB_HOST=localhost uv run python scripts/seed_demo_users.py
+DB_HOST=localhost uv run python scripts/seed_current_user_dashboard_demo.py --email demo@example.com
 ```
 
 개발 서버용 Docker 전체 스택 실행:
@@ -198,18 +225,24 @@ FastAPI 로컬 직접 실행:
 uv run uvicorn app.main:app --reload
 ```
 
-테스트:
+시연 전 체크 명령:
 
 ```bash
-uv run pytest app
+docker compose ps
+curl http://localhost:8000/api/v1/system/health
+uv run ruff check app scripts ai_worker tests
+uv run ruff format app scripts ai_worker tests --check
+uv run pytest tests
+uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 ```
 
-Lint:
+GitHub Actions CI도 같은 Python 3.13 / uv lock 기준으로 위 ruff, format, `pytest tests`, OpenAPI import 확인을 실행한다. 현재 단위 테스트는 DB 없이 통과하는 범위이므로 CI에는 PostgreSQL service를 기본으로 붙이지 않는다. DB 연동 검증은 Docker Compose 시연 체크 또는 별도 스모크 검증에서 수행한다.
 
-```bash
-uv run ruff check .
-uv run ruff format . --check
-```
+민감정보 주의:
+
+- 실제 `.env`, API key, access token, refresh token을 캡처하거나 공유하지 않는다.
+- `docker compose config` 전체 출력에는 환경변수가 펼쳐질 수 있으므로 화면공유/보고용으로 사용하지 않는다.
+- 설정 확인은 `docker compose config --services`, `docker compose ps`, `docker compose logs --tail=100 fastapi`를 우선 사용한다.
 
 ## 웹 MVP 로컬 시연 흐름
 
@@ -244,6 +277,7 @@ npm run dev
 2. 관리자 계정으로 로그인한다.
 3. 좌측 사이드바의 “관리자 콘솔”을 클릭하거나 `/admin`에 직접 접속한다.
 4. `MONITOR` 계정은 시스템 상태와 오류 로그 조회 중심이며, 민감정보 접근 로그는 `ADMIN` 이상 정책에 따라 제한될 수 있다.
+5. `SUPER_ADMIN` 계정은 FAQ/문의/로그/모니터링 등 전체 관리자 시연 흐름 확인에 사용한다.
 
 Seed 실행 내용:
 
@@ -251,6 +285,7 @@ Seed 실행 내용:
 - `scripts/seed_mvp_challenges.py`: 챌린지 마스터 생성
 - `scripts/seed_mvp_faqs.py`: FAQ 생성
 - `scripts/seed_demo_users.py`: 데모 사용자와 건강정보/분석/챌린지/식단/복약/알림 데이터, 로컬 관리자 콘솔 계정 생성
+- `scripts/seed_current_user_dashboard_demo.py --email <사용자 이메일>`: 특정 기존 사용자에게 대시보드용 상세 시연 데이터 보강
 - `scripts/setup_local_mvp_db.py`: 위 흐름 통합 실행
 
 주의:

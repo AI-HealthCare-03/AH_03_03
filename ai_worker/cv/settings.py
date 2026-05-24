@@ -3,7 +3,7 @@ ai_worker/cv/settings.py
 환경변수 기반 설정.
 envs/.local.env 에 아래 항목을 추가하세요:
 
-    OPENAI_API_KEY=sk-...
+    OPENAI_API_KEY=<your-openai-api-key>
     OPENAI_MODEL=gpt-4o-mini
 """
 

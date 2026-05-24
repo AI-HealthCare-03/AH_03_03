@@ -76,6 +76,38 @@ docker compose config --services
 git grep -n "sk-proj\|OPENAI_API_KEY=.*sk-\|LANGFUSE_SECRET_KEY=.*sk-\|CLOVA_OCR_SECRET_KEY=.*" -- . ':!uv.lock' || true
 ```
 
+더 안전하게는 값 자체를 출력하지 않는 스캐너를 사용한다.
+
+```bash
+uv run python - <<'PY'
+from pathlib import Path
+import re
+import subprocess
+
+patterns = {
+    "OPENAI_API_KEY": re.compile(r"OPENAI_API_KEY\s*=\s*(.+)"),
+    "LANGFUSE_SECRET_KEY": re.compile(r"LANGFUSE_SECRET_KEY\s*=\s*(.+)"),
+    "CLOVA_OCR_SECRET_KEY": re.compile(r"CLOVA_OCR_SECRET_KEY\s*=\s*(.+)"),
+    "sk-": re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
+    "pk-lf-": re.compile(r"pk-lf-[A-Za-z0-9_\-]{8,}"),
+    "sk-lf-": re.compile(r"sk-lf-[A-Za-z0-9_\-]{8,}"),
+}
+
+for file_name in subprocess.check_output(["git", "ls-files"], text=True).splitlines():
+    path = Path(file_name)
+    if path.name == "uv.lock":
+        continue
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        for label, pattern in patterns.items():
+            if pattern.search(line):
+                print(f"{file_name}:{line_no}: {label}: <masked>")
+PY
+```
+
 Git이 `.env` 계열 파일을 추적 중인지 확인한다.
 
 ```bash
@@ -104,6 +136,9 @@ git log -S "sk-proj" --oneline -- . ':!uv.lock'
 - 따라서 compose 파일에 직접 운영키를 쓰지 말고 `.env` 또는 secret manager를 사용한다.
 - `.env`는 Git에 올리지 않는다.
 - `envs/example.*.env`에는 더미값, 빈 값, 문서용 placeholder만 둔다.
+- GitHub Actions에서는 실제 키를 workflow YAML에 직접 쓰지 않고 GitHub Actions Secrets 또는 배포 환경 secret store를 사용한다.
+- 외부에 공유된 키는 노출 여부가 애매해도 revoke/rotate를 우선한다.
+- 발표 전에는 로컬 데모용 키와 운영키를 분리하고, 운영키는 재발급한 뒤 배포 환경에만 주입하는 것을 권장한다.
 
 ## 5. 발표/화면공유 전 체크리스트
 
