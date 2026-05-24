@@ -72,3 +72,34 @@ ANEM을 공식 분석 결과에 포함하려면 `AnalysisType` enum, DB schema, 
 ## 7. 발표용 한 줄 정리
 
 현재 `ai_worker`에서 로컬 모델 artifact로 직접 추론하는 것은 DM/HTN/DL CatBoost 3종이다. OBESITY와 ANEM 관련 흐름은 rule-based 또는 참고 분류이며, 식단 CV/GPT Vision/OCR/LLM은 provider 코드와 skeleton을 갖춘 상태에서 시연 기본 경로는 비용 없는 rule-based/fallback 중심으로 동작한다.
+
+## 8. AI Worker 기능 감사 스크립트
+
+현재 로컬 환경에서 AI Worker 기능 연결 상태를 확인하려면 아래 스크립트를 실행한다.
+
+```bash
+uv run python scripts/audit_ai_worker_capabilities.py
+```
+
+이 스크립트는 다음 항목을 점검한다.
+
+- DM/HTN/DL CatBoost artifact 경로와 `.cbm` fold 파일 개수
+- CatBoost predictor warmup 가능 여부
+- X2 health stage classifier import 가능 여부
+- 식단 nutrition scorer import 가능 여부와 runtime CSV record 개수
+- GPT Vision, Clova OCR, OpenAI LLM provider 코드 import 가능 여부
+- `OPENAI_API_KEY`, `CLOVA_OCR_SECRET_KEY`, `CLOVA_OCR_API_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` 설정 여부
+- LLM prompt 관련 코드 위치와 line number
+- 약봉투 OCR parser sample parse 가능 여부
+- 건강검진 OCR checkup extractor import 가능 여부
+
+주의사항:
+
+- 외부 API를 실제 호출하지 않는다.
+- 환경변수 값과 API key 원문은 출력하지 않는다.
+- LLM prompt 원문 전문은 출력하지 않고 파일 경로와 line number만 출력한다.
+- CatBoost 모델 로드 시간이 부담되면 아래처럼 warmup을 생략할 수 있다.
+
+```bash
+uv run python scripts/audit_ai_worker_capabilities.py --skip-warmup
+```
