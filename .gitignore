@@ -14,6 +14,11 @@ wheels/
 .venv
 .*.env
 .env
+.env.local
+*.env.local
+envs/*.env
+!envs/example.local.env
+!envs/example.prod.env
 infra/langfuse/.env
 firebase-service-account*.json
 *firebase-adminsdk*.json

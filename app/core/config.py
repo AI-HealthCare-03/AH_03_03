@@ -48,6 +48,8 @@ class Config(BaseSettings):
     SMTP_FROM_NAME: str = "AI HealthCare"
     SMTP_USE_TLS: bool = True
     FRONTEND_BASE_URL: str = "http://localhost:5173"
+    GPT_VISION_FALLBACK_ENABLED: bool = False
+    FOOD_CV_CONFIDENCE_THRESHOLD: float = 0.75
 
     COOKIE_DOMAIN: str = "localhost"
     REFRESH_TOKEN_COOKIE_NAME: str = "refresh_token"
