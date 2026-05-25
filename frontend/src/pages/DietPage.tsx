@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -98,6 +98,8 @@ export default function DietPage() {
   const [manualNutrition, setManualNutrition] = useState<NutritionDraft>({ ...emptyNutritionDraft });
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -112,6 +114,36 @@ export default function DietPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (selectedImagePreviewUrl) {
+        URL.revokeObjectURL(selectedImagePreviewUrl);
+      }
+    };
+  }, [selectedImagePreviewUrl]);
+
+  const handleDietImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (selectedImagePreviewUrl) {
+      URL.revokeObjectURL(selectedImagePreviewUrl);
+    }
+    if (!file) {
+      setSelectedImageFile(null);
+      setSelectedImagePreviewUrl("");
+      return;
+    }
+    setSelectedImageFile(file);
+    setSelectedImagePreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearSelectedImage = () => {
+    if (selectedImagePreviewUrl) {
+      URL.revokeObjectURL(selectedImagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setSelectedImagePreviewUrl("");
+  };
 
   const submitManualDiet = async (event: FormEvent) => {
     event.preventDefault();
@@ -158,8 +190,9 @@ export default function DietPage() {
     setError("");
     try {
       const result = await analyzeDiet<Record<string, unknown>>({
-        description: analysisDescription || "기록된 식단",
+        description: analysisDescription || (selectedImageFile ? "사진으로 선택한 식단" : "기록된 식단"),
         meal_time: new Date().toISOString(),
+        image_path: selectedImageFile?.name || null,
       });
       setAnalysisResult(result);
       await load();
@@ -201,8 +234,36 @@ export default function DietPage() {
             <textarea value={analysisDescription} onChange={(event) => setAnalysisDescription(event.target.value)} />
           </label>
           <div className="upload-box">
-            <strong>이미지 업로드 영역</strong>
-            <span>사진을 선택하거나 식단 메모를 남기면 간편 분석 결과를 확인할 수 있습니다.</span>
+            <strong>음식 사진 선택</strong>
+            <span>이미지 파일을 선택하거나, 지원되는 모바일 브라우저에서는 후면 카메라로 바로 촬영할 수 있습니다.</span>
+            <div className="button-row">
+              <label className="button secondary" htmlFor="diet-file-input">
+                이미지 파일 선택
+              </label>
+              <label className="button secondary" htmlFor="diet-camera-input">
+                카메라로 촬영
+              </label>
+            </div>
+            <input accept="image/*" id="diet-file-input" onChange={handleDietImageChange} type="file" />
+            <input
+              accept="image/*"
+              capture="environment"
+              id="diet-camera-input"
+              onChange={handleDietImageChange}
+              type="file"
+            />
+            {selectedImageFile && (
+              <div className="state-box">
+                <strong>선택한 이미지</strong>
+                <span>{selectedImageFile.name}</span>
+                <span className="muted">이미지를 다시 선택하려면 파일 선택 또는 카메라 촬영을 눌러주세요.</span>
+                <span className="muted">현재 분석은 음식명 후보 기반 점수화로 처리되며, 실제 CV 모델 연결은 후속 단계입니다.</span>
+                <button className="button secondary" onClick={clearSelectedImage} type="button">
+                  선택 이미지 삭제
+                </button>
+              </div>
+            )}
+            {selectedImagePreviewUrl && <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />}
           </div>
           <div className="button-row">
             <button type="button" onClick={runDietAnalysis}>

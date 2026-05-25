@@ -2695,6 +2695,21 @@ pre {
   text-align: center;
 }
 
+.upload-box input[type="file"] {
+  display: none;
+  justify-self: center;
+  max-width: 100%;
+}
+
+.upload-preview {
+  border-radius: var(--radius-md);
+  justify-self: center;
+  max-height: 220px;
+  max-width: min(100%, 360px);
+  object-fit: cover;
+  width: 100%;
+}
+
 .ocr-card-icon {
   align-items: center;
   background: var(--color-primary-soft);
