@@ -131,6 +131,7 @@ async def run_analysis(
 ) -> list[dict[str, Any]]:
     results = []
     user = await User.get_or_none(id=user_id)
+    # PRECISION에서만 CatBoost를 시도하고, 실패하면 아래 룰 기반 점수로 자연스럽게 이어진다.
     ml_predictions = _predict_ml_outputs(user, health_record) if mode == AnalysisMode.PRECISION else {}
     for analysis_type, fallback_score in _calculate_analysis_scores(health_record, mode, user).items():
         prediction = ml_predictions.get(analysis_type)
@@ -218,6 +219,7 @@ def _calculate_analysis_scores(
     record: HealthRecord, mode: AnalysisMode = AnalysisMode.BASIC, user: User | None = None
 ) -> dict[AnalysisType, Decimal]:
     if mode == AnalysisMode.PRECISION:
+        # ML artifact가 없는 OBESITY는 정밀 모드에서도 룰 기반 검진값 보강으로 처리한다.
         return {
             AnalysisType.DIABETES: max(_basic_diabetes_score(record, user), _diabetes_score(record)),
             AnalysisType.OBESITY: max(_basic_obesity_score(record, user), _obesity_score(record)),
@@ -365,6 +367,7 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
         AnalysisType.HYPERTENSION: "고혈압",
     }[analysis_type]
     mode_label = "정밀" if mode == AnalysisMode.PRECISION else "간편"
+    # 결과 문구는 위험도 안내에 머물러야 하며 진단/처방처럼 읽히면 안 된다.
     notice = f" 이 결과는 {mode_label} 분석 참고용 판정이며 의료 진단이 아닙니다."
     if risk_level == RiskLevel.HIGH:
         return f"{disease_label} 관련 위험도가 높게 나타났습니다. 생활습관 기록과 의료기관 상담을 함께 고려해 주세요.{notice}"
@@ -392,6 +395,7 @@ def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFa
         ],
     )
     try:
+        # keyword RAG는 참고 출처를 덧붙이는 PoC이며, 실패해도 분석 결과 저장을 막지 않는다.
         explanation = generate_explanation_with_context(
             input_data,
             contexts=retrieve_health_context(
