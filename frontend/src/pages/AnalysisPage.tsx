@@ -104,31 +104,6 @@ function getRiskScore(result: AnalysisResult): number {
   return riskFallbackScores[getRiskLevel(result)] ?? 0;
 }
 
-function getOverallLevel(results: AnalysisResult[]): string {
-  const levels = results.map(getRiskLevel).filter(Boolean);
-  if (levels.includes("HIGH")) {
-    return "HIGH";
-  }
-  if (levels.includes("MEDIUM")) {
-    return "MEDIUM";
-  }
-  if (levels.length > 0 && levels.every((level) => level === "LOW")) {
-    return "LOW";
-  }
-  return "-";
-}
-
-function getOverallScore(results: AnalysisResult[]): number {
-  if (results.length === 0) {
-    return 0;
-  }
-  const scores = results.map(getRiskScore).filter((score) => score > 0);
-  if (scores.length > 0) {
-    return Math.max(...scores);
-  }
-  return riskFallbackScores[getOverallLevel(results)] ?? 0;
-}
-
 function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId: Record<string, AnalysisExplanation>): string {
   const firstResult = results[0];
   if (!firstResult) {
@@ -237,8 +212,6 @@ export default function AnalysisPage() {
     }
   };
 
-  const overallLevel = getOverallLevel(results);
-  const overallScore = getOverallScore(results);
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
 
   return (
@@ -297,16 +270,6 @@ export default function AnalysisPage() {
         </Card>
       )}
       <div className="page-grid">
-        <Card title="종합 위험도">
-          <div className="score-panel">
-            <span>종합 위험도 게이지</span>
-            <strong>{overallLevel}</strong>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${overallScore}%` }} />
-            </div>
-            <p>이 결과는 저장된 건강정보와 검진값을 바탕으로 계산한 건강관리 참고 신호이며 실제 의료 진단이 아닙니다.</p>
-          </div>
-        </Card>
         <Card title="분석 기반 건강 코멘트">
           <p>{analysisComment}</p>
         </Card>

@@ -7,6 +7,8 @@ export type DashboardAnalysisResult = {
   risk_level: string;
   risk_score: number;
   summary?: string | null;
+  model_name?: string | null;
+  model_version?: string | null;
   analyzed_at: string;
   created_at: string;
 };

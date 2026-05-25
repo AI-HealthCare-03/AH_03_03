@@ -69,6 +69,8 @@ async def get_dashboard_summary(user_id: int) -> dict[str, Any]:
                 "risk_level": result.risk_level,
                 "risk_score": float(result.risk_score),
                 "summary": result.summary,
+                "model_name": result.model_name,
+                "model_version": result.model_version,
                 "analyzed_at": result.analyzed_at.isoformat(),
                 "created_at": result.created_at.isoformat(),
             }
