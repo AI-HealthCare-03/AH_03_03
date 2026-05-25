@@ -41,6 +41,11 @@ REQUIRED_ENV_KEYS = (
 
 OPTIONAL_PROVIDER_ENV_KEYS = (
     "OPENAI_API_KEY",
+    "EMAIL_ENABLED",
+    "EMAIL_VERIFICATION_DEBUG",
+    "PASSWORD_RESET_DEBUG",
+    "PHONE_VERIFICATION_DEBUG",
+    "TWILIO_ENABLED",
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
     "TWILIO_VERIFY_SERVICE_SID",
@@ -66,6 +71,7 @@ def main() -> int:
         _check_disease_score_load(),
         _check_environment_keys(),
         _check_optional_provider_keys(),
+        _check_auth_delivery_policy(),
         _check_deferred_provider_policy(),
         _check_system_health_if_running(),
     ]
@@ -191,6 +197,42 @@ def _check_optional_provider_keys() -> CheckResult:
             "not configured: " + ", ".join(missing) + " (no external API call is made)",
         )
     return CheckResult("External provider environment", "OK", "optional provider keys are configured")
+
+
+def _check_auth_delivery_policy() -> CheckResult:
+    try:
+        from app.core import config
+        from app.services.email_service import EmailService
+    except Exception as exc:  # noqa: BLE001 - readiness check should report import/config errors clearly.
+        return CheckResult("Auth delivery policy", "WARN", f"{type(exc).__name__}: {exc}")
+
+    debug_flags = {
+        "EMAIL_VERIFICATION_DEBUG": config.EMAIL_VERIFICATION_DEBUG,
+        "PASSWORD_RESET_DEBUG": config.PASSWORD_RESET_DEBUG,
+        "PHONE_VERIFICATION_DEBUG": config.PHONE_VERIFICATION_DEBUG,
+    }
+    enabled_debug_flags = [key for key, enabled in debug_flags.items() if enabled]
+    if config.is_production and enabled_debug_flags:
+        return CheckResult(
+            "Auth delivery policy",
+            "FAIL",
+            "production must not enable debug auth responses: " + ", ".join(enabled_debug_flags),
+        )
+
+    email_status = EmailService().status()
+    email_detail = (
+        "Brevo/SMTP live email configured" if email_status == "configured" else f"SMTP live email status={email_status}"
+    )
+    if config.TWILIO_ENABLED and config.twilio_verify_status == "configured":
+        phone_detail = "Twilio Verify configured; Trial Korean SMS may require verified recipient or paid account"
+    elif config.PHONE_VERIFICATION_DEBUG and not config.is_production:
+        phone_detail = "local/demo phone debug fallback enabled"
+    else:
+        phone_detail = "phone verification needs Twilio config or local/demo debug fallback"
+    status = (
+        "OK" if email_status == "configured" or config.PHONE_VERIFICATION_DEBUG or config.TWILIO_ENABLED else "WARN"
+    )
+    return CheckResult("Auth delivery policy", status, f"{email_detail}; {phone_detail}")
 
 
 def _check_deferred_provider_policy() -> CheckResult:

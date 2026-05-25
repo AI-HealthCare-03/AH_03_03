@@ -194,9 +194,13 @@ Seed 포함 데이터:
 - JWT 저장 정책은 access token은 기존 프론트 저장 방식을 유지하고, refresh token은 HttpOnly cookie로만 전달합니다. refresh cookie 기본값은 `SameSite=Lax`, `Path=/api/v1/auth`, `HttpOnly=true`이며 local/dev에서는 `Secure=false`, prod/production에서는 `Secure=true`를 사용합니다.
 - refresh cookie의 `Max-Age/Expires`는 refresh token의 `exp`와 맞춥니다. logout은 같은 cookie name/path/domain/samesite/secure 조건으로 삭제하므로 브라우저에 남은 refresh cookie가 재사용되지 않도록 합니다.
 - `SameSite=Lax`는 일반적인 CSRF 위험을 줄이지만 모든 교차 출처 요청을 완전히 막는 장치는 아닙니다. 운영에서는 HTTPS, 제한된 CORS origin, refresh token 서버 검증/폐기, 짧은 access token 수명을 함께 적용합니다.
-- 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 대신 `/api/v1/auth/email-verifications/send` 응답의 `debug_code`로 확인합니다. 프론트는 로컬 테스트 편의를 위해 이 값을 인증코드 입력칸에 자동 반영합니다.
+- 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 없이 코드를 생성할 수 있지만, 응답 본문 노출은 `EMAIL_VERIFICATION_DEBUG=true`일 때만 허용합니다. 비밀번호 재설정 토큰도 `PASSWORD_RESET_DEBUG=true`일 때만 응답합니다.
 - 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. `EMAIL_ENABLED=true`와 SMTP 환경변수를 설정하면 실제 인증코드/비밀번호 재설정 링크를 발송합니다.
-- 휴대폰 SMS 인증은 Twilio Verify 기반입니다. 서버는 한국 휴대폰 번호를 Twilio 호출용 E.164 형식(`+821012345678`)으로 정규화하고, 기존 사용자 DB 호환을 위해 저장/중복확인은 로컬 번호(`01012345678`) 기준도 함께 확인합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용할 수 있지만, 운영환경에서는 debug code를 응답하지 않으며 `TWILIO_ENABLED=true`와 Twilio Verify secret 설정이 필요합니다.
+- 휴대폰 SMS 인증은 Twilio Verify 기반입니다. 서버는 한국 휴대폰 번호를 Twilio 호출용 E.164 형식(`+821012345678`)으로 정규화하고, 기존 사용자 DB 호환을 위해 저장/중복확인은 로컬 번호(`01012345678`) 기준도 함께 확인합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용할 수 있지만, 응답 본문 노출은 `PHONE_VERIFICATION_DEBUG=true`일 때만 허용합니다. 운영환경에서는 debug code를 응답하지 않으며 `TWILIO_ENABLED=true`와 Twilio Verify secret 설정이 필요합니다.
+- 인증 발송 설정은 `uv run python scripts/verify_auth_delivery_config.py`로 값 노출 없이 점검할 수 있습니다. 실제 발송 테스트는 명시적으로 `--send-email <email>` 또는 `--send-sms <phone>`을 붙였을 때만 수행합니다.
+- Brevo SMTP 이메일 인증은 live 발송 경로로 사용할 수 있습니다. `EMAIL_ENABLED=true`, Brevo SMTP host/port/login/key/from email을 설정하고 debug flag를 `false`로 둡니다.
+- Twilio Verify는 설정이 완료되어도 Trial 계정에서는 한국 번호 live SMS가 verified recipient 제한으로 막힐 수 있습니다. 시연에서는 `TWILIO_ENABLED=false`, `PHONE_VERIFICATION_DEBUG=true`로 로컬/시연 전용 휴대폰 인증 fallback을 사용할 수 있으며, prod에서는 반드시 `PHONE_VERIFICATION_DEBUG=false`를 유지합니다. 운영 전 선택지는 Twilio 유료 전환 또는 국내 SMS provider 도입입니다.
+- Twilio live SMS를 테스트할 때는 한국 번호 `+82` E.164 형식을 권장하며, Twilio Console의 verified recipient, Geo Permissions, Verify Service SID, SMS channel 활성화, trial/account 권한을 함께 확인합니다.
 - 휴대폰 인증번호 요청은 같은 번호 기준 60초 이내 재발송을 제한하고, 1시간 5회 초과 요청을 제한합니다. 인증번호 확인 실패도 같은 번호 기준 5회 이상이면 일정 시간 제한합니다.
 - 알림은 `notifications` inbox, `reminder_schedules` 예약 설정, `notification_logs` 발송 이력으로 분리합니다. 현재 외부 Push/SMS/Kakao/Email 발송 worker는 후속 범위이며, 발송 로그에는 민감 건강 수치 원문이나 인증코드/토큰을 저장하지 않습니다.
 - 주소는 1차 풀서비스 회원가입 필수 입력에서 제외합니다. 지역 기반 병원/검진기관 추천, 배송, 방문 케어 등이 도입될 경우 개인정보 최소수집 원칙에 따라 선택 정보로 재검토합니다.

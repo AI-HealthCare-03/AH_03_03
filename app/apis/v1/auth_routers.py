@@ -55,8 +55,8 @@ def _refresh_cookie_expires(refresh_token_exp: int) -> datetime:
     return datetime.fromtimestamp(refresh_token_exp, tz=UTC)
 
 
-def _allow_auth_debug_response() -> bool:
-    return not config.is_production
+def _allow_auth_debug_response(debug_enabled: bool) -> bool:
+    return debug_enabled and not config.is_production
 
 
 @auth_router.get("/check-login-id", response_model=AvailabilityResponse, status_code=status.HTTP_200_OK)
@@ -115,7 +115,7 @@ async def send_email_verification_code(
     code = await auth_service.send_email_verification_code(request.email)
     return EmailVerificationSendResponse(
         detail="인증코드가 생성되었습니다.",
-        debug_code=code if _allow_auth_debug_response() else None,
+        debug_code=code if _allow_auth_debug_response(config.EMAIL_VERIFICATION_DEBUG) else None,
     )
 
 
@@ -145,7 +145,7 @@ async def send_phone_verification_code(
     code = await auth_service.send_phone_verification_code(request.phone_number)
     return PhoneVerificationSendResponse(
         detail="인증번호가 발송되었습니다.",
-        debug_code=code if _allow_auth_debug_response() else None,
+        debug_code=code if _allow_auth_debug_response(config.PHONE_VERIFICATION_DEBUG) else None,
     )
 
 
@@ -219,7 +219,7 @@ async def request_password_reset(
     token = await auth_service.request_password_reset(request.email)
     return PasswordResetRequestResponse(
         detail="비밀번호 재설정 요청이 처리되었습니다.",
-        debug_token=token if _allow_auth_debug_response() else None,
+        debug_token=token if _allow_auth_debug_response(config.PASSWORD_RESET_DEBUG) else None,
     )
 
 
