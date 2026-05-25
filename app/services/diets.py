@@ -4,6 +4,8 @@ from typing import Any
 from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
 from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
+from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
+from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
 from ai_runtime.llm.explanation_service import generate_diet_score_explanation
 from ai_runtime.llm.schemas import DietScoreExplanationInput
 from app.core import config
@@ -61,15 +63,26 @@ async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: 
     return await diet_repository.list_diet_photo_results(diet_record_id, limit=limit, offset=offset)
 
 
-async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[str, object]:
+async def run_diet_analysis(
+    user_id: int,
+    request: DietAnalyzeRequest,
+    image_bytes: bytes | None = None,
+    image_media_type: str | None = None,
+) -> dict[str, object]:
     case = _select_rule_based_diet_case(request)
-    # 자체 CV/GPT Vision은 아직 기본 경로가 아니므로, 시연은 규칙 기반 음식 후보로 안정성을 우선한다.
+    cv_result, fallback_used, provider_message = await _detect_foods_with_provider(
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
+    )
     food_candidate = select_food_detection_candidate(
-        cv_result=None,
+        cv_result=cv_result,
         rule_based_foods=case["detected_foods"],
         gpt_vision_fallback_enabled=config.GPT_VISION_FALLBACK_ENABLED,
         confidence_threshold=config.FOOD_CV_CONFIDENCE_THRESHOLD,
     )
+    if cv_result is None or food_candidate.provider != cv_result.provider:
+        fallback_used = True
+        provider_message = provider_message or "rule_based_food_detection fallback used"
     detected_foods = food_candidate.to_scorer_foods()
     scoring_result = _safe_build_nutrition_scoring_result(detected_foods)
     explanation = _safe_generate_diet_explanation(scoring_result["disease_scores"])
@@ -104,10 +117,15 @@ async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[s
                 "needs_review": food_candidate.needs_review,
                 "fallback_reason": food_candidate.fallback_reason,
                 "scoring_source": scoring_result["scoring_source"],
-                "gpt_vision_called": False,
+                "gpt_vision_called": cv_result is not None,
+                "fallback_used": fallback_used,
+                "provider_message": provider_message,
             },
             raw_output={
                 "source": food_candidate.provider,
+                "vision_provider": food_candidate.provider,
+                "fallback_used": fallback_used,
+                "provider_message": provider_message,
                 "case": case["case_name"],
                 "foods": detected_foods,
                 "provider_result": {
@@ -136,10 +154,79 @@ async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[s
         "disease_scores": scoring_result["disease_scores"],
         "food_score_details": scoring_result["food_score_details"],
         "scoring_source": scoring_result["scoring_source"],
+        "vision_provider": food_candidate.provider,
+        "fallback_used": fallback_used,
+        "raw_output": photo_result.raw_output,
         "explanation": explanation,
         "warnings": case["warnings"],
         "recommended_actions": case["recommended_actions"],
     }
+
+
+async def _detect_foods_with_provider(
+    image_bytes: bytes | None,
+    image_media_type: str | None,
+) -> tuple[FoodDetectionCandidateSet | None, bool, str | None]:
+    provider = str(config.DIET_VISION_PROVIDER or "rule_based").lower()
+    if provider != "gpt_vision" or not config.DIET_GPT_VISION_ENABLED:
+        return None, True, "diet GPT Vision disabled"
+    if not image_bytes:
+        return None, True, "image file not provided"
+    if not config.OPENAI_API_KEY:
+        return None, True, "OPENAI_API_KEY missing"
+
+    try:
+        client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.DIET_GPT_VISION_MODEL)
+        raw = await client.analyze(
+            analysis_type=AnalysisType.DIET,
+            image_bytes=image_bytes,
+            media_type=image_media_type or "image/jpeg",
+        )
+    except Exception:
+        logger.exception("Diet GPT Vision provider failed; using rule_based_food_detection fallback")
+        return None, True, "gpt_vision_failed"
+
+    foods = raw.get("foods") if isinstance(raw, dict) else None
+    if not isinstance(foods, list):
+        return None, True, "gpt_vision_returned_no_foods"
+
+    detected_foods = [
+        str(food.get("name") or food.get("food_name") or "").strip()
+        for food in foods
+        if isinstance(food, dict) and str(food.get("name") or food.get("food_name") or "").strip()
+    ]
+    if not detected_foods:
+        return None, True, "gpt_vision_returned_empty_foods"
+
+    confidence = _average_confidence_from_provider_foods(foods)
+    return (
+        FoodDetectionCandidateSet(
+            provider="gpt_vision",
+            detected_foods=detected_foods,
+            confidence=confidence,
+            needs_review=False,
+            raw_output=raw,
+            raw_provider_status=str(raw.get("analysis_status") or "success"),
+            metadata={"model": config.DIET_GPT_VISION_MODEL},
+        ),
+        False,
+        "gpt_vision_food_detection",
+    )
+
+
+def _average_confidence_from_provider_foods(foods: list[Any]) -> float | None:
+    values = [float(value) for food in foods if isinstance(food, dict) and _is_number(value := food.get("confidence"))]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 4)
+
+
+def _is_number(value: Any) -> bool:
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 def build_nutrition_scoring_result(

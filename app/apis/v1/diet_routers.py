@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, UploadFile, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.diets import (
@@ -41,16 +41,24 @@ async def list_diet_records(
 async def _run_diet_analysis(
     request: DietAnalyzeRequest,
     user: User,
+    image_bytes: bytes | None = None,
+    image_media_type: str | None = None,
 ) -> DietAnalyzeResponse:
-    return await diet_service.run_diet_analysis(user.id, request)
+    return await diet_service.run_diet_analysis(
+        user.id,
+        request,
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
+    )
 
 
 @diet_router.post("/analyze", response_model=DietAnalyzeResponse, status_code=status.HTTP_201_CREATED)
 async def run_diet_analysis(
-    request: DietAnalyzeRequest,
+    request: Request,
     user: Annotated[User, Depends(get_request_user)],
 ):
-    return await _run_diet_analysis(request, user)
+    payload, image_bytes, image_media_type = await _parse_diet_analyze_request(request)
+    return await _run_diet_analysis(payload, user, image_bytes=image_bytes, image_media_type=image_media_type)
 
 
 @diet_router.post(
@@ -65,6 +73,28 @@ async def run_legacy_diet_analysis(
     user: Annotated[User, Depends(get_request_user)],
 ):
     return await _run_diet_analysis(request, user)
+
+
+async def _parse_diet_analyze_request(request: Request) -> tuple[DietAnalyzeRequest, bytes | None, str | None]:
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        body = await request.json()
+        return DietAnalyzeRequest.model_validate(body), None, None
+
+    form = await request.form()
+    data = {
+        key: value
+        for key, value in form.items()
+        if key != "image" and not _is_upload(value) and value not in {"", None}
+    }
+    image = form.get("image")
+    image_bytes = await image.read() if _is_upload(image) else None
+    image_media_type = image.content_type if _is_upload(image) else None
+    return DietAnalyzeRequest.model_validate(data), image_bytes, image_media_type
+
+
+def _is_upload(value: object) -> bool:
+    return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
 
 
 @diet_router.get("/{diet_record_id}", response_model=DietRecordResponse)

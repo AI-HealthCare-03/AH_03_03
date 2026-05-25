@@ -52,7 +52,24 @@ class Config(BaseSettings):
     ENABLE_CLOVA_OCR: bool = False
     GPT_VISION_FALLBACK_ENABLED: bool = False
     FOOD_CV_CONFIDENCE_THRESHOLD: float = 0.75
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    DIET_GPT_VISION_ENABLED: bool = False
+    DIET_GPT_VISION_MODEL: str = "gpt-4o-mini"
+    DIET_VISION_PROVIDER: str = "rule_based"
+    EXAM_OCR_PROVIDER: str = "fallback"
+    EXAM_GPT_VISION_ENABLED: bool = False
+    EXAM_GPT_VISION_MODEL: str = "gpt-4o-mini"
+    PADDLE_OCR_ENABLED: bool = False
+    MEDICATION_OCR_PROVIDER: str = "fallback"
+    MEDICATION_GPT_VISION_ENABLED: bool = False
+    MEDICATION_GPT_VISION_MODEL: str = "gpt-4o-mini"
     CHATBOT_USE_REAL_LLM: bool = False
+    LANGFUSE_ENABLED: bool = False
+    LANGFUSE_BASE_URL: str | None = None
+    LANGFUSE_HOST: str | None = None
+    LANGFUSE_PUBLIC_KEY: str | None = None
+    LANGFUSE_SECRET_KEY: str | None = None
 
     COOKIE_DOMAIN: str = "localhost"
     REFRESH_TOKEN_COOKIE_NAME: str = "refresh_token"

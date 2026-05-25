@@ -24,6 +24,9 @@ export type MedicationOcrResponse = {
   items: MedicationOcrItem[];
   message: string;
   source?: string;
+  fallback_used?: boolean;
+  provider_message?: string | null;
+  extracted_text_preview?: string | null;
   raw_text?: string | null;
   parser_warnings?: string[];
 };
@@ -80,9 +83,7 @@ export async function deleteMedication<T>(medicationId: number): Promise<T> {
   return apiRequest<T>(`/medications/${medicationId}`, { method: "DELETE" });
 }
 
-export async function runMedicationOcr(
-  payload: MedicationOcrRequest,
-): Promise<MedicationOcrResponse> {
+export async function runMedicationOcr(payload: MedicationOcrRequest | FormData): Promise<MedicationOcrResponse> {
   return apiRequest<MedicationOcrResponse>("/medications/ocr", { method: "POST", body: payload });
 }
 

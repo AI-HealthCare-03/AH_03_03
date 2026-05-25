@@ -28,6 +28,9 @@ export type DietAnalyzeResponse = {
   disease_scores?: Record<string, number | null> | null;
   food_score_details?: Array<Record<string, ApiValue>>;
   scoring_source?: string | null;
+  vision_provider?: string | null;
+  fallback_used?: boolean;
+  raw_output?: Record<string, ApiValue> | null;
   explanation?: Record<string, ApiValue> | null;
   warnings?: string[];
   recommended_actions?: string[];
@@ -63,6 +66,6 @@ export async function createDietRecord<T>(payload: DietRecordPayload): Promise<T
   return apiRequest<T>("/diets", { method: "POST", body: payload as Record<string, ApiValue> });
 }
 
-export async function analyzeDiet<T>(payload: Record<string, ApiValue>): Promise<T> {
+export async function analyzeDiet<T>(payload: Record<string, ApiValue> | FormData): Promise<T> {
   return apiRequest<T>("/diets/analyze", { method: "POST", body: payload });
 }

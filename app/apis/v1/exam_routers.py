@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, UploadFile, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.exams import (
@@ -57,20 +57,40 @@ async def get_exam_report(exam_id: int, request: Request, user: Annotated[User, 
     return report
 
 
-async def _run_exam_ocr(exam_id: int, user: User) -> ExamOCRResponse:
+async def _run_exam_ocr(
+    exam_id: int,
+    user: User,
+    image_bytes: bytes | None = None,
+    image_media_type: str | None = None,
+) -> ExamOCRResponse:
     report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
     ensure_owner(report.user_id, user)
-    return await exam_service.run_exam_ocr(exam_id)
+    return await exam_service.run_exam_ocr(exam_id, image_bytes=image_bytes, image_media_type=image_media_type)
 
 
 @exam_router.post("/{exam_id}/ocr", response_model=ExamOCRResponse)
-async def run_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
-    return await _run_exam_ocr(exam_id, user)
+async def run_exam_ocr(exam_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
+    image_bytes, image_media_type = await _read_optional_upload(request)
+    return await _run_exam_ocr(exam_id, user, image_bytes=image_bytes, image_media_type=image_media_type)
 
 
 @exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamOCRResponse, deprecated=True, include_in_schema=False)
 async def run_legacy_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
     return await _run_exam_ocr(exam_id, user)
+
+
+async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | None]:
+    if "multipart/form-data" not in request.headers.get("content-type", ""):
+        return None, None
+    form = await request.form()
+    upload = form.get("image") or form.get("file")
+    if _is_upload(upload):
+        return await upload.read(), upload.content_type
+    return None, None
+
+
+def _is_upload(value: object) -> bool:
+    return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
 
 
 @exam_router.patch("/{exam_id}", response_model=ExamReportResponse)

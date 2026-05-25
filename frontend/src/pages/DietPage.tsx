@@ -193,11 +193,14 @@ export default function DietPage() {
   const runDietAnalysis = async () => {
     setError("");
     try {
-      const result = await analyzeDiet<Record<string, unknown>>({
-        description: analysisDescription || (selectedImageFile ? "사진으로 선택한 식단" : "기록된 식단"),
-        meal_time: new Date().toISOString(),
-        image_path: selectedImageFile?.name || null,
-      });
+      const payload = selectedImageFile
+        ? buildDietAnalysisFormData(selectedImageFile, analysisDescription)
+        : {
+            description: analysisDescription || "기록된 식단",
+            meal_time: new Date().toISOString(),
+            image_path: null,
+          };
+      const result = await analyzeDiet<Record<string, unknown>>(payload);
       setAnalysisResult(result);
       await load();
     } catch (err) {
@@ -261,7 +264,7 @@ export default function DietPage() {
                 <strong>선택한 이미지</strong>
                 <span>{selectedImageFile.name}</span>
                 <span className="muted">이미지를 다시 선택하려면 파일 선택 또는 카메라 촬영을 눌러주세요.</span>
-                <span className="muted">현재 분석은 음식명 후보 기반 점수화로 처리되며, 실제 CV 모델 연결은 후속 단계입니다.</span>
+                <span className="muted">Vision provider가 켜져 있으면 이미지에서 음식명 후보를 추론하고, 아니면 규칙 기반 후보로 점수화합니다.</span>
                 <button className="button secondary" onClick={clearSelectedImage} type="button">
                   선택 이미지 삭제
                 </button>
@@ -544,4 +547,13 @@ export default function DietPage() {
       </Card>
     </div>
   );
+}
+
+function buildDietAnalysisFormData(file: File, description: string): FormData {
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("description", description || "사진으로 선택한 식단");
+  formData.append("meal_time", new Date().toISOString());
+  formData.append("image_path", file.name);
+  return formData;
 }

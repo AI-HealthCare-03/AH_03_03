@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, UploadFile, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.medications import (
@@ -52,17 +52,27 @@ async def list_medications(
     )
 
 
-async def _run_medication_ocr(request: MedicationOCRRequest, user: User) -> MedicationOCRResponse:
+async def _run_medication_ocr(
+    request: MedicationOCRRequest,
+    user: User,
+    image_bytes: bytes | None = None,
+    image_media_type: str | None = None,
+) -> MedicationOCRResponse:
     _ = user
-    return await medication_service.run_medication_ocr(request)
+    return await medication_service.run_medication_ocr(
+        request,
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
+    )
 
 
 @medication_router.post("/ocr", response_model=MedicationOCRResponse)
 async def run_medication_ocr(
-    request: MedicationOCRRequest,
+    request: Request,
     user: Annotated[User, Depends(get_request_user)],
 ):
-    return await _run_medication_ocr(request, user)
+    payload, image_bytes, image_media_type = await _parse_medication_ocr_request(request)
+    return await _run_medication_ocr(payload, user, image_bytes=image_bytes, image_media_type=image_media_type)
 
 
 @medication_router.post("/dummy-ocr", response_model=MedicationOCRResponse, deprecated=True, include_in_schema=False)
@@ -71,6 +81,27 @@ async def run_legacy_medication_ocr(
     user: Annotated[User, Depends(get_request_user)],
 ):
     return await _run_medication_ocr(request, user)
+
+
+async def _parse_medication_ocr_request(request: Request) -> tuple[MedicationOCRRequest, bytes | None, str | None]:
+    if "multipart/form-data" not in request.headers.get("content-type", ""):
+        body = await request.json()
+        return MedicationOCRRequest.model_validate(body), None, None
+
+    form = await request.form()
+    data = {
+        key: value
+        for key, value in form.items()
+        if key not in {"image", "file"} and not _is_upload(value) and value not in {"", None}
+    }
+    upload = form.get("image") or form.get("file")
+    image_bytes = await upload.read() if _is_upload(upload) else None
+    image_media_type = upload.content_type if _is_upload(upload) else None
+    return MedicationOCRRequest.model_validate(data), image_bytes, image_media_type
+
+
+def _is_upload(value: object) -> bool:
+    return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
 
 
 @medication_router.post(

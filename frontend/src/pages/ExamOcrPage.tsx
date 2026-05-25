@@ -15,6 +15,7 @@ import ErrorMessage from "../components/ErrorMessage";
 
 export default function ExamOcrPage() {
   const [selectedFileName, setSelectedFileName] = useState("health-exam-upload.pdf");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [exam, setExam] = useState<ExamReport | null>(null);
   const [measurements, setMeasurements] = useState<ExamMeasurement[]>([]);
@@ -32,6 +33,14 @@ export default function ExamOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  const handleFileSelection = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+    setSelectedFile(file);
+    setSelectedFileName(file.name);
+  };
+
   const startExamOcr = async () => {
     setError("");
     setMessage("");
@@ -44,9 +53,13 @@ export default function ExamOcrPage() {
           uploaded_at: new Date().toISOString(),
         }));
       setExam(report);
-      const result = await runExamOcr(report.id);
+      const result = await runExamOcr(report.id, selectedFile);
       setMeasurements(result.measurements);
-      setMessage(toUserMessage(result.message));
+      setMessage(
+        toUserMessage(
+          `${result.message} provider=${result.ocr_provider ?? "unknown"}, fallback=${result.fallback_used ? "yes" : "no"}`,
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
     }
@@ -105,7 +118,7 @@ export default function ExamOcrPage() {
                 파일에서 선택
                 <input
                   accept="image/*,.pdf"
-                  onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? selectedFileName)}
+                  onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
                   type="file"
                 />
               </label>
@@ -113,11 +126,11 @@ export default function ExamOcrPage() {
                 <label className="upload-action-button">
                   카메라로 촬영
                   <input
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? selectedFileName)}
-                    type="file"
-                  />
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
+                  type="file"
+                />
                 </label>
               ) : (
                 <span className="upload-mobile-hint">카메라 촬영은 모바일에서 사용할 수 있습니다.</span>
