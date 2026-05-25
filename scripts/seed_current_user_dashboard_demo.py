@@ -210,8 +210,8 @@ async def _seed_analysis(user: User) -> dict[str, int]:
                 risk_score=score,
                 risk_level=_risk_level(score),
                 summary=_summary(analysis_type, _risk_level(score)),
-                model_name="dummy_rule_based",
-                model_version="mvp-demo-v1",
+                model_name="seed_rule_based",
+                model_version="seed-precision-rule-v1",
                 analyzed_at=datetime.now(config.TIMEZONE),
             )
             stats["analysis_results_created"] += 1
@@ -311,7 +311,7 @@ async def _ensure_snapshot(result: AnalysisResult, record: HealthRecord) -> int:
             "final_outputs": {"risk_level": result.risk_level.value, "guide_message": result.summary},
         },
         shap_payload={"top_factors": ["혈압", "공복혈당", "BMI"]},
-        model_payload={"model_name": "dummy_rule_based", "model_version": "mvp-demo-v1"},
+        model_payload={"model_name": "seed_rule_based", "model_version": "seed-precision-rule-v1"},
     )
     return 1
 
@@ -415,7 +415,7 @@ async def _seed_diets(user: User) -> dict[str, int]:
                 detected_foods=record.detected_foods,
                 confidence_payload={"avg_confidence": 0.91},
                 raw_output={"source": "local_mvp_seed"},
-                is_dummy=True,
+                is_dummy=False,
             )
             stats["diet_photo_results_created"] += 1
     return stats

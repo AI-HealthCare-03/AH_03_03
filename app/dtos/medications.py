@@ -63,7 +63,6 @@ class MedicationOCRItem(BaseModel):
 
 
 class MedicationOCRResponse(BaseModel):
-    is_dummy: bool = False
     source_type: str
     ocr_confidence: float
     items: list[MedicationOCRItem]
