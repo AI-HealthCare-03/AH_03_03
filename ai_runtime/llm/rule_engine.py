@@ -30,7 +30,7 @@ def unmatched_rule_result(intent: str = "unknown_complex_question") -> RuleEngin
         is_matched=False,
         intent=intent,
         response="",
-        source="llm_fallback_stub",
+        source="rule_engine_unmatched",
     )
 
 

@@ -39,9 +39,9 @@ def generate_result_chatbot_llm_response(
         source = "llm"
         intent = "llm_result_chatbot_response"
     else:
-        answer = generate_result_chatbot_stub_answer(input_data)
-        source = "llm_stub"
-        intent = infer_result_llm_stub_intent(input_data.user_message)
+        answer = generate_result_chatbot_fallback_answer(input_data)
+        source = "rule_based_llm_fallback"
+        intent = infer_result_fallback_intent(input_data.user_message)
 
     final_answer, safety_result = ensure_safe_answer(answer)
     grounding_result = check_result_chatbot_grounding(
@@ -88,9 +88,9 @@ def generate_main_health_chatbot_llm_response(
         source = "llm"
         intent = "llm_main_health_chatbot_response"
     else:
-        answer = generate_main_health_chatbot_stub_answer(input_data)
-        source = "llm_stub"
-        intent = infer_main_llm_stub_intent(input_data.user_message)
+        answer = generate_main_health_chatbot_fallback_answer(input_data)
+        source = "rule_based_llm_fallback"
+        intent = infer_main_fallback_intent(input_data.user_message)
 
     final_answer, safety_result = ensure_safe_answer(answer)
     safety_result = add_llm_metadata(
@@ -117,7 +117,7 @@ def rewrite_result_chatbot_response_with_llm(
 ) -> ResultChatbotOutput:
     if rule_engine_output.intent == "medical_consult_required":
         answer = rule_engine_output.answer
-        source = "llm_rewrite_stub" if not use_real_llm else "llm_rewrite"
+        source = "rule_based_rewrite" if not use_real_llm else "llm_rewrite"
     elif use_real_llm:
         answer, llm_succeeded = call_llm_with_rewrite_fallback_status(
             prompt=build_result_chatbot_rewrite_prompt(input_data, rule_engine_output),
@@ -131,11 +131,11 @@ def rewrite_result_chatbot_response_with_llm(
         )
         source = "openai_rewrite" if llm_succeeded else rule_engine_output.source
     else:
-        answer = rewrite_result_chatbot_answer_stub(
+        answer = rewrite_result_chatbot_answer_fallback(
             input_data,
             rule_engine_output,
         )
-        source = "llm_rewrite_stub"
+        source = "rule_based_rewrite"
 
     final_answer, safety_result = ensure_safe_answer(answer)
     grounding_result = check_result_chatbot_grounding(
@@ -173,7 +173,7 @@ def rewrite_main_health_chatbot_response_with_llm(
 ) -> MainHealthChatbotOutput:
     if rule_engine_output.intent == "medical_consult_required":
         answer = rule_engine_output.answer
-        source = "llm_rewrite_stub" if not use_real_llm else "llm_rewrite"
+        source = "rule_based_rewrite" if not use_real_llm else "llm_rewrite"
     elif use_real_llm:
         answer, llm_succeeded = call_llm_with_rewrite_fallback_status(
             prompt=build_main_health_chatbot_rewrite_prompt(input_data, rule_engine_output),
@@ -187,8 +187,8 @@ def rewrite_main_health_chatbot_response_with_llm(
         )
         source = "openai_rewrite" if llm_succeeded else rule_engine_output.source
     else:
-        answer = rewrite_main_health_chatbot_answer_stub(rule_engine_output)
-        source = "llm_rewrite_stub"
+        answer = rewrite_main_health_chatbot_answer_fallback(rule_engine_output)
+        source = "rule_based_rewrite"
 
     final_answer, safety_result = ensure_safe_answer(answer)
     safety_result = add_llm_metadata(
@@ -302,7 +302,7 @@ rule_engine_answer:
 """.strip()
 
 
-def generate_result_chatbot_stub_answer(input_data: ResultChatbotInput) -> str:
+def generate_result_chatbot_fallback_answer(input_data: ResultChatbotInput) -> str:
     if has_medical_consult_keyword(input_data.user_message):
         return (
             "약 복용, 중단, 치료 여부는 개인의 검사 결과와 진료 이력을 함께 확인해야 하므로 "
@@ -321,7 +321,7 @@ def generate_result_chatbot_stub_answer(input_data: ResultChatbotInput) -> str:
     )
 
 
-def generate_main_health_chatbot_stub_answer(input_data: MainHealthChatbotInput) -> str:
+def generate_main_health_chatbot_fallback_answer(input_data: MainHealthChatbotInput) -> str:
     user_message = input_data.user_message
 
     if has_medical_consult_keyword(user_message):
@@ -348,27 +348,27 @@ def generate_main_health_chatbot_stub_answer(input_data: MainHealthChatbotInput)
     )
 
 
-def infer_result_llm_stub_intent(user_message: str) -> str:
+def infer_result_fallback_intent(user_message: str) -> str:
     if has_medical_consult_keyword(user_message):
         return "medical_consult_required"
     if any(keyword in user_message for keyword in ["당뇨", "혈당"]):
         return "diabetes_result_guidance"
     if any(keyword in user_message for keyword in ["고혈압", "혈압"]):
         return "hypertension_result_guidance"
-    return "llm_stub_result_guidance"
+    return "rule_based_result_guidance"
 
 
-def infer_main_llm_stub_intent(user_message: str) -> str:
+def infer_main_fallback_intent(user_message: str) -> str:
     if has_medical_consult_keyword(user_message):
         return "medical_consult_required"
     if any(keyword in user_message for keyword in ["당뇨", "혈당"]):
         return "diabetes_guidance"
     if any(keyword in user_message for keyword in ["고혈압", "혈압"]):
         return "hypertension_guidance"
-    return "llm_stub_main_guidance"
+    return "rule_based_main_guidance"
 
 
-def rewrite_result_chatbot_answer_stub(
+def rewrite_result_chatbot_answer_fallback(
     input_data: ResultChatbotInput,
     rule_engine_output: ResultChatbotOutput,
 ) -> str:
@@ -399,7 +399,7 @@ def rewrite_result_chatbot_answer_stub(
     )
 
 
-def rewrite_main_health_chatbot_answer_stub(
+def rewrite_main_health_chatbot_answer_fallback(
     rule_engine_output: MainHealthChatbotOutput,
 ) -> str:
     answer = remove_caution_message(rule_engine_output.answer)

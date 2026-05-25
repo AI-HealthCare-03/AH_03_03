@@ -3181,29 +3181,6 @@ pre {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.mock-chart {
-  background:
-    linear-gradient(180deg, transparent 24%, var(--color-muted-surface) 25%, transparent 26%),
-    linear-gradient(90deg, transparent 24%, var(--color-muted-surface) 25%, transparent 26%);
-  background-size: 100% 25%, 25% 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  min-height: 240px;
-  position: relative;
-}
-
-.mock-chart::after {
-  background: linear-gradient(90deg, var(--color-blue), var(--color-primary));
-  border-radius: 999px;
-  content: "";
-  height: 4px;
-  left: 8%;
-  position: absolute;
-  right: 8%;
-  top: 52%;
-  transform: rotate(-7deg);
-}
-
 .challenge-icon {
   align-items: center;
   background: var(--color-green-soft);

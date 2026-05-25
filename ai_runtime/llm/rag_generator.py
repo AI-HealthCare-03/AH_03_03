@@ -33,7 +33,7 @@ def generate_main_health_rag_response(
         )
 
     if not use_real_llm:
-        answer = build_stub_answer(retrieved_context)
+        answer = build_context_based_fallback_answer(retrieved_context)
     else:
         raw_answer = call_llm(
             build_main_health_rag_prompt(
@@ -120,7 +120,7 @@ def format_context_source(source: RagContextSource) -> str:
     return f"- {', '.join(part for part in parts if part)}"
 
 
-def build_stub_answer(retrieved_context: str) -> str:
+def build_context_based_fallback_answer(retrieved_context: str) -> str:
     context_summary = retrieved_context.strip().splitlines()[0]
     return (
         f"제공된 공신력 있는 건강정보 context 기준으로 보면, {context_summary} "
