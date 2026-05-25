@@ -39,7 +39,10 @@ class Config(BaseSettings):
     TWILIO_ACCOUNT_SID: str | None = None
     TWILIO_AUTH_TOKEN: str | None = None
     TWILIO_VERIFY_SERVICE_SID: str | None = None
+    PHONE_VERIFICATION_DEBUG: bool = False
     EMAIL_ENABLED: bool = False
+    EMAIL_VERIFICATION_DEBUG: bool = False
+    PASSWORD_RESET_DEBUG: bool = False
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USERNAME: str | None = None

@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import re
 import secrets
 import urllib.parse
 import urllib.request
@@ -47,6 +48,8 @@ PHONE_VERIFICATION_FAILURE_LOCK_MINUTES = 15
 PHONE_VERIFICATION_SIGNUP_TTL_MINUTES = 30
 PHONE_VERIFICATION_RATE_LIMIT_MESSAGE = "인증번호 요청이 너무 잦습니다. 잠시 후 다시 시도해주세요."
 PHONE_VERIFICATION_FAILURE_LIMIT_MESSAGE = "인증번호 확인 시도가 여러 번 실패했습니다. 잠시 후 다시 시도해주세요."
+TWILIO_IDENTIFIER_PATTERN = re.compile(r"\b(AC|VA|SK|SS)[A-Za-z0-9]{6,}\b")
+E164_PHONE_PATTERN = re.compile(r"\+?\d{8,15}")
 
 
 class AuthService:
@@ -522,20 +525,69 @@ class AuthService:
         try:
             return await asyncio.to_thread(_request)
         except HTTPError as exc:
+            detail = self._twilio_error_detail(exc)
             if exc.code in {400, 404}:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="인증번호가 만료되었거나 올바르지 않습니다.",
+                    detail=detail,
                 ) from exc
             if exc.code == 429:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=PHONE_VERIFICATION_RATE_LIMIT_MESSAGE,
+                    detail=detail,
                 ) from exc
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail="휴대폰 인증 처리에 실패했습니다."
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
             ) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY, detail="휴대폰 인증 처리에 실패했습니다."
             ) from exc
+
+    def _twilio_error_detail(self, exc: HTTPError) -> dict[str, object]:
+        detail: dict[str, object] = {
+            "message": "휴대폰 인증 처리에 실패했습니다.",
+            "provider": "twilio_verify",
+            "provider_status": exc.code,
+        }
+        try:
+            raw_body = exc.read().decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 - provider diagnostics should never mask the original failure.
+            raw_body = ""
+        if not raw_body:
+            return detail
+
+        try:
+            payload = json.loads(raw_body)
+        except json.JSONDecodeError:
+            provider_message = self._sanitize_twilio_error_text(raw_body[:300])
+            if provider_message:
+                detail["provider_message"] = provider_message
+            return detail
+
+        if not isinstance(payload, dict):
+            return detail
+        provider_code = payload.get("code")
+        provider_status = payload.get("status")
+        provider_message = payload.get("message") or payload.get("detail")
+        more_info = payload.get("more_info")
+        if provider_code is not None:
+            detail["provider_code"] = str(provider_code)
+        if provider_status is not None:
+            detail["provider_status"] = provider_status
+        if provider_message:
+            detail["provider_message"] = self._sanitize_twilio_error_text(str(provider_message))
+        if more_info:
+            detail["provider_more_info"] = self._sanitize_twilio_error_text(str(more_info))
+        return detail
+
+    def _sanitize_twilio_error_text(self, text: str) -> str:
+        sanitized = TWILIO_IDENTIFIER_PATTERN.sub(lambda match: f"{match.group(1)}***", text)
+        return E164_PHONE_PATTERN.sub(lambda match: self._mask_phone_for_log(match.group(0)), sanitized)
+
+    def _mask_phone_for_log(self, phone_number: str) -> str:
+        digits = "".join(char for char in phone_number if char.isdigit())
+        if len(digits) <= 4:
+            return "***"
+        return f"***{digits[-4:]}"

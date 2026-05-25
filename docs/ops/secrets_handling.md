@@ -141,6 +141,15 @@ git log -S "sk-proj" --oneline -- . ':!uv.lock'
 - 외부에 공유된 키는 노출 여부가 애매해도 revoke/rotate를 우선한다.
 - 발표 전에는 로컬 데모용 키와 운영키를 분리하고, 운영키는 재발급한 뒤 배포 환경에만 주입하는 것을 권장한다.
 
+## 4.2 Auth delivery provider notes
+
+- Brevo SMTP는 이메일 인증/비밀번호 재설정 live 발송 경로로 사용할 수 있다.
+- Twilio Verify는 설정이 완료되어도 Trial 계정에서는 한국 번호 live SMS가 verified recipient 제한으로 실패할 수 있다.
+- local/demo에서 휴대폰 인증 시연이 필요하면 `TWILIO_ENABLED=false`, `PHONE_VERIFICATION_DEBUG=true`를 사용한다.
+- prod/production에서는 `PHONE_VERIFICATION_DEBUG=false`, `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`를 유지한다.
+- 운영 전에는 Twilio 유료 전환 또는 국내 SMS provider 도입 중 하나를 선택한다.
+- `uv run python scripts/verify_auth_delivery_config.py --debug-twilio-ids`는 SID prefix/마지막 4자리만 출력하며 Auth Token은 출력하지 않는다.
+
 ## 4.1 Langfuse key/base URL 전환 주의
 
 Langfuse는 RAG 엔진이 아니라 trace, prompt, evaluation metadata를 관리하는 관측 도구다. vector DB나 retrieval store로 사용하지 않는다.
