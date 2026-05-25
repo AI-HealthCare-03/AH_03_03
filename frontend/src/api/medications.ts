@@ -19,7 +19,6 @@ export type MedicationOcrRequest = {
 };
 
 export type MedicationOcrResponse = {
-  is_dummy: boolean;
   source_type: string;
   ocr_confidence: number;
   items: MedicationOcrItem[];

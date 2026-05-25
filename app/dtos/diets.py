@@ -72,7 +72,6 @@ class DietPhotoResultResponse(BaseModel):
     detected_foods: dict[str, Any] | list[dict[str, Any]] | None
     confidence_payload: dict[str, Any] | None
     raw_output: dict[str, Any] | None
-    is_dummy: bool
     created_at: datetime
 
 

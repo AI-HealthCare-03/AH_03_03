@@ -99,7 +99,6 @@ async def run_medication_ocr(request: MedicationOCRRequest) -> MedicationOCRResp
     if not items:
         items = _FALLBACK_OCR_ITEMS
     return MedicationOCRResponse(
-        is_dummy=False,
         source_type=source_type,
         ocr_confidence=_average_confidence(items),
         items=items,

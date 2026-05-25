@@ -322,8 +322,8 @@ async def _seed_analysis_results(user: User) -> int:
                 risk_score=score,
                 risk_level=risk_level,
                 summary=_demo_guide_message(analysis_type, risk_level),
-                model_name="dummy_rule_based",
-                model_version="mvp-demo-v1",
+                model_name="seed_rule_based",
+                model_version="seed-precision-rule-v1",
                 analyzed_at=datetime.now(config.TIMEZONE),
             )
             created_count += 1
@@ -394,7 +394,7 @@ def _demo_guide_message(analysis_type: AnalysisType, risk_level: RiskLevel) -> s
         AnalysisType.DYSLIPIDEMIA: "이상지질혈증",
         AnalysisType.HYPERTENSION: "고혈압",
     }[analysis_type]
-    return f"{label} {risk_level.value} 구간입니다. MVP 데모용 더미 룰이며 실제 의료 진단이 아닙니다."
+    return f"{label} {risk_level.value} 구간입니다. 시연용 seed rule-based 결과이며 실제 의료 진단이 아닙니다."
 
 
 async def _ensure_analysis_factor(result: AnalysisResult, record: HealthRecord) -> None:
@@ -414,8 +414,8 @@ async def _ensure_analysis_factor(result: AnalysisResult, record: HealthRecord) 
 
     await AnalysisResultFactor.create(
         analysis_result=result,
-        factor_key="dummy_risk_score",
-        factor_name="더미 위험도 점수",
+        factor_key="seed_rule_risk_score",
+        factor_name="seed rule-based 위험도 점수",
         factor_value=str(result.risk_score),
         contribution_score=result.risk_score,
         direction=FactorDirection.NEUTRAL,
@@ -460,8 +460,8 @@ async def _ensure_analysis_snapshot(result: AnalysisResult, record: HealthRecord
                 }
             },
             "rule_outputs": {
-                "rule_engine": "seed_dummy_rule_based",
-                "note": "로컬 MVP 데모용 더미 룰이며 실제 의료 진단이 아닙니다.",
+                "rule_engine": "seed_rule_based",
+                "note": "로컬 MVP 데모용 seed rule-based 결과이며 실제 의료 진단이 아닙니다.",
             },
             "final_outputs": {
                 "risk_level": result.risk_level.value,
@@ -469,7 +469,7 @@ async def _ensure_analysis_snapshot(result: AnalysisResult, record: HealthRecord
             },
         },
         shap_payload={"note": "실제 SHAP 계산이 아닌 seed 데모용 factor입니다."},
-        model_payload={"model_name": "dummy_rule_based", "model_version": "mvp-demo-v1"},
+        model_payload={"model_name": "seed_rule_based", "model_version": "seed-precision-rule-v1"},
     )
 
 
@@ -572,15 +572,15 @@ async def _seed_diets(user: User, risk_profile: str) -> int:
             nutrition_summary={"calories": 520 + index * 35, "carbs_g": 65, "protein_g": 28, "fat_g": 16},
             diet_score=score,
             diet_feedback=feedback,
-            analysis_method="DUMMY",
+            analysis_method="SEED_RULE_BASED",
             memo="로컬 MVP 데모 식단",
         )
         await DietPhotoResult.create(
             diet_record=record,
             detected_foods=record.detected_foods,
             confidence_payload={"avg_confidence": 0.92, "is_demo": True},
-            raw_output={"source": "seed_demo_users", "is_dummy": True},
-            is_dummy=True,
+            raw_output={"source": "seed_rule_based_food_detection"},
+            is_dummy=False,
         )
         created_count += 1
     return created_count
