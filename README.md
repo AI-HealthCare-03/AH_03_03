@@ -121,6 +121,7 @@ make langfuse-down
 - `docker compose up`과 `docker compose build`는 원격 저장소에 이미지를 올리지 않습니다. 원격 업로드는 `docker push`를 실행할 때만 발생합니다.
 - `docker compose up/build` 중 로컬에 없는 base image나 service image는 registry에서 pull될 수 있습니다.
 - 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
+- `.env`, example env, `ai_worker` 코드 변경 후 이미 떠 있는 컨테이너에 반영하려면 `docker compose up -d --force-recreate fastapi ai-worker`로 FastAPI/AI Worker를 재생성하세요.
 - Langfuse는 RAG 엔진이 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다. Cloud와 Docker self-host를 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿔야 합니다.
 - 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck, `DEMO_ECHO` Redis Stream skeleton 용도입니다. 실제 OCR/CV/ML/LLM 비동기 작업, retry/dead-letter queue, heartbeat는 P2 운영 확장 범위입니다.
 - 시연 설명은 “현재 MVP 핵심 흐름은 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 연결되어 있다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환”으로 통일합니다.

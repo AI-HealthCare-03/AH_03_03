@@ -57,6 +57,12 @@ async def _run(args: argparse.Namespace) -> int:
         print("TWILIO_AUTH_TOKEN_MASKED=hidden")
     if config.TWILIO_ENABLED and config.twilio_verify_status == "configured":
         print("twilio_trial_note=Korean live SMS may be blocked on Trial unless the recipient is verified.")
+    elif config.PHONE_VERIFICATION_DEBUG and not config.is_production:
+        print("phone_verification_mode=demo-compatible debug fallback; no Twilio SMS is required.")
+    elif not config.TWILIO_ENABLED:
+        print(
+            "phone_verification_mode=Twilio disabled; enable Twilio or local/demo debug fallback before requiring SMS."
+        )
 
     failures = 0
     if args.send_email:

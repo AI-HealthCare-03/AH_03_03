@@ -1,5 +1,7 @@
 __pycache__/
 *.py[oc]
+*.py[cod]
+.pytest_cache/
 build/
 dist/
 .vite/
@@ -14,9 +16,11 @@ wheels/
 .venv
 .*.env
 .env
+*.env
 .env.local
 *.env.local
 envs/*.env
+envs/.local.env
 !envs/example.local.env
 !envs/example.prod.env
 infra/langfuse/.env
