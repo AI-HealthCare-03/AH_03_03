@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from ai_worker.ml.inference.catboost_predictor import (
+from ai_runtime.ml.inference.catboost_predictor import (
     CatBoostDiseasePredictor,
     FeatureSchemaError,
     _validate_feature_schema,
 )
-from ai_worker.ml.inference.disease_risk_service import warmup_chronic_disease_models
+from ai_runtime.ml.inference.disease_risk_service import warmup_chronic_disease_models
 
 
 def test_validate_feature_schema_rejects_missing_feature() -> None:

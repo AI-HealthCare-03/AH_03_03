@@ -85,7 +85,7 @@ services:
     container_name: ai-worker
     build:
       context: .  # 프로젝트 루트를 빌드 컨텍스트로 지정
-      dockerfile: ai_worker/Dockerfile  # Dockerfile 위치 지정
+      dockerfile: ai_runtime/Dockerfile  # Dockerfile 위치 지정
       platforms:
         - linux/amd64
         - linux/arm64
@@ -95,7 +95,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
     volumes:
-      - ./ai_worker:/app/ai_worker
+      - ./ai_runtime:/app/ai_runtime
     restart: always
     mem_limit: 4G
     networks:

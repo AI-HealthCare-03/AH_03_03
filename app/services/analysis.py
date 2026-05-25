@@ -4,12 +4,12 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from ai_worker.llm.explanation_service import (
+from ai_runtime.llm.explanation_service import (
     generate_analysis_explanation,
     generate_explanation_with_context,
     retrieve_health_context,
 )
-from ai_worker.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
+from ai_runtime.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
 from app.core import config
 from app.dtos.analysis import (
     AnalysisResultCreateRequest,
@@ -188,7 +188,7 @@ def _predict_ml_outputs(user: User | None, health_record: HealthRecord) -> dict[
     if user is None:
         return {}
     try:
-        from ai_worker.ml.inference.disease_risk_service import predict_chronic_disease_risks
+        from ai_runtime.ml.inference.disease_risk_service import predict_chronic_disease_risks
     except Exception:
         logger.exception(
             "ML prediction import failed; falling back to rule-based precision analysis",

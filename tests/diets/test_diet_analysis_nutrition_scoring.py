@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from ai_worker.cv.food.schemas import (
+from ai_runtime.cv.food.schemas import (
     CV_CONFIDENCE_THRESHOLD,
     FOOD_DETECTION_PROVIDER_PRIORITY,
     GPT_VISION_FALLBACK_POLICY,

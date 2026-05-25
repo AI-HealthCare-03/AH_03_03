@@ -35,22 +35,22 @@ serviceAccountKey.json
 *.sas7bdat
 .DS_Store
 **/.DS_Store
-ai_worker/outputs/
-ai_worker/data/
+ai_runtime/outputs/
+ai_runtime/data/
 etc/ml/ai_worker/data/
 # CV 평가 데이터 (로컬 전용)
-ai_worker/cv/data/
+ai_runtime/cv/data/
 
 # CLOVA OCR PoC local inputs/outputs
-ai_worker/ocr/providers/clova_ocr/data/images/*
-!ai_worker/ocr/providers/clova_ocr/data/images/.gitkeep
-ai_worker/ocr/providers/clova_ocr/data/pdfs/*
-!ai_worker/ocr/providers/clova_ocr/data/pdfs/.gitkeep
-ai_worker/ocr/providers/clova_ocr/outputs/*
-ai_worker/ocr/providers/clova_ocr/outputs/**/*
-!ai_worker/ocr/providers/clova_ocr/outputs/.gitkeep
-ai_worker/ocr/providers/clova_ocr/ground_truth/*
-!ai_worker/ocr/providers/clova_ocr/ground_truth/.gitkeep
+ai_runtime/ocr/providers/clova_ocr/data/images/*
+!ai_runtime/ocr/providers/clova_ocr/data/images/.gitkeep
+ai_runtime/ocr/providers/clova_ocr/data/pdfs/*
+!ai_runtime/ocr/providers/clova_ocr/data/pdfs/.gitkeep
+ai_runtime/ocr/providers/clova_ocr/outputs/*
+ai_runtime/ocr/providers/clova_ocr/outputs/**/*
+!ai_runtime/ocr/providers/clova_ocr/outputs/.gitkeep
+ai_runtime/ocr/providers/clova_ocr/ground_truth/*
+!ai_runtime/ocr/providers/clova_ocr/ground_truth/.gitkeep
 .venv-ocr/
 .venv-ocr2/
 
@@ -59,16 +59,16 @@ ai_worker/ocr/providers/clova_ocr/ground_truth/*
 .sas7bdat
 *.oof
 
-ai_worker/ml/outputs/
-ai_worker/ml/artifacts/*
-!ai_worker/ml/artifacts/.gitkeep
-!ai_worker/ml/artifacts/*/
-!ai_worker/ml/artifacts/*/catboost/
+ai_runtime/ml/outputs/
+ai_runtime/ml/artifacts/*
+!ai_runtime/ml/artifacts/.gitkeep
+!ai_runtime/ml/artifacts/*/
+!ai_runtime/ml/artifacts/*/catboost/
 ML/artifacts/*
 !ML/artifacts/.gitkeep
 etc/ml/ML/artifacts/*
 !etc/ml/ML/artifacts/.gitkeep
-ai_worker/ml/LGB18~24/outputs/
+ai_runtime/ml/LGB18~24/outputs/
 **/outputs/
 
 # Local data / generated outputs
@@ -85,7 +85,7 @@ ai_worker/ml/LGB18~24/outputs/
 !docs/data/challenges/*.csv
 !ML/models/report/*.csv
 !etc/ml/ML/models/report/*.csv
-!ai_worker/cv/food/nutrition/data/food_disease_scores.csv
+!ai_runtime/cv/food/nutrition/data/food_disease_scores.csv
 *.parquet
 *.pkl
 *.joblib
@@ -97,14 +97,14 @@ ai_worker/ml/LGB18~24/outputs/
 *.h5
 
 # Final CatBoost inference artifacts for local demo/runtime
-!ai_worker/ml/artifacts/*/catboost/*.cbm
-!ai_worker/ml/artifacts/*/catboost/feature_columns.json
-!ai_worker/ml/artifacts/*/catboost/threshold.json
-!ai_worker/ml/artifacts/*/catboost/metrics.json
-!ai_worker/ml/artifacts/*/catboost/model_params.json
-!ai_worker/ml/artifacts/*/catboost/experiment_config.json
-ai_worker/ml/artifacts/**/oof_*.npy
-ai_worker/ml/artifacts/**/threshold_tuning.csv
+!ai_runtime/ml/artifacts/*/catboost/*.cbm
+!ai_runtime/ml/artifacts/*/catboost/feature_columns.json
+!ai_runtime/ml/artifacts/*/catboost/threshold.json
+!ai_runtime/ml/artifacts/*/catboost/metrics.json
+!ai_runtime/ml/artifacts/*/catboost/model_params.json
+!ai_runtime/ml/artifacts/*/catboost/experiment_config.json
+ai_runtime/ml/artifacts/**/oof_*.npy
+ai_runtime/ml/artifacts/**/threshold_tuning.csv
 
 # OS files
 .DS_Store

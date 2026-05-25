@@ -1,5 +1,5 @@
-from ai_worker.llm.response_router import route_main_health_chatbot_response
-from ai_worker.llm.schemas import MainHealthChatbotInput
+from ai_runtime.llm.response_router import route_main_health_chatbot_response
+from ai_runtime.llm.schemas import MainHealthChatbotInput
 from app.dtos.chatbot import ChatbotAskRequest, ChatbotAskResponse, ChatbotContextType
 
 SAFETY_NOTICE = "본 서비스는 진단/처방이 아니며, 치료 변경은 반드시 의료진과 상담해야 합니다."

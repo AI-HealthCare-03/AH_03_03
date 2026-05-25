@@ -37,7 +37,7 @@
 | `요구사항_정의서_3조_ver1.xlsx` | 풀서비스 1차 범위와 보류 범위를 다시 명시 | `docs/design/full_service_scope.md`, `docs/design/requirements_refactor_notes.md` |
 | `API명세서_ver1.xlsx` | 실제 FastAPI path, request/response, deprecated endpoint 정책 반영 | OpenAPI, `app/apis/v1/*`, `frontend/src/api/*` |
 | `ERD_ver0.sql` | 현재 DB 모델, role, analysis mode, family/admin/notification 구조 반영 | `docs/erd/mvp_erd.dbml` |
-| `Architecture_ver1.drawio` | FastAPI, frontend, PostgreSQL/pgvector, Redis, ai_worker, Docker, Langfuse 분리 구조 반영 | `docs/design/ai_worker_structure.md`, Docker compose 구조 |
+| `Architecture_ver1.drawio` | FastAPI, frontend, PostgreSQL/pgvector, Redis, ai_runtime, Docker, Langfuse 분리 구조 반영 | `docs/design/ai_worker_structure.md`, Docker compose 구조 |
 | 발표용 기능 범위 표 | 구현 완료/부분 구현/보류 항목을 명확히 구분 | `docs/design/ai_worker_service_integration_plan.md`, 실제 코드 상태 |
 
 ## 3. ver2 반영 항목
@@ -109,13 +109,13 @@
 - Frontend는 React/Vite, API는 FastAPI로 표시한다.
 - DB는 PostgreSQL + pgvector 이미지 기준으로 표시한다.
 - Redis는 현재 health/check 및 후속 queue 준비 구성으로 표시한다.
-- `ai_worker`는 기능 도메인별 구조로 표시한다.
-  - `ai_worker/ml`
-  - `ai_worker/ocr`
-  - `ai_worker/cv`
-  - `ai_worker/llm`
-  - `ai_worker/common`
-  - `ai_worker/pipelines`
+- `ai_runtime`은 기능 도메인별 구조로 표시한다.
+  - `ai_runtime/ml`
+  - `ai_runtime/ocr`
+  - `ai_runtime/cv`
+  - `ai_runtime/llm`
+  - `ai_runtime/common`
+  - `ai_runtime/pipelines`
 - CatBoost artifact는 FastAPI 컨테이너에 포함되어 동기 PRECISION 분석에서 사용되는 현재 구조로 표시한다.
 - Langfuse는 별도 compose/DB/Redis를 사용하는 외부 관측 도구로 표시한다.
 - Redis Stream, async_jobs, 별도 AI worker consumer는 P2 보류 박스로 분리한다.
@@ -189,8 +189,8 @@
   - `OBE`
   - `ANEM`
 - 런타임 기준:
-  - `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`
-  - `ai_worker/cv/food/nutrition/rules/disease_score_rules.json`
+  - `ai_runtime/cv/food/nutrition/data/food_disease_scores.csv`
+  - `ai_runtime/cv/food/nutrition/rules/disease_score_rules.json`
 - 원본 엑셀은 런타임에서 직접 읽지 않는다.
   - `etc/ai/cv/food/nutrition/raw/food_nutrition_db.xlsx`
 - GPT Vision은 fallback provider 후보로 반영하되, 실제 자동 호출은 보류 또는 사용자 확인 후 호출 정책으로 구분한다.

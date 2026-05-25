@@ -9,12 +9,12 @@
 - PDF 파일을 CLOVA OCR에 직접 전송한 결과
 - 같은 PDF의 전체 페이지를 JPG 이미지로 변환한 뒤 페이지별로 CLOVA OCR에 전송한 결과
 
-이 실험은 운영 라우터와 연결하지 않은 독립 PoC입니다. 건강검진표 기본 OCR과 provider 런타임 코드는 `ai_worker/ocr`에 두고, 과거 실험 스크립트와 샘플 산출물은 `etc/ai/ocr/providers/clova_ocr` 아래에 archive/reference 용도로 보관합니다.
+이 실험은 운영 라우터와 연결하지 않은 독립 PoC입니다. 건강검진표 기본 OCR과 provider 런타임 코드는 `ai_runtime/ocr`에 두고, 과거 실험 스크립트와 샘플 산출물은 `etc/ai/ocr/providers/clova_ocr` 아래에 archive/reference 용도로 보관합니다.
 
 ## 폴더 구조
 
 ```text
-ai_worker/ocr/providers/clova_ocr/
+ai_runtime/ocr/providers/clova_ocr/
 ├── clova_client.py
 ├── extractor.py
 ├── pdf_converter.py
@@ -55,8 +55,8 @@ CLOVA_OCR_SECRET_KEY="..."
 
 - `etc/ai/ocr/providers/clova_ocr/data/pdfs/*`
 - `etc/ai/ocr/providers/clova_ocr/data/images/*`
-- `ai_worker/ocr/providers/clova_ocr/outputs/*`
-- `ai_worker/ocr/providers/clova_ocr/ground_truth/*`
+- `ai_runtime/ocr/providers/clova_ocr/outputs/*`
+- `ai_runtime/ocr/providers/clova_ocr/ground_truth/*`
 
 각 폴더의 `.gitkeep`만 유지합니다.
 
@@ -151,7 +151,7 @@ uv run python etc/ai/ocr/providers/clova_ocr/experiments/run_batch_pdf_vs_image_
 PDF별 결과는 다음 위치에 저장됩니다.
 
 ```text
-ai_worker/ocr/providers/clova_ocr/outputs/{pdf_stem}/
+ai_runtime/ocr/providers/clova_ocr/outputs/{pdf_stem}/
 ```
 
 대표 산출물은 다음과 같습니다.
@@ -257,7 +257,7 @@ uv run python etc/ai/ocr/providers/clova_ocr/experiments/export_ground_truth_tem
 생성 위치:
 
 ```text
-ai_worker/ocr/providers/clova_ocr/ground_truth/{pdf_stem}.json
+ai_runtime/ocr/providers/clova_ocr/ground_truth/{pdf_stem}.json
 ```
 
 이 파일은 사람이 원본 PDF를 보고 직접 채웁니다. 개인정보와 검진값이 포함될 수 있으므로 Git에 올리지 않습니다.
@@ -351,7 +351,7 @@ uv run python etc/ai/ocr/providers/clova_ocr/experiments/evaluate_value_accuracy
 ## 주의사항
 
 - 이 PoC는 운영 API와 연결하지 않습니다.
-- 기본 건강검진표 OCR(`ai_worker/ocr/checkup`)과 CLOVA OCR PoC(`ai_worker/ocr/providers/clova_ocr`)는 독립적으로 관리합니다.
+- 기본 건강검진표 OCR(`ai_runtime/ocr/checkup`)과 CLOVA OCR PoC(`ai_runtime/ocr/providers/clova_ocr`)는 독립적으로 관리합니다.
 - API URL과 Secret Key는 코드에 하드코딩하지 않습니다.
 - `.env`, PDF, JPG, OCR outputs, ground truth JSON은 Git에 올리지 않습니다.
 - CLOVA confidence는 실제 정답 대비 accuracy가 아닙니다.

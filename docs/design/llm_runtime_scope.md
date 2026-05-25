@@ -8,7 +8,7 @@
 
 | 분류 | 상태 | 설명 |
 | --- | --- | --- |
-| 공식 runtime | 사용 중 | `app/services/analysis.py`, `app/services/diets.py`가 `ai_worker.llm.explanation_service`를 호출 |
+| 공식 runtime | 사용 중 | `app/services/analysis.py`, `app/services/diets.py`가 `ai_runtime.llm.explanation_service`를 호출 |
 | Keyword RAG PoC | 사용 중 | `docs/rag_sources` markdown source를 keyword/disease_type으로 조회하고 reference source를 설명에 첨부 |
 | Langfuse trace | 사용 가능 | RAG retrieval metadata를 no-op 안전 구조로 기록. env 미설정 시 외부 호출 없음 |
 | 챗봇 LLM 라우터 | 준비됨, 미연결 | `response_router.py`, `health_chatbot.py`, `rule_engine.py`, `llm_generator.py`는 공식 챗봇 API에 아직 직접 연결되지 않음 |
@@ -23,10 +23,10 @@
 
 ```text
 app/services/analysis.py
-  -> ai_worker.llm.explanation_service.retrieve_health_context()
-  -> ai_worker.llm.rag.retrieve_keyword_rag_contexts()
-  -> ai_worker.llm.rag.tracing.trace_keyword_rag_retrieval()
-  -> ai_worker.llm.explanation_service.generate_explanation_with_context()
+  -> ai_runtime.llm.explanation_service.retrieve_health_context()
+  -> ai_runtime.llm.rag.retrieve_keyword_rag_contexts()
+  -> ai_runtime.llm.rag.tracing.trace_keyword_rag_retrieval()
+  -> ai_runtime.llm.explanation_service.generate_explanation_with_context()
 ```
 
 역할:
@@ -43,8 +43,8 @@ app/services/analysis.py
 
 ```text
 app/services/diets.py
-  -> ai_worker.cv.food.nutrition.scoring.DiseaseFoodScorer
-  -> ai_worker.llm.explanation_service.generate_diet_score_explanation()
+  -> ai_runtime.cv.food.nutrition.scoring.DiseaseFoodScorer
+  -> ai_runtime.llm.explanation_service.generate_diet_score_explanation()
 ```
 
 역할:
@@ -58,10 +58,10 @@ app/services/diets.py
 
 | 파일 | 역할 | 현재 분류 |
 | --- | --- | --- |
-| `ai_worker/llm/schemas.py` | 챗봇, 추천문구, 분석 설명, RAG context 공통 Pydantic schema | 공통 |
-| `ai_worker/llm/safety.py` | 의료 안전 문구/위험 표현 검사 | 공통 |
-| `ai_worker/llm/llm_client.py` | OpenAI 호출, Langfuse trace/event helper | 공통 provider adapter |
-| `ai_worker/llm/prompt_templates.py` | 추천문구, 챗봇, RAG prompt template | 공통 prompt |
+| `ai_runtime/llm/schemas.py` | 챗봇, 추천문구, 분석 설명, RAG context 공통 Pydantic schema | 공통 |
+| `ai_runtime/llm/safety.py` | 의료 안전 문구/위험 표현 검사 | 공통 |
+| `ai_runtime/llm/llm_client.py` | OpenAI 호출, Langfuse trace/event helper | 공통 provider adapter |
+| `ai_runtime/llm/prompt_templates.py` | 추천문구, 챗봇, RAG prompt template | 공통 prompt |
 
 `schemas.py`는 여러 기능 schema가 한 파일에 모여 있다. 시연 전에는 유지하고, 운영 전 규모가 커지면 `schemas/chatbot.py`, `schemas/explanation.py`, `schemas/rag.py`로 나누는 것을 검토한다.
 
@@ -71,10 +71,10 @@ app/services/diets.py
 
 | 파일 | 역할 | 현재 분류 |
 | --- | --- | --- |
-| `ai_worker/llm/rag/source_loader.py` | `docs/rag_sources/index.json`과 markdown source 로드 | READY_RAG_POC |
-| `ai_worker/llm/rag/keyword_retriever.py` | disease_type/keyword 기반 source 선택 | READY_RAG_POC |
-| `ai_worker/llm/rag/rag_context_builder.py` | `RetrievedContext`, reference summary/source 변환 | READY_RAG_POC |
-| `ai_worker/llm/rag/tracing.py` | Langfuse trace metadata 생성/기록 | READY_RAG_POC |
+| `ai_runtime/llm/rag/source_loader.py` | `docs/rag_sources/index.json`과 markdown source 로드 | READY_RAG_POC |
+| `ai_runtime/llm/rag/keyword_retriever.py` | disease_type/keyword 기반 source 선택 | READY_RAG_POC |
+| `ai_runtime/llm/rag/rag_context_builder.py` | `RetrievedContext`, reference summary/source 변환 | READY_RAG_POC |
+| `ai_runtime/llm/rag/tracing.py` | Langfuse trace metadata 생성/기록 | READY_RAG_POC |
 
 주의:
 
@@ -86,8 +86,8 @@ app/services/diets.py
 
 | 파일 | 역할 | 현재 분류 |
 | --- | --- | --- |
-| `ai_worker/llm/rag_generator.py` | 이미 검색된 context를 받아 main health RAG 답변 생성 | legacy/PoC 후보 |
-| `ai_worker/llm/rag_sources.py` | 허용 RAG source/domain whitelist | legacy/PoC 후보 |
+| `ai_runtime/llm/rag_generator.py` | 이미 검색된 context를 받아 main health RAG 답변 생성 | legacy/PoC 후보 |
+| `ai_runtime/llm/rag_sources.py` | 허용 RAG source/domain whitelist | legacy/PoC 후보 |
 
 이 두 파일은 현재 공식 API runtime에서 직접 호출되지 않는다. 삭제하지 말고, 운영형 RAG 설계 시 유지/통합 여부를 결정한다.
 
@@ -95,20 +95,20 @@ app/services/diets.py
 
 | 파일 | 현재 역할 | 현재 분류 |
 | --- | --- | --- |
-| `ai_worker/llm/response_router.py` | rule engine, LLM fallback/rewrite 라우팅 | PREPARED_NOT_WIRED |
-| `ai_worker/llm/health_chatbot.py` | 메인/결과 기반 챗봇 rule-based 응답 | PREPARED_NOT_WIRED |
-| `ai_worker/llm/rule_engine.py` | 챗봇 intent/rule 처리 | PREPARED_NOT_WIRED |
-| `ai_worker/llm/llm_generator.py` | OpenAI 기반 생성, stub fallback, rewrite | PREPARED_NOT_WIRED |
-| `ai_worker/llm/grounding.py` | 결과 기반 챗봇 grounding 검사 | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/response_router.py` | rule engine, LLM fallback/rewrite 라우팅 | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/health_chatbot.py` | 메인/결과 기반 챗봇 rule-based 응답 | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/rule_engine.py` | 챗봇 intent/rule 처리 | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/llm_generator.py` | OpenAI 기반 생성, stub fallback, rewrite | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/grounding.py` | 결과 기반 챗봇 grounding 검사 | PREPARED_NOT_WIRED |
 
-현재 공식 챗봇 API인 `app/services/chatbot.py`는 아직 `ai_worker.llm.response_router`를 직접 호출하지 않는다. 지금은 앱 서비스 내부의 간단 rule-based 응답 중심이다.
+현재 공식 챗봇 API인 `app/services/chatbot.py`는 아직 `ai_runtime.llm.response_router`를 직접 호출하지 않는다. 지금은 앱 서비스 내부의 간단 rule-based 응답 중심이다.
 
 향후 챗봇 정렬 방향:
 
 ```text
 app/services/chatbot.py
-  -> ai_worker.llm.response_router.route_main_health_chatbot_response()
-  -> ai_worker.llm.response_router.route_result_chatbot_response()
+  -> ai_runtime.llm.response_router.route_main_health_chatbot_response()
+  -> ai_runtime.llm.response_router.route_result_chatbot_response()
 ```
 
 이 전환 전에는 API 응답 DTO, 안전 문구, grounding 실패 fallback, 실제 LLM 호출 flag를 함께 검증해야 한다.
@@ -117,8 +117,8 @@ app/services/chatbot.py
 
 | 파일 | 현재 역할 | 현재 분류 |
 | --- | --- | --- |
-| `ai_worker/llm/risk_mapper.py` | ML 예측 결과를 위험요인/추천 챌린지 후보로 변환 | PREPARED_NOT_WIRED |
-| `ai_worker/llm/recommendation_message.py` | 위험요인/챌린지 기반 사용자 문구 생성 | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/risk_mapper.py` | ML 예측 결과를 위험요인/추천 챌린지 후보로 변환 | PREPARED_NOT_WIRED |
+| `ai_runtime/llm/recommendation_message.py` | 위험요인/챌린지 기반 사용자 문구 생성 | PREPARED_NOT_WIRED |
 
 현재 공식 분석 서비스는 `app/services/analysis.py`에서 DB의 active challenge를 조회해 recommendation을 만든다. 위 모듈은 구조는 준비되어 있지만 공식 분석 결과 생성 경로의 핵심 호출부는 아니다.
 
@@ -133,7 +133,7 @@ app/services/chatbot.py
 
 ## 8. Audit 분류 기준
 
-`scripts/audit_ai_worker_capabilities.py`는 LLM/RAG 항목을 아래 기준으로 표시한다.
+`scripts/audit_ai_runtime_capabilities.py`는 LLM/RAG 항목을 아래 기준으로 표시한다.
 
 | Category | 의미 |
 | --- | --- |
@@ -145,7 +145,7 @@ app/services/chatbot.py
 
 ## 9. 권장 리팩터링 판단
 
-시연 전에는 파일 이동 리팩터링을 하지 않는다. 현재 import는 `app/services/analysis.py`, `app/services/diets.py`, `tests/llm`, `scripts/audit_ai_worker_capabilities.py`에 걸려 있어 폴더 이동 시 깨질 가능성이 있다.
+시연 전에는 파일 이동 리팩터링을 하지 않는다. 현재 import는 `app/services/analysis.py`, `app/services/diets.py`, `tests/llm`, `scripts/audit_ai_runtime_capabilities.py`에 걸려 있어 폴더 이동 시 깨질 가능성이 있다.
 
 최소 순서:
 

@@ -128,7 +128,7 @@ LANGFUSE_HOST=http://localhost:3000
 
 현재 작업은 Langfuse 실행 인프라와 문서화까지만 포함한다.
 
-후속 작업에서 `app/` 또는 `ai_worker/`에 Langfuse SDK 연동을 추가한다.
+후속 작업에서 `app/` 또는 `ai_runtime/`에 Langfuse SDK 연동을 추가한다.
 
 후속 연동 대상:
 

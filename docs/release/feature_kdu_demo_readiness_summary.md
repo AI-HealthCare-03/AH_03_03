@@ -8,8 +8,8 @@
 - 현재 브랜치: `feature/kdu`
 - 현재 OpenAPI path 수: `106`
 - 주요 검증 기준:
-  - `uv run ruff check app scripts ai_worker tests`
-  - `uv run ruff format app scripts ai_worker tests --check`
+  - `uv run ruff check app scripts ai_runtime tests`
+  - `uv run ruff format app scripts ai_runtime tests --check`
   - `uv run pytest tests`
   - `uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"`
 
@@ -57,13 +57,13 @@
 주요 변경:
 
 - FastAPI Docker image에서 `ai` dependency group을 함께 설치하도록 보강했다.
-- `ai_worker` 코드가 컨테이너에 포함되도록 Dockerfile을 조정했다.
+- `ai_runtime` 코드가 컨테이너에 포함되도록 Dockerfile을 조정했다.
 - CatBoost artifact가 Docker build context에서 빠지지 않도록 `.dockerignore` 정책을 보강했다.
 - Docker compose 실행 시 `uv run --no-sync`를 사용해 빌드된 `.venv`를 안정적으로 사용하게 했다.
 
 검증 목적:
 
-- 컨테이너 내부에서 `catboost`, `argon2`, `ai_worker.ml.inference.disease_risk_service` import가 가능해야 한다.
+- 컨테이너 내부에서 `catboost`, `argon2`, `ai_runtime.ml.inference.disease_risk_service` import가 가능해야 한다.
 - `/analysis/run` PRECISION 경로에서 CatBoost artifact를 사용할 수 있어야 한다.
 
 ### 4.2 Redis health
@@ -93,8 +93,8 @@
 관련 범위:
 
 - `app/services/analysis.py`
-- `ai_worker/ml/inference/disease_risk_service.py`
-- `ai_worker/ml/inference/catboost_predictor.py`
+- `ai_runtime/ml/inference/disease_risk_service.py`
+- `ai_runtime/ml/inference/catboost_predictor.py`
 - `scripts/verify_precision_analysis_api.py`
 
 ### 4.4 OCR confirm -> HealthRecord X2
@@ -118,7 +118,7 @@
 
 주요 변경:
 
-- 음식 영양 점수화 모듈을 `ai_worker/cv/food/nutrition/` 하위로 정리했다.
+- 음식 영양 점수화 모듈을 `ai_runtime/cv/food/nutrition/` 하위로 정리했다.
 - 런타임은 원본 Excel을 직접 읽지 않고 `food_disease_scores.csv`와 `disease_score_rules.json`을 읽는다.
 - `/diets/analyze` 공식 흐름에 nutrition scorer를 연결했다.
 - 식단 분석 결과에 `DM`, `HTN`, `DL`, `OBE`, `ANEM` 질병군별 점수를 포함한다.
@@ -238,7 +238,7 @@ CI 기준:
 
 | 구분 | 항목 | 상태 | 설명 | 다음 액션 |
 | --- | --- | --- | --- | --- |
-| P0 | Docker ML 빌드 | 해결됨 | FastAPI 컨테이너에서 `ai` group, `ai_worker`, CatBoost artifact를 사용할 수 있게 정리 | 시연 직전 `docker compose build fastapi`와 import 확인 |
+| P0 | Docker ML 빌드 | 해결됨 | FastAPI 컨테이너에서 `ai` group, `ai_runtime`, CatBoost artifact를 사용할 수 있게 정리 | 시연 직전 `docker compose build fastapi`와 import 확인 |
 | P0 | Redis health | 해결됨 | compose 환경에서 Redis host 설정과 health check 흐름 정리 | `/api/v1/system/health` 재확인 |
 | P0 | CatBoost PRECISION E2E | 해결됨 | smoke script로 DM/HTN/DL CatBoost 결과 확인 가능 | seed 후 `verify_precision_analysis_api.py` 실행 |
 | P0 | OCR confirm -> X2 | 해결됨 | OCR 측정값이 HealthRecord X2 필드에 반영됨 | 실제 OCR/confirm 화면에서 수동 QA |
@@ -289,8 +289,8 @@ CI 기준:
 ## 8. 최종 시연 전 명령
 
 ```bash
-uv run ruff check app scripts ai_worker tests
-uv run ruff format app scripts ai_worker tests --check
+uv run ruff check app scripts ai_runtime tests
+uv run ruff format app scripts ai_runtime tests --check
 uv run pytest tests
 uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 uv run python scripts/verify_demo_ready.py

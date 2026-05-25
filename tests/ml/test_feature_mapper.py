@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from ai_worker.ml.inference.feature_mapper import FeatureMappingError, map_service_features
+from ai_runtime.ml.inference.feature_mapper import FeatureMappingError, map_service_features
 
 BASE_FEATURE_COLUMNS = [
     "성별",

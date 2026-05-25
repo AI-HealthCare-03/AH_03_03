@@ -36,10 +36,10 @@ jobs:
         run: uv sync --group app --group ai --group dev --frozen
 
       - name: Run Ruff Check (Linting)
-        run: uv run ruff check app scripts ai_worker tests
+        run: uv run ruff check app scripts ai_runtime tests
 
       - name: Run Ruff Format Check
-        run: uv run ruff format app scripts ai_worker tests --check
+        run: uv run ruff format app scripts ai_runtime tests --check
 
   test:
     runs-on: ubuntu-latest

@@ -34,12 +34,12 @@
 ## 작업 영역 분리 기준
 
 - Backend API: `app/`
-- ML: `ai_worker/ml/`
-- CV: `ai_worker/cv/`
-- LLM/RAG: `ai_worker/llm/`, `ai_worker/llm/rag/`
-- Pipeline: `ai_worker/pipelines/`
+- ML: `ai_runtime/ml/`
+- CV: `ai_runtime/cv/`
+- LLM/RAG: `ai_runtime/llm/`, `ai_runtime/llm/rag/`
+- Pipeline: `ai_runtime/pipelines/`
 
-ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않는다. 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않는다. API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정한다.
+ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않는다. 백엔드 담당자는 `ai_runtime` 내부 모델 코드를 직접 크게 수정하지 않는다. API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정한다.
 
 ## 풀서비스 요구사항 정리 기준
 
@@ -230,8 +230,8 @@ uv run uvicorn app.main:app --reload
 ```bash
 docker compose ps
 curl http://localhost:8000/api/v1/system/health
-uv run ruff check app scripts ai_worker tests
-uv run ruff format app scripts ai_worker tests --check
+uv run ruff check app scripts ai_runtime tests
+uv run ruff format app scripts ai_runtime tests --check
 uv run pytest tests
 uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 ```

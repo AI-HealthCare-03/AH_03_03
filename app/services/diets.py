@@ -1,11 +1,11 @@
 import logging
 from typing import Any
 
-from ai_worker.cv.food.fallback_policy import select_food_detection_candidate
-from ai_worker.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
-from ai_worker.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
-from ai_worker.llm.explanation_service import generate_diet_score_explanation
-from ai_worker.llm.schemas import DietScoreExplanationInput
+from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
+from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
+from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
+from ai_runtime.llm.explanation_service import generate_diet_score_explanation
+from ai_runtime.llm.schemas import DietScoreExplanationInput
 from app.core import config
 from app.dtos.diets import (
     DietAnalyzeRequest,

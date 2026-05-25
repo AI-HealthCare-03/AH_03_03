@@ -15,11 +15,11 @@
 
 관련 파일:
 
-- `ai_worker/llm/health_chatbot.py`
-- `ai_worker/llm/rule_engine.py`
-- `ai_worker/llm/llm_generator.py`
-- `ai_worker/llm/prompt_templates.py`
-- `ai_worker/llm/response_router.py`
+- `ai_runtime/llm/health_chatbot.py`
+- `ai_runtime/llm/rule_engine.py`
+- `ai_runtime/llm/llm_generator.py`
+- `ai_runtime/llm/prompt_templates.py`
+- `ai_runtime/llm/response_router.py`
 
 입력 스키마:
 
@@ -68,10 +68,10 @@
 
 관련 파일:
 
-- `ai_worker/llm/risk_mapper.py`
-- `ai_worker/llm/recommendation_message.py`
-- `ai_worker/llm/schemas.py`
-- `ai_worker/llm/prompt_templates.py`
+- `ai_runtime/llm/risk_mapper.py`
+- `ai_runtime/llm/recommendation_message.py`
+- `ai_runtime/llm/schemas.py`
+- `ai_runtime/llm/prompt_templates.py`
 - `etc/ai/llm/notebooks/01_recommendation_message_experiment.ipynb`
 - `etc/ai/llm/experiments/run_health_chatbot_poc.py`
 
@@ -113,11 +113,11 @@
 
 관련 파일:
 
-- `ai_worker/llm/health_chatbot.py`
-- `ai_worker/llm/rule_engine.py`
-- `ai_worker/llm/llm_generator.py`
-- `ai_worker/llm/grounding.py`
-- `ai_worker/llm/response_router.py`
+- `ai_runtime/llm/health_chatbot.py`
+- `ai_runtime/llm/rule_engine.py`
+- `ai_runtime/llm/llm_generator.py`
+- `ai_runtime/llm/grounding.py`
+- `ai_runtime/llm/response_router.py`
 
 입력 스키마:
 
@@ -149,10 +149,10 @@
 
 관련 파일:
 
-- `ai_worker/llm/prompt_templates.py`
-- `ai_worker/llm/rag_sources.py`
-- `ai_worker/llm/rag_generator.py`
-- `ai_worker/llm/schemas.py`
+- `ai_runtime/llm/prompt_templates.py`
+- `ai_runtime/llm/rag_sources.py`
+- `ai_runtime/llm/rag_generator.py`
+- `ai_runtime/llm/schemas.py`
 
 현재 역할:
 
@@ -205,8 +205,8 @@ RAG 프롬프트 원칙:
 실험 위치:
 
 - `etc/ai/llm/notebooks/01_recommendation_message_experiment.ipynb`
-- `ai_worker/llm/recommendation_message.py`
-- `ai_worker/llm/prompt_templates.py`
+- `ai_runtime/llm/recommendation_message.py`
+- `ai_runtime/llm/prompt_templates.py`
 
 실험 목적:
 
@@ -246,9 +246,9 @@ RAG 프롬프트 원칙:
 
 - `etc/ai/llm/experiments/run_health_chatbot_poc.py`
 - `etc/ai/llm/experiments/dummy_health_cases.py`
-- `ai_worker/llm/health_chatbot.py`
-- `ai_worker/llm/llm_generator.py`
-- `ai_worker/llm/response_router.py`
+- `ai_runtime/llm/health_chatbot.py`
+- `ai_runtime/llm/llm_generator.py`
+- `ai_runtime/llm/response_router.py`
 
 실험 목적:
 
@@ -281,8 +281,8 @@ RAG 프롬프트 원칙:
 - `etc/ai/llm/experiments/run_health_chatbot_poc.py`
 - `etc/ai/llm/experiments/run_rule_vs_llm_comparison.py`
 - `etc/ai/llm/experiments/dummy_health_cases.py`
-- `ai_worker/llm/grounding.py`
-- `ai_worker/llm/llm_generator.py`
+- `ai_runtime/llm/grounding.py`
+- `ai_runtime/llm/llm_generator.py`
 
 실험 목적:
 
@@ -337,8 +337,8 @@ RAG 프롬프트 원칙:
 
 실험 위치:
 
-- `ai_worker/llm/llm_client.py`
-- `ai_worker/llm/llm_generator.py`
+- `ai_runtime/llm/llm_client.py`
+- `ai_runtime/llm/llm_generator.py`
 - Langfuse JP Cloud
 
 실험 목적:
@@ -371,10 +371,10 @@ RAG 프롬프트 원칙:
 
 실험 위치:
 
-- `ai_worker/llm/prompt_templates.py`
-- `ai_worker/llm/rag_sources.py`
-- `ai_worker/llm/rag_generator.py`
-- `ai_worker/llm/schemas.py`
+- `ai_runtime/llm/prompt_templates.py`
+- `ai_runtime/llm/rag_sources.py`
+- `ai_runtime/llm/rag_generator.py`
+- `ai_runtime/llm/schemas.py`
 
 실험 목적:
 
