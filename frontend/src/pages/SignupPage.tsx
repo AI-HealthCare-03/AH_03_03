@@ -4,11 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   checkEmail,
   checkLoginId,
-  checkPhone,
   sendEmailVerification,
-  sendPhoneVerification,
   verifyEmailCode,
-  verifyPhoneCode,
 } from "../api/auth";
 import { createHealthRecord, type HealthRecordPayload } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
@@ -57,13 +54,10 @@ export default function SignupPage() {
   const [isOccupationHelpOpen, setIsOccupationHelpOpen] = useState(false);
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCheck, setEmailCheck] = useState<AvailabilityCheck | null>(null);
-  const [phoneCheck, setPhoneCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCode, setEmailCode] = useState("");
   const [emailVerification, setEmailVerification] = useState<AvailabilityCheck | null>(null);
-  const [phoneCode, setPhoneCode] = useState("");
-  const [phoneVerification, setPhoneVerification] = useState<AvailabilityCheck | null>(null);
   const [checkingField, setCheckingField] = useState<
-    "login_id" | "email" | "phone" | "email_send" | "email_verify" | "phone_send" | "phone_verify" | null
+    "login_id" | "email" | "email_send" | "email_verify" | null
   >(null);
 
   const steps = ["계정 정보", "기본 정보", "생활 습관", "간편 분석 정보"];
@@ -98,12 +92,10 @@ export default function SignupPage() {
     value.length >= 8 && /[A-Za-z]/.test(value) && /[0-9]/.test(value) && /[^A-Za-z0-9]/.test(value);
 
   const normalizedPhoneNumber = `${phoneParts.first}${phoneParts.second}${phoneParts.third}`;
+  const hasPhoneInput = Boolean(phoneParts.second || phoneParts.third);
 
   const setOnlyDigitsPhonePart = (key: keyof typeof phoneParts, value: string, maxLength: number) => {
     setPhoneParts((prev) => ({ ...prev, [key]: value.replace(/\D/g, "").slice(0, maxLength) }));
-    setPhoneCheck(null);
-    setPhoneVerification(null);
-    setPhoneCode("");
   };
 
   const validateCurrentStep = (targetStep = step): boolean => {
@@ -130,18 +122,8 @@ export default function SignupPage() {
       ) {
         nextErrors.email_verification = "이메일 인증을 완료해야 다음 단계로 이동할 수 있습니다.";
       }
-      if (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4) {
+      if (hasPhoneInput && (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4)) {
         nextErrors.phone_number = "휴대폰 번호를 올바르게 입력해주세요.";
-      }
-      if (!phoneCheck || phoneCheck.checkedValue !== normalizedPhoneNumber || !phoneCheck.available) {
-        nextErrors.phone_check = "휴대폰 번호 중복확인을 완료해주세요.";
-      }
-      if (
-        !phoneVerification ||
-        phoneVerification.checkedValue !== normalizedPhoneNumber ||
-        !phoneVerification.available
-      ) {
-        nextErrors.phone_verification = "휴대폰 인증을 완료해야 다음 단계로 이동할 수 있습니다.";
       }
       if (!isPasswordValid(password)) {
         nextErrors.password = passwordPolicyMessage;
@@ -309,85 +291,6 @@ export default function SignupPage() {
     }
   };
 
-  const handleCheckPhone = async () => {
-    setError("");
-    if (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4) {
-      setFieldErrors((prev) => ({ ...prev, phone_number: "휴대폰 번호를 올바르게 입력해주세요." }));
-      return;
-    }
-    try {
-      setCheckingField("phone");
-      const result = await checkPhone(normalizedPhoneNumber);
-      setPhoneCheck({
-        checkedValue: normalizedPhoneNumber,
-        available: result.available,
-        message: result.message ?? (result.available ? "사용 가능한 휴대폰 번호입니다." : "이미 사용 중인 휴대폰 번호입니다."),
-      });
-      setPhoneVerification(null);
-      setPhoneCode("");
-      setFieldErrors((prev) => {
-        const { phone_number, phone_check, phone_verification, ...rest } = prev;
-        return rest;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "휴대폰 번호 중복확인에 실패했습니다.");
-    } finally {
-      setCheckingField(null);
-    }
-  };
-
-  const handleSendPhoneVerification = async () => {
-    setError("");
-    if (!phoneCheck || phoneCheck.checkedValue !== normalizedPhoneNumber || !phoneCheck.available) {
-      setFieldErrors((prev) => ({ ...prev, phone_check: "휴대폰 번호 중복확인을 먼저 완료해주세요." }));
-      return;
-    }
-    try {
-      setCheckingField("phone_send");
-      const result = await sendPhoneVerification(normalizedPhoneNumber);
-      setPhoneVerification(null);
-      setPhoneCode(result.debug_code ?? "");
-      setNotice("휴대폰 인증번호를 발송했습니다. 인증번호를 확인해주세요.");
-      setFieldErrors((prev) => {
-        const { phone_verification, ...rest } = prev;
-        return rest;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "휴대폰 인증번호 발송에 실패했습니다.");
-    } finally {
-      setCheckingField(null);
-    }
-  };
-
-  const handleVerifyPhoneCode = async () => {
-    setError("");
-    if (!phoneCode.trim()) {
-      setFieldErrors((prev) => ({ ...prev, phone_verification: "휴대폰 인증번호를 입력해주세요." }));
-      return;
-    }
-    try {
-      setCheckingField("phone_verify");
-      const result = await verifyPhoneCode(normalizedPhoneNumber, phoneCode.trim());
-      setPhoneVerification({
-        checkedValue: normalizedPhoneNumber,
-        available: result.verified,
-        message: result.verified ? "휴대폰 인증이 완료되었습니다." : "인증번호를 확인해주세요.",
-      });
-      setFieldErrors((prev) => {
-        const { phone_verification, ...rest } = prev;
-        return rest;
-      });
-    } catch (err) {
-      setPhoneVerification({
-        checkedValue: normalizedPhoneNumber,
-        available: false,
-        message: err instanceof Error ? err.message : "인증번호를 확인해주세요.",
-      });
-    } finally {
-      setCheckingField(null);
-    }
-  };
-
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -411,7 +314,7 @@ export default function SignupPage() {
         name: name.trim(),
         gender,
         birth_date: birthDate,
-        phone_number: normalizedPhoneNumber,
+        ...(hasPhoneInput ? { phone_number: normalizedPhoneNumber } : {}),
         nickname: name.trim(),
         sensitive_data_agreed: true,
       });
@@ -591,82 +494,30 @@ export default function SignupPage() {
                 )}
               </div>
               <label>
-                휴대폰 번호
+                휴대폰 번호 <span className="muted">(선택)</span>
                 <div className="phone-input-grid">
                   <input
                     inputMode="numeric"
                     maxLength={3}
                     value={phoneParts.first}
                     onChange={(event) => setOnlyDigitsPhonePart("first", event.target.value, 3)}
-                    required
                   />
                   <input
                     inputMode="numeric"
                     maxLength={4}
                     value={phoneParts.second}
                     onChange={(event) => setOnlyDigitsPhonePart("second", event.target.value, 4)}
-                    required
                   />
                   <input
                     inputMode="numeric"
                     maxLength={4}
                     value={phoneParts.third}
                     onChange={(event) => setOnlyDigitsPhonePart("third", event.target.value, 4)}
-                    required
                   />
                 </div>
-                <span className="muted">숫자만 입력되며, 저장 시 하나의 휴대폰 번호로 전송됩니다.</span>
+                <span className="muted">MVP 시연에서는 이메일 인증만 사용합니다. 휴대폰 번호는 선택 입력입니다.</span>
                 {fieldErrors.phone_number && <span className="field-error">{fieldErrors.phone_number}</span>}
               </label>
-              <button
-                className="secondary"
-                disabled={checkingField === "phone"}
-                type="button"
-                onClick={() => void handleCheckPhone()}
-              >
-                {checkingField === "phone" ? "확인 중..." : "휴대폰 번호 중복확인"}
-              </button>
-              {phoneCheck && <div className={phoneCheck.available ? "success-text" : "warning-text"}>{phoneCheck.message}</div>}
-              {fieldErrors.phone_check && <span className="field-error">{fieldErrors.phone_check}</span>}
-              <div className="signup-verification-panel">
-                <button
-                  className="secondary"
-                  disabled={checkingField === "phone_send"}
-                  type="button"
-                  onClick={() => void handleSendPhoneVerification()}
-                >
-                  {checkingField === "phone_send" ? "발송 중..." : "휴대폰 인증번호 발송"}
-                </button>
-                <label>
-                  휴대폰 인증번호
-                  <input
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={phoneCode}
-                    onChange={(event) => {
-                      setPhoneCode(event.target.value.replace(/\D/g, "").slice(0, 10));
-                      setPhoneVerification(null);
-                    }}
-                    placeholder="인증번호"
-                  />
-                </label>
-                <button
-                  className="secondary"
-                  disabled={checkingField === "phone_verify"}
-                  type="button"
-                  onClick={() => void handleVerifyPhoneCode()}
-                >
-                  {checkingField === "phone_verify" ? "확인 중..." : "휴대폰 인증번호 확인"}
-                </button>
-                {phoneVerification && (
-                  <div className={phoneVerification.available ? "success-text" : "warning-text"}>
-                    {phoneVerification.message}
-                  </div>
-                )}
-                {fieldErrors.phone_verification && (
-                  <span className="field-error">{fieldErrors.phone_verification}</span>
-                )}
-              </div>
               <label>
                 비밀번호
                 <input

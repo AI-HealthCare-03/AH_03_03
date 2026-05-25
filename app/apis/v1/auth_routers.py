@@ -56,6 +56,7 @@ def _refresh_cookie_expires(refresh_token_exp: int) -> datetime:
 
 
 def _allow_auth_debug_response(debug_enabled: bool) -> bool:
+    # 인증코드/토큰 디버그 응답은 시연 편의를 위한 local/demo 전용 장치다.
     return debug_enabled and not config.is_production
 
 
@@ -137,15 +138,17 @@ async def verify_email_code(
     "/phone-verifications/send",
     response_model=PhoneVerificationSendResponse,
     status_code=status.HTTP_200_OK,
+    deprecated=True,
+    include_in_schema=False,
 )
 async def send_phone_verification_code(
     request: PhoneVerificationSendRequest,
     auth_service: Annotated[AuthService, Depends(AuthService)],
 ) -> PhoneVerificationSendResponse:
-    code = await auth_service.send_phone_verification_code(request.phone_number)
-    return PhoneVerificationSendResponse(
-        detail="인증번호가 발송되었습니다.",
-        debug_code=code if _allow_auth_debug_response(config.PHONE_VERIFICATION_DEBUG) else None,
+    # 기존 클라이언트 호환을 위해 endpoint는 남기되 MVP 공식 인증 경로에서는 제외한다.
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="휴대폰 인증은 현재 MVP 범위에서 제공하지 않습니다. 이메일 인증을 사용해주세요.",
     )
 
 
@@ -153,13 +156,17 @@ async def send_phone_verification_code(
     "/phone-verifications/verify",
     response_model=PhoneVerificationVerifyResponse,
     status_code=status.HTTP_200_OK,
+    deprecated=True,
+    include_in_schema=False,
 )
 async def verify_phone_code(
     request: PhoneVerificationVerifyRequest,
     auth_service: Annotated[AuthService, Depends(AuthService)],
 ) -> PhoneVerificationVerifyResponse:
-    return PhoneVerificationVerifyResponse(
-        verified=await auth_service.verify_phone_code(request.phone_number, request.code),
+    # 404보다 410을 반환해 호출자가 정책적으로 중단된 기능임을 알 수 있게 한다.
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="휴대폰 인증은 현재 MVP 범위에서 제공하지 않습니다. 이메일 인증을 사용해주세요.",
     )
 
 

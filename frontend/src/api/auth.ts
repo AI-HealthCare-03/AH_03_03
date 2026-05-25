@@ -22,7 +22,7 @@ export type SignupPayload = {
   name: string;
   gender: "MALE" | "FEMALE";
   birth_date: string;
-  phone_number: string;
+  phone_number?: string;
   nickname?: string;
   address?: string;
   sensitive_data_agreed?: boolean;
@@ -60,15 +60,6 @@ export type EmailVerificationSendResponse = {
 };
 
 export type EmailVerificationVerifyResponse = {
-  verified: boolean;
-};
-
-export type PhoneVerificationSendResponse = {
-  detail: string;
-  debug_code?: string | null;
-};
-
-export type PhoneVerificationVerifyResponse = {
   verified: boolean;
 };
 
@@ -142,22 +133,6 @@ export async function verifyEmailCode(email: string, code: string): Promise<Emai
   return apiRequest<EmailVerificationVerifyResponse>("/auth/email-verifications/verify", {
     method: "POST",
     body: { email, code },
-    skipAuth: true,
-  });
-}
-
-export async function sendPhoneVerification(phoneNumber: string): Promise<PhoneVerificationSendResponse> {
-  return apiRequest<PhoneVerificationSendResponse>("/auth/phone-verifications/send", {
-    method: "POST",
-    body: { phone_number: phoneNumber },
-    skipAuth: true,
-  });
-}
-
-export async function verifyPhoneCode(phoneNumber: string, code: string): Promise<PhoneVerificationVerifyResponse> {
-  return apiRequest<PhoneVerificationVerifyResponse>("/auth/phone-verifications/verify", {
-    method: "POST",
-    body: { phone_number: phoneNumber, code },
     skipAuth: true,
   });
 }

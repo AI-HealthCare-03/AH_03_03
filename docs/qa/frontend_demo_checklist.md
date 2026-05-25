@@ -41,14 +41,12 @@ docker compose logs --tail=100 fastapi
   - seed 계정 생성 여부 확인
 - 상태: 완료
 
-## 2. 회원가입/휴대폰 인증 화면
+## 2. 회원가입/이메일 인증 화면
 
 - 화면 경로: `/signup`
 - API 연결:
   - `POST /api/v1/auth/email-verifications/send`
   - `POST /api/v1/auth/email-verifications/verify`
-  - `POST /api/v1/auth/phone-verifications/send`
-  - `POST /api/v1/auth/phone-verifications/verify`
   - `POST /api/v1/auth/signup`
 - 확인 항목:
   - 주소 입력 없이 진행 가능
@@ -57,12 +55,11 @@ docker compose logs --tail=100 fastapi
   - 가입 완료 후 OCR 선택 CTA 또는 나중에 입력하기 흐름이 자연스러움
 - 눌러볼 버튼:
   - 이메일 인증 요청/확인
-  - 휴대폰 인증 요청/확인
   - 건강검진표 OCR로 정밀 분석 정보 추가
   - 나중에 입력하기
 - 실패 시:
   - FastAPI auth 로그
-  - `EMAIL_ENABLED`, `TWILIO_ENABLED` 로컬 설정 확인
+  - `EMAIL_ENABLED`, `EMAIL_VERIFICATION_DEBUG`, SMTP 로컬 설정 확인
 - 상태: 부분
 
 ## 3. 건강정보 입력

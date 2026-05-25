@@ -170,7 +170,7 @@ uv run python scripts/verify_precision_analysis_api.py --warmup-ml
 확인할 화면:
 
 - 로그인
-- 회원가입/휴대폰 인증
+- 회원가입/이메일 인증
 - 건강정보
 - 건강검진 OCR 업로드/confirm
 - 분석 실행/결과/히스토리
@@ -199,4 +199,4 @@ uv run python scripts/verify_demo_ready.py
 
 - `.env` 파일을 화면에 띄우지 않는다.
 - `docker compose config` 전체 출력은 공유하지 않는다.
-- 실제 OpenAI/CLOVA/Twilio/Langfuse 키는 출력하지 않는다.
+- 실제 OpenAI/CLOVA/Langfuse/SMTP 키는 출력하지 않는다.

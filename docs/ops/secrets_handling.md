@@ -16,7 +16,7 @@
   - `LANGFUSE_PUBLIC_KEY`
   - `LANGFUSE_BASE_URL` 자체는 secret은 아니지만 key와 함께 출력하면 사용 환경이 드러날 수 있으므로 공유 전 확인한다.
   - `CLOVA_OCR_SECRET_KEY`
-  - Twilio/SMTP/DB password 등 외부 서비스 또는 계정 비밀값
+  - SMTP/DB password 등 외부 서비스 또는 계정 비밀값
 - 아래처럼 값을 직접 찍는 명령 금지
 
 ```bash
@@ -144,11 +144,11 @@ git log -S "sk-proj" --oneline -- . ':!uv.lock'
 ## 4.2 Auth delivery provider notes
 
 - Brevo SMTP는 이메일 인증/비밀번호 재설정 live 발송 경로로 사용할 수 있다.
-- Twilio Verify는 설정이 완료되어도 Trial 계정에서는 한국 번호 live SMS가 verified recipient 제한으로 실패할 수 있다.
-- local/demo에서 휴대폰 인증 시연이 필요하면 `TWILIO_ENABLED=false`, `PHONE_VERIFICATION_DEBUG=true`를 사용한다.
-- prod/production에서는 `PHONE_VERIFICATION_DEBUG=false`, `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`를 유지한다.
-- 운영 전에는 Twilio 유료 전환 또는 국내 SMS provider 도입 중 하나를 선택한다.
-- `uv run python scripts/verify_auth_delivery_config.py --debug-twilio-ids`는 SID prefix/마지막 4자리만 출력하며 Auth Token은 출력하지 않는다.
+- MVP/시연 회원가입 인증은 이메일 인증만 필수로 사용한다.
+- 휴대폰 인증은 현재 보류 상태이며, `phone_number`는 DB/프로필 호환성용 선택값으로만 유지한다.
+- prod/production에서는 `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`를 유지한다.
+- 운영 전 SMS 인증이 필요하면 별도 SMS provider와 rate limit, 실패 처리, 비용 정책을 새로 설계한다.
+- `uv run python scripts/verify_auth_delivery_config.py`는 SMTP 설정 상태만 출력하며 secret 원문은 출력하지 않는다.
 
 ## 4.1 Langfuse key/base URL 전환 주의
 

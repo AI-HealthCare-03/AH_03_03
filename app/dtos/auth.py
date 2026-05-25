@@ -3,7 +3,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, EmailStr, Field, model_validator
 
-from app.core.validators import validate_birthday, validate_password, validate_phone_number
+from app.core.validators import optional_after_validator, validate_birthday, validate_password, validate_phone_number
 from app.models.users import Gender
 
 
@@ -17,7 +17,7 @@ class SignUpRequest(BaseModel):
     name: Annotated[str, Field(max_length=20)]
     gender: Gender
     birth_date: Annotated[date, AfterValidator(validate_birthday)]
-    phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+    phone_number: Annotated[str | None, optional_after_validator(validate_phone_number)] = None
     nickname: Annotated[str | None, Field(None, max_length=30)] = None
     address: Annotated[str | None, Field(None, max_length=255)] = None
     profile_image_url: Annotated[str | None, Field(None, max_length=500)] = None

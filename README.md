@@ -195,14 +195,11 @@ Seed 포함 데이터:
 - JWT 저장 정책은 access token은 기존 프론트 저장 방식을 유지하고, refresh token은 HttpOnly cookie로만 전달합니다. refresh cookie 기본값은 `SameSite=Lax`, `Path=/api/v1/auth`, `HttpOnly=true`이며 local/dev에서는 `Secure=false`, prod/production에서는 `Secure=true`를 사용합니다.
 - refresh cookie의 `Max-Age/Expires`는 refresh token의 `exp`와 맞춥니다. logout은 같은 cookie name/path/domain/samesite/secure 조건으로 삭제하므로 브라우저에 남은 refresh cookie가 재사용되지 않도록 합니다.
 - `SameSite=Lax`는 일반적인 CSRF 위험을 줄이지만 모든 교차 출처 요청을 완전히 막는 장치는 아닙니다. 운영에서는 HTTPS, 제한된 CORS origin, refresh token 서버 검증/폐기, 짧은 access token 수명을 함께 적용합니다.
-- 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 없이 코드를 생성할 수 있지만, 응답 본문 노출은 `EMAIL_VERIFICATION_DEBUG=true`일 때만 허용합니다. 비밀번호 재설정 토큰도 `PASSWORD_RESET_DEBUG=true`일 때만 응답합니다.
+- MVP/시연 회원가입 인증은 이메일 인증만 필수로 사용합니다. 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 없이 코드를 생성할 수 있지만, 응답 본문 노출은 `EMAIL_VERIFICATION_DEBUG=true`일 때만 허용합니다. 비밀번호 재설정 토큰도 `PASSWORD_RESET_DEBUG=true`일 때만 응답합니다.
 - 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. `EMAIL_ENABLED=true`와 SMTP 환경변수를 설정하면 실제 인증코드/비밀번호 재설정 링크를 발송합니다.
-- 휴대폰 SMS 인증은 Twilio Verify 기반입니다. 서버는 한국 휴대폰 번호를 Twilio 호출용 E.164 형식(`+821012345678`)으로 정규화하고, 기존 사용자 DB 호환을 위해 저장/중복확인은 로컬 번호(`01012345678`) 기준도 함께 확인합니다. 로컬에서는 `TWILIO_ENABLED=false`로 개발용 인증번호 흐름을 사용할 수 있지만, 응답 본문 노출은 `PHONE_VERIFICATION_DEBUG=true`일 때만 허용합니다. 운영환경에서는 debug code를 응답하지 않으며 `TWILIO_ENABLED=true`와 Twilio Verify secret 설정이 필요합니다.
-- 인증 발송 설정은 `uv run python scripts/verify_auth_delivery_config.py`로 값 노출 없이 점검할 수 있습니다. 실제 발송 테스트는 명시적으로 `--send-email <email>` 또는 `--send-sms <phone>`을 붙였을 때만 수행합니다.
+- 인증 발송 설정은 `uv run python scripts/verify_auth_delivery_config.py`로 값 노출 없이 점검할 수 있습니다. 실제 SMTP 발송 테스트는 명시적으로 `--send-email <email>`을 붙였을 때만 수행합니다.
 - Brevo SMTP 이메일 인증은 live 발송 경로로 사용할 수 있습니다. `EMAIL_ENABLED=true`, Brevo SMTP host/port/login/key/from email을 설정하고 debug flag를 `false`로 둡니다.
-- Twilio Verify는 설정이 완료되어도 Trial 계정에서는 한국 번호 live SMS가 verified recipient 제한으로 막힐 수 있습니다. 시연에서는 `TWILIO_ENABLED=false`, `PHONE_VERIFICATION_DEBUG=true`로 로컬/시연 전용 휴대폰 인증 fallback을 사용할 수 있으며, prod에서는 반드시 `PHONE_VERIFICATION_DEBUG=false`를 유지합니다. 운영 전 선택지는 Twilio 유료 전환 또는 국내 SMS provider 도입입니다.
-- Twilio live SMS를 테스트할 때는 한국 번호 `+82` E.164 형식을 권장하며, Twilio Console의 verified recipient, Geo Permissions, Verify Service SID, SMS channel 활성화, trial/account 권한을 함께 확인합니다.
-- 휴대폰 인증번호 요청은 같은 번호 기준 60초 이내 재발송을 제한하고, 1시간 5회 초과 요청을 제한합니다. 인증번호 확인 실패도 같은 번호 기준 5회 이상이면 일정 시간 제한합니다.
+- 휴대폰 인증은 MVP/시연 범위에서 보류합니다. `phone_number` DB 컬럼과 일부 조회/프로필 호환성은 유지하지만, 회원가입 필수 인증은 이메일 인증만 사용합니다. 기존 휴대폰 인증 API는 호환성을 위해 숨김/deprecated 상태로 남기고 `410 Gone`을 반환합니다. 운영 전 SMS 인증이 필요하면 별도 SMS provider를 새 정책으로 검토합니다.
 - 알림은 `notifications` inbox, `reminder_schedules` 예약 설정, `notification_logs` 발송 이력으로 분리합니다. 현재 외부 Push/SMS/Kakao/Email 발송 worker는 후속 범위이며, 발송 로그에는 민감 건강 수치 원문이나 인증코드/토큰을 저장하지 않습니다.
 - 주소는 1차 풀서비스 회원가입 필수 입력에서 제외합니다. 지역 기반 병원/검진기관 추천, 배송, 방문 케어 등이 도입될 경우 개인정보 최소수집 원칙에 따라 선택 정보로 재검토합니다.
 - 풀서비스 관리자 권한은 `users.role`을 기준으로 판단합니다. `is_admin`은 legacy 호환 필드로만 남기고, 관리자 role은 `USER/MONITOR/OPERATOR/ADMIN/SUPER_ADMIN` 구조로 설계합니다. 운영 단계에서는 관리자 서브도메인, 2FA, audit log를 추가해야 합니다.
@@ -212,7 +209,7 @@ Seed 포함 데이터:
 - 건강정보/분석결과/검진표/복약정보/대시보드 조회는 `sensitive_access_logs`에 접근 사실을 남깁니다. 건강 수치 원문, 토큰, 인증코드, request body는 저장하지 않습니다.
 - 비밀번호 해싱은 Argon2id 단일 방식입니다. 이전 로컬 계정의 예전 해시는 호환하지 않으므로 로그인되지 않으면 재가입하거나 비밀번호 재설정을 진행하세요. 운영 전환 시에는 별도 재설정/전환 정책이 필요합니다.
 - AI Worker, `async_jobs`, Redis queue 기반 비동기 모델 처리 연결은 MVP 범위 안의 후속 ML/CV/LLM 운영 연동 단계에서 진행합니다.
-- 풀서비스 1차 범위는 [Full Service Scope](docs/design/full_service_scope.md)를 기준으로 관리합니다. 1차 제외/보류 항목은 소셜 로그인, 웨어러블 연동 2개이며, 휴대폰 SMS 인증은 Twilio Verify 기반 구현 대상으로 유지합니다.
+- 풀서비스 1차 범위는 [Full Service Scope](docs/design/full_service_scope.md)를 기준으로 관리합니다. 1차 제외/보류 항목은 소셜 로그인, 웨어러블 연동, 휴대폰 SMS 인증입니다.
 - 코치님/조교님 피드백 반영 기준은 [Requirements Refactor Notes](docs/design/requirements_refactor_notes.md)에 정리합니다. 요구사항 정의서는 사용자 기능 중심으로 유지하고, NFR/아키텍처/재시도/공통 컴포넌트는 별도 설계 문서로 분리합니다.
 - 제출/발표 전 기준 문서는 내부 `docs/design/`, `docs/erd/mvp_erd.dbml`, 실제 OpenAPI를 최신 기준으로 봅니다. 외부 `메인프로젝트 문서/`의 ver1 요구사항/API/ERD/Architecture 파일은 초기 산출물이므로, 최종 제출 전 [Spec v2 Sync Plan](docs/design/spec_v2_sync_plan.md)에 따라 ver2로 동기화해야 합니다.
 
