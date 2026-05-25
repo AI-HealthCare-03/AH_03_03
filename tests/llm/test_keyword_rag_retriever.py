@@ -112,6 +112,25 @@ def test_langfuse_event_is_noop_when_disabled_even_with_env(monkeypatch) -> None
     assert recorded is False
 
 
+def test_langfuse_event_is_noop_when_client_fails(monkeypatch) -> None:
+    import ai_worker.llm.llm_client as llm_client
+
+    class FailingLangfuse:
+        def start_as_current_observation(self, *args, **kwargs):
+            raise RuntimeError("langfuse unavailable")
+
+    monkeypatch.setattr(llm_client, "build_langfuse_client", lambda: FailingLangfuse())
+
+    recorded = llm_client.record_langfuse_event(
+        name="rag.keyword_retrieval",
+        input_payload={"query_preview": "혈당"},
+        output_payload={"retrieved_source_count": 1},
+        metadata={"source": "keyword_rag_poc"},
+    )
+
+    assert recorded is False
+
+
 def test_keyword_rag_trace_metadata_marks_safety_only_fallback() -> None:
     contexts = retrieve_keyword_rag_contexts(
         user_message="전혀 관련 없는 문장입니다",

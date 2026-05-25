@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from ai_worker.cv.food.fallback_policy import select_food_detection_candidate
@@ -17,6 +18,8 @@ from app.repositories import diet_repository
 
 SCORING_SOURCE = "nutrition_rule_table"
 FOOD_DETECTION_SOURCE = "rule_based_food_detection"
+SCORING_FALLBACK_SOURCE = "nutrition_rule_table_unavailable"
+logger = logging.getLogger(__name__)
 
 
 async def create_diet_record(user_id: int, request: DietRecordCreateRequest) -> DietRecord:
@@ -67,10 +70,8 @@ async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[s
         confidence_threshold=config.FOOD_CV_CONFIDENCE_THRESHOLD,
     )
     detected_foods = food_candidate.to_scorer_foods()
-    scoring_result = build_nutrition_scoring_result(detected_foods)
-    explanation = generate_diet_score_explanation(
-        DietScoreExplanationInput(disease_scores=scoring_result["disease_scores"])
-    ).model_dump()
+    scoring_result = _safe_build_nutrition_scoring_result(detected_foods)
+    explanation = _safe_generate_diet_explanation(scoring_result["disease_scores"])
     nutrition_summary = {
         **case["nutrition_summary"],
         "disease_scores": scoring_result["disease_scores"],
@@ -154,6 +155,43 @@ def build_nutrition_scoring_result(
         "food_score_details": details,
         "scoring_source": SCORING_SOURCE,
     }
+
+
+def _safe_build_nutrition_scoring_result(detected_foods: list[dict[str, Any]]) -> dict[str, Any]:
+    try:
+        return build_nutrition_scoring_result(detected_foods)
+    except Exception:
+        logger.exception("Diet nutrition scoring failed; continuing with unavailable score payload")
+        return {
+            "detected_foods": [_food_name(food) for food in detected_foods],
+            "disease_scores": {code: None for code in DISEASE_CODES},
+            "food_score_details": [
+                {
+                    "food_name": _food_name(food),
+                    "matched_food_name": None,
+                    "scores": None,
+                    "match_status": "scoring_unavailable",
+                }
+                for food in detected_foods
+            ],
+            "scoring_source": SCORING_FALLBACK_SOURCE,
+        }
+
+
+def _safe_generate_diet_explanation(disease_scores: dict[str, float | int | None]) -> dict[str, Any]:
+    try:
+        return generate_diet_score_explanation(DietScoreExplanationInput(disease_scores=disease_scores)).model_dump()
+    except Exception:
+        logger.exception("Diet score explanation failed; using base safety explanation")
+        return {
+            "summary": "식단 점수 설명을 생성하지 못했습니다.",
+            "caution": "식단 분석 결과는 건강관리 참고용으로만 확인해 주세요.",
+            "recommended_action": "음식명과 섭취량을 확인한 뒤 다시 분석해 보세요.",
+            "safety_notice": "이 설명은 진단이 아니며, 건강관리 참고용입니다. 정확한 진단과 치료는 의료진 상담이 필요합니다.",
+            "source": "rule_based_explanation_fallback",
+            "reference_summary": None,
+            "reference_sources": [],
+        }
 
 
 def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseFoodScoreRecord]) -> dict[str, Any]:

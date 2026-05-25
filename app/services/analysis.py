@@ -4,7 +4,11 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from ai_worker.llm.explanation_service import generate_explanation_with_context, retrieve_health_context
+from ai_worker.llm.explanation_service import (
+    generate_analysis_explanation,
+    generate_explanation_with_context,
+    retrieve_health_context,
+)
 from ai_worker.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
 from app.core import config
 from app.dtos.analysis import (
@@ -387,13 +391,20 @@ def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFa
             for factor in factors
         ],
     )
-    explanation = generate_explanation_with_context(
-        input_data,
-        contexts=retrieve_health_context(
-            _analysis_reference_query(input_data),
-            disease_type=result.analysis_type.value,
-        ),
-    )
+    try:
+        explanation = generate_explanation_with_context(
+            input_data,
+            contexts=retrieve_health_context(
+                _analysis_reference_query(input_data),
+                disease_type=result.analysis_type.value,
+            ),
+        )
+    except Exception:
+        logger.exception(
+            "Analysis explanation generation failed; using base rule-based explanation",
+            extra={"analysis_result_id": result.id, "analysis_type": result.analysis_type.value},
+        )
+        explanation = generate_analysis_explanation(input_data)
     return explanation.model_dump()
 
 

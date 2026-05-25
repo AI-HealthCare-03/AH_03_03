@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from ai_worker.llm.rag import retrieve_keyword_rag_contexts
@@ -11,6 +12,7 @@ from ai_worker.llm.schemas import (
 )
 
 SAFETY_NOTICE = "이 설명은 진단이 아니며, 건강관리 참고용입니다. 정확한 진단과 치료는 의료진 상담이 필요합니다."
+logger = logging.getLogger(__name__)
 
 DISEASE_LABELS = {
     "DIABETES": "당뇨",
@@ -90,12 +92,20 @@ def retrieve_health_context(query: str, disease_type: str | None = None) -> list
     """Keyword RAG PoC hook backed by reviewed-local candidate source files."""
     top_k = 2
     include_safety_disclaimer = True
-    contexts = retrieve_keyword_rag_contexts(
-        user_message=query,
-        disease_type=disease_type,
-        top_k=top_k,
-        include_safety_disclaimer=include_safety_disclaimer,
-    )
+    try:
+        contexts = retrieve_keyword_rag_contexts(
+            user_message=query,
+            disease_type=disease_type,
+            top_k=top_k,
+            include_safety_disclaimer=include_safety_disclaimer,
+        )
+    except Exception:
+        logger.exception(
+            "Keyword RAG context retrieval failed; continuing with rule-based explanation",
+            extra={"disease_type": disease_type},
+        )
+        return []
+
     trace_keyword_rag_retrieval(
         query=query,
         disease_type=disease_type,
