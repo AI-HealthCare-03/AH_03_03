@@ -129,6 +129,21 @@ function getOverallScore(results: AnalysisResult[]): number {
   return riskFallbackScores[getOverallLevel(results)] ?? 0;
 }
 
+function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId: Record<string, AnalysisExplanation>): string {
+  const firstResult = results[0];
+  if (!firstResult) {
+    return "건강정보를 입력하고 분석을 실행하면 질환별 위험도와 관리 설명이 표시됩니다.";
+  }
+  const explanation = explanationsByResultId[String(firstResult.id)];
+  if (explanation?.recommended_action) {
+    return explanation.recommended_action;
+  }
+  if (explanation?.summary) {
+    return explanation.summary;
+  }
+  return "분석 결과는 입력된 건강정보 기준의 참고 신호입니다. 상세 화면에서 주요 요인을 확인해보세요.";
+}
+
 export default function AnalysisPage() {
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [healthRecordId, setHealthRecordId] = useState<number | null>(null);
@@ -224,6 +239,7 @@ export default function AnalysisPage() {
 
   const overallLevel = getOverallLevel(results);
   const overallScore = getOverallScore(results);
+  const analysisComment = buildAnalysisComment(results, explanationsByResultId);
 
   return (
     <div className="page-stack">
@@ -288,11 +304,11 @@ export default function AnalysisPage() {
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${overallScore}%` }} />
             </div>
-            <p>이 결과는 현재 개발 환경의 간편 분석이며 실제 의료 진단이 아닙니다.</p>
+            <p>이 결과는 저장된 건강정보와 검진값을 바탕으로 계산한 건강관리 참고 신호이며 실제 의료 진단이 아닙니다.</p>
           </div>
         </Card>
-        <Card title="AI 건강 코멘트">
-          <p>혈압과 혈당을 함께 추적하고, 식후 산책과 저당 식단 챌린지를 병행해보세요.</p>
+        <Card title="분석 기반 건강 코멘트">
+          <p>{analysisComment}</p>
         </Card>
       </div>
       <div className="metric-grid">
@@ -374,7 +390,7 @@ export default function AnalysisPage() {
                     ))}
                   </div>
                 ) : (
-                  <span>주요 factor: 혈당, 혈압, BMI, 지질 지표</span>
+                  <span>상세 요인은 분석 입력값과 질환별 기준에 따라 표시됩니다.</span>
                 )}
                 <Link to={`/analysis/${String(result.id)}`}>상세보기</Link>
               </div>

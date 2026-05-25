@@ -1,17 +1,21 @@
+import os
+
 from ai_runtime.llm.response_router import route_main_health_chatbot_response
 from ai_runtime.llm.schemas import MainHealthChatbotInput
+from app.core import config
 from app.dtos.chatbot import ChatbotAskRequest, ChatbotAskResponse, ChatbotContextType
 
 SAFETY_NOTICE = "본 서비스는 진단/처방이 아니며, 치료 변경은 반드시 의료진과 상담해야 합니다."
 
 
 async def ask_chatbot(request: ChatbotAskRequest) -> ChatbotAskResponse:
-    # 공식 챗봇 API는 시연 안정성을 위해 OpenAI 호출 없이 로컬 룰엔진 경로를 사용한다.
+    use_real_llm = config.CHATBOT_USE_REAL_LLM and bool(os.getenv("OPENAI_API_KEY"))
+    # 기본은 로컬 룰엔진이다. 시연에서 실제 LLM을 켤 때만 rewrite 경로를 열고, 실패 시 source=rule_engine으로 돌아온다.
     routed = route_main_health_chatbot_response(
         MainHealthChatbotInput(user_message=request.message),
         use_llm_fallback=False,
-        use_llm_rewrite=False,
-        use_real_llm=False,
+        use_llm_rewrite=use_real_llm,
+        use_real_llm=use_real_llm,
     )
     actions = _recommended_actions(request)
     return ChatbotAskResponse(

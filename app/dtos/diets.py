@@ -76,6 +76,17 @@ class DietPhotoResultResponse(BaseModel):
     created_at: datetime
 
 
+class DietAnalyzePhotoResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    diet_record_id: int
+    detected_foods: dict[str, Any] | list[dict[str, Any]] | None
+    confidence_payload: dict[str, Any] | None
+    raw_output: dict[str, Any] | None
+    created_at: datetime
+
+
 class DietRecordDetailResponse(DietRecordResponse):
     photo_results: list[DietPhotoResultResponse]
 
@@ -91,7 +102,7 @@ class DietAnalyzeRequest(BaseModel):
 class DietAnalyzeResponse(BaseModel):
     message: str
     diet_record: DietRecordResponse
-    photo_result: DietPhotoResultResponse
+    photo_result: DietAnalyzePhotoResultResponse
     detected_foods: list[dict[str, Any]]
     nutrition_summary: dict[str, Any]
     diet_score: float

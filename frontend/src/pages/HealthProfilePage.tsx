@@ -192,7 +192,14 @@ const displayValueMap: Partial<Record<keyof HealthProfileFormState, Record<strin
     WEEKLY_2_3: "주 2-3회",
     WEEKLY_4_PLUS: "주 4회 이상",
   },
-  drinking_amount: { NONE: "마시지 않음", ONE_TO_TWO: "1-2잔", THREE_TO_SIX: "3-6잔", SEVEN_PLUS: "7잔 이상" },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    THREE_TO_SIX: "3-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
 };
 
 function toStringValue(value: unknown): string {

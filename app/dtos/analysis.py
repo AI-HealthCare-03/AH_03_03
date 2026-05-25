@@ -101,6 +101,8 @@ class AnalysisRunResultResponse(BaseModel):
     analysis_mode: AnalysisMode
     risk_score: Decimal
     risk_level: RiskLevel
+    model_name: str | None = None
+    model_version: str | None = None
     guide_message: str
     explanation: dict[str, Any] | None = None
     challenge_recommendation_ids: list[int]

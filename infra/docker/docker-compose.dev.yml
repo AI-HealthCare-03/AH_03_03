@@ -55,9 +55,15 @@ services:
       DB_NAME: ${DB_NAME:-ai_health}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      EMAIL_ENABLED: "false"
+      EMAIL_VERIFICATION_DEBUG: "true"
+      PASSWORD_RESET_DEBUG: "false"
+      CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://host.docker.internal:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     volumes:
@@ -100,8 +106,12 @@ services:
       DB_NAME: ${DB_NAME:-ai_health}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://host.docker.internal:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     volumes:

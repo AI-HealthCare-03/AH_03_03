@@ -8,6 +8,8 @@ export type AnalysisRunResponse = {
   analysis_mode: AnalysisMode;
   risk_score: string | number;
   risk_level: string;
+  model_name?: string | null;
+  model_version?: string | null;
   guide_message: string;
   explanation?: {
     summary?: string;

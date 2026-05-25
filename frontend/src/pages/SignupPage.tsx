@@ -55,6 +55,7 @@ export default function SignupPage() {
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCheck, setEmailCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCode, setEmailCode] = useState("");
+  const [emailDebugCode, setEmailDebugCode] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState<AvailabilityCheck | null>(null);
   const [checkingField, setCheckingField] = useState<
     "login_id" | "email" | "email_send" | "email_verify" | null
@@ -226,6 +227,7 @@ export default function SignupPage() {
       });
       setEmailVerification(null);
       setEmailCode("");
+      setEmailDebugCode(null);
       setFieldErrors((prev) => {
         const { email: _email, email_check, email_verification, ...rest } = prev;
         return rest;
@@ -249,7 +251,12 @@ export default function SignupPage() {
       const result = await sendEmailVerification(normalizedEmail);
       setEmailVerification(null);
       setEmailCode(result.debug_code ?? "");
-      setNotice("인증코드를 발송했습니다. 인증코드를 확인해주세요.");
+      setEmailDebugCode(result.debug_code ?? null);
+      setNotice(
+        result.debug_code
+          ? "인증코드를 생성했습니다. 아래 개발/시연용 인증코드로 확인해주세요."
+          : "인증코드를 발송했습니다. 이메일을 확인해주세요.",
+      );
       setFieldErrors((prev) => {
         const { email_verification, ...rest } = prev;
         return rest;
@@ -438,6 +445,7 @@ export default function SignupPage() {
                     setEmailCheck(null);
                     setEmailVerification(null);
                     setEmailCode("");
+                    setEmailDebugCode(null);
                   }}
                   type="email"
                   required
@@ -491,6 +499,11 @@ export default function SignupPage() {
                 )}
                 {fieldErrors.email_verification && (
                   <span className="field-error">{fieldErrors.email_verification}</span>
+                )}
+                {emailDebugCode && (
+                  <div className="state-box">
+                    개발/시연용 인증코드: <strong>{emailDebugCode}</strong>
+                  </div>
                 )}
               </div>
               <label>
@@ -606,7 +619,8 @@ export default function SignupPage() {
                 >
                   <option value="NONE">마시지 않음</option>
                   <option value="ONE_TO_TWO">1-2잔</option>
-                  <option value="THREE_TO_SIX">3-6잔</option>
+                  <option value="THREE_TO_FOUR">3-4잔</option>
+                  <option value="FIVE_TO_SIX">5-6잔</option>
                   <option value="SEVEN_PLUS">7잔 이상</option>
                 </select>
               </label>

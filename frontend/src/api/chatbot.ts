@@ -10,7 +10,7 @@ export type ChatbotAskRequest = {
 
 export type ChatbotAskResponse = {
   answer: string;
-  source: "DUMMY_LLM" | string;
+  source: string;
   context_type: ChatbotContextType;
   recommended_actions: string[];
   safety_notice: string;
