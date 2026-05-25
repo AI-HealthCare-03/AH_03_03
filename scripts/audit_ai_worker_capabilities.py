@@ -317,9 +317,9 @@ def _audit_llm_runtime_scope() -> list[AuditRow]:
         AuditRow(
             area="llm_runtime",
             item="Official chatbot runtime wiring",
-            status="INFO",
-            detail="app/services/chatbot.py uses local rule-based responses; ai_worker.llm.response_router is not wired yet",
-            category="PREPARED_NOT_WIRED",
+            status="OK",
+            detail="app/services/chatbot.py calls ai_worker.llm.response_router with use_real_llm=False",
+            category="READY_RUNTIME",
         ),
     ]
     rows.extend(
@@ -462,7 +462,7 @@ def _audit_keyword_rag_poc() -> list[AuditRow]:
             area="rag_trace",
             item="Keyword RAG Langfuse trace module",
             module="ai_worker.llm.rag.tracing",
-            ready_category="READY_LANGFUSE_TRACE",
+            ready_category="READY_PROVIDER_CODE_ONLY",
         ),
     ]
     try:
@@ -519,7 +519,7 @@ def _audit_keyword_rag_poc() -> list[AuditRow]:
                     f"sources={','.join(metadata.get('retrieved_source_ids', [])) or '-'}, "
                     f"fallback={metadata.get('fallback')}"
                 ),
-                category="READY_LANGFUSE_TRACE",
+                category="READY_PROVIDER_CODE_ONLY",
             )
         )
     except Exception as exc:
@@ -670,7 +670,6 @@ def _print_summary(rows: list[AuditRow]) -> None:
         "READY_LOCAL_MODEL",
         "READY_RULE_BASED",
         "READY_RAG_POC",
-        "READY_LANGFUSE_TRACE",
         "READY_PROVIDER_CODE_ONLY",
         "PREPARED_NOT_WIRED",
         "NEEDS_ENV",

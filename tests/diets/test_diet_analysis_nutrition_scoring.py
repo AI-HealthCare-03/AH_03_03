@@ -94,3 +94,28 @@ async def test_run_diet_analysis_adds_nutrition_scoring_and_service_sources(monk
     assert "image_analysis_stub" not in str(response)
     assert "rule_stub" not in str(created_photo_payload)
     assert "image_analysis_stub" not in str(created_photo_payload)
+
+
+@pytest.mark.asyncio
+async def test_run_diet_analysis_keeps_response_when_scorer_fails(monkeypatch) -> None:
+    async def fake_create_diet_record(user_id: int, request):
+        return SimpleNamespace(id=1, user_id=user_id, **request.model_dump())
+
+    async def fake_create_diet_photo_result(diet_record_id: int, request):
+        return SimpleNamespace(id=2, diet_record_id=diet_record_id, **request.model_dump())
+
+    def raise_scoring_error(*args, **kwargs):
+        raise RuntimeError("score csv missing")
+
+    monkeypatch.setattr(diet_service, "create_diet_record", fake_create_diet_record)
+    monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
+    monkeypatch.setattr(diet_service, "build_nutrition_scoring_result", raise_scoring_error)
+
+    response = await diet_service.run_diet_analysis(
+        10,
+        DietAnalyzeRequest(meal_type="LUNCH", description="점심 현미밥 닭가슴살 샐러드"),
+    )
+
+    assert response["scoring_source"] == "nutrition_rule_table_unavailable"
+    assert response["disease_scores"] == {"DM": None, "HTN": None, "DL": None, "OBE": None, "ANEM": None}
+    assert response["explanation"]["source"] == "rule_based_explanation"

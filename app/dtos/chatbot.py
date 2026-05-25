@@ -19,7 +19,7 @@ class ChatbotAskRequest(BaseModel):
 
 class ChatbotAskResponse(BaseModel):
     answer: str
-    source: str = "DUMMY_LLM"
+    source: str = "rule_based_chatbot"
     context_type: ChatbotContextType
     recommended_actions: list[str]
     safety_notice: str
