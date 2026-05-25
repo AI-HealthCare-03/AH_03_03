@@ -35,11 +35,7 @@ class Config(BaseSettings):
     LOGIN_FAILURE_LIMIT: int = 5
     LOGIN_SOFT_LOCK_MINUTES: int = 1
     ACCOUNT_LOCK_MINUTES: int = 15
-    TWILIO_ENABLED: bool = False
-    TWILIO_ACCOUNT_SID: str | None = None
-    TWILIO_AUTH_TOKEN: str | None = None
-    TWILIO_VERIFY_SERVICE_SID: str | None = None
-    PHONE_VERIFICATION_DEBUG: bool = False
+    # local/demo에서는 이메일 인증 흐름 검증을 돕되, prod에서는 응답에 인증값이 노출되면 안 된다.
     EMAIL_ENABLED: bool = False
     EMAIL_VERIFICATION_DEBUG: bool = False
     PASSWORD_RESET_DEBUG: bool = False
@@ -51,6 +47,7 @@ class Config(BaseSettings):
     SMTP_FROM_NAME: str = "AI HealthCare"
     SMTP_USE_TLS: bool = True
     FRONTEND_BASE_URL: str = "http://localhost:5173"
+    # OCR/CV 외부 provider는 비용/안정성 때문에 명시 플래그가 켜진 경우에만 공식 경로에서 사용한다.
     CHECKUP_OCR_PRIMARY_PROVIDER: str = "paddle"
     ENABLE_CLOVA_OCR: bool = False
     GPT_VISION_FALLBACK_ENABLED: bool = False
@@ -89,10 +86,3 @@ class Config(BaseSettings):
         if not self.is_production and self.COOKIE_DOMAIN == "localhost":
             return None
         return self.COOKIE_DOMAIN
-
-    @property
-    def twilio_verify_status(self) -> str:
-        if not self.TWILIO_ENABLED:
-            return "disabled"
-        required_values = [self.TWILIO_ACCOUNT_SID, self.TWILIO_AUTH_TOKEN, self.TWILIO_VERIFY_SERVICE_SID]
-        return "configured" if all(required_values) else "misconfigured"

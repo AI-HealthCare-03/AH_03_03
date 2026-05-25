@@ -14,6 +14,6 @@ def normalize_phone_number(phone_number: str) -> str:
 
 
 def normalize_phone_number_e164(phone_number: str) -> str:
-    """Normalize Korean mobile numbers to E.164 format for Twilio: +821012345678."""
+    """Normalize Korean mobile numbers to E.164 format: +821012345678."""
     local_number = normalize_phone_number(phone_number)
     return f"+82{local_number[1:]}"

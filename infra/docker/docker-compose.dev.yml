@@ -56,7 +56,6 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
-      TWILIO_ENABLED: ${TWILIO_ENABLED:-false}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
