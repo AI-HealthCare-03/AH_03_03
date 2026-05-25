@@ -1,6 +1,6 @@
-from ai_worker.llm.llm_client import record_langfuse_event
-from ai_worker.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts, retrieve_keyword_rag_matches
-from ai_worker.llm.rag.tracing import build_keyword_rag_trace_metadata
+from ai_runtime.llm.llm_client import record_langfuse_event
+from ai_runtime.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts, retrieve_keyword_rag_matches
+from ai_runtime.llm.rag.tracing import build_keyword_rag_trace_metadata
 
 
 def test_retrieve_by_disease_type() -> None:
@@ -113,7 +113,7 @@ def test_langfuse_event_is_noop_when_disabled_even_with_env(monkeypatch) -> None
 
 
 def test_langfuse_event_is_noop_when_client_fails(monkeypatch) -> None:
-    import ai_worker.llm.llm_client as llm_client
+    import ai_runtime.llm.llm_client as llm_client
 
     class FailingLangfuse:
         def start_as_current_observation(self, *args, **kwargs):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from ai_worker.jobs import consumer, handlers
-from ai_worker.jobs.redis_stream import build_stream_fields, parse_stream_fields
+from ai_runtime.jobs import consumer, handlers
+from ai_runtime.jobs.redis_stream import build_stream_fields, parse_stream_fields
 
 
 def test_stream_fields_round_trip_preserves_demo_payload() -> None:

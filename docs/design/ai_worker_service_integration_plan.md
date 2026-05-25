@@ -4,24 +4,24 @@
 
 이 문서는 `feature/kdu` 기준 AI Worker 구조 정리 이후, 시연/운영 전까지 남은 서비스 연동 작업을 우선순위별로 정리한 구현 계획서다. 이번 단계에서는 코드 수정, 라우터 연결, 스키마 변경, Dockerfile 수정, `pyproject.toml` 수정, `uv.lock` 수정은 하지 않는다.
 
-현재 `ai_worker/`는 새 최상위 `AI_worker` 폴더를 만들지 않고 기존 하위에서 도메인별로 정리되어 있다. `docs/design/ai_worker_structure.md`에도 구조 설명 문서가 존재한다. 다만 현재 `git status` 기준으로 여러 코드/문서/의존성 변경사항이 남아 있으므로, AI Worker 구조 정리 커밋이 최종 완료되었는지는 별도 확인이 필요하다.
+현재 `ai_runtime/`는 새 최상위 `AI_worker` 폴더를 만들지 않고 기존 하위에서 도메인별로 정리되어 있다. `docs/design/ai_worker_structure.md`에도 구조 설명 문서가 존재한다. 다만 현재 `git status` 기준으로 여러 코드/문서/의존성 변경사항이 남아 있으므로, AI Worker 구조 정리 커밋이 최종 완료되었는지는 별도 확인이 필요하다.
 
-현재 `ai_worker/` 하위 구조:
+현재 `ai_runtime/` 하위 구조:
 
 | 경로 | 현재 역할 |
 | --- | --- |
-| `ai_worker/ml/` | CatBoost/XGBoost 학습/추론, X2 룰 기반 분류, 모델 artifact, 학습 config |
-| `ai_worker/ocr/` | 건강검진표 OCR, OCR extractor/parser, Clova OCR PoC/deferred provider 후보 영역 |
-| `ai_worker/cv/` | 음식 이미지 분석, CV provider, 품질 판정, CV schema 후보 영역 |
-| `ai_worker/llm/` | LLM 호출, GPT Vision 호출 계층, 프롬프트, RAG 준비, 상담/해설 생성 |
-| `ai_worker/common/` | AI 영역 공통 유틸, 공통 schema 후보 영역 |
-| `ai_worker/jobs/` | 향후 worker/job entrypoint 후보 영역. 현재 queue/stream 구현 없음 |
-| `ai_worker/pipelines/` | OCR -> ML -> LLM orchestration 후보 영역. 현재 신규 파이프라인 기능 없음 |
+| `ai_runtime/ml/` | CatBoost/XGBoost 학습/추론, X2 룰 기반 분류, 모델 artifact, 학습 config |
+| `ai_runtime/ocr/` | 건강검진표 OCR, OCR extractor/parser, Clova OCR PoC/deferred provider 후보 영역 |
+| `ai_runtime/cv/` | 음식 이미지 분석, CV provider, 품질 판정, CV schema 후보 영역 |
+| `ai_runtime/llm/` | LLM 호출, GPT Vision 호출 계층, 프롬프트, RAG 준비, 상담/해설 생성 |
+| `ai_runtime/common/` | AI 영역 공통 유틸, 공통 schema 후보 영역 |
+| `ai_runtime/jobs/` | 향후 worker/job entrypoint 후보 영역. 현재 queue/stream 구현 없음 |
+| `ai_runtime/pipelines/` | OCR -> ML -> LLM orchestration 후보 영역. 현재 신규 파이프라인 기능 없음 |
 
 현재 기록할 검증 명령:
 
 ```bash
-uv run ruff check app scripts ai_worker tests
+uv run ruff check app scripts ai_runtime tests
 uv run pytest tests
 uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 ```
@@ -32,16 +32,16 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 
 | 번호 | 작업명 | 우선순위 | 목적 | 현재 상태 | 완료 기준 | 관련 경로 | 구현 여부 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | AI worker 정리 커밋 완료 확인 | P0 | 구조 정리 작업의 기준점을 확정한다 | 구조는 나뉘어 있으나 git status상 변경사항이 남아 있어 커밋 완료 여부 확인 필요 | AI Worker 구조 정리 커밋 hash 확인, 남은 변경사항 분리 | `ai_worker/`, `docs/design/ai_worker_structure.md` | 미구현 |
-| 2 | dummy/stub 공식 경로 정리 | P0 | 공식 API/서비스 경로에서 개발용 명칭 노출과 호출을 줄인다 | 일부 서비스에 dummy/stub/is_dummy 표현 잔존 | 공식 endpoint는 `run_analysis`, `run_diet_analysis` 등 공식 함수명 호출. 내부 fallback source만 명확히 유지 | `app/services/*`, `app/apis/v1/*`, `ai_worker/llm/*` | 일부 구현 |
+| 1 | AI worker 정리 커밋 완료 확인 | P0 | 구조 정리 작업의 기준점을 확정한다 | 구조는 나뉘어 있으나 git status상 변경사항이 남아 있어 커밋 완료 여부 확인 필요 | AI Worker 구조 정리 커밋 hash 확인, 남은 변경사항 분리 | `ai_runtime/`, `docs/design/ai_worker_structure.md` | 미구현 |
+| 2 | dummy/stub 공식 경로 정리 | P0 | 공식 API/서비스 경로에서 개발용 명칭 노출과 호출을 줄인다 | 일부 서비스에 dummy/stub/is_dummy 표현 잔존 | 공식 endpoint는 `run_analysis`, `run_diet_analysis` 등 공식 함수명 호출. 내부 fallback source만 명확히 유지 | `app/services/*`, `app/apis/v1/*`, `ai_runtime/llm/*` | 일부 구현 |
 | 3 | 식단 질병군별 점수 엑셀 작성 | P0 | 음식별 질병군 점수 기준표를 팀 공통 rule source로 만든다 | 질병군별 식단 점수 기준표 필요 | `docs/rules/diet_score_matrix.xlsx` 작성 및 리뷰 완료 | `docs/rules/` | 미구현 |
-| 4 | 식단 점수 계산 모듈 구현 | P0 | CV/GPT Vision 음식 결과를 질병군별 점수로 변환한다 | 공식 `/diets/analyze`에 음식명 후보 기반 nutrition scorer 연결. 자체 CV/GPT Vision 공급자는 미연결 | 음식명 입력 -> DM/HTN/DL/OBE/ANEM 점수, 상세 매칭 결과, `nutrition_rule_table` source 반환 | `ai_worker/cv/food/nutrition/`, `app/services/diets.py` | 일부 구현 |
-| 5 | 건강검진 OCR -> 정밀검사 연결 확인/보강 | P0 | OCR 결과가 PRECISION 분석 입력으로 실제 반영되게 한다 | OCR 결과와 `HealthRecord` X2 필드 연결 검증 필요 | OCR/검진값 confirm 후 precision readiness true 가능, PRECISION 분석 실행 가능 | `app/services/exams.py`, `app/services/analysis.py`, `ai_worker/ocr/`, `ai_worker/ml/` | 일부 구현 |
-| 6 | CV 모델 fallback 정책 정의 | P0 | 자체 식단 CV와 GPT Vision fallback 경계를 정한다 | 자체 CV 모델 미완성, fallback 정책 미정 | confidence threshold, timeout, retry, provider log 정책 문서화 | `ai_worker/cv/`, `ai_worker/cv/providers/gpt_vision.py` | 미구현 |
-| 7 | GPT Vision fallback 연결 | P0 | 자체 CV 실패/저신뢰 시 GPT Vision 보조 분석을 연결한다 | GPT Vision provider는 있으나 식단 API 흐름 연결 검증 필요 | CV 결과 schema와 GPT Vision 결과 schema 통일, provider/source 기록 | `ai_worker/cv/providers/gpt_vision.py`, `app/services/diets.py` | 미구현 |
-| 8 | LLM/RAG 설명 생성 붙이기 | P1 | 분석/식단/OCR 결과를 사용자 친화적 설명으로 변환한다 | 분석/식단 설명은 `explanation_service`로 공식 runtime 연결. keyword RAG PoC와 Langfuse trace metadata가 붙어 있으나 챗봇 라우터/추천문구 모듈은 아직 공식 runtime 미연결 | 공식 runtime과 prepared-not-wired 범위 문서화, 챗봇/추천문구 연결 여부 별도 결정 | `ai_worker/llm/`, `ai_worker/llm/rag/`, `app/services/analysis.py`, `app/services/diets.py` | 일부 구현 |
-| 9 | Docker ML 빌드 검증 | P0 | 시연/배포 컨테이너에서 ML import와 artifact loading을 검증한다 | 로컬 검증 중심. Docker 빌드 검증 필요 | fastapi 컨테이너에서 CatBoost import 및 `predict_chronic_disease_risks` import 성공 | `Dockerfile`, `.dockerignore`, `infra/docker/`, `ai_worker/ml/artifacts/` | 미구현 |
-| 10 | Redis Stream / async_jobs / worker 구조 | P2 | 운영용 비동기 AI 작업 처리 기반을 만든다 | 현재 구현 범위 밖. queue/stream 없음 | async job 상태 추적, retry, DLQ, worker heartbeat 설계/구현 | `ai_worker/jobs/`, `ai_worker/pipelines/`, future DB model | 미구현 |
+| 4 | 식단 점수 계산 모듈 구현 | P0 | CV/GPT Vision 음식 결과를 질병군별 점수로 변환한다 | 공식 `/diets/analyze`에 음식명 후보 기반 nutrition scorer 연결. 자체 CV/GPT Vision 공급자는 미연결 | 음식명 입력 -> DM/HTN/DL/OBE/ANEM 점수, 상세 매칭 결과, `nutrition_rule_table` source 반환 | `ai_runtime/cv/food/nutrition/`, `app/services/diets.py` | 일부 구현 |
+| 5 | 건강검진 OCR -> 정밀검사 연결 확인/보강 | P0 | OCR 결과가 PRECISION 분석 입력으로 실제 반영되게 한다 | OCR 결과와 `HealthRecord` X2 필드 연결 검증 필요 | OCR/검진값 confirm 후 precision readiness true 가능, PRECISION 분석 실행 가능 | `app/services/exams.py`, `app/services/analysis.py`, `ai_runtime/ocr/`, `ai_runtime/ml/` | 일부 구현 |
+| 6 | CV 모델 fallback 정책 정의 | P0 | 자체 식단 CV와 GPT Vision fallback 경계를 정한다 | 자체 CV 모델 미완성, fallback 정책 미정 | confidence threshold, timeout, retry, provider log 정책 문서화 | `ai_runtime/cv/`, `ai_runtime/cv/providers/gpt_vision.py` | 미구현 |
+| 7 | GPT Vision fallback 연결 | P0 | 자체 CV 실패/저신뢰 시 GPT Vision 보조 분석을 연결한다 | GPT Vision provider는 있으나 식단 API 흐름 연결 검증 필요 | CV 결과 schema와 GPT Vision 결과 schema 통일, provider/source 기록 | `ai_runtime/cv/providers/gpt_vision.py`, `app/services/diets.py` | 미구현 |
+| 8 | LLM/RAG 설명 생성 붙이기 | P1 | 분석/식단/OCR 결과를 사용자 친화적 설명으로 변환한다 | 분석/식단 설명은 `explanation_service`로 공식 runtime 연결. keyword RAG PoC와 Langfuse trace metadata가 붙어 있으나 챗봇 라우터/추천문구 모듈은 아직 공식 runtime 미연결 | 공식 runtime과 prepared-not-wired 범위 문서화, 챗봇/추천문구 연결 여부 별도 결정 | `ai_runtime/llm/`, `ai_runtime/llm/rag/`, `app/services/analysis.py`, `app/services/diets.py` | 일부 구현 |
+| 9 | Docker ML 빌드 검증 | P0 | 시연/배포 컨테이너에서 ML import와 artifact loading을 검증한다 | 로컬 검증 중심. Docker 빌드 검증 필요 | fastapi 컨테이너에서 CatBoost import 및 `predict_chronic_disease_risks` import 성공 | `Dockerfile`, `.dockerignore`, `infra/docker/`, `ai_runtime/ml/artifacts/` | 미구현 |
+| 10 | Redis Stream / async_jobs / worker 구조 | P2 | 운영용 비동기 AI 작업 처리 기반을 만든다 | 현재 구현 범위 밖. queue/stream 없음 | async job 상태 추적, retry, DLQ, worker heartbeat 설계/구현 | `ai_runtime/jobs/`, `ai_runtime/pipelines/`, future DB model | 미구현 |
 
 ## 3. 우선순위 기준
 
@@ -80,13 +80,13 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 
 - 목적: AI Worker 구조 정리 작업의 기준점을 확정한다.
 - 왜 필요한가: 이후 dummy 정리, OCR/ML/CV/LLM 연결, Docker 검증 작업이 같은 파일 구조를 기준으로 진행되어야 한다.
-- 현재 문제: `ai_worker/` 구조는 도메인별로 나뉘어 있지만 현재 워크트리에 여러 변경사항이 남아 있어 정리 커밋 완료 여부를 별도로 확인해야 한다.
+- 현재 문제: `ai_runtime/` 구조는 도메인별로 나뉘어 있지만 현재 워크트리에 여러 변경사항이 남아 있어 정리 커밋 완료 여부를 별도로 확인해야 한다.
 - 해야 할 일:
   - `git status --short` 확인
   - AI Worker 구조 정리 관련 변경과 다른 작업 변경을 분리
   - 구조 정리 커밋 hash 기록
 - 건드릴 파일 후보:
-  - `ai_worker/`
+  - `ai_runtime/`
   - `docs/design/ai_worker_structure.md`
 - 완료 기준:
   - AI Worker 구조 정리 커밋이 명확히 존재한다.
@@ -94,7 +94,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 검증 명령:
   ```bash
   git status --short
-  find ai_worker -maxdepth 3 -type d | sort
+  find ai_runtime -maxdepth 3 -type d | sort
   ```
 - 주의사항:
   - 이번 문서 작업에서는 커밋하지 않는다.
@@ -124,10 +124,10 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
     - `ask_dummy_chatbot`
   - `app/services/main.py`
     - `_build_dummy_ai_comment`
-  - `ai_worker/llm/llm_generator.py`
+  - `ai_runtime/llm/llm_generator.py`
     - `llm_stub`
     - `llm_rewrite_stub`
-  - `ai_worker/llm/rag_generator.py`
+  - `ai_runtime/llm/rag_generator.py`
     - `build_stub_answer`
 - 해야 할 일:
   - 공식 API/서비스 경로에서는 `dummy` 함수명을 줄인다.
@@ -147,16 +147,16 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `app/services/medications.py`
   - `app/services/chatbot.py`
   - `app/services/main.py`
-  - `ai_worker/llm/llm_generator.py`
-  - `ai_worker/llm/rag_generator.py`
+  - `ai_runtime/llm/llm_generator.py`
+  - `ai_runtime/llm/rag_generator.py`
 - 완료 기준:
   - 공식 service/router 호출 경로에서 `run_dummy`, `ask_dummy`, `_build_dummy` 호출이 사라진다.
   - deprecated 경로는 wrapper로 남아도 된다.
   - 사용자 응답에 `dummy`, `더미`, `stub` 표현이 노출되지 않는다.
 - 검증 명령:
   ```bash
-  grep -R -n "run_dummy\|ask_dummy\|_build_dummy" app/services app/apis/v1 ai_worker || true
-  uv run ruff check app scripts ai_worker tests
+  grep -R -n "run_dummy\|ask_dummy\|_build_dummy" app/services app/apis/v1 ai_runtime || true
+  uv run ruff check app scripts ai_runtime tests
   uv run pytest tests
   ```
 - 주의사항:
@@ -233,15 +233,15 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 현재 문제: 식단 점수 계산 모듈은 공식 `/diets/analyze` 경로에 연결되었지만, 음식명 후보는 아직 자체 CV 모델이 아니라 rule-based 후보 생성 흐름에서 나온다.
 - 해야 할 일:
   - 현재는 `app/services/diets.py`의 음식명 후보를 입력받는다.
-  - `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`와 `disease_score_rules.json`을 읽는다.
+  - `ai_runtime/cv/food/nutrition/data/food_disease_scores.csv`와 `disease_score_rules.json`을 읽는다.
   - 사용자 질병군별 점수를 계산한다.
   - `disease_scores`, `food_score_details`, `scoring_source`를 응답과 `DietPhotoResult.raw_output`에 포함한다.
   - 추후 CV 또는 GPT Vision 결과로 나온 음식명을 같은 scorer 입력으로 연결한다.
 - 건드릴 파일 후보:
-  - `ai_worker/cv/food/nutrition/scoring/disease_food_scorer.py`
-  - `ai_worker/cv/food/nutrition/scoring/schemas.py`
-  - `ai_worker/cv/food/nutrition/data/food_disease_scores.csv`
-  - `ai_worker/cv/food/nutrition/rules/disease_score_rules.json`
+  - `ai_runtime/cv/food/nutrition/scoring/disease_food_scorer.py`
+  - `ai_runtime/cv/food/nutrition/scoring/schemas.py`
+  - `ai_runtime/cv/food/nutrition/data/food_disease_scores.csv`
+  - `ai_runtime/cv/food/nutrition/rules/disease_score_rules.json`
   - `app/services/diets.py`
 - 완료 기준:
   - 음식명 배열 입력 시 DM/HTN/DL/OBE/ANEM 점수와 음식별 매칭 상세를 반환한다.
@@ -250,10 +250,10 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 검증 명령:
   ```bash
   uv run pytest tests
-  uv run ruff check ai_worker app tests
+  uv run ruff check ai_runtime app tests
   ```
 - 주의사항:
-  - 영양소/음식 성분 점수화는 `ai_worker/cv/food/nutrition/` 하위에 두고 음식 이미지 분석 흐름과 함께 관리한다.
+  - 영양소/음식 성분 점수화는 `ai_runtime/cv/food/nutrition/` 하위에 두고 음식 이미지 분석 흐름과 함께 관리한다.
   - 이번 문서 작업에서는 구현하지 않는다.
 
 ### 5. 건강검진 OCR -> 정밀검사 연결 확인/보강
@@ -267,13 +267,13 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `app/services/exams.py`에서 OCR/confirm 결과가 health record에 반영되는지 확인한다.
   - `app/apis/v1/exam_routers.py` confirm 흐름을 확인한다.
   - `app/services/analysis.py`에서 PRECISION 모드가 DM/HTN/DL CatBoost와 OBE rule fallback을 실제로 사용하는지 검증한다.
-  - `ai_worker/ml/inference/disease_risk_service.py`의 artifact loading/fallback 정책을 확인한다.
+  - `ai_runtime/ml/inference/disease_risk_service.py`의 artifact loading/fallback 정책을 확인한다.
   - OCR field key와 health field key를 매핑한다.
 - 건드릴 파일 후보:
   - `app/services/analysis.py`
-  - `ai_worker/ml/inference/disease_risk_service.py`
-  - `ai_worker/ocr/checkup/`
-  - `ai_worker/ocr/providers/clova_ocr/`
+  - `ai_runtime/ml/inference/disease_risk_service.py`
+  - `ai_runtime/ocr/checkup/`
+  - `ai_runtime/ocr/providers/clova_ocr/`
   - `app/apis/v1/analysis_routers.py`
   - `app/apis/v1/exam_routers.py`
 - 완료 기준:
@@ -301,13 +301,13 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - 2차: 자체 CV 모델 confidence 부족 또는 음식명 후보 부족 시 GPT Vision API
   - 3차: GPT Vision 실패 시 수동 입력 또는 `needs_review`
   - confidence threshold, timeout, retry, provider 로그 정책을 문서화한다.
-  - provider 결과는 `ai_worker/cv/food/schemas.py`의 `FoodDetectionCandidateSet` 기준으로 정규화한다.
+  - provider 결과는 `ai_runtime/cv/food/schemas.py`의 `FoodDetectionCandidateSet` 기준으로 정규화한다.
   - fallback 호출 정책은 `GPT_VISION_FALLBACK_POLICY=user_confirmation_required`를 기본으로 둔다.
   - 최종 `DiseaseFoodScorer` 입력은 provider와 무관하게 음식명 후보 `list[str]`로 통일한다.
 - 건드릴 파일 후보:
-  - `ai_worker/cv/`
-  - `ai_worker/cv/food/`
-  - `ai_worker/cv/providers/gpt_vision.py`
+  - `ai_runtime/cv/`
+  - `ai_runtime/cv/food/`
+  - `ai_runtime/cv/providers/gpt_vision.py`
   - `app/services/diets.py`
 - 완료 기준:
   - provider priority와 fallback 조건이 문서화되어 있다.
@@ -315,7 +315,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - 정규화 필드 `provider`, `confidence`, `detected_foods`, `needs_review`, `fallback_reason`이 타입 또는 문서에 명시되어 있다.
 - 검증 명령:
   ```bash
-  rg -n "provider|confidence|gpt_vision|needs_review" ai_worker app/services/diets.py
+  rg -n "provider|confidence|gpt_vision|needs_review" ai_runtime app/services/diets.py
   ```
 - 주의사항:
   - GPT Vision은 비용 발생 API이므로 무조건 자동 호출하지 않는다.
@@ -326,8 +326,8 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 목적: 자체 CV 모델 결과가 없거나 신뢰도가 낮을 때 GPT Vision으로 식단 분석을 보조한다.
 - 왜 필요한가: 시연 전 자체 CV 정확도가 충분하지 않으면 사용자가 식단 분석 결과를 얻지 못할 수 있다.
 - 현재 문제:
-  - `ai_worker/cv/providers/gpt_vision.py`는 존재하지만 공식 식단 API 흐름과 schema 통합이 필요하다.
-  - `ai_worker/cv/router.py`와 `app/services/diets.py` 연결 정책을 확정해야 한다.
+  - `ai_runtime/cv/providers/gpt_vision.py`는 존재하지만 공식 식단 API 흐름과 schema 통합이 필요하다.
+  - `ai_runtime/cv/router.py`와 `app/services/diets.py` 연결 정책을 확정해야 한다.
 - 해야 할 일:
   - CV 결과 schema와 GPT Vision 결과 schema를 통일한다.
   - `provider` 필드를 남긴다.
@@ -335,8 +335,8 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - 비용 발생 API이므로 호출 조건을 명확히 한다.
   - GPT Vision 결과도 `FoodDetectionCandidateSet`으로 정규화한 뒤 nutrition scorer에 전달한다.
 - 건드릴 파일 후보:
-  - `ai_worker/cv/providers/gpt_vision.py`
-  - `ai_worker/cv/router.py`
+  - `ai_runtime/cv/providers/gpt_vision.py`
+  - `ai_runtime/cv/router.py`
   - `app/services/diets.py`
   - `app/apis/v1/diet_routers.py`
 - 완료 기준:
@@ -346,7 +346,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 검증 명령:
   ```bash
   uv run pytest tests
-  uv run ruff check app scripts ai_worker tests
+  uv run ruff check app scripts ai_runtime tests
   ```
 - 주의사항:
   - 실제 API key가 없을 때 서버 import가 깨지면 안 된다.
@@ -363,16 +363,16 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - vector RAG, LangChain/LangGraph, 운영형 평가 파이프라인은 아직 완성된 운영 경로가 아니다.
 - 해야 할 일:
   - 공식 runtime 범위는 `docs/design/llm_runtime_scope.md`를 기준으로 유지한다.
-  - 챗봇 공식 API를 `ai_worker.llm.response_router`로 연결할지 별도 작업에서 결정한다.
+  - 챗봇 공식 API를 `ai_runtime.llm.response_router`로 연결할지 별도 작업에서 결정한다.
   - 추천/챌린지 문구 모듈을 DB challenge recommendation 흐름과 통합할지 결정한다.
   - 운영형 RAG는 질병/영양/복약 주의사항 근거 문서가 준비된 뒤 붙인다.
   - 입력에 없는 질환/수치/챌린지를 LLM이 생성하지 않도록 grounding 검사를 유지한다.
 - 건드릴 파일 후보:
-  - `ai_worker/llm/`
-  - `ai_worker/llm/rag/`
-  - `ai_worker/llm/explanation_service.py`
-  - `ai_worker/llm/response_router.py`
-  - `ai_worker/llm/recommendation_message.py`
+  - `ai_runtime/llm/`
+  - `ai_runtime/llm/rag/`
+  - `ai_runtime/llm/explanation_service.py`
+  - `ai_runtime/llm/response_router.py`
+  - `ai_runtime/llm/recommendation_message.py`
   - `app/services/chatbot.py`
 - 완료 기준:
   - 분석 결과를 기반으로 안전한 설명 문구를 생성한다.
@@ -381,7 +381,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 검증 명령:
   ```bash
   uv run pytest tests
-  uv run ruff check ai_worker tests
+  uv run ruff check ai_runtime tests
   ```
 - 주의사항:
   - RAG vector DB 구현은 이번 계획의 P2로 둔다.
@@ -390,14 +390,14 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 ### 9. Docker ML 빌드 검증
 
 - 목적: 시연/배포 환경의 Docker 이미지에서 ML import, CatBoost artifact loading, FastAPI 실행이 가능한지 확인한다.
-- 왜 필요한가: 로컬에서는 동작해도 Docker image에 `ai_worker`, `catboost`, artifact가 누락되면 시연/배포에서 정밀분석이 실패한다.
+- 왜 필요한가: 로컬에서는 동작해도 Docker image에 `ai_runtime`, `catboost`, artifact가 누락되면 시연/배포에서 정밀분석이 실패한다.
 - 현재 문제:
   - Dockerfile과 `.dockerignore` 기준으로 ML artifact 포함 여부와 AI dependency 설치 여부 확인이 필요하다.
 - 확인할 것:
   - `pyproject.toml` ai 그룹에 `catboost`, `xgboost`, `pandas`, `numpy`가 포함되는지
   - app Dockerfile에서 `--group ai`를 설치하는지
-  - app Docker image에 `ai_worker`가 COPY 되는지
-  - `.dockerignore`가 `ai_worker/ml/artifacts/*.cbm`을 제외하지 않는지
+  - app Docker image에 `ai_runtime`가 COPY 되는지
+  - `.dockerignore`가 `ai_runtime/ml/artifacts/*.cbm`을 제외하지 않는지
   - FastAPI 컨테이너에서 ML import가 되는지
 - 건드릴 파일 후보:
   - `Dockerfile`
@@ -405,7 +405,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `infra/docker/`
   - `pyproject.toml`
   - `uv.lock`
-  - `ai_worker/ml/artifacts/`
+  - `ai_runtime/ml/artifacts/`
 - 완료 기준:
   - FastAPI 컨테이너 안에서 `predict_chronic_disease_risks` import 성공
   - CatBoost artifact 존재 시 predictor load 가능
@@ -413,7 +413,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   ```bash
   docker compose build fastapi
   docker compose up -d fastapi
-  docker compose exec fastapi python -c "from ai_worker.ml.inference.disease_risk_service import predict_chronic_disease_risks; print('OK')"
+  docker compose exec fastapi python -c "from ai_runtime.ml.inference.disease_risk_service import predict_chronic_disease_risks; print('OK')"
   ```
 - 주의사항:
   - 이번 문서 작업에서는 Dockerfile을 수정하지 않는다.
@@ -439,8 +439,8 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - worker heartbeat
   - idempotency key
 - 건드릴 파일 후보:
-  - `ai_worker/jobs/`
-  - `ai_worker/pipelines/`
+  - `ai_runtime/jobs/`
+  - `ai_runtime/pipelines/`
   - future DB models/migrations
   - future admin monitoring API
 - 완료 기준:
@@ -449,7 +449,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 - 검증 명령:
   ```bash
   uv run pytest tests
-  uv run ruff check app scripts ai_worker tests
+  uv run ruff check app scripts ai_runtime tests
   ```
 - 주의사항:
   - 이번 시연 전에는 P2로 유지한다.

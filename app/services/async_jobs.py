@@ -5,7 +5,7 @@ from typing import Any
 
 from tortoise.timezone import now
 
-from ai_worker.jobs.redis_stream import enqueue_async_job
+from ai_runtime.jobs.redis_stream import enqueue_async_job
 from app.models.async_jobs import AsyncJob, AsyncJobStatus
 
 logger = logging.getLogger(__name__)

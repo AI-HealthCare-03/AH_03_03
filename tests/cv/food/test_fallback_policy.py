@@ -1,5 +1,5 @@
-from ai_worker.cv.food.fallback_policy import select_food_detection_candidate
-from ai_worker.cv.food.schemas import FoodDetectionCandidateSet
+from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
+from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
 
 
 def test_default_policy_uses_rule_based_and_does_not_call_gpt_vision() -> None:

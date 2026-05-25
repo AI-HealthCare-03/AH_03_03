@@ -1,4 +1,4 @@
-from ai_worker.ocr.medication.parser import parse_medication_text
+from ai_runtime.ocr.medication.parser import parse_medication_text
 
 
 def test_parse_medication_text_extracts_core_fields() -> None:

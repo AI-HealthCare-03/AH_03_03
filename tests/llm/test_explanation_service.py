@@ -1,10 +1,10 @@
-from ai_worker.llm.explanation_service import (
+from ai_runtime.llm.explanation_service import (
     generate_analysis_explanation,
     generate_diet_score_explanation,
     generate_explanation_with_context,
     retrieve_health_context,
 )
-from ai_worker.llm.schemas import AnalysisExplanationInput, DietScoreExplanationInput, HealthRiskFactor
+from ai_runtime.llm.schemas import AnalysisExplanationInput, DietScoreExplanationInput, HealthRiskFactor
 
 
 def test_analysis_explanation_is_rule_based_and_safe() -> None:
@@ -57,7 +57,7 @@ def test_rag_ready_interface_adds_keyword_context_references() -> None:
 
 
 def test_retrieve_health_context_returns_empty_when_rag_loader_fails(monkeypatch) -> None:
-    import ai_worker.llm.explanation_service as explanation_service
+    import ai_runtime.llm.explanation_service as explanation_service
 
     def raise_rag_error(*args, **kwargs):
         raise RuntimeError("index broken")

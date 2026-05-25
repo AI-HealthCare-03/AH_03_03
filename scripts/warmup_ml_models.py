@@ -13,7 +13,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from ai_worker.ml.inference.disease_risk_service import warmup_chronic_disease_models  # noqa: E402
+from ai_runtime.ml.inference.disease_risk_service import warmup_chronic_disease_models  # noqa: E402
 
 
 def main() -> int:

@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from ai_worker.cv.food.nutrition.scoring.disease_food_scorer import (
+from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import (
     DEFAULT_SCORE_CSV_PATH,
     DiseaseFoodScorer,
     build_food_disease_score_csv,
 )
-from ai_worker.cv.food.nutrition.scoring.schemas import FoodNutritionRow
+from ai_runtime.cv.food.nutrition.scoring.schemas import FoodNutritionRow
 
 
 def test_scores_are_bounded_for_five_disease_groups() -> None:

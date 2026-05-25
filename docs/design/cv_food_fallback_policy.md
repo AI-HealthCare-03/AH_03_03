@@ -7,7 +7,7 @@
 - 자체 식단 CV 모델은 아직 공식 서비스 경로에 연결되어 있지 않다.
 - `/api/v1/diets/analyze`는 현재 rule-based 음식 후보를 생성한다.
 - 생성된 음식명 후보는 `DiseaseFoodScorer`로 전달되어 `DM / HTN / DL / OBE / ANEM` 질병군별 식단 점수를 계산한다.
-- `ai_worker/cv/providers/gpt_vision.py`는 존재하지만 공식 식단 fallback으로 자동 호출하지 않는다.
+- `ai_runtime/cv/providers/gpt_vision.py`는 존재하지만 공식 식단 fallback으로 자동 호출하지 않는다.
 - 실제 유료 GPT Vision 호출은 env flag와 사용자 확인 정책이 정리된 뒤 켜야 한다.
 
 ## 2. Provider 공통 결과 schema
@@ -25,8 +25,8 @@
 
 구현 위치:
 
-- `ai_worker/cv/food/schemas.py`
-- `ai_worker/cv/food/fallback_policy.py`
+- `ai_runtime/cv/food/schemas.py`
+- `ai_runtime/cv/food/fallback_policy.py`
 
 ## 3. 선택 정책
 

@@ -74,7 +74,7 @@ def _parse_args():
 
 
 def _warmup_ml_models() -> None:
-    from ai_worker.ml.inference.disease_risk_service import warmup_chronic_disease_models
+    from ai_runtime.ml.inference.disease_risk_service import warmup_chronic_disease_models
 
     results = warmup_chronic_disease_models()
     failed = [disease for disease, result in results.items() if result.get("status") == "failed"]

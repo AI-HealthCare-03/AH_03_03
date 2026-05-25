@@ -89,7 +89,7 @@ services:
     container_name: ai-health-dev-ai-worker
     build:
       context: ../..
-      dockerfile: ai_worker/Dockerfile
+      dockerfile: ai_runtime/Dockerfile
     environment:
       ENV: ${ENV:-local}
       SECRET_KEY: ${SECRET_KEY:-PLEASE_CHANGE_ME}
@@ -105,7 +105,7 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     volumes:
-      - ../../ai_worker:/app/ai_worker
+      - ../../ai_runtime:/app/ai_runtime
     restart: unless-stopped
     networks:
       - app

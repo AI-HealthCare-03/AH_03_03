@@ -102,7 +102,7 @@ def _check_ml_import() -> CheckResult:
     try:
         from catboost import CatBoostClassifier
 
-        from ai_worker.ml.inference.disease_risk_service import predict_chronic_disease_risks
+        from ai_runtime.ml.inference.disease_risk_service import predict_chronic_disease_risks
     except Exception as exc:  # noqa: BLE001 - readiness check should report import errors clearly.
         return CheckResult("ML import", "FAIL", f"{type(exc).__name__}: {exc}")
 
@@ -112,7 +112,7 @@ def _check_ml_import() -> CheckResult:
 
 
 def _check_catboost_artifacts() -> CheckResult:
-    artifact_root = REPO_ROOT / "ai_worker" / "ml" / "artifacts"
+    artifact_root = REPO_ROOT / "ai_runtime" / "ml" / "artifacts"
     missing: list[str] = []
     details: list[str] = []
 
@@ -137,8 +137,8 @@ def _check_catboost_artifacts() -> CheckResult:
 
 
 def _check_nutrition_assets() -> CheckResult:
-    csv_path = REPO_ROOT / "ai_worker" / "cv" / "food" / "nutrition" / "data" / "food_disease_scores.csv"
-    rules_path = REPO_ROOT / "ai_worker" / "cv" / "food" / "nutrition" / "rules" / "disease_score_rules.json"
+    csv_path = REPO_ROOT / "ai_runtime" / "cv" / "food" / "nutrition" / "data" / "food_disease_scores.csv"
+    rules_path = REPO_ROOT / "ai_runtime" / "cv" / "food" / "nutrition" / "rules" / "disease_score_rules.json"
     missing = [path for path in (csv_path, rules_path) if not path.exists()]
     if missing:
         return CheckResult(
@@ -151,8 +151,8 @@ def _check_nutrition_assets() -> CheckResult:
 
 def _check_disease_score_load() -> CheckResult:
     try:
-        from ai_worker.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
-        from ai_worker.cv.food.nutrition.scoring.schemas import DISEASE_CODES
+        from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
+        from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES
 
         records = DiseaseFoodScorer().load_runtime_scores()
     except Exception as exc:  # noqa: BLE001 - readiness check should report load errors clearly.

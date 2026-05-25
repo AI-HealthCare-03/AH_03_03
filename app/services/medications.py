@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from starlette import status
 
-from ai_worker.ocr.medication import MedicationOcrItem, parse_medication_text
+from ai_runtime.ocr.medication import MedicationOcrItem, parse_medication_text
 from app.dtos.medications import (
     MedicationCreateRequest,
     MedicationOCRConfirmRequest,

@@ -44,7 +44,7 @@
   - FastAPI는 `REDIS_HOST`, `REDIS_PORT` 설정으로 compose 내부 Redis에 연결할 수 있다.
   - `/api/v1/system/health`는 Redis 연결 상태를 확인한다.
   - `async_jobs` 모델과 `/api/v1/jobs/demo`, `/api/v1/jobs/{job_id}` 상태 조회 API가 추가되어 있다.
-  - `ai_worker/main.py`는 Redis Stream consumer로 실행되며 현재 `DEMO_ECHO` job만 처리한다.
+  - `ai_runtime/main.py`는 Redis Stream consumer로 실행되며 현재 `DEMO_ECHO` job만 처리한다.
   - 현재 Redis Stream 사용 범위는 demo skeleton 검증용이다.
   - FastAPI 라우터와 DB I/O는 async 기반이지만, OCR/CV/ML/LLM workflow는 현재 동기 API 요청 안에서 처리한다.
   - `/analysis/run`, `/diets/analyze`, 건강검진 OCR confirm은 아직 Redis Stream으로 넘기지 않는다.
@@ -62,8 +62,8 @@
 - 예상 변경 파일/모듈:
   - `app/models/async_jobs.py` 고도화
   - `app/apis/v1/job_routers.py` 실제 job type 확장
-  - `ai_worker/jobs/` retry/DLQ/heartbeat 확장
-  - `ai_worker/pipelines/`
+  - `ai_runtime/jobs/` retry/DLQ/heartbeat 확장
+  - `ai_runtime/pipelines/`
   - Redis Stream producer/consumer 모듈
   - retry/dead-letter queue 모듈
 - 우선순위: P2
@@ -71,7 +71,7 @@
 ### 2. vector RAG / pgvector embedding search
 
 - 현재 상태:
-  - `ai_worker/llm`에 RAG-ready interface와 안전한 fallback 구조가 있다.
+  - `ai_runtime/llm`에 RAG-ready interface와 안전한 fallback 구조가 있다.
   - 실제 문서 수집, chunking, embedding, pgvector 검색은 구현하지 않는다.
 - 왜 시연 전 P0가 아닌지:
   - 검증되지 않은 RAG는 의료 정보 답변 품질과 안전성 위험을 키운다.
@@ -80,9 +80,9 @@
   - 건강정보 답변에는 공신력 있는 출처와 근거 추적이 중요하다.
   - 향후 질병/영양/복약 설명을 근거 문서 기반으로 제공하려면 embedding 검색이 필요하다.
 - 예상 변경 파일/모듈:
-  - `ai_worker/llm/rag/`
-  - `ai_worker/llm/rag_generator.py`
-  - `ai_worker/llm/rag_sources.py`
+  - `ai_runtime/llm/rag/`
+  - `ai_runtime/llm/rag_generator.py`
+  - `ai_runtime/llm/rag_sources.py`
   - pgvector migration/model
   - 문서 ingest script
 - 우선순위: P2
@@ -119,7 +119,7 @@
 - 예상 변경 파일/모듈:
   - `app/services/notifications.py`
   - `app/models/notifications.py`
-  - `ai_worker/jobs/notification_worker.py`
+  - `ai_runtime/jobs/notification_worker.py`
   - SMS/Email/Push/Kakao provider
 - 우선순위: P2
 
@@ -135,9 +135,9 @@
   - prompt version, model, token 사용량, fallback reason, safety result를 추적해야 한다.
   - 의료 표현 safety failure를 관측하고 개선할 수 있다.
 - 예상 변경 파일/모듈:
-  - `ai_worker/llm/llm_client.py`
-  - `ai_worker/llm/llm_generator.py`
-  - `ai_worker/llm/explanation_service.py`
+  - `ai_runtime/llm/llm_client.py`
+  - `ai_runtime/llm/llm_generator.py`
+  - `ai_runtime/llm/explanation_service.py`
   - Langfuse env/config
 - 우선순위: P1
 
@@ -232,7 +232,7 @@
 ### 11. model registry 고도화
 
 - 현재 상태:
-  - CatBoost artifact는 `ai_worker/ml/artifacts/{dm,htn,dl}/catboost` 경로와 JSON metadata로 관리한다.
+  - CatBoost artifact는 `ai_runtime/ml/artifacts/{dm,htn,dl}/catboost` 경로와 JSON metadata로 관리한다.
   - 별도 registry server나 model promotion workflow는 없다.
 - 왜 시연 전 P0가 아닌지:
   - 현재 DM/HTN/DL 모델 artifact와 `feature_columns.json`, `threshold.json`, `metrics.json`으로 추론 가능하다.
@@ -241,8 +241,8 @@
   - 모델 버전 승인, rollback, metric 비교, artifact integrity check가 필요하다.
   - disease별 model lifecycle을 추적해야 한다.
 - 예상 변경 파일/모듈:
-  - `ai_worker/ml/common/artifacts.py`
-  - `ai_worker/ml/inference/catboost_predictor.py`
+  - `ai_runtime/ml/common/artifacts.py`
+  - `ai_runtime/ml/inference/catboost_predictor.py`
   - `docs/design/ml_model_registry_design.md`
   - model metadata schema
 - 우선순위: P2
@@ -259,7 +259,7 @@
   - 첫 PRECISION 분석 요청의 cold start 지연을 줄여야 한다.
   - artifact load 실패를 사용자 요청 전에 탐지할 수 있어야 한다.
 - 예상 변경 파일/모듈:
-  - `ai_worker/ml/inference/disease_risk_service.py`
+  - `ai_runtime/ml/inference/disease_risk_service.py`
   - `scripts/warmup_ml_models.py`
   - FastAPI lifespan optional hook
   - healthcheck extension

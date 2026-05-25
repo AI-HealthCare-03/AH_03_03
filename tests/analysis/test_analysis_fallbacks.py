@@ -34,7 +34,7 @@ def _health_record(**overrides):
 
 
 def test_ml_prediction_failure_returns_empty_for_rule_based_fallback(monkeypatch) -> None:
-    from ai_worker.ml.inference import disease_risk_service
+    from ai_runtime.ml.inference import disease_risk_service
 
     def raise_prediction_error(*args, **kwargs):
         raise RuntimeError("catboost failed")

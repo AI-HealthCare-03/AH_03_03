@@ -6,8 +6,8 @@
 
 ```bash
 git status --short
-uv run ruff check app scripts ai_worker tests
-uv run ruff format app scripts ai_worker tests --check
+uv run ruff check app scripts ai_runtime tests
+uv run ruff format app scripts ai_runtime tests --check
 uv run pytest tests
 uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 uv run python scripts/verify_demo_ready.py

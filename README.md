@@ -20,7 +20,7 @@
 
 ```text
 .
-├── ai_worker/          # AI 모델 추론 및 학습 관련 코드 (Worker)
+├── ai_runtime/          # AI 모델 추론 및 학습 관련 코드 (Worker)
 │   ├── core/           # 워커 설정 및 로거
 │   ├── models/         # AI 모델 파일 보관 (PyTorch 등)
 │   ├── tasks/          # 실제 처리할 작업 정의
@@ -121,7 +121,7 @@ make langfuse-down
 - `docker compose up`과 `docker compose build`는 원격 저장소에 이미지를 올리지 않습니다. 원격 업로드는 `docker push`를 실행할 때만 발생합니다.
 - `docker compose up/build` 중 로컬에 없는 base image나 service image는 registry에서 pull될 수 있습니다.
 - 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
-- `.env`, example env, `ai_worker` 코드 변경 후 이미 떠 있는 컨테이너에 반영하려면 `docker compose up -d --force-recreate fastapi ai-worker`로 FastAPI/AI Worker를 재생성하세요.
+- `.env`, example env, `ai_runtime` 코드 변경 후 이미 떠 있는 컨테이너에 반영하려면 `docker compose up -d --force-recreate fastapi ai-worker`로 FastAPI/AI Worker를 재생성하세요.
 - Langfuse는 RAG 엔진이 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다. Cloud와 Docker self-host를 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿔야 합니다.
 - 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck, `DEMO_ECHO` Redis Stream skeleton 용도입니다. 실제 OCR/CV/ML/LLM 비동기 작업, retry/dead-letter queue, heartbeat는 P2 운영 확장 범위입니다.
 - 시연 설명은 “현재 MVP 핵심 흐름은 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 연결되어 있다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환”으로 통일합니다.
@@ -244,7 +244,7 @@ DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 - `frontend`: `frontend/Dockerfile` multi-stage build로 React/Vite 정적 파일을 생성하고 내부 Nginx로 서빙합니다.
 - `nginx`: `/` 요청은 `frontend`로, `/api/` 요청은 `fastapi:8000`으로 proxy합니다.
 - `fastapi`: Docker 내부에서는 `DB_HOST=postgres`, `REDIS_HOST=redis` 기준으로 실행합니다.
-- `ai-worker`: `ai_worker/main.py`가 Redis Stream consumer를 실행합니다. 현재 처리 job은 `DEMO_ECHO`뿐이며, OCR/CV/ML/LLM 작업은 아직 큐로 넘기지 않습니다.
+- `ai-worker`: `ai_runtime/main.py`가 Redis Stream consumer를 실행합니다. 현재 처리 job은 `DEMO_ECHO`뿐이며, OCR/CV/ML/LLM 작업은 아직 큐로 넘기지 않습니다.
 - `postgres`, `redis`: 우리 서비스 전용입니다. Langfuse의 Postgres/Redis와 공유하지 않습니다.
 
 현재 FastAPI 라우터와 Tortoise/asyncpg 기반 DB I/O는 async 기반입니다. 다만 OCR/CV/ML/LLM workflow는 시연 전까지 동기 API 흐름을 유지합니다. Redis는 health/infrastructure와 `DEMO_ECHO` job skeleton 용도이며, retry/dead-letter queue, heartbeat, 실제 OCR/CV/ML/LLM 비동기화는 운영 확장용 P2입니다. `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs` 연동을 위한 reserved field입니다.
@@ -364,9 +364,9 @@ docker compose up -d --build app
 
 **AI Worker 실행:**
 ```bash
-uv run python -m ai_worker.main
+uv run python -m ai_runtime.main
 # or
-docker compose up -d --build ai_worker
+docker compose up -d --build ai-worker
 ```
 
 **로컬 MVP 데모 DB 준비:**
@@ -428,8 +428,8 @@ chmod +x scripts/certbot.sh
 로컬과 GitHub Actions CI는 아래 검증 범위를 기준으로 맞춥니다.
 
 ```bash
-uv run ruff check app scripts ai_worker tests
-uv run ruff format app scripts ai_worker tests --check
+uv run ruff check app scripts ai_runtime tests
+uv run ruff format app scripts ai_runtime tests --check
 uv run pytest tests
 uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 ```
@@ -450,35 +450,35 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 
 - **API 추가**: `app/apis/v1/` 아래에 새로운 라우터 파일을 생성하고 `app/apis/v1/__init__.py`에 등록하세요.
 - **DB 모델 추가**: `app/models/`에 Tortoise 모델을 정의하고 `app/db/databases.py`의 `MODELS` 리스트에 추가하세요.
-- **AI 로직 추가**: `ai_worker/tasks/`에 새로운 처리 로직을 작성하고 `ai_worker/main.py`에서 호출하도록 구성하세요.
+- **AI 로직 추가**: `ai_runtime/tasks/`에 새로운 처리 로직을 작성하고 `ai_runtime/main.py`에서 호출하도록 구성하세요.
 
 ## 개발 작업 영역 분리 기준
 
 - 백엔드 API 담당자는 `app/` 하위에서 작업합니다.
-- ML 담당자는 `ai_worker/ml/` 하위에서 작업합니다.
-- CV 담당자는 `ai_worker/cv/` 하위에서 작업합니다.
-- LLM 담당자는 `ai_worker/llm/` 하위에서 작업합니다.
-- RAG 담당자는 `ai_worker/llm/rag/` 하위에서 작업합니다.
+- ML 담당자는 `ai_runtime/ml/` 하위에서 작업합니다.
+- CV 담당자는 `ai_runtime/cv/` 하위에서 작업합니다.
+- LLM 담당자는 `ai_runtime/llm/` 하위에서 작업합니다.
+- RAG 담당자는 `ai_runtime/llm/rag/` 하위에서 작업합니다.
 - 현재 공식 API에서 직접 호출되는 LLM runtime은 분석/식단 결과 설명 생성과 keyword RAG reference source 첨부입니다. 메인 챗봇 LLM 라우터와 추천/챌린지 문구 모듈은 준비되어 있지만 공식 runtime 연결은 후속 작업입니다. 자세한 기준은 [LLM/RAG Runtime Scope](docs/design/llm_runtime_scope.md)를 따릅니다.
-- 여러 AI 처리 흐름을 묶는 파이프라인은 `ai_worker/pipelines/`에서 관리합니다.
+- 여러 AI 처리 흐름을 묶는 파이프라인은 `ai_runtime/pipelines/`에서 관리합니다.
 - ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않습니다.
-- 백엔드 담당자는 `ai_worker` 내부 모델 코드를 직접 크게 수정하지 않습니다.
+- 백엔드 담당자는 `ai_runtime` 내부 모델 코드를 직접 크게 수정하지 않습니다.
 - API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정합니다.
 - `pyproject.toml`, `uv.lock`, `docker-compose.yml`, env example, `app/core` 같은 공용 설정 파일은 팀장 승인 없이 수정하지 않습니다.
 
 ### ML 학습/추론 실행 기준
 
 - 서비스 DB/ORM 필드명은 모델 학습 feature명에 직접 맞추지 않습니다.
-- 서비스 입력값은 `ai_worker/ml/inference/feature_mapper.py`에서 CatBoost 학습 당시 한글 feature schema로 변환합니다.
+- 서비스 입력값은 `ai_runtime/ml/inference/feature_mapper.py`에서 CatBoost 학습 당시 한글 feature schema로 변환합니다.
 - 학습/검증 스크립트는 파일 직접 실행 대신 모듈 방식으로 실행합니다.
 
 ```bash
-uv run python -m ai_worker.ml.training.run_experiment --config ai_worker/ml/experiments/configs/dm_catboost_final.json --dry-run
-uv run python -m ai_worker.ml.training.run_experiment --config ai_worker/ml/experiments/configs/htn_catboost_final.json --dry-run
-uv run python -m ai_worker.ml.training.run_experiment --config ai_worker/ml/experiments/configs/dl_catboost_final.json --dry-run
+uv run python -m ai_runtime.ml.training.run_experiment --config ai_runtime/ml/experiments/configs/dm_catboost_final.json --dry-run
+uv run python -m ai_runtime.ml.training.run_experiment --config ai_runtime/ml/experiments/configs/htn_catboost_final.json --dry-run
+uv run python -m ai_runtime.ml.training.run_experiment --config ai_runtime/ml/experiments/configs/dl_catboost_final.json --dry-run
 ```
 
-- `python ai_worker/ml/training/run_experiment.py` 방식은 repo root package import가 깨질 수 있으므로 사용하지 않습니다.
-- 모델 artifact는 `ai_worker/ml/artifacts/{disease}/catboost` 아래에 두되 `.cbm`, `.npy`, `.pkl`, `.joblib` 산출물은 git에 커밋하지 않습니다.
+- `python ai_runtime/ml/training/run_experiment.py` 방식은 repo root package import가 깨질 수 있으므로 사용하지 않습니다.
+- 모델 artifact는 `ai_runtime/ml/artifacts/{disease}/catboost` 아래에 두되 `.cbm`, `.npy`, `.pkl`, `.joblib` 산출물은 git에 커밋하지 않습니다.
 - 로컬 학습 CSV는 `etc/ml/ai_worker/data/`에 배치합니다. 서비스 런타임은 이 경로를 import하거나 직접 참조하지 않고, 학습 loader만 `dataset_name` 기준으로 읽습니다.
 - 학습 CSV와 전처리 데이터는 민감/대용량 가능성이 있으므로 git 커밋 대상이 아닙니다. 공유가 필요하면 별도 Drive/S3/archive 저장소에서 받아 `etc/ml/ai_worker/data/`에 내려받아 사용합니다.
