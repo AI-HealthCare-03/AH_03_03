@@ -8,16 +8,38 @@ type ErrorBoundaryState = {
   error: Error | null;
 };
 
+function isChunkLoadError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("failed to fetch dynamically imported module") ||
+    message.includes("importing a module script failed") ||
+    message.includes("loading chunk") ||
+    message.includes("chunkloaderror")
+  );
+}
+
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = {
     error: null,
   };
+
+  componentDidMount() {
+    if (!this.state.error) {
+      window.sessionStorage.removeItem("ai_health_chunk_reload_once");
+    }
+  }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    if (isChunkLoadError(error) && window.sessionStorage.getItem("ai_health_chunk_reload_once") !== "true") {
+      window.sessionStorage.setItem("ai_health_chunk_reload_once", "true");
+      window.location.reload();
+      return;
+    }
+
     if (import.meta.env.DEV) {
       console.error("Render error boundary caught an error", error, errorInfo);
     }
