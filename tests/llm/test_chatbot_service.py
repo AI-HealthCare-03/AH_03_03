@@ -13,7 +13,6 @@ async def test_chatbot_uses_local_llm_rule_router_without_dummy_source() -> None
     )
 
     assert response.source == "rule_engine"
-    assert response.source != "DUMMY_LLM"
     assert "진단이 아니" in response.answer
     assert "의료진 상담" in response.safety_notice
 

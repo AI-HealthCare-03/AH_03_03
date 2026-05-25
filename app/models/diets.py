@@ -29,7 +29,7 @@ class DietPhotoResult(models.Model):
     detected_foods = fields.JSONField(null=True)
     confidence_payload = fields.JSONField(null=True)
     raw_output = fields.JSONField(null=True)
-    is_dummy = fields.BooleanField(default=True)
+    is_dummy = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
