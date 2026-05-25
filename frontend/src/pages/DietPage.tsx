@@ -88,6 +88,10 @@ function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
     .filter(([, score]) => score !== null && score !== undefined && score !== "");
 }
 
+function foodDisplayName(food: Record<string, unknown>): string {
+  return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
+}
+
 export default function DietPage() {
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [manualMealType, setManualMealType] = useState("LUNCH");
@@ -423,6 +427,12 @@ export default function DietPage() {
               <strong>{String(analysisResult.diet_score ?? "-")}</strong>
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
+            <div className="mini-card">
+              <span className="muted">분석 음식</span>
+              <strong>
+                {detectedFoods.length > 0 ? detectedFoods.map(foodDisplayName).join(", ") : "음식명 확인 불가"}
+              </strong>
+            </div>
             <div className="nutrition-grid">
               <div>
                 <span>칼로리</span>
@@ -446,9 +456,10 @@ export default function DietPage() {
               </div>
             </div>
             <div className="chip-list">
-              {detectedFoods.map((food) => (
-                <span className="badge badge-reference" key={String(food.name)}>
-                  {String(food.name ?? "음식")} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
+              {detectedFoods.length === 0 && <span className="badge badge-reference">음식명 확인 불가</span>}
+              {detectedFoods.map((food, index) => (
+                <span className="badge badge-reference" key={`${foodDisplayName(food)}-${index}`}>
+                  {foodDisplayName(food)} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
                 </span>
               ))}
             </div>
@@ -466,10 +477,22 @@ export default function DietPage() {
               <div className="card-list">
                 {foodScoreDetails.slice(0, 3).map((detail, index) => {
                   const matched = detail.matched_food_name ? String(detail.matched_food_name) : "매칭 정보 없음";
+                  const detailScores = diseaseScoreEntries(detail.scores);
                   return (
-                    <div className="mini-card" key={`${String(detail.food_name ?? "food")}-${index}`}>
-                      <strong>{String(detail.food_name ?? "음식")}</strong>
+                    <div className="mini-card" key={`${foodDisplayName(detail)}-${index}`}>
+                      <strong>{foodDisplayName(detail)}</strong>
                       <span className="muted">점수 기준: {matched}</span>
+                      {detailScores.length > 0 ? (
+                        <div className="chip-list">
+                          {detailScores.map(([label, score]) => (
+                            <span className="badge badge-reference" key={`${foodDisplayName(detail)}-${label}`}>
+                              {label}: {Math.round(Number(score))}점
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="muted">음식별 점수 확인 불가</span>
+                      )}
                     </div>
                   );
                 })}
