@@ -14,6 +14,7 @@ RUN uv sync --group app --group ai --no-dev --frozen
 # 4. 로컬 소스 코드를 컨테이너 내부로 복사합니다.
 COPY ./ai_runtime ./ai_runtime
 COPY ./app ./app
+COPY ./docs/rag_sources ./docs/rag_sources
 
 # 5. 실제 AI Worker 진입점입니다. 현재는 DEMO_ECHO Redis Stream job만 처리합니다.
 CMD ["uv", "run", "--no-sync", "python", "-m", "ai_runtime.main"]

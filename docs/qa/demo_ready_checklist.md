@@ -25,25 +25,25 @@ uv run python scripts/verify_demo_ready.py
 
 ## 2. Docker compose 실행
 
+프론트 포함 전체 시연은 dev compose 스택을 표준으로 사용한다. 접속 주소는 `http://localhost:8080`이다.
+루트 `docker-compose.yml`은 백엔드/AI 검증용이며 `http://localhost`가 404를 반환하는 것은 정상이다.
+
 ```bash
-docker compose down
-docker compose build fastapi
-docker compose up -d postgres redis fastapi
-docker compose ps
-curl http://localhost:8000/api/v1/system/health
+make demo-up
+make demo-ps
+make demo-health
 ```
 
 기대 결과:
 
-- `postgres`, `redis`, `fastapi`가 running 또는 healthy
+- `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`가 running 또는 healthy
 - `/api/v1/system/health` 응답에서 Redis/DB가 정상
 
 실패 시 확인:
 
 ```bash
-docker compose logs --tail=100 fastapi
-docker compose logs --tail=100 postgres
-docker compose logs --tail=100 redis
+make demo-logs
+docker compose -f infra/docker/docker-compose.dev.yml logs --tail=100 postgres redis
 ```
 
 ## 3. DB migration 및 seed
@@ -68,6 +68,7 @@ docker compose exec fastapi uv run --no-sync python scripts/seed_current_user_da
 화면:
 
 - `http://localhost:5173/login`
+- Docker 전체 시연 기준: `http://localhost:8080/login`
 
 확인:
 
