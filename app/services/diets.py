@@ -63,6 +63,7 @@ async def list_diet_photo_results(diet_record_id: int, limit: int = 20, offset: 
 
 async def run_diet_analysis(user_id: int, request: DietAnalyzeRequest) -> dict[str, object]:
     case = _select_rule_based_diet_case(request)
+    # 자체 CV/GPT Vision은 아직 기본 경로가 아니므로, 시연은 규칙 기반 음식 후보로 안정성을 우선한다.
     food_candidate = select_food_detection_candidate(
         cv_result=None,
         rule_based_foods=case["detected_foods"],
@@ -161,6 +162,7 @@ def _safe_build_nutrition_scoring_result(detected_foods: list[dict[str, Any]]) -
     try:
         return build_nutrition_scoring_result(detected_foods)
     except Exception:
+        # 점수 테이블 로드 실패가 식단 기록 자체를 막지 않도록 null 점수 payload로 낮춘다.
         logger.exception("Diet nutrition scoring failed; continuing with unavailable score payload")
         return {
             "detected_foods": [_food_name(food) for food in detected_foods],
@@ -182,6 +184,7 @@ def _safe_generate_diet_explanation(disease_scores: dict[str, float | int | None
     try:
         return generate_diet_score_explanation(DietScoreExplanationInput(disease_scores=disease_scores)).model_dump()
     except Exception:
+        # 설명 생성은 보조 기능이므로 실패 시에도 안전 문구가 포함된 기본 설명을 반환한다.
         logger.exception("Diet score explanation failed; using base safety explanation")
         return {
             "summary": "식단 점수 설명을 생성하지 못했습니다.",

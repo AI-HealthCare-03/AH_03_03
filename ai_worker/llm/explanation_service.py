@@ -45,6 +45,7 @@ DIET_ACTION_MESSAGES = {
 
 
 def generate_analysis_explanation(input_data: AnalysisExplanationInput) -> ExplanationOutput:
+    """분석 결과를 진단이 아닌 건강관리 참고 설명으로 변환한다."""
     disease_label = _disease_label(input_data.disease_type)
     risk_label = _risk_level_label(input_data.risk_level)
     factor_text = _factor_summary(input_data.factors)
@@ -64,6 +65,7 @@ def generate_analysis_explanation(input_data: AnalysisExplanationInput) -> Expla
 
 
 def generate_diet_score_explanation(input_data: DietScoreExplanationInput) -> ExplanationOutput:
+    """식단 점수 중 가장 주의가 필요한 질병군을 짧게 설명한다."""
     lowest_code, lowest_score = _lowest_diet_score(input_data.disease_scores)
     if lowest_code is None:
         return ExplanationOutput(
@@ -89,7 +91,7 @@ def generate_diet_score_explanation(input_data: DietScoreExplanationInput) -> Ex
 
 
 def retrieve_health_context(query: str, disease_type: str | None = None) -> list[RetrievedContext]:
-    """Keyword RAG PoC hook backed by reviewed-local candidate source files."""
+    """로컬 후보 문서 기반 keyword RAG PoC이며 외부 검색/embedding은 수행하지 않는다."""
     top_k = 2
     include_safety_disclaimer = True
     try:
@@ -121,7 +123,7 @@ def generate_explanation_with_context(
     contexts: list[RetrievedContext] | None = None,
     use_real_llm: bool = False,
 ) -> ExplanationOutput:
-    """RAG-ready generation hook that keeps rule-based text as the default path."""
+    """RAG-ready 연결점이지만 기본 설명 생성은 항상 룰 기반으로 유지한다."""
     _ = use_real_llm
     explanation = generate_analysis_explanation(input_data)
     reference_contexts = contexts or []
