@@ -13,6 +13,8 @@ class DashboardAnalysisResultResponse(BaseModel):
     risk_level: RiskLevel
     risk_score: float
     summary: str | None = None
+    model_name: str | None = None
+    model_version: str | None = None
     analyzed_at: str
     created_at: str
 

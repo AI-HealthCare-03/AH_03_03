@@ -47,7 +47,19 @@ const diseaseChartColors: Record<string, string> = {
   DIABETES: "var(--chart-diabetes)",
   DYSLIPIDEMIA: "var(--chart-dyslipidemia)",
   OBESITY: "var(--chart-obesity)",
-  OVERALL: "var(--chart-overall)",
+};
+
+const analysisTypeLabels: Record<string, string> = {
+  DIABETES: "당뇨",
+  HYPERTENSION: "고혈압",
+  DYSLIPIDEMIA: "이상지질혈증",
+  OBESITY: "비만",
+};
+
+const riskLevelLabels: Record<string, string> = {
+  LOW: "낮음",
+  MEDIUM: "관리 필요",
+  HIGH: "높음",
 };
 
 const periodOptions = [
@@ -262,6 +274,34 @@ function formatCompactValue(value: unknown, fallback = "아직 기록 없음"): 
   return String(value);
 }
 
+function formatRiskLevel(value: unknown): string {
+  const key = String(value ?? "").toUpperCase();
+  return riskLevelLabels[key] ?? (key || "-");
+}
+
+function formatModelLabel(result: DashboardAnalysisResult): string | null {
+  const modelName = result.model_name ? String(result.model_name) : "";
+  const modelVersion = result.model_version ? String(result.model_version) : "";
+  if (!modelName && !modelVersion) {
+    return null;
+  }
+  if (modelName.toLowerCase() === "catboost") {
+    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
+  }
+  if (modelName.toLowerCase() === "rule_based") {
+    return modelVersion ? `rule_based · ${modelVersion}` : "rule_based";
+  }
+  return modelVersion ? `${modelName} · ${modelVersion}` : modelName || modelVersion;
+}
+
+function formatRiskScore(value: unknown): string {
+  const score = Number(value);
+  if (!Number.isFinite(score)) {
+    return "";
+  }
+  return `${Math.round(score <= 1 ? score * 100 : score)}/100`;
+}
+
 function getSeriesDelta(series: ChartSeries[]): number | null {
   const points = series.flatMap((item) => item.points).filter((point) => Number.isFinite(point.value));
   if (points.length < 2) {
@@ -465,6 +505,9 @@ export default function DashboardPage() {
   const latestAnalysisResults = Array.isArray(summary.latest_analysis_results)
     ? (summary.latest_analysis_results as DashboardAnalysisResult[])
     : [];
+  const diseaseAnalysisResults = latestAnalysisResults.filter((result) =>
+    Boolean(analysisTypeLabels[String(result.analysis_type)]),
+  );
   const dashboardDiets = Array.isArray(dietSection.recent_diet_records)
     ? (dietSection.recent_diet_records as AnyRecord[])
     : [];
@@ -750,6 +793,43 @@ export default function DashboardPage() {
                   간편 분석 실행하기
                 </Link>
               ) : null}
+            </section>
+            <section className="card">
+              <div className="card-header">
+                <h2>최근 분석 결과</h2>
+              </div>
+              {diseaseAnalysisResults.length > 0 ? (
+                <div className="card-list">
+                  {diseaseAnalysisResults.map((result) => {
+                    const model = formatModelLabel(result);
+                    return (
+                      <div className="mini-card" key={result.id}>
+                        <div className="record-row">
+                          <div>
+                            <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
+                            <p className="muted">
+                              {result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}
+                              {model ? ` · ${model}` : ""}
+                            </p>
+                          </div>
+                          <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
+                            {formatRiskLevel(result.risk_level)}
+                          </span>
+                        </div>
+                        <span className="badge badge-reference">{formatRiskScore(result.risk_score)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>최근 분석 결과가 없습니다.</strong>
+                  <p>건강정보를 입력하고 분석을 실행하면 질환별 결과가 표시됩니다.</p>
+                  <Link className="button secondary compact-button" to="/analysis">
+                    분석 실행하기
+                  </Link>
+                </div>
+              )}
             </section>
             <section className="card health-tip-card">
               <div className="card-header">

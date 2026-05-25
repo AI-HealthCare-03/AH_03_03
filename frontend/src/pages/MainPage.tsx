@@ -124,6 +124,13 @@ const riskLabelMap: Record<string, string> = {
   HIGH: "높음",
 };
 
+const analysisTypeLabels: Record<string, string> = {
+  DIABETES: "당뇨",
+  HYPERTENSION: "고혈압",
+  DYSLIPIDEMIA: "이상지질혈증",
+  OBESITY: "비만",
+};
+
 const categoryLabel: Record<string, string> = {
   BLOOD_PRESSURE: "혈압 관리",
   BLOOD_SUGAR: "혈당 관리",
@@ -191,19 +198,6 @@ function getChallengeDuration(challenge: AnyRecord): string {
   return duration ? `${String(duration)}일` : "기간 안내";
 }
 
-function buildOverallRisk(levels: string[]): string {
-  if (levels.includes("HIGH")) {
-    return "높음";
-  }
-  if (levels.includes("MEDIUM")) {
-    return "관리 필요";
-  }
-  if (levels.length > 0 && levels.every((level) => level === "LOW")) {
-    return "낮음";
-  }
-  return "-";
-}
-
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) {
     return 0;
@@ -217,29 +211,6 @@ function toPercentStyle(value: number): CSSProperties {
 
 function toGaugeStyle(value: number): CSSProperties {
   return { "--gauge-value": `${clampPercent(value)}%` } as CSSProperties;
-}
-
-function getRiskScore(result: AnyRecord): number {
-  const score = Number(result.risk_score ?? result.score ?? result.probability);
-  if (Number.isFinite(score)) {
-    return clampPercent(score <= 1 ? score * 100 : score);
-  }
-  const level = String(result.risk_level ?? "").toUpperCase();
-  if (level === "HIGH") return 85;
-  if (level === "MEDIUM") return 55;
-  if (level === "LOW") return 25;
-  return 0;
-}
-
-function getOverallRiskPercent(results: AnyRecord[]): number {
-  if (results.length === 0) {
-    return 0;
-  }
-  const scores = results.map(getRiskScore).filter((score) => score > 0);
-  if (scores.length === 0) {
-    return 0;
-  }
-  return clampPercent(Math.max(...scores));
 }
 
 function getChallengeProgress(challenge: AnyRecord): number {
@@ -364,16 +335,9 @@ export default function MainPage() {
     const effectiveAnalysisResults =
       analysisResults.length > 0 ? analysisResults : latestAnalysis.analysis_type ? [latestAnalysis] : [];
     const hasAnalysisResults = effectiveAnalysisResults.length > 0;
-    const resultByType = new Map(
-      effectiveAnalysisResults.map((result) => [
-        String(result.analysis_type ?? ""),
-        String(result.risk_level ?? "").toUpperCase(),
-      ]),
+    const displayAnalysisResults = effectiveAnalysisResults.filter((result) =>
+      Boolean(analysisTypeLabels[String(result.analysis_type ?? "")]),
     );
-    const riskLevels =
-      effectiveAnalysisResults.length > 0
-        ? effectiveAnalysisResults.map((result) => String(result.risk_level ?? "").toUpperCase()).filter(Boolean)
-        : [];
     const basicReady = readiness.basic_ready ?? readiness.is_ready;
     const todayCards = [
       {
@@ -430,7 +394,6 @@ export default function MainPage() {
     const challengeRate = getAveragePercent(myChallenges.map(getChallengeProgress));
     const medicationActiveCount = medications.filter((item) => item.is_active !== false).length;
     const medicationRate = medications.length > 0 ? clampPercent((medicationActiveCount / medications.length) * 100) : 0;
-    const overallRiskPercent = getOverallRiskPercent(effectiveAnalysisResults);
     const RING_R = 28;
     const RING_C = 2 * Math.PI * RING_R;
     const ringOffset = RING_C * (1 - challengeRate / 100);
@@ -457,7 +420,7 @@ export default function MainPage() {
               <span className="home-action-card__icon">🧭</span>
               <span>
                 <strong className="home-action-card__title">건강위험도 분석하기</strong>
-                <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 위험도 요약을 확인합니다.</em>
+                <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 질환별 결과를 확인합니다.</em>
               </span>
             </Link>
             <Link className="home-action-card" to="/diets">
@@ -674,40 +637,33 @@ export default function MainPage() {
           </Card>
         </div>
 
-        <Card title={hasAnalysisResults ? "위험도 요약" : "간편 분석 시작"}>
+        <Card title={hasAnalysisResults ? "최근 분석 결과" : "간편 분석 시작"}>
           {hasAnalysisResults ? (
             <>
-              {overallRiskPercent > 0 && (
-                <div className="progress-bar" style={{ marginBottom: 14 }}>
-                  <div
-                    className={`progress-fill ${overallRiskPercent >= 70 ? "danger-fill" : overallRiskPercent >= 45 ? "warning-fill" : "success-fill"}`}
-                    style={toPercentStyle(overallRiskPercent)}
-                  />
+              {displayAnalysisResults.length > 0 ? (
+                <div className="metric-grid">
+                  {displayAnalysisResults.map((result) => (
+                    <div key={String(result.id ?? result.analysis_type)}>
+                      <span>{analysisTypeLabels[String(result.analysis_type)]}</span>
+                      <strong>{formatRisk(result.risk_level)}</strong>
+                    </div>
+                  ))}
+                  <div>
+                    <span>최근 분석일</span>
+                    <strong>{formatDate(displayAnalysisResults[0]?.analyzed_at ?? displayAnalysisResults[0]?.created_at)}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state analysis-empty-state">
+                  <strong>최근 분석 결과가 없습니다.</strong>
+                  <p>질환별 분석을 실행하면 당뇨, 고혈압, 이상지질혈증, 비만 결과가 표시됩니다.</p>
                 </div>
               )}
-              <div className="metric-grid">
-                <div>
-                  <span>당뇨</span>
-                  <strong>{formatRisk(resultByType.get("DIABETES"))}</strong>
-                </div>
-                <div>
-                  <span>고혈압</span>
-                  <strong>{formatRisk(resultByType.get("HYPERTENSION"))}</strong>
-                </div>
-                <div>
-                  <span>종합 위험도</span>
-                  <strong>{buildOverallRisk(riskLevels)}</strong>
-                </div>
-                <div>
-                  <span>최근 분석일</span>
-                  <strong>{formatDate(latestAnalysis.analyzed_at ?? latestAnalysis.created_at)}</strong>
-                </div>
-              </div>
             </>
           ) : (
             <div className="empty-state analysis-empty-state">
               <strong>아직 분석 결과가 없습니다.</strong>
-              <p>건강정보를 입력하고 간편 분석을 실행하면 현재 건강정보 기반 위험도 요약을 볼 수 있습니다.</p>
+              <p>건강정보를 입력하고 간편 분석을 실행하면 현재 건강정보 기반 질환별 분석 결과를 볼 수 있습니다.</p>
               <p>검진표를 추가하면 정밀 분석에 활용할 수 있습니다.</p>
               <div className="button-row">
                 <Link className="button" to="/analysis">
