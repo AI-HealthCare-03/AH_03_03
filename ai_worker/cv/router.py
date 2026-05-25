@@ -11,7 +11,7 @@ MVP 기준 3개 엔드포인트 제공 (식단 / 처방전 / 건강검진표).
 
 import logging
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
@@ -46,6 +46,7 @@ def get_settings() -> VisionSettings:
 def get_vision_client(
     settings: Annotated[VisionSettings, Depends(get_settings)],
 ) -> VisionClient:
+    # 이 라우터는 provider 코드 보존용이며 공식 식단 분석 기본 경로에서는 호출하지 않는다.
     return VisionClient(api_key=settings.openai_api_key, model=settings.openai_model)
 
 
@@ -100,7 +101,7 @@ async def call_vision(
     analysis_type: str,
     file: UploadFile,
     client: VisionClient,
-) -> dict:
+) -> dict[str, Any]:
     """이미지 검증 후 GPT Vision 호출. 에러 시 HTTPException 발생."""
 
     image_bytes = await validate_image(file)

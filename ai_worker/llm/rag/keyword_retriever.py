@@ -8,6 +8,7 @@ from ai_worker.llm.rag.source_loader import (
     RagSourceDocument,
     load_all_rag_source_documents,
 )
+from ai_worker.llm.schemas import RetrievedContext
 
 DISEASE_SOURCE_MAP = {
     "DM": "diabetes",
@@ -67,6 +68,7 @@ def retrieve_keyword_rag_matches(
     include_safety_disclaimer: bool = False,
     source_dir: Path = DEFAULT_RAG_SOURCE_DIR,
 ) -> list[KeywordRagMatch]:
+    """질환 코드와 짧은 키워드만 사용해 시연용 후보 문서를 고른다."""
     documents = {document.id: document for document in load_all_rag_source_documents(source_dir)}
     scored_matches: dict[str, KeywordRagMatch] = {}
 
@@ -119,7 +121,7 @@ def retrieve_keyword_rag_contexts(
     top_k: int = 3,
     include_safety_disclaimer: bool = False,
     source_dir: Path = DEFAULT_RAG_SOURCE_DIR,
-):
+) -> list[RetrievedContext]:
     from ai_worker.llm.rag.rag_context_builder import build_retrieved_contexts
 
     matches = retrieve_keyword_rag_matches(
