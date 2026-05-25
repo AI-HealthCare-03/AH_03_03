@@ -89,6 +89,53 @@ def test_invalid_or_none_values_do_not_overwrite_health_record_fields() -> None:
 
 
 @pytest.mark.asyncio
+async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> None:
+    class FakeVisionClient:
+        def __init__(self, api_key: str, model: str):
+            assert api_key == "test-key"
+            assert model == "gpt-4o-mini"
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            assert analysis_type == "checkup"
+            assert image_bytes == b"image"
+            assert media_type == "image/png"
+            return {
+                "analysis_status": "success",
+                "extracted_data": {
+                    "systolic_bp": 132,
+                    "diastolic_bp": 84,
+                    "fasting_glucose": 108,
+                    "ldl": 132,
+                    "hdl": 46,
+                },
+            }
+
+    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
+
+    result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
+
+    assert result["provider"] == "gpt_vision"
+    assert result["fallback_used"] is False
+    assert ("systolic_bp", "수축기혈압", "132", "mmHg") in result["measurements"]
+
+
+@pytest.mark.asyncio
+async def test_exam_ocr_marks_fallback_when_provider_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", None)
+
+    result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
+
+    assert result["provider"] == "fallback"
+    assert result["fallback_used"] is True
+    assert result["measurements"] == exam_service.FALLBACK_OCR_MEASUREMENTS
+
+
+@pytest.mark.asyncio
 async def test_confirm_without_request_updates_latest_health_record_from_existing_measurements(monkeypatch) -> None:
     report = SimpleNamespace(id=1, user_id=10, exam_date=None)
     updated_payload: dict[str, object] = {}

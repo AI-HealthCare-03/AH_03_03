@@ -119,3 +119,74 @@ async def test_run_diet_analysis_keeps_response_when_scorer_fails(monkeypatch) -
     assert response["scoring_source"] == "nutrition_rule_table_unavailable"
     assert response["disease_scores"] == {"DM": None, "HTN": None, "DL": None, "OBE": None, "ANEM": None}
     assert response["explanation"]["source"] == "rule_based_explanation"
+
+
+@pytest.mark.asyncio
+async def test_run_diet_analysis_uses_gpt_vision_foods_when_enabled(monkeypatch) -> None:
+    async def fake_create_diet_record(user_id: int, request):
+        return SimpleNamespace(id=1, user_id=user_id, **request.model_dump())
+
+    async def fake_create_diet_photo_result(diet_record_id: int, request):
+        return SimpleNamespace(id=2, diet_record_id=diet_record_id, **request.model_dump())
+
+    class FakeVisionClient:
+        def __init__(self, api_key: str, model: str):
+            assert api_key == "test-key"
+            assert model == "gpt-4o-mini"
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            assert analysis_type == "diet"
+            assert image_bytes == b"image"
+            assert media_type == "image/png"
+            return {
+                "analysis_status": "success",
+                "foods": [
+                    {"name": "현미밥", "confidence": 0.91},
+                    {"name": "닭가슴살", "confidence": 0.88},
+                ],
+            }
+
+    monkeypatch.setattr(diet_service, "create_diet_record", fake_create_diet_record)
+    monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
+    monkeypatch.setattr(diet_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(diet_service.config, "DIET_VISION_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(diet_service.config, "DIET_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(diet_service.config, "OPENAI_API_KEY", "test-key")
+
+    response = await diet_service.run_diet_analysis(
+        10,
+        DietAnalyzeRequest(meal_type="LUNCH", description="사진 식단"),
+        image_bytes=b"image",
+        image_media_type="image/png",
+    )
+
+    assert response["vision_provider"] == "gpt_vision"
+    assert response["fallback_used"] is False
+    assert [food["name"] for food in response["detected_foods"]] == ["현미밥", "닭가슴살"]
+    assert response["raw_output"]["source"] == "gpt_vision"
+
+
+@pytest.mark.asyncio
+async def test_run_diet_analysis_falls_back_when_gpt_vision_key_missing(monkeypatch) -> None:
+    async def fake_create_diet_record(user_id: int, request):
+        return SimpleNamespace(id=1, user_id=user_id, **request.model_dump())
+
+    async def fake_create_diet_photo_result(diet_record_id: int, request):
+        return SimpleNamespace(id=2, diet_record_id=diet_record_id, **request.model_dump())
+
+    monkeypatch.setattr(diet_service, "create_diet_record", fake_create_diet_record)
+    monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
+    monkeypatch.setattr(diet_service.config, "DIET_VISION_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(diet_service.config, "DIET_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(diet_service.config, "OPENAI_API_KEY", None)
+
+    response = await diet_service.run_diet_analysis(
+        10,
+        DietAnalyzeRequest(meal_type="LUNCH", description="사진 식단"),
+        image_bytes=b"image",
+        image_media_type="image/png",
+    )
+
+    assert response["vision_provider"] == "rule_based_food_detection"
+    assert response["fallback_used"] is True
+    assert response["raw_output"]["source"] == "rule_based_food_detection"
