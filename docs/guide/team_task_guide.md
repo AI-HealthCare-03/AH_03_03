@@ -161,6 +161,31 @@ uv sync --group app --group dev
 
 ### 로컬 Docker 실행
 
+프론트까지 포함한 팀원/시연 표준 실행은 `make demo-up`을 사용한다. 이 명령은 `infra/docker/docker-compose.dev.yml`을 실행하며, `frontend`, `nginx`, `fastapi`, `ai-worker`, `postgres`, `redis`를 함께 띄운다.
+
+```bash
+make demo-up
+make demo-health
+make demo-ps
+```
+
+접속:
+
+- 웹/Nginx: `http://localhost:8080`
+- API Docs: `http://localhost:8080/api/docs`
+- FastAPI 직접 접근: `http://localhost:8000`
+
+루트 `docker-compose.yml`은 백엔드/AI 검증용이다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
+
+로그/종료:
+
+```bash
+make demo-logs
+make demo-down
+```
+
+백엔드/AI만 빠르게 확인할 때는 루트 compose 래퍼를 사용할 수 있다.
+
 ```bash
 docker compose up -d postgres redis fastapi
 docker compose ps
@@ -195,8 +220,7 @@ DB_HOST=localhost uv run python scripts/seed_current_user_dashboard_demo.py --em
 개발 서버용 Docker 전체 스택 실행:
 
 ```bash
-docker network create ai-health-shared
-docker compose -f infra/docker/docker-compose.dev.yml up -d --build
+make demo-up
 DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 ```
 

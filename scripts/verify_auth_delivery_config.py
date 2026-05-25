@@ -40,6 +40,10 @@ async def _run(args: argparse.Namespace) -> int:
     print("phone_verification_status=deferred_from_mvp")
     print("required_auth_delivery=email_verification")
     print("secret_values=hidden")
+    if not config.is_production and not config.EMAIL_ENABLED and config.EMAIL_VERIFICATION_DEBUG:
+        print("demo_email_verification=debug_code_response_enabled")
+    elif not config.is_production and not config.EMAIL_ENABLED:
+        print("demo_email_verification=needs_EMAIL_VERIFICATION_DEBUG_true_or_SMTP")
 
     failures = 0
     if args.send_email:

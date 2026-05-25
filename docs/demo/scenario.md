@@ -4,7 +4,9 @@
 
 ## 0. 준비
 
-- Docker compose 기준으로 `postgres`, `redis`, `fastapi`가 실행 중인지 확인한다.
+- 프론트 포함 전체 시연은 `make demo-up`으로 실행하고 `http://localhost:8080`에서 진행한다.
+- 루트 `docker-compose.yml`은 백엔드/AI 검증용이므로 `http://localhost`가 404를 반환해도 정상이다.
+- Docker compose 기준으로 `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`가 실행 중인지 확인한다.
 - 필요 시 로컬/시연 seed를 실행한다.
 - 민감키가 보이는 `.env` 또는 `docker compose config` 전체 출력 화면은 공유하지 않는다.
 - 발표 설명 기준: 현재 `ai_runtime`의 로컬 모델 artifact는 DM/HTN/DL CatBoost 3종이다. OBESITY는 rule-based, ANEM은 공식 분석 결과가 아닌 X2/식단 참고 분류이며, 식단 CV/GPT Vision/OCR/LLM은 provider 또는 skeleton 구조를 갖춘 상태에서 기본 시연 경로는 비용 없는 rule/fallback 중심으로 동작한다.
@@ -17,9 +19,9 @@
 안전한 확인 명령:
 
 ```bash
-docker compose ps
-docker compose logs --tail=100 fastapi
-curl http://localhost:8000/api/v1/system/health
+make demo-ps
+make demo-logs
+make demo-health
 ```
 
 ## 1. 사용자 로그인
