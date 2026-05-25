@@ -119,7 +119,7 @@ def rewrite_result_chatbot_response_with_llm(
         answer = rule_engine_output.answer
         source = "llm_rewrite_stub" if not use_real_llm else "llm_rewrite"
     elif use_real_llm:
-        answer = call_llm_with_rewrite_fallback(
+        answer, llm_succeeded = call_llm_with_rewrite_fallback_status(
             prompt=build_result_chatbot_rewrite_prompt(input_data, rule_engine_output),
             fallback_answer=rule_engine_output.answer,
             metadata={
@@ -129,7 +129,7 @@ def rewrite_result_chatbot_response_with_llm(
                 "use_real_llm": True,
             },
         )
-        source = "llm_rewrite"
+        source = "openai_rewrite" if llm_succeeded else rule_engine_output.source
     else:
         answer = rewrite_result_chatbot_answer_stub(
             input_data,
@@ -151,6 +151,7 @@ def rewrite_result_chatbot_response_with_llm(
         prompt_version=RESULT_REWRITE_PROMPT_VERSION,
         model=get_openai_model() if use_real_llm else None,
     )
+    safety_result = add_rewrite_status_metadata(safety_result, use_real_llm=use_real_llm, source=source)
 
     return ResultChatbotOutput(
         answer=final_answer,
@@ -174,7 +175,7 @@ def rewrite_main_health_chatbot_response_with_llm(
         answer = rule_engine_output.answer
         source = "llm_rewrite_stub" if not use_real_llm else "llm_rewrite"
     elif use_real_llm:
-        answer = call_llm_with_rewrite_fallback(
+        answer, llm_succeeded = call_llm_with_rewrite_fallback_status(
             prompt=build_main_health_chatbot_rewrite_prompt(input_data, rule_engine_output),
             fallback_answer=rule_engine_output.answer,
             metadata={
@@ -184,7 +185,7 @@ def rewrite_main_health_chatbot_response_with_llm(
                 "use_real_llm": True,
             },
         )
-        source = "llm_rewrite"
+        source = "openai_rewrite" if llm_succeeded else rule_engine_output.source
     else:
         answer = rewrite_main_health_chatbot_answer_stub(rule_engine_output)
         source = "llm_rewrite_stub"
@@ -195,6 +196,7 @@ def rewrite_main_health_chatbot_response_with_llm(
         prompt_version=MAIN_REWRITE_PROMPT_VERSION,
         model=get_openai_model() if use_real_llm else None,
     )
+    safety_result = add_rewrite_status_metadata(safety_result, use_real_llm=use_real_llm, source=source)
 
     return MainHealthChatbotOutput(
         answer=final_answer,
@@ -457,20 +459,45 @@ def add_llm_metadata(
     }
 
 
+def add_rewrite_status_metadata(safety_result: dict, *, use_real_llm: bool, source: str) -> dict:
+    metadata = {
+        **safety_result.get("metadata", {}),
+        "llm_requested": use_real_llm,
+        "llm_used": source == "openai_rewrite",
+        "source": source,
+    }
+    if use_real_llm and source != "openai_rewrite":
+        metadata["fallback_used"] = True
+        metadata["fallback_reason"] = "llm_rewrite_unavailable"
+    return {
+        **safety_result,
+        "metadata": metadata,
+    }
+
+
 def call_llm_with_rewrite_fallback(
     prompt: str,
     fallback_answer: str,
     metadata: dict | None = None,
 ) -> str:
+    answer, _ = call_llm_with_rewrite_fallback_status(prompt, fallback_answer, metadata)
+    return answer
+
+
+def call_llm_with_rewrite_fallback_status(
+    prompt: str,
+    fallback_answer: str,
+    metadata: dict | None = None,
+) -> tuple[str, bool]:
     try:
         raw_response = call_llm_json(
             prompt,
             schema_name="health_chatbot_rewrite",
             metadata=metadata,
         )
-        return extract_answer_from_json_response(raw_response)
+        return extract_answer_from_json_response(raw_response), True
     except Exception:
-        return fallback_answer
+        return fallback_answer, False
 
 
 def extract_answer_from_json_response(raw_response: str) -> str:

@@ -284,6 +284,7 @@ def _drinking_amount(value: Any) -> float | None:
         "LIGHT": 1.0,
         "ONE_TO_TWO": 1.0,
         "THREE_TO_FOUR": 2.0,
+        "THREE_TO_SIX": 3.0,
         "FIVE_TO_SIX": 3.0,
         "SEVEN_PLUS": 4.0,
         "HEAVY": 4.0,

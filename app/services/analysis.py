@@ -175,6 +175,8 @@ async def run_analysis(
                 "analysis_mode": result.analysis_mode,
                 "risk_score": result.risk_score,
                 "risk_level": result.risk_level,
+                "model_name": result.model_name,
+                "model_version": result.model_version,
                 "guide_message": request.summary,
                 "explanation": _analysis_explanation(result, factors),
                 "challenge_recommendation_ids": recommendation_ids,
