@@ -3,6 +3,7 @@ from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
 from app.core import config
 from app.dtos.exams import (
     ExamConfirmMeasurementRequest,
@@ -236,19 +237,26 @@ def _coerce_health_record_value(field_name: str, value: Decimal) -> int | Decima
     return value
 
 
-async def run_exam_ocr(exam_report_id: int) -> ExamOCRResponse:
-    # Current demo path creates provider/fallback candidates; confirm syncs reviewed values into HealthRecord.
+async def run_exam_ocr(
+    exam_report_id: int,
+    image_bytes: bytes | None = None,
+    image_media_type: str | None = None,
+) -> ExamOCRResponse:
+    provider_result = await _extract_exam_measurements_with_provider(
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
+    )
     existing_measurements = await list_exam_measurements(exam_report_id)
     existing_by_key = {measurement.measurement_key: measurement for measurement in existing_measurements}
     saved_measurements: list[ExamMeasurement] = []
 
-    for key, name, value, unit in FALLBACK_OCR_MEASUREMENTS:
+    for key, name, value, unit in provider_result["measurements"]:
         request = ExamMeasurementCreateRequest(
             measurement_key=key,
             measurement_name=name,
             value=value,
             unit=unit,
-            ocr_confidence=Decimal("0.9700"),
+            ocr_confidence=provider_result["confidence"],
             is_user_confirmed=False,
         )
         existing = existing_by_key.get(key)
@@ -261,6 +269,129 @@ async def run_exam_ocr(exam_report_id: int) -> ExamOCRResponse:
 
     await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS))
     return ExamOCRResponse(
-        message="측정값 후보가 생성되었습니다. 현재 provider/fallback 기반 결과이므로 검진 수치를 확인한 뒤 저장해주세요.",
+        message=provider_result["message"],
         measurements=saved_measurements,
+        ocr_provider=provider_result["provider"],
+        fallback_used=provider_result["fallback_used"],
+        provider_message=provider_result["provider_message"],
+        raw_text_preview=provider_result["raw_text_preview"],
     )
+
+
+async def _extract_exam_measurements_with_provider(
+    image_bytes: bytes | None,
+    image_media_type: str | None,
+) -> dict[str, Any]:
+    provider = str(config.EXAM_OCR_PROVIDER or "fallback").lower()
+    if provider == "gpt_vision" and config.EXAM_GPT_VISION_ENABLED:
+        result = await _extract_exam_measurements_with_gpt_vision(image_bytes, image_media_type)
+        if result is not None:
+            return result
+        return _fallback_exam_ocr_result("gpt_vision_failed_or_unavailable")
+
+    if provider == "paddleocr" and config.PADDLE_OCR_ENABLED:
+        result = await _extract_exam_measurements_with_paddleocr(image_bytes, image_media_type)
+        if result is not None:
+            return result
+        return _fallback_exam_ocr_result("paddleocr_failed_or_unavailable")
+
+    return _fallback_exam_ocr_result(f"{provider}_disabled")
+
+
+async def _extract_exam_measurements_with_gpt_vision(
+    image_bytes: bytes | None,
+    image_media_type: str | None,
+) -> dict[str, Any] | None:
+    if not image_bytes or not config.OPENAI_API_KEY:
+        return None
+    try:
+        client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.EXAM_GPT_VISION_MODEL)
+        raw = await client.analyze(
+            analysis_type=AnalysisType.CHECKUP,
+            image_bytes=image_bytes,
+            media_type=image_media_type or "image/jpeg",
+        )
+    except Exception:
+        return None
+
+    extracted_data = raw.get("extracted_data") if isinstance(raw, dict) else None
+    if not isinstance(extracted_data, dict):
+        return None
+    measurements = _measurement_tuples_from_mapping(extracted_data)
+    if not measurements:
+        return None
+    return {
+        "provider": "gpt_vision",
+        "fallback_used": False,
+        "provider_message": "gpt_vision_checkup_ocr",
+        "message": "GPT Vision으로 측정값 후보를 생성했습니다. 검진 수치를 확인한 뒤 저장해주세요.",
+        "measurements": measurements,
+        "confidence": Decimal("0.9000"),
+        "raw_text_preview": None,
+    }
+
+
+async def _extract_exam_measurements_with_paddleocr(
+    image_bytes: bytes | None,
+    image_media_type: str | None,
+) -> dict[str, Any] | None:
+    if not image_bytes:
+        return None
+    try:
+        from ai_runtime.ocr.checkup.extractor import run_ocr, run_ocr_on_pdf
+    except Exception:
+        return None
+
+    try:
+        if image_media_type == "application/pdf":
+            data, low_confidence_fields, raw_text, _status = await run_ocr_on_pdf(image_bytes)
+        else:
+            data, low_confidence_fields, raw_text, _status = await run_ocr(image_bytes)
+    except Exception:
+        return None
+
+    values = data.model_dump() if hasattr(data, "model_dump") else {}
+    measurements = _measurement_tuples_from_mapping(values)
+    if not measurements:
+        return None
+    confidence = Decimal("0.7000") if low_confidence_fields else Decimal("0.9000")
+    raw_preview = "\n".join(str(line[0] if isinstance(line, tuple) else line) for line in raw_text[:8])
+    return {
+        "provider": "paddleocr",
+        "fallback_used": False,
+        "provider_message": "paddleocr_checkup_ocr",
+        "message": "PaddleOCR로 측정값 후보를 생성했습니다. 검진 수치를 확인한 뒤 저장해주세요.",
+        "measurements": measurements,
+        "confidence": confidence,
+        "raw_text_preview": raw_preview or None,
+    }
+
+
+def _fallback_exam_ocr_result(reason: str) -> dict[str, Any]:
+    return {
+        "provider": "fallback",
+        "fallback_used": True,
+        "provider_message": reason,
+        "message": "측정값 후보가 생성되었습니다. 현재 fallback 기반 결과이므로 검진 수치를 확인한 뒤 저장해주세요.",
+        "measurements": FALLBACK_OCR_MEASUREMENTS,
+        "confidence": Decimal("0.9700"),
+        "raw_text_preview": None,
+    }
+
+
+def _measurement_tuples_from_mapping(values: dict[str, Any]) -> list[tuple[str, str, str, str | None]]:
+    names = {key: name for key, name, _value, _unit in FALLBACK_OCR_MEASUREMENTS}
+    units = {key: unit for key, _name, _value, unit in FALLBACK_OCR_MEASUREMENTS}
+    measurements = []
+    for key, health_key in EXAM_MEASUREMENT_TO_HEALTH_FIELD.items():
+        if key not in values:
+            continue
+        value = values.get(key)
+        if value is None or value == "":
+            continue
+        measurement_key = key
+        measurement_name = names.get(measurement_key) or names.get(health_key) or measurement_key
+        measurements.append(
+            (measurement_key, measurement_name, str(value), units.get(measurement_key) or units.get(health_key))
+        )
+    return measurements

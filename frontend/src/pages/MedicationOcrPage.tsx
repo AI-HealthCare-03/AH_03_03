@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import {
   confirmMedicationOcr,
   type MedicationOcrItem,
+  type MedicationOcrRequest,
   runMedicationOcr,
 } from "../api/medications";
 import Card from "../components/Card";
@@ -13,6 +14,7 @@ export default function MedicationOcrPage() {
   const [items, setItems] = useState<MedicationOcrItem[]>([]);
   const [sourceType, setSourceType] = useState("PRESCRIPTION");
   const [imageFilename, setImageFilename] = useState("");
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -35,13 +37,11 @@ export default function MedicationOcrPage() {
     setMessage("");
     setIsRunning(true);
     try {
-      const response = await runMedicationOcr({
-        source_type: sourceType,
-        image_filename: imageFilename || undefined,
-        memo: "medication ocr request",
-      });
+      const response = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
       setItems(response.items);
-      setMessage(`${toUserMessage(response.message)} 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.`);
+      setMessage(
+        `${toUserMessage(response.message)} provider=${response.source ?? "unknown"}, fallback=${response.fallback_used ? "yes" : "no"}. 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "복약정보 후보 생성에 실패했습니다.");
     } finally {
@@ -51,6 +51,14 @@ export default function MedicationOcrPage() {
 
   const updateItem = (index: number, key: keyof MedicationOcrItem, value: string | number | string[] | null) => {
     setItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
+  };
+
+  const handleImageSelection = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+    setSelectedImageFile(file);
+    setImageFilename(file.name);
   };
 
   const save = async () => {
@@ -100,7 +108,7 @@ export default function MedicationOcrPage() {
                 <input
                   accept="image/*"
                   type="file"
-                  onChange={(event) => setImageFilename(event.currentTarget.files?.[0]?.name ?? "")}
+                  onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
                 />
               </label>
               {isMobileDevice ? (
@@ -110,7 +118,7 @@ export default function MedicationOcrPage() {
                     accept="image/*"
                     capture="environment"
                     type="file"
-                    onChange={(event) => setImageFilename(event.currentTarget.files?.[0]?.name ?? "")}
+                    onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
                   />
                 </label>
               ) : (
@@ -199,6 +207,21 @@ export default function MedicationOcrPage() {
       </Card>
     </div>
   );
+}
+
+function buildMedicationOcrPayload(sourceType: string, file: File | null, imageFilename: string): MedicationOcrRequest | FormData {
+  if (!file) {
+    return {
+      source_type: sourceType,
+      image_filename: imageFilename || undefined,
+      memo: "medication ocr request",
+    };
+  }
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("source_type", sourceType);
+  formData.append("image_filename", file.name);
+  return formData;
 }
 
 function toUserMessage(message: string): string {

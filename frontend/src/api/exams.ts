@@ -30,6 +30,10 @@ export type ExamMeasurement = {
 export type ExamOcrResponse = {
   message: string;
   measurements: ExamMeasurement[];
+  ocr_provider?: string;
+  fallback_used?: boolean;
+  provider_message?: string | null;
+  raw_text_preview?: string | null;
 };
 
 export async function listExams<T = ExamReport[]>(params?: { limit?: number; offset?: number }): Promise<T> {
@@ -49,7 +53,12 @@ export async function createExam(payload: {
   return apiRequest<ExamReport>("/exams", { method: "POST", body: payload });
 }
 
-export async function runExamOcr(examId: number): Promise<ExamOcrResponse> {
+export async function runExamOcr(examId: number, file?: File | null): Promise<ExamOcrResponse> {
+  if (file) {
+    const formData = new FormData();
+    formData.append("image", file);
+    return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST", body: formData });
+  }
   return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST" });
 }
 

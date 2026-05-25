@@ -68,6 +68,9 @@ class MedicationOCRResponse(BaseModel):
     items: list[MedicationOCRItem]
     message: str
     source: str = "rule_based_medication_ocr"
+    fallback_used: bool = True
+    provider_message: str | None = None
+    extracted_text_preview: str | None = None
     raw_text: str | None = None
     parser_warnings: list[str] = Field(default_factory=list)
 
