@@ -39,7 +39,11 @@ def test_diet_score_explanation_mentions_lowest_disease_score() -> None:
     assert "의료진 상담" in explanation.safety_notice
 
 
-def test_rag_ready_interface_adds_keyword_context_references() -> None:
+def test_rag_ready_interface_adds_keyword_context_references(monkeypatch) -> None:
+    import ai_runtime.llm.explanation_service as explanation_service
+
+    monkeypatch.setattr(explanation_service.config, "RAG_ENABLED", True)
+
     contexts = retrieve_health_context("혈당 관리", disease_type="DIABETES")
     explanation = generate_explanation_with_context(
         AnalysisExplanationInput(disease_type="DIABETES", risk_level="LOW"),
@@ -56,12 +60,26 @@ def test_rag_ready_interface_adds_keyword_context_references() -> None:
     assert "진단이 아니" in explanation.safety_notice
 
 
+def test_retrieve_health_context_returns_empty_when_rag_disabled(monkeypatch) -> None:
+    import ai_runtime.llm.explanation_service as explanation_service
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("RAG retrieval should be skipped when disabled")
+
+    monkeypatch.setattr(explanation_service.config, "RAG_ENABLED", False)
+    monkeypatch.setattr(explanation_service, "retrieve_keyword_rag_contexts", fail_if_called)
+    monkeypatch.setattr(explanation_service, "trace_keyword_rag_retrieval", fail_if_called)
+
+    assert explanation_service.retrieve_health_context("혈당 관리", disease_type="DIABETES") == []
+
+
 def test_retrieve_health_context_returns_empty_when_rag_loader_fails(monkeypatch) -> None:
     import ai_runtime.llm.explanation_service as explanation_service
 
     def raise_rag_error(*args, **kwargs):
         raise RuntimeError("index broken")
 
+    monkeypatch.setattr(explanation_service.config, "RAG_ENABLED", True)
     monkeypatch.setattr(explanation_service, "retrieve_keyword_rag_contexts", raise_rag_error)
 
     assert explanation_service.retrieve_health_context("혈당 관리", disease_type="DIABETES") == []

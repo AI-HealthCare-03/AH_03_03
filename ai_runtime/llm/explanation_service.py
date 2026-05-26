@@ -10,6 +10,7 @@ from ai_runtime.llm.schemas import (
     ExplanationOutput,
     RetrievedContext,
 )
+from app.core import config
 
 SAFETY_NOTICE = "이 설명은 진단이 아니며, 건강관리 참고용입니다. 정확한 진단과 치료는 의료진 상담이 필요합니다."
 logger = logging.getLogger(__name__)
@@ -92,6 +93,9 @@ def generate_diet_score_explanation(input_data: DietScoreExplanationInput) -> Ex
 
 def retrieve_health_context(query: str, disease_type: str | None = None) -> list[RetrievedContext]:
     """로컬 후보 문서 기반 keyword RAG PoC이며 외부 검색/embedding은 수행하지 않는다."""
+    if not config.RAG_ENABLED:
+        return []
+
     top_k = 2
     include_safety_disclaimer = True
     try:
