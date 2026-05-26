@@ -5,7 +5,7 @@ shared databases. It does not replace Aerich migrations and does not change
 database schema.
 
 Usage:
-    DB_HOST=localhost uv run python scripts/seed_current_user_dashboard_demo.py --email aszx91@gmail.com
+    DB_HOST=localhost uv run python scripts/seed_current_user_dashboard_demo.py --email demo@example.com
 """
 
 import argparse
@@ -548,7 +548,7 @@ def _json_value(value: Any) -> Any:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Seed current local MVP user dashboard demo data.")
-    parser.add_argument("--email", required=True, help="Target user email, e.g. aszx91@gmail.com")
+    parser.add_argument("--email", required=True, help="Target user email, e.g. demo@example.com")
     return parser.parse_args()
 
 
