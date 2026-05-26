@@ -129,6 +129,7 @@ export default function AnalysisPage() {
   const [factorsByResultId, setFactorsByResultId] = useState<Record<string, AnalysisFactor[]>>({});
   const [explanationsByResultId, setExplanationsByResultId] = useState<Record<string, AnalysisExplanation>>({});
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
 
@@ -181,6 +182,7 @@ export default function AnalysisPage() {
 
   const run = async (mode: AnalysisMode) => {
     setError("");
+    setNotice("");
     setRunningMode(mode);
     try {
       const readiness = await getAnalysisReadiness<Readiness>();
@@ -192,15 +194,15 @@ export default function AnalysisPage() {
       setMissingFields(currentBasicReady ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
       setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
       if (!readiness.latest_health_record_id) {
-        setError("분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
+        setNotice(mode === "PRECISION" ? "건강검진 데이터를 입력해주세요." : "분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
         return;
       }
       if (!currentBasicReady) {
-        setError("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
+        setNotice("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
         return;
       }
       if (mode === "PRECISION" && !currentPrecisionReady) {
-        setError("정밀 분석에 필요한 검진값이 부족해 분석을 실행하지 않았습니다.");
+        setNotice("건강검진 데이터를 입력해주세요.");
         return;
       }
       await runAnalysis(readiness.latest_health_record_id, mode);
@@ -222,10 +224,10 @@ export default function AnalysisPage() {
           <p>당뇨, 고혈압, 비만, 이상지질혈증 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
-          <button disabled={!basicReady || runningMode !== null} onClick={() => void run("BASIC")}>
+          <button disabled={runningMode !== null} onClick={() => void run("BASIC")} type="button">
             {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석 실행"}
           </button>
-          <button disabled={!basicReady || !precisionReady || runningMode !== null} onClick={() => void run("PRECISION")}>
+          <button disabled={runningMode !== null} onClick={() => void run("PRECISION")} type="button">
             {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석 실행"}
           </button>
           <Link className="button secondary" to="/analysis/history">
@@ -234,6 +236,7 @@ export default function AnalysisPage() {
         </div>
       </div>
       {error && <ErrorMessage message={error} />}
+      {notice && <div className="state-box">{notice}</div>}
       {missingFields.length > 0 && (
         <Card title="분석에 필요한 정보가 부족합니다">
           <div className="readiness-card">
