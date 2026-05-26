@@ -29,12 +29,15 @@ REQUIRED_PRECISION_ANALYSIS_FIELDS = {
     "systolic_bp": "수축기 혈압",
     "diastolic_bp": "이완기 혈압",
     "fasting_glucose": "공복혈당",
-    "hba1c": "당화혈색소",
     "total_cholesterol": "총콜레스테롤",
     "ldl_cholesterol": "LDL 콜레스테롤",
     "hdl_cholesterol": "HDL 콜레스테롤",
     "triglyceride": "중성지방",
     "waist_cm": "허리둘레",
+}
+
+OPTIONAL_PRECISION_ANALYSIS_FIELDS = {
+    "hba1c": "당화혈색소",
 }
 
 
