@@ -254,6 +254,7 @@ def _record_vision_trace(
 
         record_langfuse_event(
             name=f"{analysis_type}.gpt_vision",
+            output_payload=output,
             metadata={
                 "provider": "gpt_vision",
                 "analysis_type": analysis_type,
@@ -266,7 +267,6 @@ def _record_vision_trace(
                 "medication_count": len(output.get("medications") or []),
                 "extracted_field_count": len(output.get("extracted_data") or {}),
             },
-            output=output,
         )
     except Exception:
         logger.warning("GPT Vision Langfuse trace 기록 실패", exc_info=True)
