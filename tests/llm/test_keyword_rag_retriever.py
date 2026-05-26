@@ -1,6 +1,6 @@
 from ai_runtime.llm.llm_client import record_langfuse_event
 from ai_runtime.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts, retrieve_keyword_rag_matches
-from ai_runtime.llm.rag.tracing import build_keyword_rag_trace_metadata
+from ai_runtime.llm.rag.tracing import build_keyword_rag_trace_metadata, trace_keyword_rag_retrieval
 
 
 def test_retrieve_by_disease_type() -> None:
@@ -80,6 +80,26 @@ def test_keyword_rag_trace_metadata_contains_source_metadata() -> None:
     assert metadata["top_k"] == 3
     assert metadata["fallback"] is False
     assert any(source["id"] == "diabetes" for source in metadata["retrieved_sources"])
+
+
+def test_keyword_rag_trace_is_noop_when_rag_disabled(monkeypatch) -> None:
+    import ai_runtime.llm.rag.tracing as tracing
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("Langfuse event should be skipped when RAG is disabled")
+
+    monkeypatch.setattr(tracing.config, "RAG_ENABLED", False)
+    monkeypatch.setattr(tracing, "record_langfuse_event", fail_if_called)
+
+    recorded = trace_keyword_rag_retrieval(
+        query="공복혈당 관리",
+        disease_type="DIABETES",
+        contexts=[],
+        top_k=2,
+        include_safety_disclaimer=True,
+    )
+
+    assert recorded is False
 
 
 def test_langfuse_event_is_noop_without_env(monkeypatch) -> None:

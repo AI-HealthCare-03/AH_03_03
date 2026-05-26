@@ -65,6 +65,7 @@ class Config(BaseSettings):
     MEDICATION_GPT_VISION_ENABLED: bool = False
     MEDICATION_GPT_VISION_MODEL: str = "gpt-4o-mini"
     CHATBOT_USE_REAL_LLM: bool = False
+    RAG_ENABLED: bool = False
     LANGFUSE_ENABLED: bool = False
     LANGFUSE_BASE_URL: str | None = None
     LANGFUSE_HOST: str | None = None

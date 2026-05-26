@@ -4,6 +4,7 @@ from typing import Any
 
 from ai_runtime.llm.llm_client import record_langfuse_event
 from ai_runtime.llm.schemas import RetrievedContext
+from app.core import config
 
 KEYWORD_RAG_TRACE_VERSION = "keyword_rag_poc_v1"
 KEYWORD_RAG_PROMPT_VERSION = "keyword_rag_context_v1"
@@ -69,6 +70,9 @@ def trace_keyword_rag_retrieval(
     top_k: int,
     include_safety_disclaimer: bool,
 ) -> bool:
+    if not config.RAG_ENABLED:
+        return False
+
     metadata = build_keyword_rag_trace_metadata(
         query=query,
         disease_type=disease_type,
