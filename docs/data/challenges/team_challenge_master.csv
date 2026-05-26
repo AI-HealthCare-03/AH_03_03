@@ -1,21 +1,38 @@
 challenge_type,target_disease,category,title,description,duration_days,target_metric,target_value,difficulty,caution_message,contraindication_message,is_active
-COMMON,COMMON,EXERCISE,하루 20분 걷기,하루 20분 이상 가볍게 걷는 기본 활동 챌린지입니다.,7,exercise_minutes,20,EASY,무리가 느껴지면 속도와 시간을 줄이고 필요한 경우 의료진과 상담하세요.,어지러움이나 흉통이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
-COMMON,COMMON,WATER,물 6잔 마시기,하루 동안 물 6잔 마시기를 기록합니다.,7,water_cups,6,EASY,심장이나 신장 질환으로 수분 제한을 안내받은 경우 개인 지침을 우선하세요.,의료진에게 수분 제한을 안내받은 경우 이 챌린지는 진행하지 마세요.,true
-COMMON,COMMON,DIET,채소 한 접시 추가하기,하루 한 끼에 채소 반찬이나 샐러드를 추가합니다.,7,vegetable_serving_count,1,EASY,소화 불편이 있으면 양을 줄여 진행하세요.,특정 식품 알레르기가 있으면 해당 식품은 피하세요.,true
-COMMON,COMMON,SLEEP,취침 30분 전 화면 줄이기,잠들기 전 스마트폰과 화면 노출을 줄이는 습관 챌린지입니다.,7,screen_free_minutes,30,EASY,,,true
-COMMON,COMMON,MEDICATION,복약 시간 기록하기,복약 또는 영양제 복용 시간을 매일 확인하고 기록합니다.,7,medication_record_count,1,EASY,처방된 약은 임의로 중단하지 말고 복약 변경은 의료진과 상담하세요.,,true
-SPECIAL,HYPERTENSION,BLOOD_PRESSURE,아침 혈압 기록하기,아침 안정 상태에서 혈압을 기록하고 변화를 확인합니다.,7,morning_bp_record_count,1,EASY,측정 전 5분 이상 안정을 취하고 카페인 섭취 직후 측정은 피하세요.,수치가 매우 높거나 두통·흉통·호흡곤란이 있으면 의료기관 상담을 권장합니다.,true
-SPECIAL,HYPERTENSION,DIET,국물 절반 남기기,나트륨 섭취를 줄이기 위해 국물 섭취를 줄이는 챌린지입니다.,7,soup_left_ratio,50,NORMAL,식사량이 크게 줄지 않도록 주식과 단백질은 균형 있게 유지하세요.,,true
-SPECIAL,HYPERTENSION,HABIT,카페인 오후 줄이기,오후 카페인 음료를 줄이고 혈압과 수면 리듬을 함께 관리합니다.,7,afternoon_caffeine_count,0,NORMAL,카페인을 갑자기 줄이면 두통이 생길 수 있어 천천히 조절하세요.,,true
-SPECIAL,DIABETES,EXERCISE,식후 10분 산책,식후 가볍게 걷는 습관으로 혈당 변화를 관리합니다.,7,post_meal_walk_minutes,10,EASY,저혈당 증상이 있거나 컨디션이 좋지 않으면 휴식하고 필요한 경우 상담하세요.,저혈당 증상이 반복되거나 어지러움이 있으면 무리해서 진행하지 마세요.,true
-SPECIAL,DIABETES,DIET,단 음료 대신 물 선택,단 음료를 줄이고 물이나 무가당 음료를 선택합니다.,7,sweet_drink_replacement_count,1,EASY,,,true
-SPECIAL,DIABETES,DIET,정제 탄수화물 줄이기,하루 한 끼는 흰빵·과자·단 음료 등 정제 탄수화물을 줄여 기록합니다.,7,refined_carb_reduction_count,1,NORMAL,식사를 거르지 말고 주식 양을 과도하게 줄이지 않도록 주의하세요.,저혈당 위험이 있는 경우 개인 복약·식사 지침을 우선하세요.,true
-SPECIAL,DYSLIPIDEMIA,DIET,튀김 대신 구이 선택,튀김류 대신 구이·찜·삶은 조리법을 선택합니다.,7,grilled_choice_count,1,EASY,,,true
-SPECIAL,DYSLIPIDEMIA,DIET,견과류 소량 간식,과자 대신 무가당 견과류를 소량 선택합니다.,7,nuts_snack_count,1,NORMAL,견과류는 열량이 높으므로 한 줌 이내로 조절하세요.,견과류 알레르기가 있으면 진행하지 마세요.,true
-SPECIAL,DYSLIPIDEMIA,EXERCISE,가벼운 유산소 20분,무리하지 않는 강도로 유산소 활동을 20분 실천합니다.,7,aerobic_minutes,20,NORMAL,운동 중 통증이나 숨참이 심하면 강도를 낮추거나 중단하세요.,흉통·심한 어지러움이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
-SPECIAL,OBESITY,DIET,야식 줄이기,저녁 이후 불필요한 간식을 줄이고 수면 전 공복 시간을 확보합니다.,7,late_night_snack_count,0,NORMAL,과도한 절식 대신 식사 리듬을 일정하게 유지하세요.,섭식장애 병력이 있거나 식사 제한이 부담되는 경우 진행 전 상담을 권장합니다.,true
-SPECIAL,OBESITY,EXERCISE,하루 7000보 걷기,일상 속 걸음 수를 늘려 활동량을 관리합니다.,7,step_count,7000,NORMAL,무릎이나 발목 통증이 있으면 목표를 낮춰 시작하세요.,통증이 악화되면 중단하고 의료기관 상담을 권장합니다.,true
-SPECIAL,OBESITY,HABIT,식사 속도 늦추기,한 끼를 15분 이상 천천히 먹는 습관을 기록합니다.,7,meal_duration_minutes,15,EASY,,,true
+COMMON,COMMON,DIET,간식 횟수 하루 1회 이하,불필요한 간식 횟수를 줄이고 식사 리듬을 점검하는 생활습관 챌린지입니다.,7,snack_count,1,EASY,식사를 거르며 간식을 줄이지 않도록 주의하세요.,섭식장애 병력이 있거나 식사 제한이 부담되면 진행 전 상담을 권장합니다.,true
+COMMON,COMMON,EXERCISE,하루 30분 걷기,하루 30분 이상 가볍게 걷는 기본 활동 챌린지입니다.,7,exercise_minutes,30,EASY,무리가 느껴지면 속도와 시간을 줄이고 필요한 경우 의료진과 상담하세요.,어지러움이나 흉통이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
+COMMON,COMMON,HABIT,하루 앉은 시간 8시간 이하,오래 앉아 있는 시간을 줄이고 중간중간 몸을 움직이는 챌린지입니다.,7,sitting_hours,8,NORMAL,업무 환경에 맞춰 무리하지 않는 범위에서 휴식 시간을 조정하세요.,,true
+COMMON,COMMON,SLEEP,7시간 이상 수면,하루 7시간 이상 수면을 기록하고 일정한 수면 리듬을 확인합니다.,7,sleep_hours,7,EASY,개인 상황에 따라 적정 수면 시간은 다를 수 있습니다.,,true
+COMMON,COMMON,DIET,매 끼니 채소 섭취,매 끼니 채소 반찬이나 샐러드를 포함하는 식습관 챌린지입니다.,7,vegetable_meal_count,3,EASY,소화 불편이 있으면 양을 줄여 진행하세요.,특정 식품 알레르기가 있으면 해당 식품은 피하세요.,true
+COMMON,COMMON,HABIT,식사 속도 늦추기,한 끼를 20분 이상 천천히 먹는 습관을 기록합니다.,7,meal_duration_minutes,20,EASY,,,true
+COMMON,COMMON,WATER,하루 물 1.5L 이상 마시기,하루 수분 섭취량을 기록하고 물 마시는 습관을 점검합니다.,7,water_liters,1.5,EASY,심장이나 신장 질환으로 수분 제한을 안내받은 경우 개인 지침을 우선하세요.,의료진에게 수분 제한을 안내받은 경우 이 챌린지는 진행하지 마세요.,true
+COMMON,COMMON,HABIT,스트레스 일지 작성,하루 스트레스 상황과 대처 방법을 짧게 기록하는 챌린지입니다.,7,stress_note_count,1,EASY,기분 저하나 불안이 지속되면 전문가 상담을 권장합니다.,위기 상황이나 자해 생각이 있으면 즉시 도움을 요청하세요.,true
+COMMON,COMMON,EXERCISE,식후 10분 이상 가벼운 움직임,식후 가볍게 걷거나 움직이며 활동 습관을 만드는 챌린지입니다.,7,post_meal_activity_minutes,10,EASY,컨디션이 좋지 않거나 어지러우면 휴식하세요.,흉통이나 심한 호흡곤란이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
+COMMON,COMMON,WEIGHT,체중 측정,같은 조건에서 체중을 측정하고 변화 추이를 기록합니다.,7,weight_record_count,1,EASY,하루 변동에 지나치게 불안해하지 말고 주간 추이를 참고하세요.,섭식장애 병력이 있거나 체중 측정이 부담되면 진행 전 상담을 권장합니다.,true
+COMMON,COMMON,EXERCISE,운동 챌린지,가벼운 운동을 실천하고 오늘의 활동 여부를 기록합니다.,7,exercise_record_count,1,EASY,통증이나 어지러움이 있으면 강도를 낮추거나 중단하세요.,흉통이나 심한 어지러움이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
+COMMON,COMMON,MEDICATION,영양제 복용,영양제 또는 복약 여부를 매일 확인하고 기록합니다.,7,supplement_record_count,1,EASY,처방된 약은 임의로 중단하지 말고 복약 변경은 의료진과 상담하세요.,,true
+COMMON,COMMON,HABIT,절주 또는 금주 기록,음주량을 줄이거나 술을 마시지 않은 날을 기록합니다.,7,alcohol_free_count,1,NORMAL,금단 증상이 있거나 음주 조절이 어렵다면 전문가 상담을 권장합니다.,,true
+COMMON,COMMON,HABIT,금연 또는 절연 기록,흡연량을 줄이거나 담배를 피우지 않은 시간을 기록합니다.,7,smoking_reduction_count,1,NORMAL,금연 보조제나 치료가 필요한 경우 전문가 상담을 권장합니다.,,true
+COMMON,COMMON,DIET,규칙적인 식사시간,하루 식사 시간을 일정하게 기록하고 과도한 결식을 줄이는 챌린지입니다.,7,regular_meal_count,3,EASY,저혈당 위험이 있거나 복약 중이면 개인 식사 지침을 우선하세요.,,true
+COMMON,COMMON,DIET,정제탄수화물 줄이기,흰빵 과자 단 음료 등 정제탄수화물 섭취를 줄여 기록합니다.,7,refined_carb_reduction_count,1,NORMAL,식사를 거르지 말고 주식 양을 과도하게 줄이지 않도록 주의하세요.,저혈당 위험이 있는 경우 개인 복약 식사 지침을 우선하세요.,true
+COMMON,COMMON,HABIT,디지털 디톡스,취침 전 또는 휴식 시간에 화면 사용을 줄이는 챌린지입니다.,7,screen_free_minutes,30,EASY,,,true
+COMMON,COMMON,HABIT,카페인 하루 400mg 이하,하루 카페인 섭취량을 점검하고 과도한 섭취를 줄이는 챌린지입니다.,7,caffeine_mg,400,NORMAL,카페인을 갑자기 줄이면 두통이 생길 수 있어 천천히 조절하세요.,임신 중이거나 특정 질환으로 제한을 안내받은 경우 개인 지침을 우선하세요.,true
+COMMON,COMMON,DIET,저녁 식사 후 야식 금지,저녁 식사 후 불필요한 간식을 줄이고 수면 전 공복 시간을 확보합니다.,7,late_night_snack_count,0,NORMAL,과도한 절식 대신 식사 리듬을 일정하게 유지하세요.,섭식장애 병력이 있거나 식사 제한이 부담되면 진행 전 상담을 권장합니다.,true
 GENERAL,GENERAL,HABIT,하루 건강기록 남기기,오늘의 컨디션과 건강 습관을 간단히 기록합니다.,7,daily_health_note_count,1,EASY,,,true
-GENERAL,GENERAL,SLEEP,7시간 수면 기록,하루 수면 시간을 기록하고 일정한 수면 리듬을 확인합니다.,7,sleep_hours,7,EASY,개인 상황에 따라 적정 수면 시간은 다를 수 있습니다.,,true
 GENERAL,GENERAL,DIET,한 끼 식단 기록하기,사진 또는 직접 입력으로 하루 한 끼 식단을 기록합니다.,7,diet_record_count,1,EASY,,,true
+SPECIAL,OBESITY,WEIGHT,복부 둘레 측정 주 1회,주 1회 같은 조건에서 허리둘레를 측정하고 변화를 기록합니다.,7,waist_record_count,1,EASY,측정값 하나로 상태를 단정하지 말고 추세를 참고하세요.,,true
+SPECIAL,OBESITY,DIET,비만 식사 관리,야식과 고열량 간식을 줄이고 식사량을 점검하는 챌린지입니다.,7,obesity_diet_record_count,1,NORMAL,과도한 절식 대신 균형 잡힌 식사 리듬을 유지하세요.,섭식장애 병력이 있거나 식사 제한이 부담되면 진행 전 상담을 권장합니다.,true
+SPECIAL,OBESITY,EXERCISE,비만 운동 관리,일상 속 걷기와 가벼운 유산소 활동을 늘리는 챌린지입니다.,7,obesity_exercise_minutes,20,NORMAL,무릎이나 발목 통증이 있으면 목표를 낮춰 시작하세요.,통증이 악화되면 중단하고 의료기관 상담을 권장합니다.,true
+SPECIAL,OBESITY,HABIT,비만 생활습관 점검,수면 식사 활동 기록을 통해 체중 관리에 영향을 주는 습관을 점검합니다.,7,obesity_habit_check_count,1,NORMAL,체중 변화만으로 건강 상태를 단정하지 않도록 주의하세요.,,true
+SPECIAL,DIABETES,BLOOD_GLUCOSE,자가혈당 측정,자가혈당 측정 여부를 기록하고 변화 추이를 확인합니다.,7,blood_glucose_record_count,1,NORMAL,측정 빈도와 방법은 개인 치료 계획을 우선하세요.,저혈당 증상이 있거나 반복되면 의료진 상담을 권장합니다.,true
+SPECIAL,DIABETES,HABIT,발관리,발 상태를 확인하고 상처나 통증 여부를 기록하는 챌린지입니다.,7,foot_check_count,1,EASY,상처 물집 감각 이상이 있으면 의료진 상담을 권장합니다.,상처가 악화되거나 감염이 의심되면 즉시 진료를 권장합니다.,true
+SPECIAL,DIABETES,HABIT,당뇨병 생활습관,수면 식사 활동 기록을 통해 혈당 관리에 영향을 주는 습관을 점검합니다.,7,diabetes_habit_check_count,1,NORMAL,복약 또는 인슐린 치료 중이면 개인 의료 지침을 우선하세요.,저혈당 증상이 있으면 무리하지 말고 필요한 조치를 취하세요.,true
+SPECIAL,DIABETES,EXERCISE,당뇨병 운동,식후 가벼운 걷기와 규칙적인 활동을 실천합니다.,7,diabetes_exercise_minutes,10,EASY,저혈당 증상이 있거나 컨디션이 좋지 않으면 휴식하세요.,저혈당 증상이 반복되면 의료진 상담을 권장합니다.,true
+SPECIAL,DIABETES,DIET,당뇨병 식사,단 음료와 정제탄수화물을 줄이고 식사 균형을 기록합니다.,7,diabetes_diet_record_count,1,NORMAL,식사를 거르거나 탄수화물을 과도하게 줄이지 않도록 주의하세요.,저혈당 위험이 있는 경우 개인 복약 식사 지침을 우선하세요.,true
+SPECIAL,HYPERTENSION,BLOOD_PRESSURE,자가 혈압 측정,안정 상태에서 혈압을 측정하고 변화를 기록합니다.,7,blood_pressure_record_count,1,EASY,측정 전 5분 이상 안정을 취하고 카페인 섭취 직후 측정은 피하세요.,수치가 매우 높거나 두통 흉통 호흡곤란이 있으면 의료기관 상담을 권장합니다.,true
+SPECIAL,HYPERTENSION,HABIT,고혈압 생활,수면 스트레스 활동 기록을 통해 혈압 관리에 영향을 주는 습관을 점검합니다.,7,hypertension_habit_check_count,1,NORMAL,혈압약은 임의로 중단하지 말고 복약 변경은 의료진과 상담하세요.,두통 흉통 호흡곤란이 있으면 의료기관 상담을 권장합니다.,true
+SPECIAL,HYPERTENSION,DIET,고혈압 식사,국물과 짠 음식을 줄이고 나트륨 섭취를 점검합니다.,7,low_sodium_meal_count,1,NORMAL,식사량이 크게 줄지 않도록 주식과 단백질은 균형 있게 유지하세요.,의료진에게 별도 식이 제한을 안내받은 경우 개인 지침을 우선하세요.,true
+SPECIAL,HYPERTENSION,EXERCISE,고혈압 운동,무리하지 않는 강도의 걷기나 유산소 활동을 기록합니다.,7,hypertension_exercise_minutes,20,NORMAL,운동 중 어지러움이나 숨참이 심하면 강도를 낮추거나 중단하세요.,흉통이나 심한 어지러움이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
+SPECIAL,DYSLIPIDEMIA,DIET,이상지질 식사,튀김과 포화지방이 많은 식품을 줄이고 식사 선택을 기록합니다.,7,dyslipidemia_diet_record_count,1,NORMAL,열량을 과도하게 제한하지 말고 균형 잡힌 식사를 유지하세요.,특정 질환으로 식이 제한이 있으면 개인 지침을 우선하세요.,true
+SPECIAL,DYSLIPIDEMIA,EXERCISE,이상지질 운동,가벼운 유산소 활동을 실천하고 활동 시간을 기록합니다.,7,dyslipidemia_exercise_minutes,20,NORMAL,운동 중 통증이나 숨참이 심하면 강도를 낮추거나 중단하세요.,흉통 심한 어지러움이 있으면 즉시 중단하고 의료기관 상담을 권장합니다.,true
+SPECIAL,DYSLIPIDEMIA,HABIT,이상지질 생활,수면 활동 식사 기록을 통해 지질 관리에 영향을 주는 습관을 점검합니다.,7,dyslipidemia_habit_check_count,1,NORMAL,검사 수치 하나만으로 상태를 단정하지 말고 추세와 생활습관을 함께 확인하세요.,,true
