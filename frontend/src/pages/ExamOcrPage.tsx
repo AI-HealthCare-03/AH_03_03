@@ -19,6 +19,8 @@ export default function ExamOcrPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [exam, setExam] = useState<ExamReport | null>(null);
   const [measurements, setMeasurements] = useState<ExamMeasurement[]>([]);
+  const [isRunningOcr, setIsRunningOcr] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -44,6 +46,7 @@ export default function ExamOcrPage() {
   const startExamOcr = async () => {
     setError("");
     setMessage("");
+    setIsRunningOcr(true);
     try {
       const report =
         exam ??
@@ -62,6 +65,8 @@ export default function ExamOcrPage() {
       );
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
+    } finally {
+      setIsRunningOcr(false);
     }
   };
 
@@ -77,6 +82,7 @@ export default function ExamOcrPage() {
       return;
     }
     setError("");
+    setIsConfirming(true);
     try {
       await Promise.all(
         measurements.map((measurement) =>
@@ -92,6 +98,8 @@ export default function ExamOcrPage() {
       setMessage("측정값 후보를 확인 처리했습니다. confirm 후 HealthRecord 정밀분석 필드에 반영됩니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "측정값 후보 저장에 실패했습니다.");
+    } finally {
+      setIsConfirming(false);
     }
   };
 
@@ -138,9 +146,12 @@ export default function ExamOcrPage() {
             </div>
             <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
           </div>
-          <button onClick={startExamOcr} type="button">
-            측정값 후보 생성
+          <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
+            {isRunningOcr ? "OCR 분석 중..." : "측정값 후보 생성"}
           </button>
+          {isRunningOcr ? (
+            <div className="state-box">건강검진표를 분석 중입니다. PDF 페이지 수에 따라 시간이 걸릴 수 있습니다.</div>
+          ) : null}
         </Card>
         <Card title="저장 전 확인">
           <p className="warning-text">현재는 provider/fallback 기반 후보 값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
@@ -182,8 +193,8 @@ export default function ExamOcrPage() {
             {measurements.length === 0 ? (
               <p className="muted">측정값 후보가 생성되면 건강정보 반영 버튼을 사용할 수 있습니다.</p>
             ) : null}
-            <button disabled={measurements.length === 0} onClick={saveAndConfirm} type="button">
-              선택한 OCR 값을 건강정보에 반영
+            <button disabled={measurements.length === 0 || isConfirming} onClick={saveAndConfirm} type="button">
+              {isConfirming ? "건강정보에 반영 중..." : "선택한 OCR 값을 건강정보에 반영"}
             </button>
           </div>
         </div>
