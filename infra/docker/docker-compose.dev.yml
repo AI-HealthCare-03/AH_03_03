@@ -136,8 +136,6 @@ services:
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-http://host.docker.internal:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-    volumes:
-      - ../../ai_runtime:/app/ai_runtime
     restart: unless-stopped
     networks:
       - app
