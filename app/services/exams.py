@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
@@ -71,6 +72,7 @@ HEALTH_INT_FIELDS = {
 }
 
 NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:\.\d+)?")
+logger = logging.getLogger(__name__)
 
 
 async def create_exam_report(user_id: int, request: ExamReportCreateRequest) -> ExamReport:
@@ -241,10 +243,12 @@ async def run_exam_ocr(
     exam_report_id: int,
     image_bytes: bytes | None = None,
     image_media_type: str | None = None,
+    image_filename: str | None = None,
 ) -> ExamOCRResponse:
     provider_result = await _extract_exam_measurements_with_provider(
         image_bytes=image_bytes,
         image_media_type=image_media_type,
+        image_filename=image_filename,
     )
     existing_measurements = await list_exam_measurements(exam_report_id)
     existing_by_key = {measurement.measurement_key: measurement for measurement in existing_measurements}
@@ -281,21 +285,68 @@ async def run_exam_ocr(
 async def _extract_exam_measurements_with_provider(
     image_bytes: bytes | None,
     image_media_type: str | None,
+    image_filename: str | None = None,
 ) -> dict[str, Any]:
     provider = str(config.EXAM_OCR_PROVIDER or "fallback").lower()
-    if provider == "gpt_vision" and config.EXAM_GPT_VISION_ENABLED:
-        result = await _extract_exam_measurements_with_gpt_vision(image_bytes, image_media_type)
-        if result is not None:
-            return result
-        return _fallback_exam_ocr_result("gpt_vision_failed_or_unavailable")
+    provider_order = _select_exam_ocr_provider_order(provider, image_media_type, image_filename)
+    failure_reasons: list[str] = []
+    logger.info(
+        "건강검진 OCR provider routing | configured=%s content_type=%s filename=%s order=%s",
+        provider,
+        image_media_type,
+        image_filename,
+        ",".join(provider_order),
+    )
 
-    if provider == "paddleocr" and config.PADDLE_OCR_ENABLED:
-        result = await _extract_exam_measurements_with_paddleocr(image_bytes, image_media_type)
-        if result is not None:
-            return result
-        return _fallback_exam_ocr_result("paddleocr_failed_or_unavailable")
+    for provider_name in provider_order:
+        if provider_name == "paddleocr":
+            if not config.PADDLE_OCR_ENABLED:
+                failure_reasons.append("paddleocr_disabled")
+                continue
+            result = await _extract_exam_measurements_with_paddleocr(image_bytes, image_media_type, image_filename)
+            if result is not None:
+                return result
+            failure_reasons.append("paddleocr_failed_or_unavailable")
+            continue
 
-    return _fallback_exam_ocr_result(f"{provider}_disabled")
+        if provider_name == "gpt_vision":
+            if not config.EXAM_GPT_VISION_ENABLED:
+                failure_reasons.append("gpt_vision_disabled")
+                continue
+            result = await _extract_exam_measurements_with_gpt_vision(image_bytes, image_media_type)
+            if result is not None:
+                return result
+            failure_reasons.append("gpt_vision_failed_or_unavailable")
+
+    reason = ";".join(failure_reasons) if failure_reasons else f"{provider}_disabled"
+    return _fallback_exam_ocr_result(reason)
+
+
+def _select_exam_ocr_provider_order(
+    configured_provider: str,
+    image_media_type: str | None,
+    image_filename: str | None,
+) -> list[str]:
+    is_pdf = _is_pdf_upload(image_media_type, image_filename)
+    is_image = bool(image_media_type and image_media_type.lower().startswith("image/"))
+
+    if configured_provider == "fallback":
+        return []
+    if is_pdf and configured_provider in {"auto", "gpt_vision", "paddleocr"}:
+        return ["paddleocr", "gpt_vision"]
+    if is_image and configured_provider in {"auto", "gpt_vision"}:
+        return ["gpt_vision", "paddleocr"]
+    if configured_provider == "paddleocr":
+        return ["paddleocr", "gpt_vision"]
+    if configured_provider == "gpt_vision":
+        return ["gpt_vision", "paddleocr"]
+    return []
+
+
+def _is_pdf_upload(image_media_type: str | None, image_filename: str | None) -> bool:
+    media_type = (image_media_type or "").lower().split(";", 1)[0].strip()
+    filename = (image_filename or "").lower()
+    return media_type == "application/pdf" or filename.endswith(".pdf")
 
 
 async def _extract_exam_measurements_with_gpt_vision(
@@ -311,7 +362,8 @@ async def _extract_exam_measurements_with_gpt_vision(
             image_bytes=image_bytes,
             media_type=image_media_type or "image/jpeg",
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning("GPT Vision 건강검진 OCR 실패: %s", exc, exc_info=True)
         return None
 
     extracted_data = raw.get("extracted_data") if isinstance(raw, dict) else None
@@ -334,20 +386,23 @@ async def _extract_exam_measurements_with_gpt_vision(
 async def _extract_exam_measurements_with_paddleocr(
     image_bytes: bytes | None,
     image_media_type: str | None,
+    image_filename: str | None = None,
 ) -> dict[str, Any] | None:
     if not image_bytes:
         return None
     try:
         from ai_runtime.ocr.checkup.extractor import run_ocr, run_ocr_on_pdf
-    except Exception:
+    except Exception as exc:
+        logger.warning("PaddleOCR import 실패: %s", exc, exc_info=True)
         return None
 
     try:
-        if image_media_type == "application/pdf":
+        if _is_pdf_upload(image_media_type, image_filename):
             data, low_confidence_fields, raw_text, _status = await run_ocr_on_pdf(image_bytes)
         else:
             data, low_confidence_fields, raw_text, _status = await run_ocr(image_bytes)
-    except Exception:
+    except Exception as exc:
+        logger.warning("PaddleOCR 건강검진 OCR 실패: %s", exc, exc_info=True)
         return None
 
     values = data.model_dump() if hasattr(data, "model_dump") else {}

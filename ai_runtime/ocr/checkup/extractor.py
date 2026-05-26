@@ -23,11 +23,16 @@ def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
         logger.info("PaddleOCR 모델 로딩 중...")
-        _ocr_engine = PaddleOCR(
-            use_angle_cls=True,
-            lang="korean",
-            show_log=False,
-        )
+        try:
+            _ocr_engine = PaddleOCR(
+                lang="korean",
+                use_textline_orientation=True,
+            )
+        except ValueError:
+            _ocr_engine = PaddleOCR(
+                use_angle_cls=True,
+                lang="korean",
+            )
         logger.info("PaddleOCR 모델 로딩 완료")
     return _ocr_engine
 
