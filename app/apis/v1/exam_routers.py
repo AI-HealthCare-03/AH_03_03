@@ -62,16 +62,28 @@ async def _run_exam_ocr(
     user: User,
     image_bytes: bytes | None = None,
     image_media_type: str | None = None,
+    image_filename: str | None = None,
 ) -> ExamOCRResponse:
     report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
     ensure_owner(report.user_id, user)
-    return await exam_service.run_exam_ocr(exam_id, image_bytes=image_bytes, image_media_type=image_media_type)
+    return await exam_service.run_exam_ocr(
+        exam_id,
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
+        image_filename=image_filename,
+    )
 
 
 @exam_router.post("/{exam_id}/ocr", response_model=ExamOCRResponse)
 async def run_exam_ocr(exam_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
-    image_bytes, image_media_type = await _read_optional_upload(request)
-    return await _run_exam_ocr(exam_id, user, image_bytes=image_bytes, image_media_type=image_media_type)
+    image_bytes, image_media_type, image_filename = await _read_optional_upload(request)
+    return await _run_exam_ocr(
+        exam_id,
+        user,
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
+        image_filename=image_filename,
+    )
 
 
 @exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamOCRResponse, deprecated=True, include_in_schema=False)
@@ -79,14 +91,14 @@ async def run_legacy_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_re
     return await _run_exam_ocr(exam_id, user)
 
 
-async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | None]:
+async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | None, str | None]:
     if "multipart/form-data" not in request.headers.get("content-type", ""):
-        return None, None
+        return None, None, None
     form = await request.form()
     upload = form.get("image") or form.get("file")
     if _is_upload(upload):
-        return await upload.read(), upload.content_type
-    return None, None
+        return await upload.read(), upload.content_type, getattr(upload, "filename", None)
+    return None, None, None
 
 
 def _is_upload(value: object) -> bool:

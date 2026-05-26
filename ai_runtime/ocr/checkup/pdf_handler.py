@@ -15,7 +15,7 @@ import pdfplumber
 logger = logging.getLogger(__name__)
 
 MIN_TEXT_LENGTH = 50
-MAX_PAGES = 5
+MAX_PAGES: int | None = None
 
 
 class PdfType(StrEnum):
@@ -41,7 +41,8 @@ def extract_text_from_pdf(pdf_bytes):
     texts = []
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages[:MAX_PAGES]):
+            pages = pdf.pages if MAX_PAGES is None else pdf.pages[:MAX_PAGES]
+            for i, page in enumerate(pages):
                 text = page.extract_text() or ""
                 if text.strip():
                     texts.append(text)
@@ -54,12 +55,10 @@ def extract_text_from_pdf(pdf_bytes):
 def pdf_to_images(pdf_bytes, dpi=200):
     image_bytes_list = []
     try:
-        images = pdf2image.convert_from_bytes(
-            pdf_bytes,
-            dpi=dpi,
-            first_page=1,
-            last_page=MAX_PAGES,
-        )
+        options = {"dpi": dpi, "first_page": 1}
+        if MAX_PAGES is not None:
+            options["last_page"] = MAX_PAGES
+        images = pdf2image.convert_from_bytes(pdf_bytes, **options)
         for i, img in enumerate(images):
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=95)
