@@ -25,6 +25,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY ./app ./app
 COPY ./ai_runtime ./ai_runtime
 COPY ./docs/rag_sources ./docs/rag_sources
+COPY ./docs/data/challenges ./docs/data/challenges
+COPY ./scripts/seed_mvp_challenges.py ./scripts/seed_mvp_challenges.py
 
 # 5. 해당 이미지를 활용하여 도커컨테이너 실행시 실행되는 명령어입니다.
 # FastAPI를 uvicorn을 활용하여 비동기 환경으로 서버를 실행합니다.
