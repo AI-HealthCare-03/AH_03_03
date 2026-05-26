@@ -144,8 +144,12 @@ export default function ExamOcrPage() {
         </Card>
         <Card title="저장 전 확인">
           <p className="warning-text">현재는 provider/fallback 기반 후보 값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
+          <p className="warning-text">
+            확인/저장 시 아래 OCR 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
+            있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
+          </p>
           <button disabled={measurements.length === 0} onClick={saveAndConfirm} type="button">
-            확인/저장
+            선택한 OCR 값을 건강정보에 반영
           </button>
           <div className="button-row" style={{ marginTop: 12 }}>
             <Link className="button secondary" to="/health/profile">
