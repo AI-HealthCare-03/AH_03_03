@@ -1,3 +1,4 @@
+$content = @"
 __pycache__/
 *.py[oc]
 *.py[cod]
@@ -53,12 +54,24 @@ ai_runtime/ocr/providers/clova_ocr/ground_truth/*
 !ai_runtime/ocr/providers/clova_ocr/ground_truth/.gitkeep
 .venv-ocr/
 .venv-ocr2/
+.venv-easyocr/
+
+# ocr-compare 건강검진표 원본 파일 제외 (개인정보)
+ocr-compare/results/images/
+ocr-compare/results/*.json
+ocr-compare/01_tesseract/node_modules/
+ocr-compare/01_tesseract/*.traineddata
+ai_worker/vision/ocr/eval/images/
+ai_worker/vision/ocr/eval/pdfs/
+ai_worker/vision/ocr/eval/results/
+ai_worker/vision/ocr/eval/ground_truth.json
 
 # ML
-.csv
-.sas7bdat
 *.oof
 
+# Local data / generated outputs
+ai_worker/ml/outputs/
+ai_worker/ml/LGB18~24/outputs/
 ai_runtime/ml/outputs/
 ai_runtime/ml/artifacts/*
 !ai_runtime/ml/artifacts/.gitkeep
@@ -70,8 +83,6 @@ etc/ml/ML/artifacts/*
 !etc/ml/ML/artifacts/.gitkeep
 ai_runtime/ml/LGB18~24/outputs/
 **/outputs/
-
-# Local data / generated outputs
 /data/
 /output/
 /outputs/
@@ -96,6 +107,18 @@ ai_runtime/ml/LGB18~24/outputs/
 *.onnx
 *.h5
 
+# ocr-compare 개인정보 파일
+ocr-compare/results/images/
+ocr-compare/eval/images/
+ocr-compare/eval/pdfs/
+ocr-compare/eval/results/
+ocr-compare/results/*.json
+ai_worker/vision/ocr/eval/ground_truth.json
+ai_worker/vision/ocr/eval/images/
+ai_worker/vision/ocr/eval/pdfs/
+ai_worker/vision/ocr/eval/results/
+ocr-compare/results/summary.md
+
 # Final CatBoost inference artifacts for local demo/runtime
 !ai_runtime/ml/artifacts/*/catboost/*.cbm
 !ai_runtime/ml/artifacts/*/catboost/feature_columns.json
@@ -108,3 +131,5 @@ ai_runtime/ml/artifacts/**/threshold_tuning.csv
 
 # OS files
 .DS_Store
+"@
+$content | Set-Content .gitignore -Encoding UTF8
