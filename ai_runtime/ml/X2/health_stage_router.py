@@ -26,6 +26,21 @@ from ai_runtime.ml.X2.health_stage_classifier import (
 
 stage_router = APIRouter(prefix="/health/stage", tags=["health-stage"])
 
+FEATURE_UNITS = {
+    "systolic_bp": "mmHg",
+    "diastolic_bp": "mmHg",
+    "fasting_glucose": "mg/dL",
+    "hba1c": "%",
+    "total_cholesterol": "mg/dL",
+    "ldl_cholesterol": "mg/dL",
+    "triglyceride": "mg/dL",
+    "hdl_cholesterol": "mg/dL",
+    "bmi": "kg/m²",
+    "height_cm": "cm",
+    "weight_kg": "kg",
+    "hemoglobin": "g/dL",
+}
+
 
 class HealthStageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -117,6 +132,7 @@ async def get_health_stage_info() -> dict[str, Any]:
             "hemoglobin",
             "gender",
         ],
+        "feature_units": FEATURE_UNITS,
         "source_variable_map": SOURCE_VARIABLE_MAP,
         "notice": "기준표 기반 참고용 판정입니다. 의료 진단이 아니며 의료기관 상담을 권장할 수 있습니다.",
     }

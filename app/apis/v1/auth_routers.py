@@ -225,7 +225,7 @@ async def request_password_reset(
 ) -> PasswordResetRequestResponse:
     token = await auth_service.request_password_reset(request.email)
     return PasswordResetRequestResponse(
-        detail="비밀번호 재설정 요청이 처리되었습니다.",
+        detail="입력한 이메일로 비밀번호 재설정 링크를 전송했습니다.",
         debug_token=token if _allow_auth_debug_response(config.PASSWORD_RESET_DEBUG) else None,
     )
 

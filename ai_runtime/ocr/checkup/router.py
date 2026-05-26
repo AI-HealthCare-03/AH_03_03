@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/ocr", tags=["OCR - 건강검진표 수치 추출"])
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_PDF_TYPES = {"application/pdf"}
 MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20MB
 

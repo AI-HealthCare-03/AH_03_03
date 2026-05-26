@@ -73,6 +73,8 @@ def test_build_csv_from_excel_keeps_runtime_columns(tmp_path: Path) -> None:
     rows, columns = build_food_disease_score_csv(excel_path=excel_path, output_path=output_path)
     result = pd.read_csv(output_path)
 
-    assert (rows, columns) == (1, 18)
+    assert (rows, columns) == (1, 20)
     assert result.loc[0, "food_name"] == "샘플밥"
+    assert result.loc[0, "calcium_mg"] == 20
+    assert result.loc[0, "zinc_mg"] == 1.6
     assert {"dm_score", "htn_score", "dl_score", "obe_score", "anem_score"}.issubset(result.columns)

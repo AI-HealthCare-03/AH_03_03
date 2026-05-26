@@ -128,11 +128,12 @@ def calculate_bmi(height_cm, weight_kg) -> float | None:
 def parse_blood_pressure(text_lines):
     for text, _ in text_lines:
         if is_keyword_match(text, FIELD_KEYWORDS["systolic_bp"]):
-            numbers = extract_numbers(text)
-            if len(numbers) >= 2:
-                return numbers[0], numbers[1]
-            elif len(numbers) == 1:
-                return numbers[0], None
+            bp_candidates = [n for n in extract_numbers(text) if 40 <= n <= 250]
+            if len(bp_candidates) >= 2:
+                first, second = bp_candidates[:2]
+                return max(first, second), min(first, second)
+            if len(bp_candidates) == 1:
+                return bp_candidates[0], None
     return None, None
 
 
@@ -149,13 +150,20 @@ def parse_height_weight(text_lines):
             for ctx_text, _ in context:
                 all_nums.extend(extract_numbers(ctx_text))
             candidates_h = [n for n in all_nums if 100 <= n <= 250]
-            candidates_w = [n for n in all_nums if 20 <= n <= 150]
-            if candidates_h and candidates_w:
-                return candidates_h[0], candidates_w[0]
+            if not candidates_h:
+                continue
+            height = candidates_h[0]
+            height_index = all_nums.index(height)
+            weight_pool = all_nums[height_index + 1 :] or all_nums
+            candidates_w = [n for n in weight_pool if 20 <= n <= 150 and n != height and n < height]
+            if not candidates_w:
+                candidates_w = [n for n in weight_pool if 20 <= n <= 150 and n != height]
+            if candidates_w:
+                return height, candidates_w[0]
     return None, None
 
 
-def parse_hb(text_lines) -> float | None:
+def parse_hb(text_lines) -> tuple[float | None, float | None]:
     """
     혈색소(Hb) 수치를 파싱합니다.
     당화혈색소(HbA1c)와 혼동하지 않도록 "당화" 포함 줄은 제외합니다.
@@ -169,16 +177,16 @@ def parse_hb(text_lines) -> float | None:
         # 같은 줄에서 유효한 숫자 추출
         nums = [n for n in extract_numbers(text) if HB_RANGE[0] <= n <= HB_RANGE[1]]
         if nums:
-            return nums[0]
+            return nums[0], conf
         # 다음 2줄 탐색
         for j in range(i + 1, min(i + 3, len(text_lines))):
-            next_text = text_lines[j][0]
+            next_text, next_conf = text_lines[j]
             if "당화" in next_text:
                 break
             nums = [n for n in extract_numbers(next_text) if HB_RANGE[0] <= n <= HB_RANGE[1]]
             if nums:
-                return nums[0]
-    return None
+                return nums[0], next_conf
+    return None, None
 
 
 def parse_bmi(text_lines) -> float | None:
@@ -268,9 +276,11 @@ def parse_from_text_lines(text_lines):
         extracted["weight_kg"] = weight
 
     # 혈색소 (hb) — 전용 파서 사용
-    hb = parse_hb(text_lines)
+    hb, hb_confidence = parse_hb(text_lines)
     if hb is not None:
         extracted["hb"] = hb
+        if hb_confidence is not None and hb_confidence < CONFIDENCE_THRESHOLD:
+            low_conf.append("hb")
 
     skip_fields = {"systolic_bp", "diastolic_bp", "height_cm", "weight_kg", "hb", "bmi"}
     _parse_general_fields(text_lines, extracted, skip_fields, low_conf)
