@@ -249,7 +249,12 @@ def _bmi(health_record: Any) -> float | None:
 def _family_flag(value: Any) -> float | None:
     if value is None or value == "":
         return None
-    return 1.0 if str(value).upper() == "YES" else 0.0
+    normalized = str(value).strip().upper()
+    if normalized == "YES":
+        return 1.0
+    if normalized == "NO":
+        return 0.0
+    return float("nan")
 
 
 def _current_smoking(value: Any) -> float | None:
@@ -293,7 +298,9 @@ def _drinking_amount(value: Any) -> float | None:
 
 
 def _range_flag(value: float | None, start: float, end: float) -> float:
-    return 1.0 if value is not None and start <= value < end else 0.0
+    if value is None:
+        return float("nan")
+    return 1.0 if start <= value < end else 0.0
 
 
 def _bmi_bin(value: float | None) -> float | None:

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import math
 from datetime import date
 from types import SimpleNamespace
 
 import pytest
 
-from ai_runtime.ml.inference.feature_mapper import FeatureMappingError, map_service_features
+from ai_runtime.ml.inference.feature_mapper import FeatureMappingError, _family_flag, _range_flag, map_service_features
 
 BASE_FEATURE_COLUMNS = [
     "성별",
@@ -115,7 +116,9 @@ def test_mapper_can_default_derived_features_without_hiding_missing_sources() ->
         strict=False,
     )
 
-    assert result.features == {"나이_40대": 0.0, "BMI_구간": 0.0, "BMI_X_나이": 0.0}
+    assert math.isnan(result.features["나이_40대"])
+    assert result.features["BMI_구간"] == 0.0
+    assert result.features["BMI_X_나이"] == 0.0
     assert "나이" in result.missing_required_sources
     assert "BMI" in result.missing_required_sources
     assert sorted(result.defaulted_features) == ["BMI_X_나이", "BMI_구간"]
@@ -135,6 +138,20 @@ def test_mapper_accepts_service_drinking_frequency_rare() -> None:
     result = map_service_features(_user(), _health_record(drinking_frequency="RARE"), ["음주빈도"])
 
     assert result.features["음주빈도"] == 0.0
+
+
+def test_family_flag_preserves_unexpected_values_as_nan() -> None:
+    assert _family_flag("YES") == 1.0
+    assert _family_flag("NO") == 0.0
+    assert _family_flag(None) is None
+    assert _family_flag("") is None
+    assert math.isnan(_family_flag("UNKNOWN"))
+
+
+def test_range_flag_distinguishes_missing_from_out_of_range() -> None:
+    assert math.isnan(_range_flag(None, 40, 50))
+    assert _range_flag(45, 40, 50) == 1.0
+    assert _range_flag(55, 40, 50) == 0.0
 
 
 def _user(**overrides):

@@ -2,7 +2,7 @@
 ai_runtime/cv/router.py
 
 GPT Vision 분석 FastAPI 라우터.
-MVP 기준 3개 엔드포인트 제공 (식단 / 처방전 / 건강검진표).
+MVP 기준 3개 엔드포인트 제공 (식단 / 처방전·약봉투 / 건강검진표).
 
 팀 통합 시 app/main.py에 아래 추가:
     from ai_runtime.cv.router import router as vision_router
@@ -53,7 +53,7 @@ def get_vision_client(
 
 # ── 이미지 유효성 검사 ────────────────────────────────────────────────────────
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 
 

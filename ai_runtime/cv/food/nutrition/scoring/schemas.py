@@ -46,10 +46,12 @@ class DiseaseFoodScoreRecord:
     sugar_g: float | None
     fat_g: float | None
     protein_g: float | None
+    calcium_mg: float | None
     sodium_mg: float | None
     potassium_mg: float | None
     magnesium_mg: float | None
     iron_mg: float | None
+    zinc_mg: float | None
     cholesterol_mg: float | None
     trans_fat_g: float | None
     dm_score: float
