@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.dtos.diets import DietRecordResponse
 from app.dtos.health import HealthRecordResponse
 from app.models.analysis import AnalysisMode, AnalysisType, RiskLevel
 
@@ -52,7 +53,7 @@ class DashboardChallengesResponse(BaseModel):
 
 
 class DashboardDietsResponse(BaseModel):
-    recent_diet_records: list[Any]
+    recent_diet_records: list[DietRecordResponse]
 
 
 class DashboardMedicationsResponse(BaseModel):
