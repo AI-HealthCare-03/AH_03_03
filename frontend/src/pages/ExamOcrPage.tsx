@@ -126,11 +126,11 @@ export default function ExamOcrPage() {
                 <label className="upload-action-button">
                   카메라로 촬영
                   <input
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
-                  type="file"
-                />
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
+                    type="file"
+                  />
                 </label>
               ) : (
                 <span className="upload-mobile-hint">카메라 촬영은 모바일에서 사용할 수 있습니다.</span>
@@ -148,9 +148,6 @@ export default function ExamOcrPage() {
             확인/저장 시 아래 OCR 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
             있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
           </p>
-          <button disabled={measurements.length === 0} onClick={saveAndConfirm} type="button">
-            선택한 OCR 값을 건강정보에 반영
-          </button>
           <div className="button-row" style={{ marginTop: 12 }}>
             <Link className="button secondary" to="/health/profile">
               건강정보 확인
@@ -177,6 +174,18 @@ export default function ExamOcrPage() {
               <strong>{measurement.unit ?? "-"}</strong>
             </label>
           ))}
+          <div className="state-box">
+            <p className="warning-text">
+              확인/저장 시 아래 OCR 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
+              있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
+            </p>
+            {measurements.length === 0 ? (
+              <p className="muted">측정값 후보가 생성되면 건강정보 반영 버튼을 사용할 수 있습니다.</p>
+            ) : null}
+            <button disabled={measurements.length === 0} onClick={saveAndConfirm} type="button">
+              선택한 OCR 값을 건강정보에 반영
+            </button>
+          </div>
         </div>
       </Card>
     </div>
