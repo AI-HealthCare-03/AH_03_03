@@ -1,350 +1,268 @@
-# AI Healthcare Project Template
+# AI HealthCare MVP
 
-이 프로젝트는 AI 모델 추론(Inference) 워커와 FastAPI API 서버를 통합한 서비스 템플릿입니다. 
-현대적인 Python 패키지 관리 도구인 `uv`와 컨테이너화 도구인 `Docker`를 활용하여 일관된 개발 및 배포 환경을 제공합니다.
+AI HealthCare MVP는 사용자의 건강정보, 건강검진 OCR, 식단 이미지, 복약 정보, 챗봇 응답을 하나의 웹 서비스 흐름으로 묶은 FastAPI + React 기반 헬스케어 시연 프로젝트입니다.
 
----
+이 README는 팀원이 clone 후 같은 방식으로 실행하고, 실제 모델/provider 연결 상태를 재현할 수 있도록 작성한 기준 문서입니다.
 
-## 🚀 주요 특징
+## 현재 구현 범위
 
-- **FastAPI Framework**: 고성능 비동기 API 서버 구현.
-- **AI Worker**: 모델 추론 및 학습 작업을 API 서버와 분리하여 처리.
-- **UV Package Manager**: 매우 빠른 의존성 설치 및 가상환경 관리.
-- **Tortoise ORM**: 비동기 방식의 데이터베이스 모델링 및 쿼리 관리.
-- **Docker-Compose**: PostgreSQL(pgvector), Redis, Nginx를 포함한 전체 서비스 스택을 한 번에 실행.
-- **CI/CD Scripts**: 코드 포맷팅(Ruff), 타입 체크(Mypy), 테스트(Pytest)를 위한 자동화 스크립트 제공.
+### 핵심 사용자 흐름
 
----
+- 이메일 인증 기반 회원가입/로그인
+- 건강정보 입력 및 수정
+- 건강검진 OCR 후보 추출, 사용자 확인, 최신 건강정보 반영
+- 건강분석 실행
+  - `DIABETES`, `HYPERTENSION`, `DYSLIPIDEMIA`: CatBoost artifact 기반 정밀분석
+  - `OBESITY`: rule-based 분석
+- 식단 이미지 분석
+  - 기본: rule-based food detection + DiseaseFoodScorer
+  - 옵션: GPT Vision 음식명 추론
+- 식단 결과의 질환별 점수 표시
+- 복약/OCR parser skeleton
+- 챗봇
+  - 기본: rule-based 응답
+  - 옵션: OpenAI LLM rewrite
+- Langfuse trace/prompt/eval 관측 연결
+- 관리자/모니터링 계정 seed
+- Redis Stream `DEMO_ECHO` async job skeleton
 
-## 📂 프로젝트 구조
+### 의도적으로 보류된 범위
+
+- 소셜 로그인
+- 휴대폰 SMS 인증
+- 웨어러블 연동
+- 운영형 vector RAG, embedding, pgvector retrieval
+- LangChain/LangGraph
+- 실제 OCR/CV/ML/LLM workflow의 Redis Stream 비동기 전환
+- retry, DLQ, heartbeat 기반 worker 운영 구조
+- Clova OCR 공식 실행 경로
+
+## 기술 스택
+
+- Backend: FastAPI, Tortoise ORM, Aerich
+- Frontend: React, Vite, TypeScript
+- DB: PostgreSQL + pgvector image
+- Cache/Queue: Redis
+- AI Runtime Package: `ai_runtime`
+- ML: CatBoost
+- OCR/CV Provider: GPT Vision optional, PaddleOCR/text extraction path, rule/fallback path
+- LLM Provider: OpenAI optional
+- Observability: Langfuse optional
+- Package Manager: uv
+- Container: Docker Compose
+
+## 저장소 구조
 
 ```text
 .
-├── ai_runtime/          # AI 모델 추론 및 학습 관련 코드 (Worker)
-│   ├── core/           # 워커 설정 및 로거
-│   ├── models/         # AI 모델 파일 보관 (PyTorch 등)
-│   ├── tasks/          # 실제 처리할 작업 정의
-│   └── main.py         # 워커 진입점
-├── app/                # FastAPI 서버 코드
-│   ├── apis/           # API 라우터 (v1 버전 관리)
-│   ├── core/           # 서버 설정 (pydantic-settings), DB 설정, JWT, Validator 등 핵심 기능
-│   ├── dtos/           # 데이터 전송 객체 (Pydantic models)
-│   ├── models/         # DB 테이블 정의
-│   ├── services/       # 비즈니스 로직
-│   └── main.py         # FastAPI 애플리케이션 진입점
-├── envs/               # 환경 변수 설정 파일 (.env)
-├── infra/              # 인프라 설정 관련 디렉터리
-│   ├── docker/         # Docker Compose 설정 (운영용)
-│   └── nginx/          # Nginx 설정 파일 (리버스 프록시)
-├── scripts/            # 배포 및 CI용 쉘 스크립트
-├── docker-compose.yml  # 로컬 개발용 서비스 실행 설정
-└── pyproject.toml      # uv 기반 의존성 관리 설정
+├── app/                         # FastAPI API, service, DTO, DB model
+├── ai_runtime/                  # ML/CV/OCR/LLM/RAG runtime package
+│   ├── ml/                      # CatBoost inference, feature mapper, artifacts
+│   ├── cv/                      # food detection, nutrition scoring, GPT Vision provider
+│   ├── ocr/                     # checkup/medication OCR parser/provider structure
+│   ├── llm/                     # explanation, chatbot routing, RAG PoC
+│   └── jobs/                    # Redis Stream DEMO_ECHO worker skeleton
+├── frontend/                    # React/Vite frontend
+├── infra/docker/                # frontend 포함 dev/prod Docker compose
+├── infra/langfuse/              # optional self-host Langfuse compose
+├── scripts/                     # seed, audit, smoke, deploy scripts
+├── docs/                        # design, demo, ops, QA, RAG source registry
+├── envs/                        # example env files only
+├── app/Dockerfile
+├── ai_runtime/Dockerfile
+├── docker-compose.yml           # backend/AI 검증용 root compose
+├── Makefile
+└── pyproject.toml
 ```
 
----
+주의: Docker service 이름은 `ai-worker`로 유지하지만 Python package 이름은 `ai_runtime`입니다. 서비스 코드에서는 `ai_runtime`을 import합니다.
 
-## ⚙️ 사전 준비 사항
+## 사전 준비
 
-- **Python**: 3.13 이상 (로컬 개발 환경용)
-- **UV**: Python 패키지 매니저 ([설치 가이드](https://github.com/astral-sh/uv))
-- **Docker & Docker-Compose**: 전체 서비스 실행용
+- Docker Desktop 또는 Docker Engine
+- uv
+- Python 3.13 이상
 
----
+기본 실행은 Full Docker dev stack 기준입니다. 프론트, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 Docker로 띄우므로 웹 화면 확인만 할 때는 Node.js/npm을 직접 실행할 필요가 없습니다.
 
-## 🛠️ 설치 및 설정
-
-### 1. 가상환경 구축 및 의존성 설치
-
-`uv`를 사용하여 프로젝트에 필요한 패키지를 설치합니다.
+로컬 테스트, seed, smoke script 실행을 위해 Python/uv는 준비합니다.
 
 ```bash
-# 의존성 설치 (가상환경 자동 생성)
 uv sync
-
-# 특정 그룹의 의존성만 설치하려는 경우
-uv sync --group app  # API 서버용
-uv sync --group ai   # AI 워커용
 ```
 
-### 2. 환경 변수 설정
+Node.js 20 이상과 npm은 프론트 단독 개발, `npm run build`, `npm run dev` 디버깅을 할 때만 필요합니다.
 
-`envs/` 디렉토리에 있는 예시 파일을 복사하여 `.env` 파일을 생성합니다.
-- 로컬용 
-    ```bash
-    cp envs/example.local.env envs/.local.env
-    ```
-- 배포용 
-    ```bash
-    cp envs/example.prod.env envs/.prod.env
-    ```
+## 환경변수 준비
 
-생성된 `env` 파일 내의 환경변수들은 프로젝트 상황에 맞게 수정하세요.
-Docker Compose 내부에서 API 서버를 실행하는 경우 `DB_HOST=postgres`를 사용하고, FastAPI를 로컬에서 직접 실행하면서 DB만 Docker로 띄우는 경우 `DB_HOST=localhost`를 사용하세요.
-
-민감정보 주의:
-
-- 실제 API key, 토큰, `.env` 파일 내용을 캡처하거나 공유하지 마세요.
-- `docker compose config` 전체 출력에는 compose environment 값이 펼쳐져 민감정보가 노출될 수 있습니다.
-- 설정 확인이 필요하면 `docker compose config --services`, `docker compose ps`, `docker compose logs --tail=100 fastapi`처럼 민감값이 직접 출력되지 않는 명령을 우선 사용하세요.
-- 예시 env 파일에는 더미값만 유지하고, 실제 운영키가 노출되었으면 즉시 재발급하세요.
-
----
-
-## 🏃 실행 방법
-
-### Docker 스택 선택 요약
-
-Docker Compose 구성은 용도별로 분리되어 있습니다. 자세한 내용은 [Docker Stacks](docs/ops/docker_stacks.md)를 참고하세요.
+팀원 실행 기준으로는 루트 `.env`를 사용합니다.
 
 ```bash
-# 로컬 FastAPI/ML 시연용: postgres, redis, fastapi만 실행
-make app-up
-make app-ps
-make app-logs
-make app-down
+cp envs/example.local.env .env
+```
 
-# frontend 포함 dev 전체 스택
-make dev-up
-make dev-ps
-make dev-down
+`.env`는 git에 커밋하지 않습니다. 실제 OpenAI, Langfuse, SMTP key는 각자 로컬 `.env`에만 넣습니다.
 
-# 프론트 포함 전체 시연 스택: http://localhost:8080
+최소 로컬/시연 기본값:
+
+```env
+ENV=local
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=ozcoding
+DB_PASSWORD=PLEASE_CHANGE_ME
+DB_NAME=ai_health
+
+EMAIL_ENABLED=false
+EMAIL_VERIFICATION_DEBUG=true
+PASSWORD_RESET_DEBUG=false
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+CHATBOT_USE_REAL_LLM=false
+RAG_ENABLED=false
+
+DIET_VISION_PROVIDER=rule_based
+DIET_GPT_VISION_ENABLED=false
+
+EXAM_OCR_PROVIDER=fallback
+EXAM_GPT_VISION_ENABLED=false
+PADDLE_OCR_ENABLED=false
+
+MEDICATION_OCR_PROVIDER=fallback
+MEDICATION_GPT_VISION_ENABLED=false
+
+LANGFUSE_ENABLED=false
+LANGFUSE_BASE_URL=http://host.docker.internal:3000
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
+```
+
+실제 provider 연결 재현 시에는 `.env`에서 필요한 flag만 켭니다.
+
+```env
+OPENAI_API_KEY=<각자 발급받은 키>
+OPENAI_MODEL=gpt-4o-mini
+
+CHATBOT_USE_REAL_LLM=true
+
+DIET_VISION_PROVIDER=gpt_vision
+DIET_GPT_VISION_ENABLED=true
+
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+
+MEDICATION_OCR_PROVIDER=gpt_vision
+MEDICATION_GPT_VISION_ENABLED=true
+
+LANGFUSE_ENABLED=true
+LANGFUSE_BASE_URL=http://host.docker.internal:3000
+LANGFUSE_PUBLIC_KEY=<각자 Langfuse public key>
+LANGFUSE_SECRET_KEY=<각자 Langfuse secret key>
+```
+
+Secret 주의:
+
+- `.env`, `envs/.local.env`, `frontend/.env`는 커밋하지 않습니다.
+- `docker compose config` 전체 출력은 secret이 펼쳐질 수 있으므로 화면 공유에 사용하지 않습니다.
+- 설정 확인은 `docker compose ps`, `docker compose config --services`, 마스킹 스크립트, SET/MISSING 출력 위주로 합니다.
+- API key 원문, SMTP password, Langfuse secret key, OpenAI key를 로그/문서/스크린샷에 남기지 않습니다.
+
+## 기본 실행: Full Docker dev stack
+
+팀원/시연 표준 실행은 `infra/docker/docker-compose.dev.yml` 기반 Full Docker dev stack입니다. 이 스택이 프론트, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 함께 실행합니다.
+
+`make demo-up`은 아래 compose 명령을 감싼 단축 명령입니다.
+
+```bash
 make demo-up
-make demo-health
-make demo-ps
-make demo-logs
-make demo-down
-
-# Langfuse 관측 실험 전용 스택
-make langfuse-up
-make langfuse-ps
-make langfuse-logs
-make langfuse-down
 ```
 
-주의:
-
-- `docker compose config` 전체 출력에는 `.env` 값이 평문으로 펼쳐질 수 있으므로 화면 공유/문서 공유에 사용하지 마세요.
-- `docker compose up`과 `docker compose build`는 원격 저장소에 이미지를 올리지 않습니다. 원격 업로드는 `docker push`를 실행할 때만 발생합니다.
-- `docker compose up/build` 중 로컬에 없는 base image나 service image는 registry에서 pull될 수 있습니다.
-- 시연 직전에는 DB volume 보호를 위해 `docker compose down -v`를 사용하지 마세요.
-- `.env`, example env, `ai_runtime` 코드 변경 후 이미 떠 있는 컨테이너에 반영하려면 `docker compose up -d --force-recreate fastapi ai-worker`로 FastAPI/AI Worker를 재생성하세요.
-- Langfuse는 RAG 엔진이 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다. Cloud와 Docker self-host를 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿔야 합니다.
-- 현재 Redis는 컨테이너 실행, FastAPI 연결, `/api/v1/system/health`, compose healthcheck, `DEMO_ECHO` Redis Stream skeleton 용도입니다. 실제 OCR/CV/ML/LLM 비동기 작업, retry/dead-letter queue, heartbeat는 P2 운영 확장 범위입니다.
-- 시연 설명은 “현재 MVP 핵심 흐름은 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 연결되어 있다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환”으로 통일합니다.
-- 현재 로컬 모델 artifact는 만성질환 정밀분석용 DM/HTN/DL CatBoost 3종입니다. OBESITY는 rule-based, ANEM은 X2/식단 참고 분류로 설명합니다.
-- 건강검진 OCR 공식 시연 경로는 Clova OCR을 호출하지 않습니다. 현재 화면은 완성된 OCR provider 결과가 아니라 provider/fallback 기반 측정값 후보를 보여주고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조입니다. 현재 기준은 `CHECKUP_OCR_PRIMARY_PROVIDER=paddle`, `ENABLE_CLOVA_OCR=false`, `GPT_VISION_FALLBACK_ENABLED=false`이며, Clova OCR 코드는 PoC/deferred provider로 보존합니다.
-- 루트 `docker-compose.yml`은 백엔드/AI 검증용이다. 프론트 포함 전체 시연은 `infra/docker/docker-compose.dev.yml` 또는 `make demo-up`을 사용한다. 루트 스택의 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연 주소는 `http://localhost:8080`이다.
-
-### 0. 웹 MVP 로컬 실행
-
-현재 MVP 범위는 축소 데모가 아니라 **풀서비스 1차 범위에서 소셜 로그인과 웨어러블 연동만 제외한 기준**입니다.
-로컬 실행은 FastAPI, React/Vite, PostgreSQL을 우선 띄워 전체 사용자 흐름과 API 계약을 확인합니다.
-
-> `Architecture_ver1.drawio`에 정리된 `async_jobs`, Redis Stream, AI Worker, SSE, Notification Worker, Report Worker 구조는
-> MVP 범위 안의 후속 구현 단계입니다. 현재 로컬 실행에는 필수 구성요소가 아니며, 동기 API와 준비된 AI Worker 모듈을 기준으로 확인합니다.
-
-로컬에서 프론트와 백엔드를 같이 확인할 때는 아래 순서로 실행합니다.
+동일한 명령을 직접 실행하면 다음과 같습니다.
 
 ```bash
-# 1. PostgreSQL(pgvector) 컨테이너 실행
-docker compose up -d postgres
-
-# 2. 로컬 MVP 테스트용 테이블 생성 및 seed 실행
-DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
-
-# 3. FastAPI 실행
-DB_HOST=localhost uv run uvicorn app.main:app --reload
-
-# 4. React/Vite 프론트 실행
-cd frontend
-npm install
-npm run dev
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
 ```
 
 접속 주소:
 
-- FastAPI Swagger: `http://localhost:8000/docs`
-- FastAPI healthcheck: `http://localhost:8000/api/v1/system/health`
-- React/Vite: `http://localhost:5173`
-
-데모 계정:
-
-- `demo@example.com` / `Demo1234!`
-- `demo_high@example.com` / `Demo1234!`
-
-관리자 콘솔 로컬 계정:
-
-- SUPER_ADMIN: `admin@example.com` / `Demo1234!`
-- MONITOR: `monitor@example.com` / `Demo1234!`
-
-관리자 콘솔 접속:
-
-1. 위 로컬 실행 순서대로 DB seed, 백엔드, 프론트를 실행합니다.
-2. `admin@example.com` 또는 `monitor@example.com`으로 로그인합니다.
-3. 좌측 사이드바의 “관리자 콘솔”을 클릭하거나 `/admin`으로 이동합니다.
-4. `monitor@example.com`은 시스템 상태와 오류 로그 조회 중심으로 접근하며, 민감정보 접근 로그는 `ADMIN` 이상 정책에 따라 제한될 수 있습니다.
-
-Seed 포함 데이터:
-
-- FAQ
-- 챌린지 마스터
-- 데모 사용자
-- 건강정보, 분석 결과, 챌린지 참여/로그, 식단, 복약, 알림, 검진표 OCR 시연 데이터
-
-주의:
-
-- `scripts/setup_local_mvp_db.py`는 로컬 MVP 테스트 전용입니다.
-- Aerich migration에 old format 이슈가 남아 있어 로컬 빈 DB는 `setup_local_mvp_db.py`로 보강합니다.
-- 운영/공유 DB는 migration 파일 정리 후 Aerich 기준으로 적용해야 합니다.
-- 루트 `.env`는 백엔드/공용 환경변수용이고, `frontend/.env`는 Vite 프론트용입니다.
-- Firebase Auth와 소셜 로그인은 1차 풀서비스 범위에서 제외/보류합니다. 현재 로그인/회원가입은 FastAPI JWT Auth와 이메일 인증 기준이며, Firebase 전용 사용자 컬럼은 사용하지 않습니다.
-- 향후 소셜 로그인을 재도입할 경우 `users` 테이블에 provider 정보를 직접 넣지 않고 별도 OAuth 계정 연결 테이블을 설계합니다.
-- JWT 저장 정책은 access token은 기존 프론트 저장 방식을 유지하고, refresh token은 HttpOnly cookie로만 전달합니다. refresh cookie 기본값은 `SameSite=Lax`, `Path=/api/v1/auth`, `HttpOnly=true`이며 local/dev에서는 `Secure=false`, prod/production에서는 `Secure=true`를 사용합니다.
-- refresh cookie의 `Max-Age/Expires`는 refresh token의 `exp`와 맞춥니다. logout은 같은 cookie name/path/domain/samesite/secure 조건으로 삭제하므로 브라우저에 남은 refresh cookie가 재사용되지 않도록 합니다.
-- `SameSite=Lax`는 일반적인 CSRF 위험을 줄이지만 모든 교차 출처 요청을 완전히 막는 장치는 아닙니다. 운영에서는 HTTPS, 제한된 CORS origin, refresh token 서버 검증/폐기, 짧은 access token 수명을 함께 적용합니다.
-- MVP/시연 회원가입 인증은 이메일 인증만 필수로 사용합니다. 로컬 회원가입 이메일 인증은 `EMAIL_ENABLED=false`일 때 실제 SMTP 발송 없이 코드를 생성할 수 있지만, 응답 본문 노출은 `EMAIL_VERIFICATION_DEBUG=true`일 때만 허용합니다. 비밀번호 재설정 토큰도 `PASSWORD_RESET_DEBUG=true`일 때만 응답합니다.
-- 운영환경에서는 이메일 인증 `debug_code`와 비밀번호 재설정 `debug_token`을 응답하지 않습니다. `EMAIL_ENABLED=true`와 SMTP 환경변수를 설정하면 실제 인증코드/비밀번호 재설정 링크를 발송합니다.
-- 인증 발송 설정은 `uv run python scripts/verify_auth_delivery_config.py`로 값 노출 없이 점검할 수 있습니다. 실제 SMTP 발송 테스트는 명시적으로 `--send-email <email>`을 붙였을 때만 수행합니다.
-- Brevo SMTP 이메일 인증은 live 발송 경로로 사용할 수 있습니다. `EMAIL_ENABLED=true`, Brevo SMTP host/port/login/key/from email을 설정하고 debug flag를 `false`로 둡니다.
-- 휴대폰 인증은 MVP/시연 범위에서 보류합니다. `phone_number` DB 컬럼과 일부 조회/프로필 호환성은 유지하지만, 회원가입 필수 인증은 이메일 인증만 사용합니다. 기존 휴대폰 인증 API는 호환성을 위해 숨김/deprecated 상태로 남기고 `410 Gone`을 반환합니다. 운영 전 SMS 인증이 필요하면 별도 SMS provider를 새 정책으로 검토합니다.
-- 알림은 `notifications` inbox, `reminder_schedules` 예약 설정, `notification_logs` 발송 이력으로 분리합니다. 현재 외부 Push/SMS/Kakao/Email 발송 worker는 후속 범위이며, 발송 로그에는 민감 건강 수치 원문이나 인증코드/토큰을 저장하지 않습니다.
-- 주소는 1차 풀서비스 회원가입 필수 입력에서 제외합니다. 지역 기반 병원/검진기관 추천, 배송, 방문 케어 등이 도입될 경우 개인정보 최소수집 원칙에 따라 선택 정보로 재검토합니다.
-- 풀서비스 관리자 권한은 `users.role`을 기준으로 판단합니다. `is_admin`은 legacy 호환 필드로만 남기고, 관리자 role은 `USER/MONITOR/OPERATOR/ADMIN/SUPER_ADMIN` 구조로 설계합니다. 운영 단계에서는 관리자 서브도메인, 2FA, audit log를 추가해야 합니다.
-- 로그인 실패가 5회 이상 누적되면 CAPTCHA 등 추가 확인을 요구하는 soft-lock 정책을 적용합니다. CAPTCHA 도입 전에는 짧은 제한과 일반화된 안내 메시지를 사용합니다. `/api/v1/system/health`는 DB/Redis 상태를 포함하고, 모든 응답은 `X-Request-ID` 헤더로 요청 추적값을 반환합니다.
-- 로그인 시각은 `last_login_at`을 표준 필드로 사용합니다. `last_login` legacy 컬럼은 제거 대상이며 신규 코드에서 사용하지 않습니다.
-- 모든 응답은 `X-Request-ID`를 포함합니다. 처리되지 않은 500 서버 예외는 `system_error_logs`에 최소 추적 정보만 저장하며, request body와 민감정보 원문은 저장하지 않습니다.
-- 건강정보/분석결과/검진표/복약정보/대시보드 조회는 `sensitive_access_logs`에 접근 사실을 남깁니다. 건강 수치 원문, 토큰, 인증코드, request body는 저장하지 않습니다.
-- 비밀번호 해싱은 Argon2id 단일 방식입니다. 이전 로컬 계정의 예전 해시는 호환하지 않으므로 로그인되지 않으면 재가입하거나 비밀번호 재설정을 진행하세요. 운영 전환 시에는 별도 재설정/전환 정책이 필요합니다.
-- AI Worker, `async_jobs`, Redis queue 기반 비동기 모델 처리 연결은 MVP 범위 안의 후속 ML/CV/LLM 운영 연동 단계에서 진행합니다.
-- 풀서비스 1차 범위는 [Full Service Scope](docs/design/full_service_scope.md)를 기준으로 관리합니다. 1차 제외/보류 항목은 소셜 로그인, 웨어러블 연동, 휴대폰 SMS 인증입니다.
-- 코치님/조교님 피드백 반영 기준은 [Requirements Refactor Notes](docs/design/requirements_refactor_notes.md)에 정리합니다. 요구사항 정의서는 사용자 기능 중심으로 유지하고, NFR/아키텍처/재시도/공통 컴포넌트는 별도 설계 문서로 분리합니다.
-- 제출/발표 전 기준 문서는 내부 `docs/design/`, `docs/erd/mvp_erd.dbml`, 실제 OpenAPI를 최신 기준으로 봅니다. 외부 `메인프로젝트 문서/`의 ver1 요구사항/API/ERD/Architecture 파일은 초기 산출물이므로, 최종 제출 전 [Spec v2 Sync Plan](docs/design/spec_v2_sync_plan.md)에 따라 ver2로 동기화해야 합니다.
-
-### 1. 로컬 및 개발 환경
-
-#### Docker 개발 서버 스택 실행
-
-개발 서버처럼 프론트 정적 빌드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 Docker로 띄우려면 별도 compose 파일을 사용합니다.
-Vite `npm run dev` 로컬 개발 흐름은 계속 사용할 수 있지만, 통합 실행과 배포 전 점검은 아래 구성을 기준으로 합니다.
-
-```bash
-# Langfuse와 통신할 수 있는 공유 네트워크입니다. DB/Redis 공유 용도가 아닙니다.
-docker network create ai-health-shared
-
-# 개발 서버용 전체 스택 실행
-make demo-up
-
-# 로컬 DB schema/seed 보강은 호스트에서 실행합니다.
-DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
-```
-
-접속 주소:
-
-- 웹/Nginx: `http://localhost:8080`
+- Web: `http://localhost:8080`
 - API Docs: `http://localhost:8080/api/docs`
-- FastAPI 직접 접근: `http://localhost:8000/api/v1/system/health`
+- API Health: `http://localhost:8080/api/v1/system/health`
+- FastAPI 직접 접근: `http://localhost:8000`
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
 
-구성:
+기본 실행 순서:
 
-- `frontend`: `frontend/Dockerfile` multi-stage build로 React/Vite 정적 파일을 생성하고 내부 Nginx로 서빙합니다.
-- `nginx`: `/` 요청은 `frontend`로, `/api/` 요청은 `fastapi:8000`으로 proxy합니다.
-- 루트 `docker-compose.yml`의 nginx는 `/api/` proxy만 담당하고 `/`는 404를 반환한다. 프론트 화면 확인은 `make demo-up` 후 `http://localhost:8080`에서 진행한다.
-- `fastapi`: Docker 내부에서는 `DB_HOST=postgres`, `REDIS_HOST=redis` 기준으로 실행합니다.
-- `ai-worker`: `ai_runtime/main.py`가 Redis Stream consumer를 실행합니다. 현재 처리 job은 `DEMO_ECHO`뿐이며, OCR/CV/ML/LLM 작업은 아직 큐로 넘기지 않습니다.
-- `postgres`, `redis`: 우리 서비스 전용입니다. Langfuse의 Postgres/Redis와 공유하지 않습니다.
+```bash
+# 1. 환경변수 파일 준비
+cp envs/example.local.env .env
 
-현재 FastAPI 라우터와 Tortoise/asyncpg 기반 DB I/O는 async 기반입니다. 다만 OCR/CV/ML/LLM workflow는 시연 전까지 동기 API 흐름을 유지합니다. Redis는 health/infrastructure와 `DEMO_ECHO` job skeleton 용도이며, retry/dead-letter queue, heartbeat, 실제 OCR/CV/ML/LLM 비동기화는 운영 확장용 P2입니다. `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs` 연동을 위한 reserved field입니다.
+# 2. Full Docker dev stack 실행
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
 
-운영 compose(`infra/docker/docker-compose.prod.yml`)도 동일한 분리 구조를 따릅니다. 운영에서는 `app`, `ai`, `frontend` 이미지를 각각 빌드/푸시한 뒤 compose가 해당 이미지를 받아 실행하는 방식을 기준으로 합니다.
+# 3. DB migration 적용
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync aerich upgrade
+
+# 4. 챌린지 마스터 seed
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
+
+# 5. 데모 사용자/FAQ/대시보드 seed
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+
+# 6. health check
+curl -fsS http://localhost:8080/api/v1/system/health
+```
+
+상태 확인:
+
+```bash
+make demo-ps
+make demo-health
+make demo-logs
+```
 
 종료:
 
 ```bash
-docker compose -f infra/docker/docker-compose.dev.yml down
+make demo-down
 ```
 
-볼륨까지 초기화:
+주의:
+
+- `make demo-down`은 컨테이너만 내립니다.
+- DB volume까지 삭제하는 `docker compose down -v`는 시연/협업 중 사용하지 않습니다.
+- 시연 기준 compose는 `infra/docker/docker-compose.dev.yml`입니다.
+- 루트 `docker-compose.yml`은 backend/AI 검증용입니다. 프론트까지 보려면 `make demo-up` 또는 `infra/docker/docker-compose.dev.yml`을 사용합니다.
+- 루트 compose의 `http://localhost`가 404인 것은 설계상 정상입니다. 전체 웹은 `http://localhost:8080`입니다.
+- `.env`나 provider flag를 바꾼 뒤에는 FastAPI/AI Worker 컨테이너를 재생성해야 반영됩니다.
 
 ```bash
-docker compose -f infra/docker/docker-compose.dev.yml down -v
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate fastapi ai-worker nginx frontend
 ```
 
-#### Langfuse 별도 실행
+## DB migration 및 seed
 
-Langfuse는 `infra/langfuse` 아래 별도 compose로 실행합니다. 우리 서비스와 같은 서버에서 Docker로 띄울 수 있지만, Postgres/Redis는 반드시 분리합니다. Langfuse는 RAG 엔진이나 vector DB가 아니라 RAG 검색/LLM 호출의 trace, prompt, evaluation metadata를 관리하는 관측 도구입니다.
+DB도 Full Docker dev stack의 PostgreSQL 컨테이너를 기준으로 사용합니다. 새 volume이거나 schema가 비어 있으면 먼저 migration을 적용합니다.
 
 ```bash
-docker network create ai-health-shared
-cd infra/langfuse
-cp .env.example .env
-docker compose config --services
-docker compose up -d
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync aerich upgrade
 ```
 
-접속 주소:
-
-- Langfuse: `http://localhost:3000`
-
-Cloud Langfuse를 사용할 때는 Cloud 프로젝트에서 발급한 key와 Cloud base URL을 함께 사용합니다.
-
-```env
-LANGFUSE_ENABLED=true
-LANGFUSE_PUBLIC_KEY=<cloud-public-key>
-LANGFUSE_SECRET_KEY=<cloud-secret-key>
-LANGFUSE_BASE_URL=https://jp.cloud.langfuse.com
-```
-
-Docker self-host Langfuse를 사용할 때는 self-host 프로젝트에서 발급한 key와 FastAPI 실행 위치에서 접근 가능한 base URL을 함께 사용합니다.
-
-```env
-# FastAPI를 호스트 터미널에서 실행하는 경우
-LANGFUSE_BASE_URL=http://localhost:3000
-
-# FastAPI 컨테이너가 Langfuse와 같은 Docker network에 붙어 있는 경우
-LANGFUSE_BASE_URL=http://langfuse-web:3000
-
-# FastAPI 컨테이너가 Langfuse network에 붙어 있지 않고 host port로 접근하는 경우
-LANGFUSE_BASE_URL=http://host.docker.internal:3000
-```
-
-Cloud key와 self-host key는 서로 호환되지 않습니다. Cloud와 self-host를 전환할 때는 key만 바꾸지 말고 `LANGFUSE_BASE_URL`도 함께 바꾸세요. example env 파일에는 실제 key를 넣지 말고, 설정 확인을 위해 `docker compose config` 전체 출력을 공유하지 마세요.
-
-현재 root `docker-compose.yml`의 `fastapi`는 앱 전용 Docker network에 붙습니다. `http://langfuse-web:3000` service name을 쓰려면 FastAPI도 Langfuse의 `ai-health-shared` network에 연결해야 합니다. 네트워크를 추가하지 않을 때는 Docker Desktop 기준 `http://host.docker.internal:3000`을 사용합니다.
-
-#### Docker Compose로 전체 스택 실행
-
-모든 서비스(API, Worker, DB, Redis, Nginx)를 한 번에 실행합니다.
+챌린지 seed는 FastAPI Docker image에 포함되어 있으므로 컨테이너 내부에서 실행할 수 있습니다.
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
 ```
 
-실행 후 다음 주소로 접속 가능합니다:
-- **API 서버**: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
-- **시스템 health**: [http://localhost:8000/api/v1/system/health](http://localhost:8000/api/v1/system/health)
-- **Nginx**: 80 포트를 통해 API 서버로 요청을 전달합니다.
-
-DB는 PostgreSQL(pgvector) 컨테이너로 실행됩니다. 기존 MySQL 기준 Aerich migration을 사용하던 경우에는 migration 파일을 임의로 삭제하지 말고, 팀에서 PostgreSQL 기준으로 재초기화할지 먼저 결정한 뒤 `aerich init-db` 또는 신규 migration 생성 절차를 진행하세요.
-
-모델 변경 후 migration을 생성/적용할 때는 app dependency group을 포함해서 실행합니다.
+데모 사용자, FAQ, 대시보드용 통합 seed는 현재 호스트에서 실행하는 방식을 우선 사용합니다. dev compose는 PostgreSQL을 `localhost:5432`로 노출하므로 `DB_HOST=localhost`를 붙입니다.
 
 ```bash
-uv run --group app aerich migrate --name <migration_name>
-uv run --group app aerich upgrade
-```
-
-로컬 시연용 DB 준비는 통합 seed 스크립트를 기본으로 사용합니다.
-
-```bash
-docker compose up -d postgres redis fastapi
 DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
-curl http://localhost:8000/api/v1/system/health
 ```
 
-통합 스크립트가 실패하거나 일부 데이터만 다시 넣어야 할 때는 아래 순서로 확인합니다.
+필요한 seed만 호스트에서 개별 실행할 수도 있습니다.
 
 ```bash
 DB_HOST=localhost uv run python scripts/seed_mvp_challenges.py
@@ -353,141 +271,413 @@ DB_HOST=localhost uv run python scripts/seed_demo_users.py
 DB_HOST=localhost uv run python scripts/seed_current_user_dashboard_demo.py --email demo@example.com
 ```
 
-생성되는 주요 계정:
+정리:
 
-- 일반 데모: `demo@example.com` / `Demo1234!`
-- 고위험 데모: `demo_high@example.com` / `Demo1234!`
-- 관리자: `admin@example.com` / `Demo1234!` (`SUPER_ADMIN`)
-- 모니터링: `monitor@example.com` / `Demo1234!` (`MONITOR`)
+- `seed_mvp_challenges.py`: Docker 내부 실행 가능
+- `setup_local_mvp_db.py`, `seed_demo_users.py`, `seed_mvp_faqs.py`: 현재 호스트 실행 권장
+- DB 데이터는 Docker volume에 남습니다. PR이나 Docker image에 DB row가 포함되는 것은 아닙니다.
 
-관리자 콘솔은 프론트 로그인 후 좌측 사이드바의 “관리자 콘솔”을 클릭하거나 `/admin`으로 직접 이동합니다.
+## 데모 계정
 
-#### 로컬에서 개별 실행 (개발용)
+모든 데모 계정의 기본 비밀번호:
 
-**FastAPI 서버 실행:**
-```bash
-DB_HOST=localhost uv run uvicorn app.main:app --reload
-# or
-docker compose up -d --build app
+```text
+Demo1234!
 ```
 
-**AI Worker 실행:**
-```bash
-uv run python -m ai_runtime.main
-# or
-docker compose up -d --build ai-worker
-```
+일반 사용자:
 
-**로컬 MVP 데모 DB 준비:**
-프론트 MVP 화면을 빈 데이터 없이 확인하려면 PostgreSQL 컨테이너를 띄운 뒤 로컬 전용 seed를 실행합니다.
-이 방식은 로컬 MVP 테스트용이며, 운영/공유 DB에서는 Aerich migration 기준으로 관리해야 합니다.
+| 용도 | 이메일 | login_id |
+| --- | --- | --- |
+| 일반 데모 | `demo@example.com` | `demo_user` |
+| 고위험 데모 | `demo_high@example.com` | `demo_high` |
 
-```bash
-docker compose up -d postgres
-DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
-```
+관리자/모니터링:
 
-생성되는 데모 계정:
-- `demo@example.com` / `Demo1234!`
-- `demo_high@example.com` / `Demo1234!`
-- `admin@example.com` / `Demo1234!` (`SUPER_ADMIN`)
-- `monitor@example.com` / `Demo1234!` (`MONITOR`)
+| 권한 | 이메일 | login_id |
+| --- | --- | --- |
+| SUPER_ADMIN | `admin@example.com` | `admin01` |
+| MONITOR | `monitor@example.com` | `monitor01` |
 
-### 2. EC2 배포 환경 (Production)
+관리자 화면은 로그인 후 사이드바의 “관리자 콘솔” 또는 `/admin`에서 확인합니다.
 
-제공된 쉘 스크립트를 사용하여 AWS EC2 환경에 이미지를 빌드, 푸시 및 배포할 수 있습니다.
+## AI 기능 연결 상태
 
-#### 사전 준비
-- EC2 인스턴스 (Ubuntu 권장)
-- SSH 키 페어 (`~/.ssh/` 경로에 위치)
-- 도커 허브(Docker Hub) 계정 및 Personal Access Token
-- 배포용 환경 변수 설정 (`envs/.prod.env`)
-- 도메인 구매 (Gabia, GoDaddy, AWS Route53 등)
+### 건강분석 ML
 
-#### 자동 배포 스크립트 실행
-`scripts/deployment.sh`는 도커 이미지 빌드, 레포지토리 푸시, EC2 접속 및 컨테이너 실행 과정을 자동화합니다.
+정밀분석(`PRECISION`) 기준:
+
+| 질환 | 현재 runtime | 기대 model/source |
+| --- | --- | --- |
+| 당뇨 | CatBoost artifact | `catboost`, `dm_catboost_final` |
+| 고혈압 | CatBoost artifact | `catboost`, `htn_catboost_final` |
+| 이상지질혈증 | CatBoost artifact | `catboost`, `dl_catboost_final` |
+| 비만 | rule-based | `rule_based`, `web-precision-v1` |
+
+간편분석(`BASIC`)은 rule-based 성격입니다. CatBoost 실제 호출 여부는 API 응답의 `model_name`, `model_version`, DB `analysis_results` 최신 row, audit script로 확인합니다.
+
+확인 명령:
 
 ```bash
-chmod +x scripts/deployment.sh
-./scripts/deployment.sh
+uv run python scripts/warmup_ml_models.py
+uv run python scripts/audit_ai_runtime_capabilities.py --skip-warmup
 ```
-스크립트 실행 시 다음 정보를 입력해야 합니다:
-1. 도커 허브 계정 정보 (Username, PAT)
-2. 이미지를 업로드할 레포지토리 이름
-3. 배포할 서비스 선택 (FastAPI, AI-Worker) 및 버전(Tag)
-4. SSH 키 파일명 및 EC2 IP 주소
-5. https 사용여부
-   - 5-1. https인 경우 도메인 추가 입력  
 
-#### SSL(HTTPS) 설정 (Certbot)
-도메인을 연결하고 HTTPS를 적용하려면 `scripts/certbot.sh`를 사용합니다.
+### 식단분석
+
+기본값:
+
+```env
+DIET_VISION_PROVIDER=rule_based
+DIET_GPT_VISION_ENABLED=false
+```
+
+이 경우 실제 유료 Vision API 호출 없이 `rule_based_food_detection` + `DiseaseFoodScorer` + `nutrition_rule_table` 경로를 사용합니다.
+
+GPT Vision 음식명 추론을 재현하려면:
+
+```env
+OPENAI_API_KEY=<key>
+DIET_VISION_PROVIDER=gpt_vision
+DIET_GPT_VISION_ENABLED=true
+```
+
+응답에서 확인할 필드:
+
+- `detected_foods`
+- `raw_output.source`
+- `vision_provider`
+- `fallback_used`
+- `scoring_source`
+- `disease_scores`
+- `food_score_details`
+
+프론트는 파일 업로드와 모바일 카메라 촬영 input을 모두 제공합니다.
+
+### 건강검진 OCR
+
+현재 공식 경로는 Clova OCR이 아닙니다. Clova provider 코드는 legacy/deferred/PoC로 보존합니다.
+
+기본값:
+
+```env
+EXAM_OCR_PROVIDER=fallback
+EXAM_GPT_VISION_ENABLED=false
+PADDLE_OCR_ENABLED=false
+```
+
+GPT Vision 경로를 테스트하려면:
+
+```env
+OPENAI_API_KEY=<key>
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+```
+
+PaddleOCR/text extraction 경로를 테스트하려면:
+
+```env
+EXAM_OCR_PROVIDER=paddleocr
+PADDLE_OCR_ENABLED=true
+```
+
+주의:
+
+- 텍스트 레이어가 있는 PDF는 pdf text extraction으로 성공할 수 있습니다.
+- 실제 스캔 PDF OCR에는 PaddleOCR engine/paddlepaddle dependency와 이미지 변환 경로가 필요합니다.
+- fallback 사용 시에는 `ocr_provider=fallback`, `fallback_used=true`로 표시되어야 하며, 실제 OCR 성공처럼 설명하지 않습니다.
+- confirm 버튼을 누르면 OCR 후보값이 최신 `HealthRecord`에 반영될 수 있으므로 검진일 기준 수치가 맞는지 확인해야 합니다.
+
+### 약봉투/처방전 OCR
+
+기본값:
+
+```env
+MEDICATION_OCR_PROVIDER=fallback
+MEDICATION_GPT_VISION_ENABLED=false
+```
+
+현재는 medication parser/fallback 구조를 중심으로 보존되어 있습니다. 실제 provider 연결은 GPT Vision/PaddleOCR 후보로 남아 있으며, fallback은 실제 OCR 성공으로 포장하지 않습니다.
+
+### 챗봇 LLM
+
+기본값은 rule-based입니다.
+
+```env
+CHATBOT_USE_REAL_LLM=false
+```
+
+실제 OpenAI rewrite 경로를 테스트하려면:
+
+```env
+OPENAI_API_KEY=<key>
+CHATBOT_USE_REAL_LLM=true
+```
+
+기대 동작:
+
+- flag false: `source=rule_engine`
+- flag true + key missing: rule-based fallback
+- flag true + key set: OpenAI 호출 경로 진입, 실패 시 fallback
+
+### RAG keyword PoC
+
+RAG source registry는 `docs/rag_sources/`에 있습니다. 원문 PDF 전체가 아니라 공식 출처 metadata와 짧은 요약만 보존합니다.
+
+기본값:
+
+```env
+RAG_ENABLED=false
+```
+
+RAG를 켜면 keyword retrieval과 reference source 연결, Langfuse `rag.keyword_retrieval` trace가 활성화될 수 있습니다.
+
+```env
+RAG_ENABLED=true
+```
+
+운영형 vector RAG, embedding, pgvector retrieval은 P2 backlog입니다.
+
+### Langfuse
+
+Langfuse는 앱 실행 필수 구성요소가 아니라 선택 관측 도구입니다. RAG 엔진이 아니라 trace, prompt, evaluation metadata를 관리합니다. Full Docker dev stack은 Langfuse 없이도 실행됩니다.
+
+self-host Langfuse 실행:
 
 ```bash
-chmod +x scripts/certbot.sh
-./scripts/certbot.sh
+make langfuse-up
 ```
-1. 도메인 주소 및 이메일 입력
-2. SSH 키 파일명 및 EC2 IP 주소 입력
-3. Let's Encrypt를 통한 인증서 발급 및 Nginx 설정 자동 갱신 적용
 
----
+접속:
 
-## 🧪 테스트 및 품질 관리
+```text
+http://localhost:3000
+```
 
-로컬과 GitHub Actions CI는 아래 검증 범위를 기준으로 맞춥니다.
+FastAPI가 Docker 컨테이너 안에서 host의 Langfuse에 접근할 때:
+
+```env
+LANGFUSE_ENABLED=true
+LANGFUSE_BASE_URL=http://host.docker.internal:3000
+LANGFUSE_PUBLIC_KEY=<self-host project public key>
+LANGFUSE_SECRET_KEY=<self-host project secret key>
+```
+
+Cloud Langfuse 예:
+
+```env
+LANGFUSE_ENABLED=true
+LANGFUSE_BASE_URL=https://jp.cloud.langfuse.com
+LANGFUSE_PUBLIC_KEY=<cloud public key>
+LANGFUSE_SECRET_KEY=<cloud secret key>
+```
+
+Cloud key와 self-host key는 서로 호환되지 않습니다. 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿉니다.
+
+## 이메일 인증
+
+MVP/시연 회원가입은 이메일 인증만 필수입니다. 휴대폰 인증은 보류입니다.
+
+로컬/시연 기본값:
+
+```env
+EMAIL_ENABLED=false
+EMAIL_VERIFICATION_DEBUG=true
+PASSWORD_RESET_DEBUG=false
+```
+
+이 상태에서는 실제 SMTP 발송 없이 인증코드가 debug 응답으로 표시될 수 있습니다.
+
+Brevo SMTP 등 실제 이메일 발송을 쓰려면:
+
+```env
+EMAIL_ENABLED=true
+EMAIL_VERIFICATION_DEBUG=false
+PASSWORD_RESET_DEBUG=false
+SMTP_HOST=<smtp host>
+SMTP_PORT=587
+SMTP_USERNAME=<smtp login>
+SMTP_PASSWORD=<smtp key>
+SMTP_FROM_EMAIL=<sender email>
+SMTP_FROM_NAME=AI HealthCare
+SMTP_USE_TLS=true
+```
+
+설정 확인:
+
+```bash
+uv run python scripts/verify_auth_delivery_config.py
+```
+
+실제 발송 테스트는 명시적으로 옵션을 붙였을 때만 수행합니다.
+
+```bash
+uv run python scripts/verify_auth_delivery_config.py --send-email you@example.com
+```
+
+운영 환경에서는 `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`를 유지합니다.
+
+## Async job skeleton
+
+현재 Redis Stream 기반 async job은 `DEMO_ECHO` skeleton만 연결되어 있습니다.
+
+- `/api/v1/jobs/demo`
+- `/api/v1/jobs/{job_id}`
+- `ai-worker` service
+- `ai_runtime/jobs/*`
+
+아직 `/analysis/run`, `/diets/analyze`, OCR confirm 흐름은 비동기로 넘기지 않습니다. `AnalysisResult.async_job_id`는 향후 async job 연동을 위한 reserved field입니다.
+
+## 테스트 및 검증
+
+기본 검증:
 
 ```bash
 uv run ruff check app scripts ai_runtime tests
 uv run ruff format app scripts ai_runtime tests --check
-uv run pytest tests
+CHATBOT_USE_REAL_LLM=false OPENAI_API_KEY= LANGFUSE_ENABLED=false RAG_ENABLED=false uv run pytest tests
+cd frontend
+npm run build
+```
+
+프론트 단독 개발이 필요할 때만 Vite dev server를 별도로 실행합니다. 이 방식은 기본 시연 실행이 아니라 UI 디버깅용입니다.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+API import/OpenAPI smoke:
+
+```bash
 uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"
 ```
 
-현재 루트 `tests/`의 단위 테스트는 DB service 없이 통과하는 기준입니다. DB 연동/E2E 검증은 Docker Compose 시연 체크 또는 별도 스모크 스크립트에서 수행합니다.
-
-기존 CI 스크립트를 직접 확인할 때는 아래 명령도 사용할 수 있습니다.
+시연 준비 확인:
 
 ```bash
-./scripts/ci/run_test.sh
-./scripts/ci/code_fommatting.sh
-./scripts/ci/check_mypy.sh
+uv run python scripts/verify_demo_ready.py
+uv run python scripts/audit_ai_runtime_capabilities.py --skip-warmup
+uv run python scripts/verify_auth_delivery_config.py
 ```
 
----
-
-## 📝 개발 가이드
-
-- **API 추가**: `app/apis/v1/` 아래에 새로운 라우터 파일을 생성하고 `app/apis/v1/__init__.py`에 등록하세요.
-- **DB 모델 추가**: `app/models/`에 Tortoise 모델을 정의하고 `app/db/databases.py`의 `MODELS` 리스트에 추가하세요.
-- **AI 로직 추가**: `ai_runtime/tasks/`에 새로운 처리 로직을 작성하고 `ai_runtime/main.py`에서 호출하도록 구성하세요.
-
-## 개발 작업 영역 분리 기준
-
-- 백엔드 API 담당자는 `app/` 하위에서 작업합니다.
-- ML 담당자는 `ai_runtime/ml/` 하위에서 작업합니다.
-- CV 담당자는 `ai_runtime/cv/` 하위에서 작업합니다.
-- LLM 담당자는 `ai_runtime/llm/` 하위에서 작업합니다.
-- RAG 담당자는 `ai_runtime/llm/rag/` 하위에서 작업합니다.
-- 현재 공식 API에서 직접 호출되는 LLM runtime은 분석/식단 결과 설명 생성과 keyword RAG reference source 첨부입니다. 메인 챗봇 LLM 라우터와 추천/챌린지 문구 모듈은 준비되어 있지만 공식 runtime 연결은 후속 작업입니다. 자세한 기준은 [LLM/RAG Runtime Scope](docs/design/llm_runtime_scope.md)를 따릅니다.
-- 여러 AI 처리 흐름을 묶는 파이프라인은 `ai_runtime/pipelines/`에서 관리합니다.
-- ML/CV/LLM/RAG 담당자는 `app/`을 직접 크게 수정하지 않습니다.
-- 백엔드 담당자는 `ai_runtime` 내부 모델 코드를 직접 크게 수정하지 않습니다.
-- API와 Worker 사이 데이터 형식은 DTO/schema 기준으로 합의 후 수정합니다.
-- `pyproject.toml`, `uv.lock`, `docker-compose.yml`, env example, `app/core` 같은 공용 설정 파일은 팀장 승인 없이 수정하지 않습니다.
-
-### ML 학습/추론 실행 기준
-
-- 서비스 DB/ORM 필드명은 모델 학습 feature명에 직접 맞추지 않습니다.
-- 서비스 입력값은 `ai_runtime/ml/inference/feature_mapper.py`에서 CatBoost 학습 당시 한글 feature schema로 변환합니다.
-- 학습/검증 스크립트는 파일 직접 실행 대신 모듈 방식으로 실행합니다.
+정밀분석 smoke:
 
 ```bash
-uv run python -m ai_runtime.ml.training.run_experiment --config ai_runtime/ml/experiments/configs/dm_catboost_final.json --dry-run
-uv run python -m ai_runtime.ml.training.run_experiment --config ai_runtime/ml/experiments/configs/htn_catboost_final.json --dry-run
-uv run python -m ai_runtime.ml.training.run_experiment --config ai_runtime/ml/experiments/configs/dl_catboost_final.json --dry-run
+uv run python scripts/verify_precision_analysis_api.py
 ```
 
-- `python ai_runtime/ml/training/run_experiment.py` 방식은 repo root package import가 깨질 수 있으므로 사용하지 않습니다.
-- 모델 artifact는 `ai_runtime/ml/artifacts/{disease}/catboost` 아래에 두되 `.cbm`, `.npy`, `.pkl`, `.joblib` 산출물은 git에 커밋하지 않습니다.
-- 로컬 학습 CSV는 `etc/ml/ai_worker/data/`에 배치합니다. 서비스 런타임은 이 경로를 import하거나 직접 참조하지 않고, 학습 loader만 `dataset_name` 기준으로 읽습니다.
-- 학습 CSV와 전처리 데이터는 민감/대용량 가능성이 있으므로 git 커밋 대상이 아닙니다. 공유가 필요하면 별도 Drive/S3/archive 저장소에서 받아 `etc/ml/ai_worker/data/`에 내려받아 사용합니다.
+주의: `verify_precision_analysis_api.py`는 기본 demo 계정 seed/env가 맞지 않으면 로그인 단계에서 실패할 수 있습니다. 이 경우 모델 실패가 아니라 demo seed/env 정렬 문제인지 먼저 구분합니다.
+
+## 운영/배포 메모
+
+운영 compose는 `infra/docker/docker-compose.prod.yml`을 기준으로 합니다.
+
+운영 전 필수 확인:
+
+- `.env`와 secret 관리 정책
+- HTTPS 설정
+- `REFRESH_TOKEN_COOKIE_SECURE=true`
+- `CORS_ALLOW_ORIGINS` 제한
+- production debug flag false
+- Aerich PostgreSQL migration baseline 정책
+- 관리자 계정/권한/감사 로그
+- 실제 SMS provider 도입 여부
+- OCR/CV/LLM 외부 provider 비용 제한과 timeout
+- Langfuse Cloud/self-host key와 base URL 일치
+
+## 자주 막히는 문제
+
+### `http://localhost`가 404입니다
+
+정상입니다. 프론트 포함 dev stack 주소는 `http://localhost:8080`입니다.
+
+### 로그인 또는 회원가입 API가 500입니다
+
+새 Docker volume이면 migration/seed가 안 들어갔을 수 있습니다.
+
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync aerich upgrade
+DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
+```
+
+### demo/admin 계정 로그인이 안 됩니다
+
+seed를 다시 확인합니다.
+
+```bash
+DB_HOST=localhost uv run python scripts/seed_demo_users.py
+```
+
+계정:
+
+- `admin@example.com` / `Demo1234!`
+- `monitor@example.com` / `Demo1234!`
+- `demo@example.com` / `Demo1234!`
+
+### OCR 결과가 fallback으로 나옵니다
+
+`.env`의 provider flag를 확인합니다.
+
+```env
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+OPENAI_API_KEY=<key>
+```
+
+또는 PaddleOCR/text extraction 경로:
+
+```env
+EXAM_OCR_PROVIDER=paddleocr
+PADDLE_OCR_ENABLED=true
+```
+
+컨테이너 재생성:
+
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate fastapi ai-worker nginx
+```
+
+### Langfuse trace가 안 찍힙니다
+
+확인할 것:
+
+- `LANGFUSE_ENABLED=true`
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` SET
+- self-host/Cloud key와 `LANGFUSE_BASE_URL`이 같은 프로젝트를 바라보는지
+- Docker FastAPI 기준 self-host URL은 보통 `http://host.docker.internal:3000`
+- `RAG_ENABLED=false`이면 `rag.keyword_retrieval` trace는 생성되지 않는 것이 정상
+
+### 프론트가 예전 화면을 보여줍니다
+
+Docker frontend/nginx를 재빌드합니다.
+
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate frontend nginx
+```
+
+브라우저 hard refresh도 함께 수행합니다.
+
+## 개발 규칙
+
+- 기능 코드와 실험/문서/seed를 구분합니다.
+- 모델 artifact는 `ai_runtime/ml/artifacts/` 아래 runtime 경로에 둡니다.
+- 원본 학습 데이터, 실험 산출물, OCR raw/reference 자료는 `etc/` 또는 외부 저장소로 분리합니다.
+- 실제 secret은 절대 commit하지 않습니다.
+- dependency 변경이 없으면 `uv.lock`을 건드리지 않습니다.
+- migration은 기존 파일을 수정하지 않고 새 migration으로 관리합니다.
+- 시연 중 DB volume 삭제 명령(`down -v`)은 사용하지 않습니다.
+- 테스트 fixture/mock은 유지하되 사용자 화면/공식 API 응답에 dummy/mock/stub 결과가 실제 결과처럼 보이지 않게 합니다.
+
+## 참고 문서
+
+- 시연 시나리오: `docs/demo/scenario.md`
+- 시연 체크리스트: `docs/qa/demo_ready_checklist.md`
+- 프론트 QA 체크리스트: `docs/qa/frontend_demo_checklist.md`
+- LLM/RAG runtime 범위: `docs/design/llm_runtime_scope.md`
+- AI runtime 모델 범위: `docs/design/ai_worker_model_scope.md`
+- Docker stack 설명: `docs/ops/docker_stacks.md`
+- Secret 관리: `docs/ops/secrets_handling.md`
+- DB migration 정책: `docs/ops/database_migration_policy.md`
+- release readiness 요약: `docs/release/feature_kdu_demo_readiness_summary.md`
