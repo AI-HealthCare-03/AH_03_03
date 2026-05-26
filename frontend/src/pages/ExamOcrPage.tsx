@@ -95,9 +95,9 @@ export default function ExamOcrPage() {
       );
       await confirmExam(exam.id);
       setMeasurements(await listMeasurements(exam.id));
-      setMessage("측정값 후보를 확인 처리했습니다. confirm 후 HealthRecord 정밀분석 필드에 반영됩니다.");
+      setMessage("건강정보에 반영되었습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "측정값 후보 저장에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "건강정보 반영에 실패했습니다.");
     } finally {
       setIsConfirming(false);
     }
