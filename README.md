@@ -440,39 +440,18 @@ RAG_ENABLED=true
 
 ### Langfuse
 
-Langfuse는 앱 실행 필수 구성요소가 아니라 선택 관측 도구입니다. RAG 엔진이 아니라 trace, prompt, evaluation metadata를 관리합니다. Full Docker dev stack은 Langfuse 없이도 실행됩니다.
-
-self-host Langfuse 실행:
-
-```bash
-make langfuse-up
-```
-
-접속:
-
-```text
-http://localhost:3000
-```
-
-FastAPI가 Docker 컨테이너 안에서 host의 Langfuse에 접근할 때:
+Langfuse는 앱 실행 필수 구성요소가 아니라 LLM/GPT Vision/RAG trace 관측용 선택 도구입니다. RAG/LLM 실행 엔진이 아니며, `LANGFUSE_ENABLED=false`이면 앱은 trace 없이 정상 동작합니다.
 
 ```env
-LANGFUSE_ENABLED=true
-LANGFUSE_BASE_URL=http://host.docker.internal:3000
-LANGFUSE_PUBLIC_KEY=<self-host project public key>
-LANGFUSE_SECRET_KEY=<self-host project secret key>
+LANGFUSE_ENABLED=false
 ```
 
-Cloud Langfuse 예:
+로컬 self-host Langfuse 실행, Cloud/self-host base URL 차이, key 발급 방법은 별도 문서를 봅니다.
 
-```env
-LANGFUSE_ENABLED=true
-LANGFUSE_BASE_URL=https://jp.cloud.langfuse.com
-LANGFUSE_PUBLIC_KEY=<cloud public key>
-LANGFUSE_SECRET_KEY=<cloud secret key>
-```
-
-Cloud key와 self-host key는 서로 호환되지 않습니다. 전환할 때는 key와 `LANGFUSE_BASE_URL`을 함께 바꿉니다.
+- Langfuse self-host 문서: `infra/langfuse/README.md`
+- self-host UI 기본 주소: `http://localhost:3000`
+- Docker FastAPI가 host의 Langfuse에 접근할 때는 보통 `LANGFUSE_BASE_URL=http://host.docker.internal:3000`을 사용합니다.
+- `RAG_ENABLED=false`가 기본값이므로 keyword RAG retrieval과 `rag.keyword_retrieval` trace도 기본 비활성화입니다.
 
 ## 이메일 인증
 
