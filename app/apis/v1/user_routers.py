@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import ORJSONResponse as Response
 
-from app.dependencies.security import get_request_user
+from app.apis.v1.dependencies import get_request_user
 from app.dtos.users import UserInfoResponse, UserUpdateRequest
 from app.models.users import User
 from app.services.users import UserManageService
@@ -26,3 +26,12 @@ async def update_user_me_info(
 ) -> Response:
     updated_user = await user_manage_service.update_user(user=user, data=update_data)
     return Response(UserInfoResponse.model_validate(updated_user).model_dump(), status_code=status.HTTP_200_OK)
+
+
+@user_router.delete("/me", response_model=UserInfoResponse, status_code=status.HTTP_200_OK)
+async def deactivate_user_me(
+    user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
+) -> Response:
+    deactivated_user = await user_manage_service.deactivate_user(user)
+    return Response(UserInfoResponse.model_validate(deactivated_user).model_dump(), status_code=status.HTTP_200_OK)

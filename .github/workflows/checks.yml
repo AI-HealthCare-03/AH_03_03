@@ -33,30 +33,16 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: uv sync --group dev --frozen
+        run: uv sync --group app --group ai --group dev --frozen
 
       - name: Run Ruff Check (Linting)
-        run: uv run ruff check .
+        run: uv run ruff check app scripts ai_runtime tests
 
       - name: Run Ruff Format Check
-        run: uv run ruff format . --check
+        run: uv run ruff format app scripts ai_runtime tests --check
 
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_DB: ai_health
-          POSTGRES_USER: ozcoding
-          POSTGRES_PASSWORD: pw1234
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ozcoding -d ai_health"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -72,27 +58,10 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: uv sync --group app --group dev --frozen
+        run: uv sync --group app --group ai --group dev --frozen
 
-      - name: Check if tests exist
-        id: check_tests
-        # tests 폴더나 test_*.py 파일이 있는지 확인
-        run: |
-          if [ -d "tests" ] || [ $(find . -name "test_*.py" | wc -l) -gt 0 ]; then
-            echo "has_tests=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_tests=false" >> $GITHUB_OUTPUT
-          fi
+      - name: Run Tests
+        run: uv run pytest tests
 
-      - name: Run Tests with Coverage
-        if: steps.check_tests.outputs.has_tests == 'true'
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ozcoding
-          DB_PASSWORD: pw1234
-          DB_NAME: ai_health
-          PGDATABASE: postgres
-        run: |
-          uv run coverage run -m pytest app
-          uv run coverage report -m
+      - name: Check FastAPI OpenAPI Import
+        run: uv run python -c "from app.main import app; print(app.title); print(len(app.openapi().get('paths', {})))"

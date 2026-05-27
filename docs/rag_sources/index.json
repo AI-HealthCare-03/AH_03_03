@@ -1,0 +1,86 @@
+[
+  {
+    "id": "hypertension",
+    "disease_type": "HYPERTENSION",
+    "title": "고혈압, 주의혈압, 혈압 관리 후보 지식",
+    "source_org": "대한고혈압학회",
+    "source_url": "https://www.koreanhypertension.org",
+    "year": null,
+    "source_type": "official_society",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 공식 문서 원문 대조와 의료진 검토 전까지 운영 RAG에 사용하지 않는다."
+  },
+  {
+    "id": "diabetes",
+    "disease_type": "DIABETES",
+    "title": "당뇨, 공복혈당, 당뇨병전단계 후보 지식",
+    "source_org": "대한당뇨병학회, 질병관리청 국가건강정보포털",
+    "source_url": "https://www.diabetes.or.kr/bbs/?code=guide&mode=view&number=2078&page=1&code=guide",
+    "year": 2025,
+    "source_type": "clinical_guideline",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 2025 당뇨병 진료지침 PDF는 원문 파일을 repo에 넣지 않고 diabetes.md 요약에 통합한다."
+  },
+  {
+    "id": "dyslipidemia",
+    "disease_type": "DYSLIPIDEMIA",
+    "title": "총콜레스테롤, LDL, HDL, 중성지방 후보 지식",
+    "source_org": "대한지질·동맥경화학회, 질병관리청 국가건강정보포털",
+    "source_url": "https://lipid.or.kr/reference/guideline.php?boardid=guideline&mode=view&idx=1281",
+    "year": 2022,
+    "source_type": "clinical_guideline",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 이상지질혈증 진료지침 원문 검토 전에는 생활습관 설명 후보로만 사용한다."
+  },
+  {
+    "id": "obesity",
+    "disease_type": "OBESITY",
+    "title": "비만, BMI, 허리둘레 후보 지식",
+    "source_org": "대한비만학회, 질병관리청 국가건강정보포털",
+    "source_url": "https://www.kosso.or.kr/popup/obesity_cpg.html",
+    "year": null,
+    "source_type": "clinical_guideline",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 체중 감량 처방이 아니라 BMI/허리둘레/생활습관 안내 후보로만 사용한다."
+  },
+  {
+    "id": "diet_nutrition",
+    "disease_type": "DIET_NUTRITION",
+    "title": "질환별 식단과 영양 관리 후보 지식",
+    "source_org": "질병관리청 국가건강정보포털, 한국영양학회, 대한당뇨병학회, 대한고혈압학회, 대한비만학회",
+    "source_url": "https://www.kns.or.kr/FileRoom/FileRoom_view.asp?idx=167&BoardID=Kdr",
+    "year": null,
+    "source_type": "nutrition_guideline",
+    "runtime_use": "keyword_rag_poc_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 질환별 치료식 처방이 아니라 식단 점수 설명의 참고 근거 후보로만 사용한다."
+  },
+  {
+    "id": "food_nutrition_api",
+    "disease_type": "FOOD_NUTRITION_API",
+    "title": "식품영양성분 API 후보",
+    "source_org": "식품의약품안전처, 공공데이터포털, 농촌진흥청 농식품올바로",
+    "source_url": "https://www.data.go.kr/data/15127578/openapi.do",
+    "year": null,
+    "source_type": "public_data_api",
+    "runtime_use": "provider_metadata_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 실제 API 호출은 구현하지 않고 provider 후보 metadata와 표준 필드만 정리한다."
+  },
+  {
+    "id": "safety_disclaimer",
+    "disease_type": "SAFETY",
+    "title": "평가 제외, 진단 불가, 의료 면책 문구",
+    "source_org": "질병관리청 국가건강정보포털, 보건복지부",
+    "source_url": "https://health.kdca.go.kr",
+    "year": null,
+    "source_type": "safety_policy",
+    "runtime_use": "safety_prompt_candidate",
+    "status": "candidate_unreviewed",
+    "notes": "1차 runtime 후보. 모든 건강 설명에 공통 적용할 안전 문구 후보이며 법률 자문 문서가 아니다."
+  }
+]

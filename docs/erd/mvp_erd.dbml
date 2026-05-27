@@ -1,35 +1,35 @@
 // AI Healthcare MVP ERD
 //
 // 범위:
+// - MVP는 풀서비스 1차 범위를 기준으로 하며, 소셜 로그인과 웨어러블 연동만 제외한다.
 // - AUTH / USER
 // - MAIN / MYPAGE
 // - HEALTH
-// - EXAM / OCR Dummy
-// - ANALYSIS + SHAP
+// - EXAM / OCR
+// - ANALYSIS + SHAP / ML inference
 // - CHALLENGE
 // - RAG 공식 문서/청크 메타데이터 관리
 // - DASHBOARD 조회/집계
-// - NOTIFICATION 최소기능
-// - DIET 최소 기록
-// - MEDICATION/SUPPLEMENT 최소 기록
-// - FAQ
+// - NOTIFICATION / reminder_schedules / notification_logs
 // - SETTINGS
+// - QNA / FAQ
+// - DIET 기록/분석
+// - MEDICATION/SUPPLEMENT
+// - LLM 생성 로그
+// - FAMILY 1차 DB/API
+// - ADMIN / 운영 모니터링 / 시스템 로그 / 민감정보 접근 로그
 //
 // 제외:
-// - DIET 실서비스 DB 상세 테이블
-// - LLM 실서비스 DB
-// - FAMILY
-// - QNA
-// - MEDICATION/SUPPLEMENT 실서비스 DB 상세 테이블
-// - FAQ 실서비스 DB 상세 테이블
-// - SETTINGS 실서비스 DB 상세 테이블
-// - ADMIN
-// - 운영 로그 상세
-// - 외부 알림 SMS/Email/Push/Kakao
+// - WEARABLE 연동
+// - 소셜 로그인
+//
+// MVP 범위 안의 후속 구현 단계:
+// - 외부 알림 SMS/Email/Push/Kakao 발송 worker
+// - pgvector / RAG 검색 고도화
 
 Project ai_health_mvp {
   database_type: "PostgreSQL"
-  Note: "FastAPI + AI Worker MVP schema. Dashboard는 별도 테이블 없이 관련 테이블을 조회/집계한다."
+  Note: "FastAPI + AI Worker MVP schema. MVP는 풀서비스 1차 기준이며 소셜 로그인과 웨어러블 연동만 제외한다. Dashboard와 MyPage는 별도 테이블 없이 관련 테이블을 조회/집계한다."
 }
 
 Enum gender {
@@ -53,6 +53,12 @@ Enum analysis_type {
   DIABETES
   OBESITY
   DYSLIPIDEMIA
+  HYPERTENSION
+}
+
+Enum analysis_mode {
+  BASIC
+  PRECISION
 }
 
 Enum ocr_status {
@@ -79,6 +85,8 @@ Enum challenge_category {
   EXERCISE
   DIET
   SLEEP
+  MEDICATION
+  WATER
   BLOOD_PRESSURE
   BLOOD_GLUCOSE
   WEIGHT
@@ -103,27 +111,165 @@ Enum rag_disease_type {
   COMMON
 }
 
-Enum notification_type {
-  ANALYSIS_COMPLETED
-  CHALLENGE_RECOMMENDED
-  CHALLENGE_REMINDER
+Enum family_status {
+  ACTIVE
+  REMOVED
+}
+
+Enum family_relation_type {
+  SELF
+  FATHER
+  MOTHER
+  SPOUSE
+  CHILD
+  SIBLING
+  GRANDPARENT
+  OTHER
+}
+
+Enum family_member_role {
+  OWNER
+  MEMBER
+  GUARDIAN
+  DEPENDENT
+}
+
+Enum family_member_status {
+  ACTIVE
+  INVITED
+  PENDING_UNREGISTERED
+  REMOVED
+}
+
+Enum family_invite_status {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELED
 }
 
 Table users {
   id bigint [pk, increment]
+  login_id varchar(40) [unique]
   email varchar(40) [not null, unique]
-  hashed_password varchar(128) [not null]
+  hashed_password varchar(255) [not null]
   name varchar(20) [not null]
+  nickname varchar(30)
   gender gender [not null]
   birthday date [not null]
   phone_number varchar(11) [not null, unique]
+  address varchar(255)
+  profile_image_url varchar(500)
+  role varchar(20) [not null, default: 'USER']
   is_active boolean [not null, default: true]
   is_admin boolean [not null, default: false]
-  last_login timestamptz
+  last_login_at timestamptz
+  failed_login_count int [not null, default: 0]
+  locked_until timestamptz
+  deactivated_at timestamptz
+  email_verified_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "AUTH / USER 기준 테이블. 현재 MVP에서는 일반 사용자 기능 중심으로 사용한다."
+  Note: "AUTH / USER 기준 테이블. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
+}
+
+Table families {
+  id bigint [pk, increment]
+  name varchar(100) [not null]
+  owner_user_id bigint [not null, ref: > users.id]
+  status family_status [not null, default: 'ACTIVE']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (owner_user_id)
+    (status)
+  }
+
+  Note: "가족 그룹. 생성자가 OWNER 구성원으로 등록된다. 삭제 API는 status=REMOVED soft remove로 처리한다."
+}
+
+Table family_members {
+  id bigint [pk, increment]
+  family_id bigint [not null, ref: > families.id]
+  user_id bigint [ref: > users.id]
+  display_name varchar(100) [not null]
+  phone_number varchar(30)
+  email varchar(255)
+  relation_type family_relation_type [not null]
+  member_role family_member_role [not null, default: 'MEMBER']
+  status family_member_status [not null, default: 'ACTIVE']
+  is_registered boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (family_id)
+    (user_id)
+    (family_id, user_id)
+    (family_id, status)
+    (email)
+    (phone_number)
+  }
+
+  Note: "가족 구성원. 미가입 가족은 user_id=null, is_registered=false, status=PENDING_UNREGISTERED로 저장한다."
+}
+
+Table family_invites {
+  id bigint [pk, increment]
+  family_id bigint [not null, ref: > families.id]
+  inviter_user_id bigint [not null, ref: > users.id]
+  invitee_user_id bigint [ref: > users.id]
+  invitee_email varchar(255)
+  invitee_phone varchar(30)
+  code_hash varchar(128) [not null, unique]
+  relation_type family_relation_type [not null]
+  member_role family_member_role [not null, default: 'MEMBER']
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  status family_invite_status [not null, default: 'PENDING']
+  created_at timestamptz [not null]
+
+  indexes {
+    (family_id)
+    (inviter_user_id)
+    (invitee_user_id)
+    (invitee_email)
+    (invitee_phone)
+    (status)
+    (expires_at)
+  }
+
+  Note: "가족 초대. 초대 코드 원문은 저장하지 않고 code_hash만 저장한다. 원문 코드는 생성 직후 1회만 응답한다."
+}
+
+Table family_share_settings {
+  id bigint [pk, increment]
+  family_id bigint [not null, ref: > families.id]
+  owner_user_id bigint [not null, ref: > users.id]
+  viewer_user_id bigint [not null, ref: > users.id]
+  share_health_records boolean [not null, default: false]
+  share_analysis_results boolean [not null, default: false]
+  share_diet_records boolean [not null, default: false]
+  share_medications boolean [not null, default: false]
+  share_challenges boolean [not null, default: false]
+  share_exam_reports boolean [not null, default: false]
+  receive_analysis_alerts boolean [not null, default: false]
+  receive_abnormal_value_alerts boolean [not null, default: false]
+  receive_medication_alerts boolean [not null, default: false]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (family_id)
+    (owner_user_id)
+    (viewer_user_id)
+    (family_id, owner_user_id, viewer_user_id)
+  }
+
+  Note: "가족 공유 권한. 기본값은 모두 false이며 가족 연결만으로 자동 공유하지 않는다."
 }
 
 Table health_records {
@@ -145,9 +291,15 @@ Table health_records {
   has_obesity boolean
   has_dyslipidemia boolean
   has_hypertension boolean
-  is_smoker boolean
-  drinks_alcohol boolean
-  exercise_days_per_week int
+  occupation_code varchar(30)
+  family_htn varchar(10)
+  family_dm varchar(10)
+  family_dyslipidemia varchar(10)
+  smoking_status varchar(20)
+  drinking_frequency varchar(30)
+  drinking_amount varchar(30)
+  walking_days_per_week int
+  strength_days_per_week int
   sleep_hours decimal(4,2)
   measured_at timestamptz [not null]
   created_at timestamptz [not null]
@@ -157,7 +309,7 @@ Table health_records {
     (user_id, measured_at)
   }
 
-  Note: "사용자의 건강정보 입력 이력. 당뇨/비만/이상지질혈증 분석 입력 기준으로 사용하며, 혈압/고혈압 항목은 참고 위험요인으로 유지한다."
+  Note: "사용자의 건강정보 입력 이력. x1 기본 분석 입력은 직업군/질병별 가족력/흡연/음주/걷기/근력운동을 포함하며, BMI는 신장/체중 기반 자동 계산값으로 저장한다. 교육수준/소득수준은 기본 필수 입력에서 제외한다."
 }
 
 Table exam_reports {
@@ -231,6 +383,7 @@ Table analysis_results {
   // TODO: async_jobs 모델 및 FK 연동은 후속 PR에서 처리한다.
   async_job_id bigint [note: "Nullable BIGINT로 유지. async_jobs 모델/FK 연동은 후속 PR에서 처리한다."]
   analysis_type analysis_type [not null]
+  analysis_mode analysis_mode [not null, default: 'BASIC', note: "BASIC=x1 기본정보 기반, PRECISION=x1+x2 검진/혈액검사 수치 기반"]
   risk_score decimal(6,5) [not null]
   risk_level risk_level [not null]
   summary varchar(255)
@@ -283,8 +436,13 @@ Table challenges {
   title varchar(100) [not null]
   description text
   category challenge_category [not null]
+  challenge_type varchar(10) [not null, default: 'GENERAL']
+  target_disease varchar(20) [not null, default: 'GENERAL']
+  difficulty varchar(10) [not null, default: 'NORMAL']
   target_metric varchar(100)
   target_value varchar(100)
+  caution_message text
+  contraindication_message text
   duration_days int [not null]
   status challenge_status [not null, default: 'ACTIVE']
   created_at timestamptz [not null]
@@ -292,9 +450,10 @@ Table challenges {
 
   indexes {
     (category, status)
+    (challenge_type, target_disease, status)
   }
 
-  Note: "MVP 챌린지 마스터 데이터."
+  Note: "팀 챌린지 마스터 데이터. SPECIAL/COMMON/GENERAL 분류와 질환군 대상, 주의/금기 문구를 포함한다."
 }
 
 Table user_challenges {
@@ -335,16 +494,19 @@ Table challenge_logs {
 Table challenge_recommendations {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
-  analysis_result_id bigint [ref: > analysis_results.id]
+  analysis_result_id bigint [not null, ref: > analysis_results.id]
   challenge_id bigint [not null, ref: > challenges.id]
-  reason varchar(255)
-  priority int [not null, default: 0]
+  reason text
+  priority int
   is_selected boolean [not null, default: false]
   created_at timestamptz [not null]
+  updated_at timestamptz [not null]
 
   indexes {
-    (user_id, created_at)
-    (analysis_result_id, priority)
+    (user_id)
+    (analysis_result_id)
+    (challenge_id)
+    (user_id, is_selected)
   }
 
   Note: "분석 결과와 주요 위험요인 기반 추천 챌린지."
@@ -426,19 +588,304 @@ Table rag_retrieval_logs {
 Table notifications {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
-  notification_type notification_type [not null]
+  notification_type varchar(30) [not null]
   title varchar(100) [not null]
-  message varchar(255) [not null]
-  target_table varchar(50)
-  target_id bigint
+  message text [not null]
   is_read boolean [not null, default: false]
+  related_type varchar(50)
+  related_id bigint
   read_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, is_read)
+    (notification_type)
+  }
+
+  Note: "사용자 화면에 표시되는 알림 inbox. 발송 예약과 발송 이력은 reminder_schedules/notification_logs에서 분리 관리한다."
+}
+
+Table reminder_schedules {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  reminder_type varchar(30) [not null, note: "MEDICATION/CHALLENGE/HEALTH_RECORD/FAMILY_ALERT/SYSTEM"]
+  channel varchar(20) [not null, default: "IN_APP", note: "IN_APP/EMAIL/SMS/PUSH/KAKAO"]
+  title varchar(100) [not null]
+  message text [not null]
+  related_type varchar(50)
+  related_id bigint
+  schedule_time varchar(8)
+  cron_expression varchar(100)
+  timezone varchar(50) [not null, default: "Asia/Seoul"]
+  is_active boolean [not null, default: true]
+  last_triggered_at timestamptz
+  next_trigger_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, is_active)
+    (reminder_type)
+    (channel)
+    (next_trigger_at)
+  }
+
+  Note: "복약/챌린지/건강기록/가족/시스템 알림 예약 설정. 실제 외부 발송 worker는 후속 구현 범위."
+}
+
+Table notification_logs {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  notification_id bigint [ref: > notifications.id]
+  reminder_schedule_id bigint [ref: > reminder_schedules.id]
+  notification_type varchar(30) [not null]
+  channel varchar(20) [not null, default: "IN_APP"]
+  title varchar(100) [not null]
+  message_summary varchar(255)
+  related_type varchar(50)
+  related_id bigint
+  status varchar(20) [not null, default: "PENDING", note: "PENDING/SENT/FAILED/SKIPPED/CANCELED"]
+  provider varchar(50)
+  provider_message_id varchar(120)
+  error_code varchar(50)
+  error_message varchar(255)
+  sent_at timestamptz
+  failed_at timestamptz
   created_at timestamptz [not null]
 
   indexes {
-    (user_id, is_read)
-    (user_id, created_at)
+    (user_id)
+    (notification_id)
+    (reminder_schedule_id)
+    (status)
+    (channel)
+    (created_at)
   }
 
-  Note: "웹 내부 알림 최소 기능. SMS/Email/Push/Kakao는 MVP 제외."
+  Note: "알림 발송 시도/성공/실패 이력. 민감 건강 수치 원문, 인증코드, 토큰, 비밀번호는 저장하지 않는다."
+}
+
+Table user_settings {
+  id bigint [pk, increment]
+  user_id bigint [not null, unique, ref: > users.id]
+  notification_enabled boolean [not null, default: true]
+  challenge_reminder_enabled boolean [not null, default: true]
+  challenge_reminder_time time
+  medication_reminder_enabled boolean [not null, default: true]
+  diet_reminder_enabled boolean [not null, default: false]
+  marketing_agreed boolean [not null, default: false]
+  sensitive_data_agreed boolean [not null, default: false]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: "사용자별 알림/마케팅/민감정보 동의 설정. MyPage는 이 테이블과 사용자/건강정보 테이블을 조회해 구성한다."
+}
+
+Table faqs {
+  id bigint [pk, increment]
+  category varchar(50) [not null]
+  question varchar(255) [not null]
+  answer text [not null]
+  display_order int [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (category)
+    (is_active, display_order)
+  }
+
+  Note: "FAQ 최소 기능. 관리자 페이지는 이번 범위에서 제외한다."
+}
+
+Table inquiries {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  category varchar(50) [not null]
+  title varchar(255) [not null]
+  content text [not null]
+  status varchar(30) [not null, default: 'PENDING']
+  answer text
+  answered_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (status)
+    (category)
+  }
+
+  Note: "사용자 QNA/문의 최소 저장 구조. 관리자 답변 UI는 이번 범위에서 제외한다."
+}
+
+Table diet_records {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  meal_type varchar(20)
+  meal_time timestamptz
+  description text
+  image_path varchar(500)
+  detected_foods jsonb
+  nutrition_summary jsonb
+  diet_score float
+  diet_feedback text
+  analysis_method varchar(30)
+  is_user_corrected boolean [not null, default: false]
+  memo text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, meal_time)
+    (analysis_method)
+  }
+
+  Note: "식단 기록 및 더미 분석 결과 저장. 실제 CV/ML 식단 분석 로직은 이번 범위에서 제외한다."
+}
+
+Table diet_photo_results {
+  id bigint [pk, increment]
+  diet_record_id bigint [not null, ref: > diet_records.id]
+  detected_foods jsonb
+  confidence_payload jsonb
+  raw_output jsonb
+  is_dummy boolean [not null, default: true]
+  created_at timestamptz [not null]
+
+  indexes {
+    (diet_record_id)
+  }
+
+  Note: "식단 사진 분석 결과 원본 저장 구조. 실제 모델 추론은 이번 범위에서 제외한다."
+}
+
+Table medications {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  name varchar(100) [not null]
+  medication_type varchar(20) [not null]
+  dosage varchar(100)
+  frequency varchar(100)
+  reminder_time time
+  is_active boolean [not null, default: true]
+  memo text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, is_active)
+    (medication_type)
+  }
+
+  Note: "복약/영양제 등록 최소 기능. 외부 알림 발송 로그는 이번 범위에서 제외한다."
+}
+
+Table medication_records {
+  id bigint [pk, increment]
+  medication_id bigint [not null, ref: > medications.id]
+  user_id bigint [not null, ref: > users.id]
+  scheduled_at timestamptz
+  taken_at timestamptz
+  is_taken boolean [not null, default: false]
+  status varchar(30) [not null, default: 'PENDING']
+  memo text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (medication_id)
+    (user_id)
+    (medication_id, scheduled_at)
+    (user_id, scheduled_at)
+  }
+
+  Note: "복약/영양제 예정 및 복용 기록."
+}
+
+Table llm_generation_logs {
+  id bigint [pk, increment]
+  user_id bigint [ref: > users.id]
+  target_type varchar(50)
+  target_id bigint
+  llm_task_type varchar(50) [not null]
+  provider varchar(50)
+  model_name varchar(100)
+  prompt_version varchar(50)
+  input_summary jsonb
+  output_text text
+  prompt_tokens int
+  completion_tokens int
+  total_tokens int
+  estimated_cost decimal(12,6)
+  status varchar(30) [not null, default: 'SUCCESS']
+  error_message text
+  latency_ms int
+  created_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (target_type, target_id)
+    (llm_task_type)
+    (status)
+  }
+
+  Note: "LLM 더미/생성 결과 추적용 로그. 실제 LLM 호출 로직과 운영 모니터링 고도화는 이번 범위에서 제외한다."
+}
+
+Table system_error_logs {
+  id bigint [pk, increment]
+  request_id varchar(64)
+  user_id bigint
+  method varchar(10) [not null]
+  path varchar(500) [not null]
+  status_code int [not null]
+  error_type varchar(100) [not null]
+  error_message text
+  stack_trace text
+  client_ip varchar(100)
+  user_agent varchar(500)
+  created_at timestamptz [not null]
+
+  indexes {
+    (request_id)
+    (user_id)
+    (status_code)
+    (created_at)
+  }
+
+  Note: "처리되지 않은 500 서버 예외 추적용 운영 로그. request body와 민감정보 원문은 저장하지 않는다. stack_trace는 운영환경에서 제한한다."
+}
+
+Table sensitive_access_logs {
+  id bigint [pk, increment]
+  request_id varchar(64)
+  actor_user_id bigint [not null]
+  actor_role varchar(30)
+  target_user_id bigint [not null]
+  action_type varchar(30) [not null]
+  resource_type varchar(50) [not null]
+  resource_id bigint
+  access_reason varchar(255)
+  method varchar(10) [not null]
+  path varchar(500) [not null]
+  client_ip varchar(100)
+  user_agent varchar(500)
+  created_at timestamptz [not null]
+
+  indexes {
+    (request_id)
+    (actor_user_id)
+    (target_user_id)
+    (resource_type)
+    (created_at)
+  }
+
+  Note: "건강정보, 분석결과, 검진표, 복약정보 등 민감정보 조회 접근 로그. 누가 어떤 리소스에 접근했는지만 저장하고 건강 수치/토큰/인증코드/원문 payload는 저장하지 않는다."
 }

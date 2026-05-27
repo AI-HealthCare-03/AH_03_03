@@ -1,0 +1,8 @@
+{
+  "strategy": "recall_min_f1",
+  "threshold": 0.46,
+  "recall_min": 0.87,
+  "oof_f1": 0.6076533555541311,
+  "oof_recall": 0.8727674461425152,
+  "oof_precision": 0.46607669616519176
+}
