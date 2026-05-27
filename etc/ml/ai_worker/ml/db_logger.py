@@ -26,7 +26,7 @@ DB_URL = "postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}".format
     user=os.environ.get("DB_USER", "myuser"),
     password=os.environ.get("DB_PASSWORD", "05040000"),
     host=os.environ.get("DB_HOST", "localhost"),
-    port=os.environ.get("DB_PORT", "5433"),  # ← 5433으로
+    port=os.environ.get("DB_PORT", "5433"),  # ← 5433으로 -> 5432
     dbname=os.environ.get("DB_NAME", "mydb"),
 )
 
