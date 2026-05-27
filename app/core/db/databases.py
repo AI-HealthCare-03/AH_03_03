@@ -7,10 +7,19 @@ from app.core import config
 TORTOISE_APP_MODELS = [
     "aerich.models",
     "app.models.analysis",
+    "app.models.async_jobs",
     "app.models.challenges",
+    "app.models.diets",
     "app.models.exams",
+    "app.models.faqs",
+    "app.models.family",
     "app.models.health",
+    "app.models.llm_logs",
+    "app.models.logs",
+    "app.models.medications",
+    "app.models.notifications",
     "app.models.rag",
+    "app.models.settings",
     "app.models.users",
 ]
 
@@ -24,7 +33,6 @@ TORTOISE_ORM = {
                 "user": config.DB_USER,
                 "password": config.DB_PASSWORD,
                 "database": config.DB_NAME,
-                "connect_timeout": config.DB_CONNECT_TIMEOUT,
                 "maxsize": config.DB_CONNECTION_POOL_MAXSIZE,
             },
         },

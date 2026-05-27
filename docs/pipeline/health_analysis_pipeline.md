@@ -77,7 +77,7 @@ AI Worker 담당:
 - 혈압 관련 위험요인은 혈압/운동/생활습관 챌린지와 연결한다.
 - 혈당 관련 위험요인은 혈당/식습관/운동 챌린지와 연결한다.
 - 이미 참여 중이거나 최근 완료한 챌린지는 중복 추천하지 않는 것을 원칙으로 한다.
-- MVP에서는 정교한 개인화 랭킹보다 규칙 기반 추천을 우선한다.
+- MVP 1차에서는 정교한 개인화 랭킹보다 규칙 기반 추천을 우선하고, 이후 ML/LLM 기반 랭킹을 고도화한다.
 
 ## Dashboard 집계 기준
 
@@ -90,14 +90,67 @@ Dashboard는 별도 저장 테이블을 만들지 않고 다음 테이블을 실
 - 추천 챌린지: `challenge_recommendations`
 - 읽지 않은 알림 수: `notifications`
 
-## MVP에서 하지 않는 것
+## Nutrition Scoring 데이터 기준
 
-- DIET 실서비스 DB 설계
-- LLM 답변 실서비스 DB 저장
+식단 이미지 분석 이후 영양 DB와 매칭할 수 있도록 식품별 질병군 점수 테이블을 별도 모듈로 분리한다.
+
+- 원본 엑셀 위치: `etc/ai/cv/food/nutrition/raw/food_nutrition_db.xlsx`
+- 런타임 점수 CSV: `ai_runtime/cv/food/nutrition/data/food_disease_scores.csv`
+- 점수 규칙: `ai_runtime/cv/food/nutrition/rules/disease_score_rules.json`
+- 스코어러: `ai_runtime/cv/food/nutrition/scoring/disease_food_scorer.py`
+
+원본 엑셀은 서비스 런타임에서 직접 읽지 않는다. 원본 엑셀을 수정하거나 교체한 경우 아래 명령으로 런타임 CSV를 재생성한다.
+
+```bash
+uv run python -m ai_runtime.cv.food.nutrition.scoring.disease_food_scorer
+```
+
+생성되는 CSV는 `DM`, `HTN`, `DL`, `OBE`, `ANEM` 5개 질병군에 대해 0~100점 범위의 참고용 식품 적합도 점수를 포함한다. 높은 점수는 해당 질병군 관리 맥락에서 상대적으로 활용하기 쉬운 식품이라는 의미이며, 의료 진단이나 영양 처방이 아니다.
+
+현재 `/api/v1/diets/analyze` 공식 경로는 자체 식단 CV 모델을 아직 호출하지 않는다. 대신 기존 음식명 후보 생성 흐름에서 나온 음식명을 `DiseaseFoodScorer`의 런타임 CSV와 매칭해 `disease_scores`, `food_score_details`, `scoring_source=nutrition_rule_table`을 응답과 `DietRecord.nutrition_summary`, `DietPhotoResult.raw_output`에 포함한다. 공식 저장 payload의 source는 `rule_based_food_detection`으로 기록하며 `rule_stub`, `image_analysis_stub` 같은 개발용 표현은 노출하지 않는다.
+
+식단 이미지 provider 결과는 `ai_runtime/cv/food/schemas.py`의 `FoodDetectionCandidateSet` 형태로 정규화하는 방향을 기준으로 한다. provider 우선순위는 자체 CV 모델 -> GPT Vision -> rule-based food detection이다. 자체 CV confidence가 `CV_CONFIDENCE_THRESHOLD` 이상이고 음식명 후보가 충분하면 바로 nutrition scorer로 이동한다. confidence가 낮거나 음식명 후보가 부족하면 GPT Vision fallback 후보가 되지만, 비용 발생 API이므로 현재 정책은 `user_confirmation_required`이다. 어떤 provider를 쓰더라도 최종적으로 `detected_foods: list[str]`를 `DiseaseFoodScorer` 입력으로 넘기는 구조를 유지한다.
+
+정규화 필드 기준:
+
+- `provider`: `cv_model` | `gpt_vision` | `rule_based_food_detection`
+- `confidence`: `float | null`
+- `detected_foods`: `list[str]`
+- `needs_review`: `bool`
+- `fallback_reason`: `string | null`
+
+## 건강검진 OCR Provider 정책
+
+건강검진 OCR 공식 실행 경로는 Clova OCR을 기본 provider로 사용하지 않는다.
+
+- 기본 방향: PaddleOCR/local OCR 1차
+- fallback 후보: GPT Vision
+- GPT Vision fallback 기본값: off
+- Clova OCR: PoC/deferred provider로 코드 보존, 공식 시연 경로 호출 제외
+
+설정 기준:
+
+- `CHECKUP_OCR_PRIMARY_PROVIDER=paddle`
+- `ENABLE_CLOVA_OCR=false`
+- `GPT_VISION_FALLBACK_ENABLED=false`
+
+현재 `/api/v1/exams/{exam_id}/ocr`는 외부 Clova API를 호출하지 않고, OCR 결과 확인/confirm 후 `ExamMeasurement` 값을 `HealthRecord` X2 필드에 반영하는 서비스 흐름을 검증하는 데 초점을 둔다. Clova OCR provider 코드는 향후 provider 비교 또는 운영 전환 검토를 위한 reference로 보존한다.
+
+## MVP 범위 기준
+
+이번 프로젝트의 MVP는 풀서비스 1차 범위를 기준으로 하며, 소셜 로그인과 웨어러블 연동만 제외한다.
+
+MVP에 포함한다:
+
+- DIET 기록/분석 흐름
+- LLM 응답 생성 및 결과 설명 흐름
 - FAMILY, QNA, MEDICATION, ADMIN 기능
-- 운영 로그 상세 저장
-- 외부 SMS/Email/Push/Kakao 알림 발송
+- 운영 로그와 관리자 모니터링
+- 알림 예약/발송 이력 기반 구조
+
+MVP 범위 안에서 후속 단계로 둔다:
+
+- 외부 SMS/Email/Push/Kakao 발송 worker
 - 실시간 스트리밍 분석
 - 복잡한 모델 registry
 - 독립적인 queue abstraction 설계
-- 관리자용 분석 모니터링 화면

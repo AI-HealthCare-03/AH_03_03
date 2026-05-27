@@ -3,7 +3,7 @@ import sys
 
 
 def setup_logger(
-    name: str = "ai_worker",
+    name: str = "ai_runtime",
     level: int = logging.INFO,
 ) -> logging.Logger:
     _logger = logging.getLogger(name)
