@@ -58,3 +58,4 @@ ai_worker/ml/LGB18~24/outputs/
 
 # OS files
 .DS_Store
+env
