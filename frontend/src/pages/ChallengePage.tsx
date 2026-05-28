@@ -304,6 +304,7 @@ export default function ChallengePage() {
   const [page, setPage] = useState(1);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -407,9 +408,12 @@ export default function ChallengePage() {
 
   const handleJoin = async (challengeId: number) => {
     setActionId(`join-${challengeId}`);
+    setError("");
+    setMessage("");
     try {
       await joinChallenge(challengeId);
       await load();
+      setMessage("챌린지에 참여했습니다. 오늘 수행 기록을 남길 수 있습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "챌린지 참여 처리에 실패했습니다.");
     } finally {
@@ -423,9 +427,12 @@ export default function ChallengePage() {
       return;
     }
     setActionId(`complete-${id}`);
+    setError("");
+    setMessage("");
     try {
       await completeToday(id);
       await load();
+      setMessage("오늘 수행을 완료했습니다. 달력과 진행률에 반영되었습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "오늘 수행 완료 처리에 실패했습니다.");
     } finally {
@@ -442,9 +449,12 @@ export default function ChallengePage() {
       return;
     }
     setActionId(`give-up-${id}`);
+    setError("");
+    setMessage("");
     try {
       await giveUpChallenge(id);
       await load();
+      setMessage("챌린지를 포기 처리했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "챌린지 포기 처리에 실패했습니다.");
     } finally {
@@ -475,6 +485,7 @@ export default function ChallengePage() {
         ))}
       </div>
       {error && <div className="state-box">{error}</div>}
+      {message && <div className="state-box">{message}</div>}
       <div className="challenge-page-layout">
         <main className="challenge-main-list">
           <Card title="챌린지 목록">
@@ -623,7 +634,7 @@ export default function ChallengePage() {
                             onClick={() => void handleComplete(challenge)}
                             type="button"
                           >
-                            {getTodayActionLabel(challenge, challenges)}
+                            {actionId === `complete-${String(challenge.id)}` ? "저장 중..." : getTodayActionLabel(challenge, challenges)}
                           </button>
                           <button
                             className="secondary compact-button"
