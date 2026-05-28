@@ -134,6 +134,19 @@ async def update_user_challenge(user_challenge_id: int, request: UserChallengeUp
 
 
 async def create_challenge_log(user_challenge_id: int, request: ChallengeLogCreateRequest) -> ChallengeLog:
+    user_challenge = await challenge_repository.get_user_challenge_by_id(user_challenge_id)
+    if user_challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자 챌린지를 찾을 수 없습니다.")
+
+    challenge = await Challenge.get_or_none(id=user_challenge.challenge_id)
+    daily_goal_count = _get_daily_goal_count(challenge)
+    existing_count = await challenge_repository.count_challenge_logs_by_date(user_challenge_id, request.log_date)
+    if existing_count >= daily_goal_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="해당 날짜의 챌린지 로그가 하루 목표 횟수에 도달했습니다.",
+        )
+
     return await challenge_repository.create_challenge_log(user_challenge_id, request.model_dump())
 
 
