@@ -380,7 +380,7 @@ export default function HealthRecordPage() {
           <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
           <div className="button-row" style={{ marginTop: 12 }}>
             <Link className="button secondary" to="/ocr/exam">
-              검진표 OCR로 입력
+              검진표로 입력
             </Link>
             <Link className="button secondary" to="/health/profile">
               필수 건강정보 관리로 이동

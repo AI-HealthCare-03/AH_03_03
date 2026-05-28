@@ -155,13 +155,13 @@ function EmptyChartState() {
   return (
     <div className="empty-state chart-empty-state">
       <strong>아직 추적할 데이터가 충분하지 않습니다.</strong>
-      <p>건강정보를 2회 이상 입력하거나 검진표 OCR을 추가하면 변화 추이를 확인할 수 있습니다.</p>
+      <p>건강정보를 2회 이상 입력하거나 검진표를 등록하면 변화 추이를 확인할 수 있습니다.</p>
       <div className="button-row">
         <Link className="button secondary" to="/health">
           건강정보 입력하기
         </Link>
         <Link className="button secondary" to="/ocr/exam">
-          검진표 OCR 추가하기
+          검진표 등록하기
         </Link>
       </div>
     </div>

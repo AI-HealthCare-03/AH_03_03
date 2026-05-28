@@ -15,7 +15,7 @@ type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
   service_title: "HealthCare",
-  service_description: "AI 기반 건강 분석, 검진표 OCR, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
+  service_description: "AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
 };
 
 const landingFeatures = [
@@ -27,7 +27,7 @@ const landingFeatures = [
   },
   {
     icon: "📄",
-    title: "검진표 OCR 입력",
+    title: "검진표 등록",
     description: "검진표 이미지나 PDF에서 주요 건강 수치를 빠르게 입력합니다.",
     redirect: "/ocr/exam",
   },
@@ -63,7 +63,7 @@ const landingPersonas = [
     icon: "📋",
     title: "검진 결과가 걱정되는 직장인",
     quote: "검진표는 받았는데 수치가 뭘 의미하는지 모르겠어요.",
-    features: ["검진표 OCR", "위험도 분석", "AI 코멘트"],
+    features: ["검진표 등록", "위험도 분석", "AI 코멘트"],
     flow: [
       { icon: "📄", title: "검진표 업로드", description: "촬영하거나 파일로 올립니다." },
       { icon: "📊", title: "위험도 분석", description: "주요 질환 위험도를 확인합니다." },
@@ -87,7 +87,7 @@ const landingPersonas = [
     icon: "💊",
     title: "복약/건강기록을 관리하는 사용자",
     quote: "복약, 영양제, 건강기록을 놓치지 않고 관리하고 싶어요.",
-    features: ["복약 OCR", "복약 기록", "알림", "AI 상담"],
+    features: ["복약 정보 등록", "복약 기록", "알림", "AI 상담"],
     flow: [
       { icon: "💊", title: "복약 입력", description: "처방전과 약봉투를 정리합니다." },
       { icon: "🔔", title: "알림 확인", description: "기록과 알림을 관리합니다." },
@@ -97,7 +97,7 @@ const landingPersonas = [
 ];
 
 const serviceFlow = [
-  { icon: "📄", label: "검진표 OCR" },
+  { icon: "📄", label: "검진표 등록" },
   { icon: "📊", label: "위험도 분석" },
   { icon: "🤖", label: "AI 상담" },
   { icon: "✅", label: "맞춤 챌린지" },
@@ -432,7 +432,7 @@ export default function MainPage() {
             </Link>
             <div className="home-action-links">
               <Link to="/health">건강정보 입력</Link>
-              <Link to="/ocr/exam">검진표 OCR 추가</Link>
+              <Link to="/ocr/exam">검진표 등록</Link>
             </div>
           </div>
         </div>
@@ -673,7 +673,7 @@ export default function MainPage() {
                   건강정보 입력하기
                 </Link>
                 <Link className="button secondary" to="/ocr/exam">
-                  검진표 OCR 추가
+                  검진표 등록
                 </Link>
               </div>
             </div>
@@ -913,7 +913,7 @@ export default function MainPage() {
             <div className="preview-record-card">
               <span className="badge badge-reference">최근 기록</span>
               <strong>{previewMetrics[4][1]}</strong>
-              <p>검진표 OCR과 직접 입력 기록을 함께 관리합니다.</p>
+              <p>검진표 등록과 직접 입력 기록을 함께 관리합니다.</p>
             </div>
           </div>
         </Card>

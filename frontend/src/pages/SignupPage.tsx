@@ -356,15 +356,15 @@ export default function SignupPage() {
           </div>
           <div className="signup-ocr-choice">
             <div>
-              <strong>건강검진표 OCR로 정밀 분석 정보 추가</strong>
+              <strong>건강검진표로 정밀 분석 정보 추가</strong>
               <p>
-                건강검진 결과지가 있다면 OCR로 혈압, 혈당, 콜레스테롤 등 정밀 분석 정보를 자동 입력할 수
+                건강검진 결과지가 있다면 혈압, 혈당, 콜레스테롤 등 정밀 분석 정보를 자동 입력할 수
                 있습니다. 검진표가 없어도 간편 분석은 바로 이용할 수 있습니다.
               </p>
             </div>
             <div className="button-row">
               <Link className="button" to="/ocr/exam">
-                건강검진표 OCR로 정밀 분석 정보 추가
+                건강검진표로 정밀 분석 정보 추가
               </Link>
               <button className="secondary" onClick={() => navigate("/")} type="button">
                 나중에 입력하기
@@ -653,7 +653,7 @@ export default function SignupPage() {
               <div className="state-box signup-analysis-guide">
                 <strong>간편 분석에 필요한 신체계측과 가족력 정보입니다.</strong>
                 <p>혈압, 혈당, 콜레스테롤, 허리둘레 같은 검진값은 회원가입에서 직접 입력하지 않습니다.</p>
-                <p>가입 완료 후 건강검진표 OCR을 선택하면 정밀 분석 정보를 추가할 수 있습니다.</p>
+                <p>가입 완료 후 건강검진표 등록을 선택하면 정밀 분석 정보를 추가할 수 있습니다.</p>
               </div>
               <label>
                 <span className="field-label-row">

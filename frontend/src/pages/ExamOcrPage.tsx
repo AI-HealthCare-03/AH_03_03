@@ -111,7 +111,7 @@ export default function ExamOcrPage() {
           <p>검진표 이미지/PDF 기반 측정값 후보를 생성하고 확인 후 건강정보에 반영합니다.</p>
         </div>
         <Link className="button secondary" to="/ocr">
-          OCR 선택으로 돌아가기
+          등록 선택으로 돌아가기
         </Link>
       </div>
       {error && <ErrorMessage message={error} />}

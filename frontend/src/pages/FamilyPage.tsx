@@ -47,7 +47,7 @@ const shareSettingLabels: Array<{ key: keyof FamilyShareSetting; label: string; 
   { key: "share_diet_records", label: "식단기록 공유", helper: "식단 분석 기록 접근 허용" },
   { key: "share_medications", label: "복약정보 공유", helper: "복약/영양제 정보 접근 허용" },
   { key: "share_challenges", label: "챌린지 공유", helper: "챌린지 참여 상태 접근 허용" },
-  { key: "share_exam_reports", label: "검진표/OCR 결과 공유", helper: "검진표 인식 결과 접근 허용" },
+  { key: "share_exam_reports", label: "검진표 인식 결과 공유", helper: "검진표 인식 결과 접근 허용" },
   { key: "receive_analysis_alerts", label: "분석 결과 알림", helper: "가족 분석 완료 알림 수신" },
   { key: "receive_abnormal_value_alerts", label: "이상 수치 알림", helper: "혈압/혈당 등 이상 징후 알림 수신" },
   { key: "receive_medication_alerts", label: "복약 알림", helper: "복약 관련 알림 수신" },
