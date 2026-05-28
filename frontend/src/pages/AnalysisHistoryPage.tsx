@@ -33,16 +33,16 @@ type AnalysisDetail = {
 const labels: Record<string, string> = {
   DIABETES: "당뇨",
   OBESITY: "비만",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   HYPERTENSION: "고혈압",
 };
 
-const tabs = ["전체", "당뇨", "고혈압", "이상지질혈증", "비만"];
+const tabs = ["전체", "당뇨", "고혈압", "콜레스테롤·중성지방", "비만"];
 const tabToType: Record<string, string | null> = {
   전체: null,
   당뇨: "DIABETES",
   고혈압: "HYPERTENSION",
-  이상지질혈증: "DYSLIPIDEMIA",
+  "콜레스테롤·중성지방": "DYSLIPIDEMIA",
   비만: "OBESITY",
 };
 

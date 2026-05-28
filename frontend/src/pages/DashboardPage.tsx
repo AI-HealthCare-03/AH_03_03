@@ -52,7 +52,7 @@ const diseaseChartColors: Record<string, string> = {
 const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   HYPERTENSION: "고혈압",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   OBESITY: "비만",
 };
 

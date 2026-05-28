@@ -11,7 +11,7 @@ type Item = Record<string, unknown>;
 const diseaseScoreLabels: Record<string, string> = {
   DM: "당뇨",
   HTN: "고혈압",
-  DL: "이상지질혈증",
+  DL: "콜레스테롤·중성지방",
   OBE: "비만",
   ANEM: "빈혈",
 };
