@@ -13,9 +13,9 @@ type MobileNavProps = {
 const bottomLinks = [
   { to: "/", icon: "🏠", label: "홈" },
   { to: "/health", icon: "🧭", label: "분석" },
-  { to: "/ocr", icon: "📄", label: "OCR" },
-  { to: "/diets", icon: "🥗", label: "식단" },
   { to: "/challenges", icon: "✅", label: "챌린지" },
+  { to: "/diets", icon: "🥗", label: "식단" },
+  { to: "/ocr/exam", icon: "📄", label: "검진등록" },
 ];
 
 const linkByPath = new Map(sidebarLinks.map((link) => [link.to, link]));
