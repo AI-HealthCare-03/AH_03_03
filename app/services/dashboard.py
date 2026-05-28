@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from app.core import config
+from app.dtos.challenges import ChallengeResponse, UserChallengeResponse
 from app.dtos.diets import DietRecordResponse
 from app.models.analysis import RiskLevel
 from app.services import analysis as analysis_service
@@ -115,9 +116,16 @@ async def get_dashboard_health(user_id: int) -> dict[str, Any]:
 
 
 async def get_dashboard_challenges(user_id: int) -> dict[str, Any]:
+    active_challenges = await challenge_service.list_active_challenges(limit=10)
+    user_challenges = await challenge_service.list_user_challenges(user_id, limit=10)
     return {
-        "active_challenges": await challenge_service.list_active_challenges(limit=10),
-        "user_challenges": await challenge_service.list_user_challenges(user_id, limit=10),
+        "active_challenges": [
+            ChallengeResponse.model_validate(challenge).model_dump(mode="json") for challenge in active_challenges
+        ],
+        "user_challenges": [
+            UserChallengeResponse.model_validate(user_challenge).model_dump(mode="json")
+            for user_challenge in user_challenges
+        ],
     }
 
 
