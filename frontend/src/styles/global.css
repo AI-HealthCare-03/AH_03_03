@@ -2122,6 +2122,33 @@ pre {
   font-size: 15px;
 }
 
+.health-record-lipid-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.health-record-lipid-list span {
+  align-items: baseline;
+  color: var(--color-text);
+  display: grid;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  grid-template-columns: minmax(108px, max-content) minmax(0, 1fr);
+}
+
+.health-record-lipid-list em {
+  color: var(--color-muted);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.health-record-lipid-list strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
 .table,
 .table-row {
   width: 100%;
@@ -3139,6 +3166,50 @@ pre {
 .readiness-card {
   display: grid;
   gap: 12px;
+}
+
+.analysis-readiness-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.readiness-status {
+  align-items: center;
+  display: flex;
+  font-size: 14px;
+  gap: 8px;
+  line-height: 1.35;
+}
+
+.readiness-status > span {
+  background: currentcolor;
+  border-radius: 999px;
+  flex: 0 0 8px;
+  height: 8px;
+  width: 8px;
+}
+
+.readiness-status strong {
+  font-size: 14px;
+}
+
+.readiness-chip-list {
+  gap: 6px;
+}
+
+.readiness-note {
+  background: var(--color-muted-surface);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 12px;
+}
+
+.readiness-note p {
+  margin: 0;
+}
+
+.readiness-note .readiness-chip-list {
+  margin-top: 10px;
 }
 
 .sticky-actions {
