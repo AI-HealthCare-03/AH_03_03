@@ -26,7 +26,7 @@ const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   HYPERTENSION: "고혈압",
   OBESITY: "비만",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
 };
 
 const riskFallbackScores: Record<string, number> = {

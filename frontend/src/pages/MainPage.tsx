@@ -22,7 +22,7 @@ const landingFeatures = [
   {
     icon: "🧭",
     title: "AI 위험도 분석",
-    description: "건강정보를 기반으로 당뇨, 고혈압, 이상지질혈증 위험도를 확인합니다.",
+    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 이상 위험도를 확인합니다.",
     redirect: "/analysis",
   },
   {
@@ -127,7 +127,7 @@ const riskLabelMap: Record<string, string> = {
 const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   HYPERTENSION: "고혈압",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   OBESITY: "비만",
 };
 
@@ -656,7 +656,7 @@ export default function MainPage() {
               ) : (
                 <div className="empty-state analysis-empty-state">
                   <strong>최근 분석 결과가 없습니다.</strong>
-                  <p>질환별 분석을 실행하면 당뇨, 고혈압, 이상지질혈증, 비만 결과가 표시됩니다.</p>
+                  <p>질환별 분석을 실행하면 당뇨, 고혈압, 콜레스테롤·중성지방, 비만 결과가 표시됩니다.</p>
                 </div>
               )}
             </>

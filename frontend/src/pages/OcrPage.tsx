@@ -35,7 +35,7 @@ export default function OcrPage() {
       <div className="page-grid">
         <Card title="검진표 등록">
           <div className="ocr-card-icon">📄</div>
-          <p>혈압, 혈당, 콜레스테롤, 중성지방, HDL, LDL, HbA1c 등을 추출합니다.</p>
+          <p>혈압, 혈당, 콜레스테롤, 중성지방, HDL(좋은), LDL(나쁜), HbA1c 등을 추출합니다.</p>
           <Link className="button" to="/ocr/exam">
             검진표 등록하기
           </Link>

@@ -80,7 +80,7 @@ const healthFieldLabels: Record<string, string> = {
   occupation_code: "직업군",
   family_htn: "고혈압 가족력",
   family_dm: "당뇨병 가족력",
-  family_dyslipidemia: "이상지질혈증 가족력",
+  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력",
   smoking_status: "현재 흡연 여부",
   drinking_frequency: "음주 빈도",
   drinking_amount: "한 번 음주량",
@@ -92,8 +92,8 @@ const healthFieldLabels: Record<string, string> = {
   hba1c: "당화혈색소",
   total_cholesterol: "총콜레스테롤",
   triglyceride: "중성지방",
-  hdl_cholesterol: "HDL",
-  ldl_cholesterol: "LDL",
+  hdl_cholesterol: "HDL(좋은 콜레스테롤)",
+  ldl_cholesterol: "LDL(나쁜 콜레스테롤)",
   waist_cm: "허리둘레",
 };
 
@@ -486,10 +486,11 @@ export default function HealthRecordPage() {
                   </strong>
                 </div>
                 <div>
-                  <span>지질 주요값</span>
+                  <span>콜레스테롤/중성지방</span>
                   <strong>
-                    TC {getValue(record, "total_cholesterol")} · LDL {getValue(record, "ldl_cholesterol")} · HDL{" "}
-                    {getValue(record, "hdl_cholesterol")} · TG {getValue(record, "triglyceride")}
+                    총콜레스테롤 {getValue(record, "total_cholesterol")} · LDL(나쁜){" "}
+                    {getValue(record, "ldl_cholesterol")} · HDL(좋은) {getValue(record, "hdl_cholesterol")} · 중성지방{" "}
+                    {getValue(record, "triglyceride")}
                   </strong>
                 </div>
               </div>
