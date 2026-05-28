@@ -92,6 +92,36 @@ const missingFieldLabels: Record<string, string> = {
   strength_days_per_week: "1주일간 근력운동 일수",
 };
 
+const factorValueLabels: Record<string, Record<string, string>> = {
+  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
+  drinking_frequency: {
+    RARE: "월 1회 미만",
+    MONTHLY_2_4: "월 2-4회",
+    WEEKLY_2_3: "주 2-3회",
+    WEEKLY_4_PLUS: "주 4회 이상",
+  },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
+};
+
+function displayFactorValue(factor: AnalysisFactor): string {
+  const key = String(factor.factor_key ?? "");
+  const rawValue = factor.factor_value;
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return "";
+  }
+  const value = String(rawValue);
+  return factorValueLabels[key]?.[value] ?? value;
+}
+
 function getRiskLevel(result: AnalysisResult): string {
   return String(result.risk_level ?? "").toUpperCase();
 }
@@ -348,12 +378,15 @@ export default function AnalysisPage() {
                 <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
                 {factors.length > 0 ? (
                   <div className="chip-list">
-                    {factors.slice(0, 4).map((factor) => (
-                      <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
-                        {String(factor.factor_name ?? factor.factor_key)}
-                        {factor.factor_value ? `: ${String(factor.factor_value)}` : ""}
-                      </span>
-                    ))}
+                    {factors.slice(0, 4).map((factor) => {
+                      const value = displayFactorValue(factor);
+                      return (
+                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
+                          {String(factor.factor_name ?? factor.factor_key)}
+                          {value ? `: ${value}` : ""}
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : (
                   <span>상세 요인은 분석 입력값과 질환별 기준에 따라 표시됩니다.</span>
