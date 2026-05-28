@@ -1,3 +1,4 @@
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -6,14 +7,18 @@ from kmodes.kprototypes import KPrototypes
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+
 ROOT = Path(__file__).parent.parent.parent  # ai_worker/
 DATA_PATH = ROOT / "data/lipid_only.csv"
 OUTPUT_DIR = Path(__file__).parent / "outputs" / "selected_vars"
 
 SAMPLE_N = 50000
-SEEDS = [42, 123, 777]  # 샘플링 seed만 바꿈
+SEEDS = [42]  # 샘플링 seed만 바꿈  123, 777
 CLUSTER_SEED = 42        # 군집화 seed는 항상 고정
 K = 4
+
+# CLUSTER_SEED 고정: initialization bias 제어 목적 (sampling bias만 격리해서 확인)
+# initialization bias는 n_init=20으로 완화. 상세 의도는 PR description 참고
 
 CONT_COLS = [
     "신장(5cm단위)",
@@ -216,6 +221,11 @@ def main():
         print(f"  sample_seed={row['sample_seed']} | best_gamma={row['best_gamma']} | "
               f"Silhouette={row['silhouette']:.4f} | 최소군집비율={row['min_ratio']:.3f} | "
               f"군집크기={row['cluster_sizes']}")
+
+    # seed별 best_gamma 최빈값으로 최종 gamma 결정
+    best_gammas = [row["best_gamma"] for row in summary_rows]
+    final_gamma = Counter(best_gammas).most_common(1)[0][0]
+    print(f"\n최종 선택 gamma (최빈값): {final_gamma}")
 
 
 if __name__ == "__main__":
