@@ -801,7 +801,7 @@ export default function MainPage() {
       <section className="landing-section">
         <div className="section-heading">
           <h2>내 상황에 맞는 시작 방법</h2>
-          <p>가장 가까운 상황을 선택하면 어떤 흐름으로 서비스를 쓰면 좋은지 보여드립니다.</p>
+          <p>가장 가까운 상황을 선택하면 어떤 흐름으로 서비스를 쓰면 적절한지 보여드립니다.</p>
         </div>
         <div className="persona-grid">
           {landingPersonas.map((persona) => (

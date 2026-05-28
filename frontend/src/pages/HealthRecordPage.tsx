@@ -92,8 +92,8 @@ const healthFieldLabels: Record<string, string> = {
   hba1c: "당화혈색소",
   total_cholesterol: "총콜레스테롤",
   triglyceride: "중성지방",
-  hdl_cholesterol: "HDL(좋은 콜레스테롤)",
-  ldl_cholesterol: "LDL(나쁜 콜레스테롤)",
+  hdl_cholesterol: "HDL 콜레스테롤",
+  ldl_cholesterol: "LDL 콜레스테롤",
   waist_cm: "허리둘레",
 };
 
@@ -496,11 +496,11 @@ export default function HealthRecordPage() {
                       <strong>{getValue(record, "total_cholesterol")}</strong>
                     </span>
                     <span>
-                      <em>LDL(나쁜)</em>
+                      <em>LDL</em>
                       <strong>{getValue(record, "ldl_cholesterol")}</strong>
                     </span>
                     <span>
-                      <em>HDL(좋은)</em>
+                      <em>HDL</em>
                       <strong>{getValue(record, "hdl_cholesterol")}</strong>
                     </span>
                     <span>

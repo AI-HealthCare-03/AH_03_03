@@ -54,21 +54,6 @@ const riskFallbackScores: Record<string, number> = {
   LOW: 25,
 };
 
-function modelLabel(result: AnalysisResult): string | null {
-  const modelName = result.model_name ? String(result.model_name) : "";
-  const modelVersion = result.model_version ? String(result.model_version) : "";
-  if (!modelName && !modelVersion) {
-    return null;
-  }
-  if (modelName.toLowerCase() === "catboost") {
-    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
-  }
-  if (modelName) {
-    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
-  }
-  return modelVersion;
-}
-
 const missingFieldLabels: Record<string, string> = {
   height_cm: "키",
   weight_kg: "몸무게",
@@ -79,8 +64,8 @@ const missingFieldLabels: Record<string, string> = {
   hba1c: "당화혈색소",
   total_cholesterol: "총콜레스테롤",
   triglyceride: "중성지방",
-  hdl_cholesterol: "HDL(좋은 콜레스테롤)",
-  ldl_cholesterol: "LDL(나쁜 콜레스테롤)",
+  hdl_cholesterol: "HDL 콜레스테롤",
+  ldl_cholesterol: "LDL 콜레스테롤",
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
@@ -319,7 +304,6 @@ export default function AnalysisPage() {
               <strong>{score}/100</strong>
               <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (

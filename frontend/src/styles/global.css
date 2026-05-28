@@ -1498,10 +1498,17 @@ pre {
 
 .dashboard-analysis-board,
 .dashboard-analysis-layout {
-  align-items: start;
   display: grid;
   gap: 16px;
   grid-template-columns: 188px minmax(0, 1fr);
+}
+
+.dashboard-analysis-board {
+  align-items: start;
+}
+
+.dashboard-analysis-layout {
+  align-items: stretch;
 }
 
 .dashboard-metric-menu,
@@ -1515,10 +1522,36 @@ pre {
   padding: 14px;
 }
 
+.analysis-tab-list {
+  align-content: start;
+}
+
 .dashboard-metric-menu h2,
 .analysis-tab-list h2 {
   font-size: 16px;
   margin: 0;
+}
+
+.analysis-tab-health-tip {
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.analysis-tab-health-tip h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.analysis-tab-health-tip .dashboard-tip-list {
+  gap: 8px;
+}
+
+.analysis-tab-health-tip .dashboard-tip-list li {
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .dashboard-metric-menu > div,
@@ -1609,6 +1642,10 @@ pre {
 .dashboard-chart-panels {
   display: grid;
   gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-chart-panels.single-panel {
   grid-template-columns: 1fr;
 }
 
@@ -1618,9 +1655,24 @@ pre {
   border-radius: var(--radius-lg);
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1fr) 108px;
-  min-height: 230px;
+  grid-template-columns: 1fr;
+  min-height: 300px;
   padding: 16px;
+}
+
+.dashboard-chart-panels.single-panel .dashboard-chart-panel {
+  grid-template-columns: minmax(0, 1fr) 180px;
+  min-height: 300px;
+}
+
+.dashboard-chart-panels.single-panel .dashboard-chart-panel .line-chart-card {
+  align-self: stretch;
+}
+
+.dashboard-chart-panels.single-panel .dashboard-chart-stat {
+  align-self: center;
+  display: grid;
+  min-height: 110px;
 }
 
 .dashboard-chart-panel-head {
@@ -1645,17 +1697,23 @@ pre {
   min-width: 0;
 }
 
+.dashboard-chart-panel .line-chart-wrap {
+  overflow: hidden;
+}
+
 .dashboard-chart-panel .line-chart {
-  min-width: 520px;
+  min-width: 0;
 }
 
 .dashboard-chart-stat {
-  align-self: center;
+  align-items: center;
+  align-self: stretch;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  display: grid;
+  display: flex;
   gap: 6px;
+  justify-content: space-between;
   padding: 14px;
 }
 
@@ -1668,17 +1726,27 @@ pre {
 }
 
 .dashboard-chart-stat strong {
-  font-size: 24px;
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 22px;
+  gap: 3px;
+  line-height: 1.1;
+  min-width: 0;
 }
 
 .dashboard-chart-stat small {
   color: var(--color-muted);
+  display: inline-block;
   font-size: 11px;
   margin-left: 3px;
+  white-space: nowrap;
 }
 
 .dashboard-insight-grid,
 .dashboard-helper-grid,
+.dashboard-primary-grid,
+.dashboard-support-grid,
 .dashboard-risk-grid,
 .dashboard-bottom-grid,
 .dashboard-sub-grid {
@@ -1693,8 +1761,38 @@ pre {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-helper-grid {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
+.dashboard-primary-grid {
+  align-items: stretch;
+  grid-template-columns: 1fr;
+}
+
+.dashboard-primary-grid > .card {
+  min-height: 0;
+}
+
+.dashboard-primary-grid .card-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.dashboard-primary-grid .mini-card {
+  gap: 12px;
+  min-height: 132px;
+}
+
+.dashboard-primary-grid .mini-card .record-row {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dashboard-primary-grid .mini-card .badge-reference {
+  justify-self: stretch;
+  text-align: center;
+}
+
+.dashboard-support-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dashboard-sub-grid {
@@ -1742,6 +1840,11 @@ pre {
   grid-template-columns: 150px minmax(0, 1.1fr) minmax(240px, 0.9fr);
 }
 
+.dashboard-primary-grid .dashboard-diet-summary {
+  align-items: stretch;
+  grid-template-columns: 150px minmax(0, 1.1fr) minmax(240px, 0.9fr);
+}
+
 .dashboard-diet-summary p {
   color: var(--color-muted);
   margin: 8px 0;
@@ -1768,6 +1871,24 @@ pre {
   font-size: 18px;
 }
 
+.dashboard-primary-grid .dashboard-diet-score {
+  align-content: center;
+  background: var(--color-card-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-height: 118px;
+  padding: 14px;
+}
+
+.dashboard-primary-grid .dashboard-diet-points {
+  grid-column: auto;
+}
+
+.dashboard-primary-grid .dashboard-diet-score .metric-gauge {
+  height: 72px;
+  width: 72px;
+}
+
 .dashboard-diet-copy,
 .dashboard-diet-points {
   background: var(--color-card-subtle);
@@ -1775,6 +1896,11 @@ pre {
   border-radius: var(--radius-lg);
   min-height: 112px;
   padding: 14px;
+}
+
+.dashboard-primary-grid .dashboard-diet-copy,
+.dashboard-primary-grid .dashboard-diet-points {
+  min-height: 0;
 }
 
 .dashboard-diet-copy span,
@@ -1817,6 +1943,13 @@ pre {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.dashboard-primary-grid .challenge-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  overflow-x: visible;
+  padding: 0;
+}
+
 .challenge-compact-card {
   background: var(--color-card-subtle);
   border: 1px solid var(--color-border);
@@ -1825,6 +1958,10 @@ pre {
   gap: 10px;
   min-height: 170px;
   padding: 14px;
+}
+
+.dashboard-primary-grid .challenge-compact-card {
+  min-height: 176px;
 }
 
 .challenge-compact-icon {
@@ -3583,6 +3720,8 @@ pre {
   .dashboard-analysis-layout,
   .dashboard-insight-grid,
   .dashboard-helper-grid,
+  .dashboard-primary-grid,
+  .dashboard-support-grid,
   .dashboard-risk-grid,
   .dashboard-bottom-grid,
   .dashboard-sub-grid,

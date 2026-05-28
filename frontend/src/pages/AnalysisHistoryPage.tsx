@@ -82,21 +82,6 @@ function displayFactorValue(factor: AnalysisResult): string {
   return factorValueLabels[key]?.[value] ?? value;
 }
 
-function modelLabel(result: AnalysisResult | undefined): string | null {
-  const modelName = result?.model_name ? String(result.model_name) : "";
-  const modelVersion = result?.model_version ? String(result.model_version) : "";
-  if (!modelName && !modelVersion) {
-    return null;
-  }
-  if (modelName.toLowerCase() === "catboost") {
-    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
-  }
-  if (modelName) {
-    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
-  }
-  return modelVersion;
-}
-
 export default function AnalysisHistoryPage() {
   const { analysisId } = useParams();
   const [results, setResults] = useState<AnalysisResult[]>([]);
@@ -180,7 +165,6 @@ export default function AnalysisHistoryPage() {
             <strong>{String(result?.risk_level ?? "-")}</strong>
             <span className="badge badge-reference">{scoreLabel(result?.risk_score)}</span>
             <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-            {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
             <p>{String(result?.summary ?? "")}</p>
           </div>
         </Card>
