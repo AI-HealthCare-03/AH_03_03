@@ -800,26 +800,20 @@ export default function DashboardPage() {
               </div>
               {diseaseAnalysisResults.length > 0 ? (
                 <div className="card-list">
-                  {diseaseAnalysisResults.map((result) => {
-                    const model = formatModelLabel(result);
-                    return (
-                      <div className="mini-card" key={result.id}>
-                        <div className="record-row">
-                          <div>
-                            <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
-                            <p className="muted">
-                              {result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}
-                              {model ? ` · ${model}` : ""}
-                            </p>
-                          </div>
-                          <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
-                            {formatRiskLevel(result.risk_level)}
-                          </span>
+                  {diseaseAnalysisResults.map((result) => (
+                    <div className="mini-card" key={result.id}>
+                      <div className="record-row">
+                        <div>
+                          <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
+                          <p className="muted">{result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}</p>
                         </div>
-                        <span className="badge badge-reference">{formatRiskScore(result.risk_score)}</span>
+                        <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
+                          {formatRiskLevel(result.risk_level)}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <span className="badge badge-reference">{formatRiskScore(result.risk_score)}</span>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="empty-state">

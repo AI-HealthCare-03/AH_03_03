@@ -1500,8 +1500,8 @@ pre {
 .dashboard-analysis-layout {
   align-items: start;
   display: grid;
-  gap: 14px;
-  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 16px;
+  grid-template-columns: 188px minmax(0, 1fr);
 }
 
 .dashboard-metric-menu,
@@ -1511,8 +1511,8 @@ pre {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 12px;
+  padding: 14px;
 }
 
 .dashboard-metric-menu h2,
@@ -1537,7 +1537,7 @@ pre {
   color: var(--color-text);
   display: flex;
   justify-content: space-between;
-  padding: 9px 11px;
+  padding: 9px 10px;
   text-align: left;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
@@ -1576,8 +1576,9 @@ pre {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 18px;
+  min-height: 400px;
+  padding: 22px;
 }
 
 .dashboard-chart-heading {
@@ -1589,7 +1590,7 @@ pre {
 
 .dashboard-chart-heading h2 {
   color: var(--color-primary-dark);
-  font-size: 17px;
+  font-size: 19px;
   margin: 0 0 6px;
 }
 
@@ -1607,8 +1608,8 @@ pre {
 
 .dashboard-chart-panels {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  grid-template-columns: 1fr;
 }
 
 .dashboard-chart-panel {
@@ -1616,9 +1617,10 @@ pre {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) 98px;
-  padding: 12px;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  min-height: 230px;
+  padding: 16px;
 }
 
 .dashboard-chart-panel-head {
@@ -1644,7 +1646,7 @@ pre {
 }
 
 .dashboard-chart-panel .line-chart {
-  min-width: 300px;
+  min-width: 520px;
 }
 
 .dashboard-chart-stat {
@@ -1654,7 +1656,7 @@ pre {
   border-radius: var(--radius-md);
   display: grid;
   gap: 6px;
-  padding: 12px;
+  padding: 14px;
 }
 
 .dashboard-chart-stat span,
@@ -1666,7 +1668,7 @@ pre {
 }
 
 .dashboard-chart-stat strong {
-  font-size: 21px;
+  font-size: 24px;
 }
 
 .dashboard-chart-stat small {
@@ -1691,6 +1693,10 @@ pre {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.dashboard-helper-grid {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
+}
+
 .dashboard-sub-grid {
   grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
 }
@@ -1702,7 +1708,31 @@ pre {
 
 .dashboard-tip-list li {
   color: var(--color-muted);
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ai-comment-card,
+.health-tip-card {
+  gap: 10px;
+  padding: 16px;
+}
+
+.ai-comment-card .card-header,
+.health-tip-card .card-header {
+  margin-bottom: 6px;
+}
+
+.ai-comment-card h2,
+.health-tip-card h2 {
+  font-size: 16px;
+}
+
+.ai-comment-card p {
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0;
 }
 
 .dashboard-diet-summary {
