@@ -92,6 +92,17 @@ function foodDisplayName(food: Record<string, unknown>): string {
   return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
 }
 
+function scoringSourceLabel(value: unknown): string {
+  const source = String(value ?? "").toLowerCase();
+  if (!source) {
+    return "";
+  }
+  if (source.includes("vision") || source.includes("gpt")) {
+    return "이미지 인식 + 식단 기준표";
+  }
+  return "식단 기준표";
+}
+
 export default function DietPage() {
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [manualMealType, setManualMealType] = useState("LUNCH");
@@ -227,6 +238,7 @@ export default function DietPage() {
   const recommendedActions = Array.isArray(analysisResult?.recommended_actions)
     ? (analysisResult.recommended_actions as string[])
     : [];
+  const scoringSource = scoringSourceLabel(analysisResult?.scoring_source);
 
   return (
     <div className="page-grid">
@@ -269,7 +281,7 @@ export default function DietPage() {
                 <strong>선택한 이미지</strong>
                 <span>{selectedImageFile.name}</span>
                 <span className="muted">이미지를 다시 선택하려면 파일 선택 또는 카메라 촬영을 눌러주세요.</span>
-                <span className="muted">Vision provider가 켜져 있으면 이미지에서 음식명 후보를 추론하고, 아니면 규칙 기반 후보로 점수화합니다.</span>
+                <span className="muted">이미지에서 음식명 후보를 찾고 식단 기준표로 점수화합니다. 결과는 저장 전 확인해주세요.</span>
                 <button className="button secondary" disabled={isAnalyzing} onClick={clearSelectedImage} type="button">
                   선택 이미지 삭제
                 </button>
@@ -509,9 +521,7 @@ export default function DietPage() {
                 })}
               </div>
             )}
-            {Boolean(analysisResult.scoring_source) && (
-              <span className="badge badge-reference">점수 기준: {String(analysisResult.scoring_source)}</span>
-            )}
+            {scoringSource && <span className="badge badge-reference">점수 기준: {scoringSource}</span>}
             {warnings.length > 0 && (
               <div className="warning-card card-list">
                 {warnings.map((warning) => (

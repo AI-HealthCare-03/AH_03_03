@@ -84,8 +84,8 @@ const x2Fields: Array<{ key: keyof HealthProfileFormState; label: string }> = [
   { key: "hba1c", label: "당화혈색소" },
   { key: "total_cholesterol", label: "총콜레스테롤" },
   { key: "triglyceride", label: "중성지방" },
-  { key: "hdl_cholesterol", label: "HDL(좋은 콜레스테롤)" },
-  { key: "ldl_cholesterol", label: "LDL(나쁜 콜레스테롤)" },
+  { key: "hdl_cholesterol", label: "HDL 콜레스테롤" },
+  { key: "ldl_cholesterol", label: "LDL 콜레스테롤" },
   { key: "waist_cm", label: "허리둘레" },
 ];
 
@@ -99,8 +99,8 @@ const backendMissingLabelMap: Record<string, string> = {
   hba1c: "당화혈색소",
   total_cholesterol: "총콜레스테롤",
   triglyceride: "중성지방",
-  hdl_cholesterol: "HDL(좋은 콜레스테롤)",
-  ldl_cholesterol: "LDL(나쁜 콜레스테롤)",
+  hdl_cholesterol: "HDL 콜레스테롤",
+  ldl_cholesterol: "LDL 콜레스테롤",
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
@@ -165,8 +165,8 @@ const readOnlySections: Array<{
       { key: "hba1c", label: "당화혈색소", unit: "%" },
       { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL" },
       { key: "triglyceride", label: "중성지방", unit: "mg/dL" },
-      { key: "hdl_cholesterol", label: "HDL(좋은 콜레스테롤)", unit: "mg/dL" },
-      { key: "ldl_cholesterol", label: "LDL(나쁜 콜레스테롤)", unit: "mg/dL" },
+      { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL" },
+      { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL" },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
     ],
   },
@@ -338,8 +338,8 @@ function validateForm(form: HealthProfileFormState): string | null {
     ["fasting_glucose", "공복혈당", 40, 500],
     ["total_cholesterol", "총콜레스테롤", 50, 500],
     ["triglyceride", "중성지방", 20, 1000],
-    ["hdl_cholesterol", "HDL(좋은 콜레스테롤)", 10, 150],
-    ["ldl_cholesterol", "LDL(나쁜 콜레스테롤)", 10, 400],
+    ["hdl_cholesterol", "HDL 콜레스테롤", 10, 150],
+    ["ldl_cholesterol", "LDL 콜레스테롤", 10, 400],
     ["walking_days", "1주일간 걷기 일수", 0, 7],
     ["strength_days", "1주일간 근력운동 일수", 0, 7],
   ];
@@ -547,8 +547,8 @@ export default function HealthProfilePage() {
               ],
               ["혈압", form.systolic_bp && form.diastolic_bp ? `${form.systolic_bp}/${form.diastolic_bp}` : ""],
               ["공복혈당", form.fasting_glucose],
-              ["HDL(좋은)", form.hdl_cholesterol],
-              ["LDL(나쁜)", form.ldl_cholesterol],
+              ["HDL", form.hdl_cholesterol],
+              ["LDL", form.ldl_cholesterol],
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>

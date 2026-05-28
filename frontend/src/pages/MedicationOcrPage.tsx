@@ -39,9 +39,7 @@ export default function MedicationOcrPage() {
     try {
       const response = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
       setItems(response.items);
-      setMessage(
-        `${toUserMessage(response.message)} provider=${response.source ?? "unknown"}, fallback=${response.fallback_used ? "yes" : "no"}. 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.`,
-      );
+      setMessage("복약 정보 후보를 생성했습니다. 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.");
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "복약정보 후보 생성에 실패했습니다.");
     } finally {
@@ -76,7 +74,7 @@ export default function MedicationOcrPage() {
           memo: item.memo,
         })),
       });
-      setMessage(`${response.message} 생성 ${response.created_count}건, 건너뜀 ${response.skipped_count}건`);
+      setMessage(`확인한 복약 정보가 저장되었습니다. 생성 ${response.created_count}건, 건너뜀 ${response.skipped_count}건`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약정보 저장에 실패했습니다.");
     } finally {
@@ -225,5 +223,8 @@ function buildMedicationOcrPayload(sourceType: string, file: File | null, imageF
 }
 
 function toUserMessage(message: string): string {
-  return message;
+  if (message.includes("provider") || message.includes("fallback")) {
+    return "복약 정보 후보를 생성했습니다.";
+  }
+  return message.replaceAll("OCR", "자동 인식");
 }
