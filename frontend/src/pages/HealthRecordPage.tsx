@@ -73,6 +73,50 @@ const stepToSection: Record<number, string[]> = {
   3: [healthProfileSectionTitles[3]],
 };
 
+const healthFieldLabels: Record<string, string> = {
+  height_cm: "키",
+  weight_kg: "몸무게",
+  bmi: "BMI",
+  occupation_code: "직업군",
+  family_htn: "고혈압 가족력",
+  family_dm: "당뇨병 가족력",
+  family_dyslipidemia: "이상지질혈증 가족력",
+  smoking_status: "현재 흡연 여부",
+  drinking_frequency: "음주 빈도",
+  drinking_amount: "한 번 음주량",
+  walking_days_per_week: "걷기 일수",
+  strength_days_per_week: "근력운동 일수",
+  systolic_bp: "수축기 혈압",
+  diastolic_bp: "이완기 혈압",
+  fasting_glucose: "공복혈당",
+  hba1c: "당화혈색소",
+  total_cholesterol: "총콜레스테롤",
+  triglyceride: "중성지방",
+  hdl_cholesterol: "HDL",
+  ldl_cholesterol: "LDL",
+  waist_cm: "허리둘레",
+};
+
+const healthValueLabels: Record<string, Record<string, string>> = {
+  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
+  drinking_frequency: {
+    RARE: "월 1회 미만",
+    MONTHLY_2_4: "월 2-4회",
+    WEEKLY_2_3: "주 2-3회",
+    WEEKLY_4_PLUS: "주 4회 이상",
+  },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
+};
+
 function toStringValue(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
@@ -207,6 +251,15 @@ function getValue(record: HealthRecord, key: string, unit = ""): string {
     return "-";
   }
   return `${String(value)}${unit}`;
+}
+
+function getDisplayValue(record: HealthRecord, key: string, unit = ""): string {
+  const value = record[key];
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  const stringValue = String(value);
+  return `${healthValueLabels[key]?.[stringValue] ?? stringValue}${unit}`;
 }
 
 export default function HealthRecordPage() {
@@ -382,7 +435,7 @@ export default function HealthRecordPage() {
         <div className="chip-list">
           {missingBasicFields.map((field) => (
             <span className="badge badge-missing" key={field}>
-              {field}
+              {healthFieldLabels[field] ?? field}
             </span>
           ))}
           {missingBasicFields.length === 0 && <span className="badge badge-saved">기본 분석 부족 항목 없음</span>}
@@ -392,7 +445,7 @@ export default function HealthRecordPage() {
           <div className="chip-list" style={{ marginTop: 8 }}>
             {missingPrecisionFields.map((field) => (
               <span className="badge badge-reference" key={field}>
-                {field}
+                {healthFieldLabels[field] ?? field}
               </span>
             ))}
             {missingPrecisionFields.length === 0 && <span className="badge badge-saved">정밀 보강값 입력 완료</span>}
@@ -422,7 +475,7 @@ export default function HealthRecordPage() {
                 <div>
                   <span>가족력/생활</span>
                   <strong>
-                    {getValue(record, "family_htn")} · {getValue(record, "smoking_status")} ·{" "}
+                    {getDisplayValue(record, "family_htn")} · {getDisplayValue(record, "smoking_status")} ·{" "}
                     {getValue(record, "walking_days_per_week", "일 걷기")}
                   </strong>
                 </div>
