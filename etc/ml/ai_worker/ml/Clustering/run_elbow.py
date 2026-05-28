@@ -1,3 +1,11 @@
+"""
+Elbow Curve 분석 — K-Prototypes 최적 K 탐색
+
+- 데이터: lipid_only.csv (건강검진, 샘플 50,000명)
+- 알고리즘: K-Prototypes (연속형 14개 + 범주형 5개)
+- 실험 조건: K=2~7, gamma=1.02 고정, n_init=3, SEED=42
+- 결과: outputs/elbow_results.csv
+"""
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +30,7 @@ CONT_COLS = [
     "이완기혈압",
     "식전혈당(공복혈당)",
     "총콜레스테롤",
-    # "트리글리세라이드",
+    # "트리글리세라이드",  # drop-one-out 결과에서 노이즈 변수로 분류
     "HDL콜레스테롤",
     "LDL콜레스테롤",
     "혈색소",
@@ -74,7 +82,6 @@ def remove_outliers_clinical(df):
         df.loc[(df[col] < lower) | (df[col] > upper), col] = np.nan
     return df
 
-
 def main():
     print("[0] 데이터 로드 및 전처리")
     df = pd.read_csv(DATA_PATH)
@@ -90,10 +97,14 @@ def main():
     #     if c in df.columns:
     #         df[c] = df[c].fillna(df[c].mode()[0])
 
+    # 결측치 처리: 이전 버전(중앙값 대체)에서 dropna로 변경
+    # 중앙값 대체 시 임상 범위 외 값이 희석될 수 있어 행 제거 방식 채택
     df = df.dropna(subset=CONT_COLS_FINAL + CAT_COLS)
 
     # 샘플링
-    df = df.sample(n=SAMPLE_N, random_state=SEED).reset_index(drop=True)
+    # dropna 후 데이터가 SAMPLE_N보다 적을 경우 ValueError 방지
+    sample_n = min(SAMPLE_N, len(df))
+    df = df.sample(n=sample_n, random_state=SEED).reset_index(drop=True)
     print(f"  샘플: {len(df):,}명")
 
     df_use = df[CONT_COLS_FINAL + CAT_COLS].copy()
