@@ -15,7 +15,7 @@ const bottomLinks = [
   { to: "/health", icon: "🧭", label: "분석" },
   { to: "/challenges", icon: "✅", label: "챌린지" },
   { to: "/diets", icon: "🥗", label: "식단" },
-  { to: "/ocr/exam", icon: "📄", label: "검진등록" },
+  { to: "/ocr", icon: "📄", label: "등록" },
 ];
 
 const linkByPath = new Map(sidebarLinks.map((link) => [link.to, link]));

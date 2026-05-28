@@ -92,7 +92,7 @@ export default function MedicationOcrPage() {
           <p>처방전 또는 약봉투 이미지/텍스트 기반 복약 정보 후보를 생성합니다.</p>
         </div>
         <Link className="button secondary" to="/ocr">
-          OCR 선택으로 돌아가기
+          등록 선택으로 돌아가기
         </Link>
       </div>
       {error && <ErrorMessage message={error} />}
