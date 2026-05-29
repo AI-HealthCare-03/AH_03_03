@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   checkEmail,
   checkLoginId,
+  checkPhone,
   sendEmailVerification,
   verifyEmailCode,
 } from "../api/auth";
@@ -54,11 +55,12 @@ export default function SignupPage() {
   const [isOccupationHelpOpen, setIsOccupationHelpOpen] = useState(false);
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCheck, setEmailCheck] = useState<AvailabilityCheck | null>(null);
+  const [phoneCheck, setPhoneCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCode, setEmailCode] = useState("");
   const [emailDebugCode, setEmailDebugCode] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState<AvailabilityCheck | null>(null);
   const [checkingField, setCheckingField] = useState<
-    "login_id" | "email" | "email_send" | "email_verify" | null
+    "login_id" | "email" | "phone" | "email_send" | "email_verify" | null
   >(null);
 
   const steps = ["계정 정보", "기본 정보", "생활 습관", "간편 분석 정보"];
@@ -97,6 +99,11 @@ export default function SignupPage() {
 
   const setOnlyDigitsPhonePart = (key: keyof typeof phoneParts, value: string, maxLength: number) => {
     setPhoneParts((prev) => ({ ...prev, [key]: value.replace(/\D/g, "").slice(0, maxLength) }));
+    setPhoneCheck(null);
+    setFieldErrors((prev) => {
+      const { phone_number, phone_number_check, ...rest } = prev;
+      return rest;
+    });
   };
 
   const validateCurrentStep = (targetStep = step): boolean => {
@@ -125,6 +132,15 @@ export default function SignupPage() {
       }
       if (hasPhoneInput && (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4)) {
         nextErrors.phone_number = "휴대폰 번호를 올바르게 입력해주세요.";
+      }
+      if (
+        hasPhoneInput &&
+        phoneParts.first.length >= 2 &&
+        phoneParts.second.length >= 3 &&
+        phoneParts.third.length === 4 &&
+        (!phoneCheck || phoneCheck.checkedValue !== normalizedPhoneNumber || !phoneCheck.available)
+      ) {
+        nextErrors.phone_number_check = "휴대폰 번호 중복확인을 해주세요.";
       }
       if (!isPasswordValid(password)) {
         nextErrors.password = passwordPolicyMessage;
@@ -234,6 +250,38 @@ export default function SignupPage() {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이메일 중복확인에 실패했습니다.");
+    } finally {
+      setCheckingField(null);
+    }
+  };
+
+  const handleCheckPhone = async () => {
+    setError("");
+    if (!hasPhoneInput) {
+      setFieldErrors((prev) => ({ ...prev, phone_number: "휴대폰 번호를 입력한 뒤 중복확인해주세요." }));
+      return;
+    }
+    if (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4) {
+      setFieldErrors((prev) => ({ ...prev, phone_number: "휴대폰 번호를 올바르게 입력해주세요." }));
+      return;
+    }
+
+    try {
+      setCheckingField("phone");
+      const result = await checkPhone(normalizedPhoneNumber);
+      setPhoneCheck({
+        checkedValue: normalizedPhoneNumber,
+        available: result.available,
+        message:
+          result.message ?? (result.available ? "사용 가능한 휴대폰 번호입니다." : "이미 사용중인 휴대폰 번호입니다."),
+      });
+      setFieldErrors((prev) => {
+        const { phone_number, phone_number_check, ...rest } = prev;
+        return rest;
+      });
+    } catch (err) {
+      setPhoneCheck(null);
+      setError(err instanceof Error ? err.message : "휴대폰 번호 중복확인에 실패했습니다.");
     } finally {
       setCheckingField(null);
     }
@@ -531,6 +579,16 @@ export default function SignupPage() {
                 <span className="muted">MVP 시연에서는 이메일 인증만 사용합니다. 휴대폰 번호는 선택 입력입니다.</span>
                 {fieldErrors.phone_number && <span className="field-error">{fieldErrors.phone_number}</span>}
               </label>
+              <button
+                className="secondary"
+                disabled={checkingField === "phone"}
+                type="button"
+                onClick={() => void handleCheckPhone()}
+              >
+                {checkingField === "phone" ? "확인 중..." : "휴대폰 번호 중복확인"}
+              </button>
+              {phoneCheck && <div className={phoneCheck.available ? "success-text" : "warning-text"}>{phoneCheck.message}</div>}
+              {fieldErrors.phone_number_check && <span className="field-error">{fieldErrors.phone_number_check}</span>}
               <label>
                 비밀번호
                 <input
