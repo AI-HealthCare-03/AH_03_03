@@ -59,9 +59,9 @@ export default function ExamOcrPage() {
       const result = await runExamOcr(report.id, selectedFile);
       setMeasurements(result.measurements);
       setMessage(
-        toUserMessage(
-          `${result.message} provider=${result.ocr_provider ?? "unknown"}, fallback=${result.fallback_used ? "yes" : "no"}`,
-        ),
+        result.fallback_used
+          ? "측정값 후보가 생성되었습니다. 자동 인식 결과가 부정확할 수 있으니 저장 전 검진 수치를 확인해주세요."
+          : "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요.",
       );
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
@@ -111,7 +111,7 @@ export default function ExamOcrPage() {
           <p>검진표 이미지/PDF 기반 측정값 후보를 생성하고 확인 후 건강정보에 반영합니다.</p>
         </div>
         <Link className="button secondary" to="/ocr">
-          OCR 선택으로 돌아가기
+          등록 선택으로 돌아가기
         </Link>
       </div>
       {error && <ErrorMessage message={error} />}
@@ -147,16 +147,16 @@ export default function ExamOcrPage() {
             <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
           </div>
           <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
-            {isRunningOcr ? "OCR 분석 중..." : "측정값 후보 생성"}
+            {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
           </button>
           {isRunningOcr ? (
             <div className="state-box">건강검진표를 분석 중입니다. PDF 페이지 수에 따라 시간이 걸릴 수 있습니다.</div>
           ) : null}
         </Card>
         <Card title="저장 전 확인">
-          <p className="warning-text">현재는 provider/fallback 기반 후보 값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
+          <p className="warning-text">자동 인식으로 생성된 후보값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
           <p className="warning-text">
-            확인/저장 시 아래 OCR 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
+            확인/저장 시 아래 인식 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
             있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
           </p>
           <div className="button-row" style={{ marginTop: 12 }}>
@@ -187,14 +187,14 @@ export default function ExamOcrPage() {
           ))}
           <div className="state-box">
             <p className="warning-text">
-              확인/저장 시 아래 OCR 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
+              확인/저장 시 아래 인식 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
               있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
             </p>
             {measurements.length === 0 ? (
               <p className="muted">측정값 후보가 생성되면 건강정보 반영 버튼을 사용할 수 있습니다.</p>
             ) : null}
             <button disabled={measurements.length === 0 || isConfirming} onClick={saveAndConfirm} type="button">
-              {isConfirming ? "건강정보에 반영 중..." : "선택한 OCR 값을 건강정보에 반영"}
+              {isConfirming ? "건강정보에 반영 중..." : "선택한 후보값을 건강정보에 반영"}
             </button>
           </div>
         </div>
@@ -204,5 +204,8 @@ export default function ExamOcrPage() {
 }
 
 function toUserMessage(message: string): string {
-  return message;
+  if (message.includes("provider") || message.includes("fallback")) {
+    return "자동 인식 후보값을 생성했습니다. 저장 전 내용을 확인해주세요.";
+  }
+  return message.replaceAll("OCR", "자동 인식");
 }

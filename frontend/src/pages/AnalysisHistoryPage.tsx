@@ -33,32 +33,53 @@ type AnalysisDetail = {
 const labels: Record<string, string> = {
   DIABETES: "당뇨",
   OBESITY: "비만",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   HYPERTENSION: "고혈압",
 };
 
-const tabs = ["전체", "당뇨", "고혈압", "이상지질혈증", "비만"];
+const tabs = ["전체", "당뇨", "고혈압", "콜레스테롤·중성지방", "비만"];
 const tabToType: Record<string, string | null> = {
   전체: null,
   당뇨: "DIABETES",
   고혈압: "HYPERTENSION",
-  이상지질혈증: "DYSLIPIDEMIA",
+  "콜레스테롤·중성지방": "DYSLIPIDEMIA",
   비만: "OBESITY",
 };
 
-function modelLabel(result: AnalysisResult | undefined): string | null {
-  const modelName = result?.model_name ? String(result.model_name) : "";
-  const modelVersion = result?.model_version ? String(result.model_version) : "";
-  if (!modelName && !modelVersion) {
-    return null;
+const factorValueLabels: Record<string, Record<string, string>> = {
+  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
+  drinking_frequency: {
+    RARE: "월 1회 미만",
+    MONTHLY_2_4: "월 2-4회",
+    WEEKLY_2_3: "주 2-3회",
+    WEEKLY_4_PLUS: "주 4회 이상",
+  },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
+};
+
+const factorDirectionLabels: Record<string, string> = {
+  POSITIVE: "위험 증가",
+  NEGATIVE: "위험 감소",
+  NEUTRAL: "중립",
+};
+
+function displayFactorValue(factor: AnalysisResult): string {
+  const key = String(factor.factor_key ?? "");
+  const rawValue = factor.factor_value;
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return "값 정보 없음";
   }
-  if (modelName.toLowerCase() === "catboost") {
-    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
-  }
-  if (modelName) {
-    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
-  }
-  return modelVersion;
+  const value = String(rawValue);
+  return factorValueLabels[key]?.[value] ?? value;
 }
 
 export default function AnalysisHistoryPage() {
@@ -144,7 +165,6 @@ export default function AnalysisHistoryPage() {
             <strong>{String(result?.risk_level ?? "-")}</strong>
             <span className="badge badge-reference">{scoreLabel(result?.risk_score)}</span>
             <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-            {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
             <p>{String(result?.summary ?? "")}</p>
           </div>
         </Card>
@@ -156,9 +176,11 @@ export default function AnalysisHistoryPage() {
                 <div className="record-row">
                   <div>
                     <strong>{String(factor.factor_name ?? factor.factor_key ?? "요인")}</strong>
-                    <p className="muted">{String(factor.factor_value ?? "값 정보 없음")}</p>
+                    <p className="muted">{displayFactorValue(factor)}</p>
                   </div>
-                  <span className="badge badge-reference">{String(factor.direction ?? "NEUTRAL")}</span>
+                  <span className="badge badge-reference">
+                    {factorDirectionLabels[String(factor.direction ?? "NEUTRAL")] ?? String(factor.direction ?? "중립")}
+                  </span>
                 </div>
                 <span className="badge risk-medium">기여도 {String(factor.contribution_score ?? "-")}</span>
               </div>

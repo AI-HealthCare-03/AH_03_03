@@ -32,7 +32,7 @@ type NutritionDraft = {
 const diseaseScoreLabels: Record<string, string> = {
   DM: "당뇨",
   HTN: "고혈압",
-  DL: "이상지질혈증",
+  DL: "콜레스테롤·중성지방",
   OBE: "비만",
   ANEM: "빈혈",
 };
@@ -92,6 +92,17 @@ function foodDisplayName(food: Record<string, unknown>): string {
   return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
 }
 
+function scoringSourceLabel(value: unknown): string {
+  const source = String(value ?? "").toLowerCase();
+  if (!source) {
+    return "";
+  }
+  if (source.includes("vision") || source.includes("gpt")) {
+    return "이미지 인식 + 식단 기준표";
+  }
+  return "식단 기준표";
+}
+
 export default function DietPage() {
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [manualMealType, setManualMealType] = useState("LUNCH");
@@ -104,6 +115,7 @@ export default function DietPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -192,6 +204,7 @@ export default function DietPage() {
 
   const runDietAnalysis = async () => {
     setError("");
+    setIsAnalyzing(true);
     try {
       const payload = selectedImageFile
         ? buildDietAnalysisFormData(selectedImageFile, analysisDescription)
@@ -205,6 +218,8 @@ export default function DietPage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "식단 분석에 실패했습니다.");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -223,6 +238,7 @@ export default function DietPage() {
   const recommendedActions = Array.isArray(analysisResult?.recommended_actions)
     ? (analysisResult.recommended_actions as string[])
     : [];
+  const scoringSource = scoringSourceLabel(analysisResult?.scoring_source);
 
   return (
     <div className="page-grid">
@@ -251,10 +267,11 @@ export default function DietPage() {
                 카메라로 촬영
               </label>
             </div>
-            <input accept="image/*" id="diet-file-input" onChange={handleDietImageChange} type="file" />
+            <input accept="image/*" disabled={isAnalyzing} id="diet-file-input" onChange={handleDietImageChange} type="file" />
             <input
               accept="image/*"
               capture="environment"
+              disabled={isAnalyzing}
               id="diet-camera-input"
               onChange={handleDietImageChange}
               type="file"
@@ -264,8 +281,8 @@ export default function DietPage() {
                 <strong>선택한 이미지</strong>
                 <span>{selectedImageFile.name}</span>
                 <span className="muted">이미지를 다시 선택하려면 파일 선택 또는 카메라 촬영을 눌러주세요.</span>
-                <span className="muted">Vision provider가 켜져 있으면 이미지에서 음식명 후보를 추론하고, 아니면 규칙 기반 후보로 점수화합니다.</span>
-                <button className="button secondary" onClick={clearSelectedImage} type="button">
+                <span className="muted">이미지에서 음식명 후보를 찾고 식단 기준표로 점수화합니다. 결과는 저장 전 확인해주세요.</span>
+                <button className="button secondary" disabled={isAnalyzing} onClick={clearSelectedImage} type="button">
                   선택 이미지 삭제
                 </button>
               </div>
@@ -273,10 +290,13 @@ export default function DietPage() {
             {selectedImagePreviewUrl && <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />}
           </div>
           <div className="button-row">
-            <button type="button" onClick={runDietAnalysis}>
-              간편 식단 분석
+            <button disabled={isAnalyzing} type="button" onClick={runDietAnalysis}>
+              {isAnalyzing ? "식단 분석 중..." : "간편 식단 분석"}
             </button>
           </div>
+          {isAnalyzing ? (
+            <div className="state-box">식단을 분석 중입니다. 이미지 분석과 질환별 점수 계산에 잠시 시간이 걸릴 수 있습니다.</div>
+          ) : null}
         </form>
       </Card>
       <Card title="식단 직접 입력">
@@ -501,9 +521,7 @@ export default function DietPage() {
                 })}
               </div>
             )}
-            {Boolean(analysisResult.scoring_source) && (
-              <span className="badge badge-reference">점수 기준: {String(analysisResult.scoring_source)}</span>
-            )}
+            {scoringSource && <span className="badge badge-reference">점수 기준: {scoringSource}</span>}
             {warnings.length > 0 && (
               <div className="warning-card card-list">
                 {warnings.map((warning) => (
