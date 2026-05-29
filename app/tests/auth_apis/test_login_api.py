@@ -35,3 +35,4 @@ class TestLoginAPI(TestCase):
 
         # AuthService.authenticate 에서 실패 시 HTTP_400_BAD_REQUEST 발생
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "가입되지 않은 아이디 또는 이메일입니다."
