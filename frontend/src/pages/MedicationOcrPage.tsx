@@ -7,19 +7,31 @@ import {
   type MedicationOcrRequest,
   runMedicationOcr,
 } from "../api/medications";
+import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { isHeicFile } from "../utils/files";
 
 export default function MedicationOcrPage() {
   const [items, setItems] = useState<MedicationOcrItem[]>([]);
   const [sourceType, setSourceType] = useState("PRESCRIPTION");
   const [imageFilename, setImageFilename] = useState("");
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
+  const [previewMessage, setPreviewMessage] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (selectedPreviewUrl) {
+        URL.revokeObjectURL(selectedPreviewUrl);
+      }
+    };
+  }, [selectedPreviewUrl]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -51,12 +63,34 @@ export default function MedicationOcrPage() {
     setItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
   };
 
-  const handleImageSelection = (file: File | null) => {
+  const handleImageSelection = async (file: File | null) => {
+    if (selectedPreviewUrl) {
+      URL.revokeObjectURL(selectedPreviewUrl);
+    }
+    setSelectedPreviewUrl("");
+    setPreviewMessage("");
     if (!file) {
       return;
     }
     setSelectedImageFile(file);
     setImageFilename(file.name);
+    if (!isHeicFile(file)) {
+      setSelectedPreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setPreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
+    try {
+      const previewBlob = await normalizeImageForPreview(file);
+      setSelectedPreviewUrl(URL.createObjectURL(previewBlob));
+      setPreviewMessage("");
+    } catch (err) {
+      setPreviewMessage(
+        err instanceof Error
+          ? err.message
+          : "HEIC 미리보기를 생성하지 못했습니다. 분석은 업로드 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const save = async () => {
@@ -104,7 +138,7 @@ export default function MedicationOcrPage() {
               <label className="upload-action-button">
                 파일에서 선택
                 <input
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   type="file"
                   onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
                 />
@@ -113,7 +147,7 @@ export default function MedicationOcrPage() {
                 <label className="upload-action-button">
                   카메라로 촬영
                   <input
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     capture="environment"
                     type="file"
                     onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
@@ -124,6 +158,14 @@ export default function MedicationOcrPage() {
               )}
             </div>
             <span className="muted">선택된 파일: {imageFilename || "없음"}</span>
+            {previewMessage ? (
+              <div className="state-box heic-preview-notice">
+                {previewMessage}
+              </div>
+            ) : null}
+            {selectedPreviewUrl ? (
+              <img alt="선택한 처방전 또는 약봉투 이미지 미리보기" className="upload-preview" src={selectedPreviewUrl} />
+            ) : null}
           </div>
           <label>
             인식 유형

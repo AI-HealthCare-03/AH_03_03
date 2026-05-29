@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 
+from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.medications import (
     MedicationCreateRequest,
@@ -95,13 +96,28 @@ async def _parse_medication_ocr_request(request: Request) -> tuple[MedicationOCR
         if key not in {"image", "file"} and not _is_upload(value) and value not in {"", None}
     }
     upload = form.get("image") or form.get("file")
-    image_bytes = await upload.read() if _is_upload(upload) else None
-    image_media_type = upload.content_type if _is_upload(upload) else None
+    if not _is_upload(upload):
+        return MedicationOCRRequest.model_validate(data), None, None
+
+    normalized_image = _normalize_uploaded_image(
+        await upload.read(),
+        upload.content_type,
+        getattr(upload, "filename", None),
+    )
+    image_bytes = normalized_image.data
+    image_media_type = normalized_image.media_type
     return MedicationOCRRequest.model_validate(data), image_bytes, image_media_type
 
 
 def _is_upload(value: object) -> bool:
     return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
+
+
+def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
+    try:
+        return normalize_upload_image(image_bytes, media_type, filename)
+    except ImageNormalizationError as exc:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
 
 
 @medication_router.post(

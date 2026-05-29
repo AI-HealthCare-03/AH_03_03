@@ -9,6 +9,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from ai_runtime.common.image_normalizer import (
+    HEIC_CONVERSION_ERROR_MESSAGE,
+    SUPPORTED_UPLOAD_IMAGE_TYPES,
+    ImageNormalizationError,
+    NormalizedImage,
+    is_heic_upload,
+    normalize_upload_image,
+)
+
 from .extractor import run_ocr, run_ocr_on_pdf
 from .preprocessor import assess_quality
 from .schemas import (
@@ -24,13 +33,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/ocr", tags=["OCR - 건강검진표 수치 추출"])
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_IMAGE_TYPES = SUPPORTED_UPLOAD_IMAGE_TYPES
 ALLOWED_PDF_TYPES = {"application/pdf"}
 MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20MB
 
 
-async def validate_image(file):
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+async def validate_image(file) -> NormalizedImage:
+    if file.content_type not in ALLOWED_IMAGE_TYPES and not is_heic_upload(file.content_type, file.filename):
         err = ERROR_MAP["unsupported_type"]
         raise HTTPException(
             status_code=err["status_code"],
@@ -49,7 +58,13 @@ async def validate_image(file):
             status_code=err["status_code"],
             detail=ErrorResponse(error_code="image_too_small", message=err["message"]).model_dump(),
         )
-    return image_bytes
+    try:
+        return normalize_upload_image(image_bytes, file.content_type, file.filename)
+    except ImageNormalizationError as e:
+        raise HTTPException(
+            status_code=415,
+            detail=ErrorResponse(error_code="unsupported_type", message=HEIC_CONVERSION_ERROR_MESSAGE).model_dump(),
+        ) from e
 
 
 async def validate_pdf(file):
@@ -91,9 +106,10 @@ async def validate_pdf(file):
     """,
 )
 async def analyze_checkup_image(
-    file: Annotated[UploadFile, File(description="건강검진표 이미지 (JPG/PNG/WEBP, 최대 20MB)")],
+    file: Annotated[UploadFile, File(description="건강검진표 이미지 (JPG/PNG/WEBP/HEIC, 최대 20MB)")],
 ):
-    image_bytes = await validate_image(file)
+    normalized_image = await validate_image(file)
+    image_bytes = normalized_image.data
     quality_report = assess_quality(image_bytes)
 
     if quality_report.status == ImageQualityStatus.SMALL:

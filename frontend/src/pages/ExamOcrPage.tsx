@@ -10,12 +10,16 @@ import {
   type ExamMeasurement,
   type ExamReport,
 } from "../api/exams";
+import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { isHeicFile } from "../utils/files";
 
 export default function ExamOcrPage() {
   const [selectedFileName, setSelectedFileName] = useState("health-exam-upload.pdf");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
+  const [previewMessage, setPreviewMessage] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [exam, setExam] = useState<ExamReport | null>(null);
   const [measurements, setMeasurements] = useState<ExamMeasurement[]>([]);
@@ -23,6 +27,14 @@ export default function ExamOcrPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (selectedPreviewUrl) {
+        URL.revokeObjectURL(selectedPreviewUrl);
+      }
+    };
+  }, [selectedPreviewUrl]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -35,12 +47,37 @@ export default function ExamOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const handleFileSelection = (file: File | null) => {
+  const handleFileSelection = async (file: File | null) => {
+    if (selectedPreviewUrl) {
+      URL.revokeObjectURL(selectedPreviewUrl);
+    }
+    setSelectedPreviewUrl("");
+    setPreviewMessage("");
     if (!file) {
       return;
     }
     setSelectedFile(file);
     setSelectedFileName(file.name);
+    if (isPdfFile(file)) {
+      return;
+    }
+    if (!isHeicFile(file)) {
+      setSelectedPreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setPreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
+    try {
+      const previewBlob = await normalizeImageForPreview(file);
+      setSelectedPreviewUrl(URL.createObjectURL(previewBlob));
+      setPreviewMessage("");
+    } catch (err) {
+      setPreviewMessage(
+        err instanceof Error
+          ? err.message
+          : "HEIC 미리보기를 생성하지 못했습니다. 분석은 업로드 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const startExamOcr = async () => {
@@ -125,7 +162,7 @@ export default function ExamOcrPage() {
               <label className="upload-action-button">
                 파일에서 선택
                 <input
-                  accept="image/*,.pdf"
+                  accept="image/*,.heic,.heif,.pdf"
                   onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
                   type="file"
                 />
@@ -134,7 +171,7 @@ export default function ExamOcrPage() {
                 <label className="upload-action-button">
                   카메라로 촬영
                   <input
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     capture="environment"
                     onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
                     type="file"
@@ -145,6 +182,14 @@ export default function ExamOcrPage() {
               )}
             </div>
             <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
+            {previewMessage ? (
+              <div className="state-box heic-preview-notice">
+                {previewMessage}
+              </div>
+            ) : null}
+            {selectedPreviewUrl ? (
+              <img alt="선택한 검진표 이미지 미리보기" className="upload-preview" src={selectedPreviewUrl} />
+            ) : null}
           </div>
           <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
             {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
@@ -208,4 +253,8 @@ function toUserMessage(message: string): string {
     return "자동 인식 후보값을 생성했습니다. 저장 전 내용을 확인해주세요.";
   }
   return message.replaceAll("OCR", "자동 인식");
+}
+
+function isPdfFile(file: File): boolean {
+  return file.type.toLowerCase() === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
