@@ -3,10 +3,16 @@ import { NavLink } from "react-router-dom";
 import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
 
-const links = [
+export type SidebarLink = {
+  icon: string;
+  label: string;
+  to: string;
+};
+
+export const sidebarLinks: SidebarLink[] = [
   { to: "/", icon: "🏠", label: "홈" },
   { to: "/health", icon: "🧭", label: "건강 분석" },
-  { to: "/ocr", icon: "📄", label: "OCR 입력" },
+  { to: "/ocr", icon: "📄", label: "검진·복약 등록" },
   { to: "/chatbot", icon: "🤖", label: "AI 건강 상담" },
   { to: "/diets", icon: "🥗", label: "식단 분석" },
   { to: "/dashboard", icon: "📊", label: "추적 대시보드" },
@@ -26,7 +32,7 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {links.map((link) => (
+      {sidebarLinks.map((link) => (
         <NavLink aria-label={link.label} className={getLinkClass} key={link.to} title={link.label} to={link.to}>
           <span aria-hidden="true" className="sidebar-active-indicator" />
           <span className="sidebar-link-icon">{link.icon}</span>

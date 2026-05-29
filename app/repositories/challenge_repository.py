@@ -77,6 +77,10 @@ async def create_challenge_log(user_challenge_id: int, data: dict[str, Any]) -> 
     return await ChallengeLog.create(user_challenge_id=user_challenge_id, **data)
 
 
+async def count_challenge_logs_by_date(user_challenge_id: int, log_date: date) -> int:
+    return await ChallengeLog.filter(user_challenge_id=user_challenge_id, log_date=log_date).count()
+
+
 async def list_challenge_logs(user_challenge_id: int) -> list[ChallengeLog]:
     return await ChallengeLog.filter(user_challenge_id=user_challenge_id).order_by("-log_date")
 

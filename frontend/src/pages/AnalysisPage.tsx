@@ -44,7 +44,7 @@ type Readiness = {
 const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   OBESITY: "비만",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   HYPERTENSION: "고혈압",
 };
 
@@ -53,21 +53,6 @@ const riskFallbackScores: Record<string, number> = {
   MEDIUM: 55,
   LOW: 25,
 };
-
-function modelLabel(result: AnalysisResult): string | null {
-  const modelName = result.model_name ? String(result.model_name) : "";
-  const modelVersion = result.model_version ? String(result.model_version) : "";
-  if (!modelName && !modelVersion) {
-    return null;
-  }
-  if (modelName.toLowerCase() === "catboost") {
-    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
-  }
-  if (modelName) {
-    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
-  }
-  return modelVersion;
-}
 
 const missingFieldLabels: Record<string, string> = {
   height_cm: "키",
@@ -79,18 +64,48 @@ const missingFieldLabels: Record<string, string> = {
   hba1c: "당화혈색소",
   total_cholesterol: "총콜레스테롤",
   triglyceride: "중성지방",
-  hdl_cholesterol: "HDL",
-  ldl_cholesterol: "LDL",
+  hdl_cholesterol: "HDL 콜레스테롤",
+  ldl_cholesterol: "LDL 콜레스테롤",
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
-  family_dyslipidemia: "이상지질혈증 가족력 여부",
+  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력 여부",
   smoking_status: "현재 흡연 여부",
   drinking_frequency: "1년간 음주 빈도",
   drinking_amount: "한 번 음주량",
   walking_days_per_week: "1주일간 걷기 일수",
   strength_days_per_week: "1주일간 근력운동 일수",
 };
+
+const factorValueLabels: Record<string, Record<string, string>> = {
+  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
+  drinking_frequency: {
+    RARE: "월 1회 미만",
+    MONTHLY_2_4: "월 2-4회",
+    WEEKLY_2_3: "주 2-3회",
+    WEEKLY_4_PLUS: "주 4회 이상",
+  },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
+};
+
+function displayFactorValue(factor: AnalysisFactor): string {
+  const key = String(factor.factor_key ?? "");
+  const rawValue = factor.factor_value;
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return "";
+  }
+  const value = String(rawValue);
+  return factorValueLabels[key]?.[value] ?? value;
+}
 
 function getRiskLevel(result: AnalysisResult): string {
   return String(result.risk_level ?? "").toUpperCase();
@@ -221,7 +236,7 @@ export default function AnalysisPage() {
       <div className="page-header">
         <div>
           <h1>건강 분석 결과</h1>
-          <p>당뇨, 고혈압, 비만, 이상지질혈증 위험도를 한 화면에서 확인합니다.</p>
+          <p>당뇨, 고혈압, 비만, 콜레스테롤·중성지방 이상 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
           <button disabled={runningMode !== null} onClick={() => void run("BASIC")} type="button">
@@ -289,7 +304,6 @@ export default function AnalysisPage() {
               <strong>{score}/100</strong>
               <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (
@@ -348,12 +362,15 @@ export default function AnalysisPage() {
                 <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
                 {factors.length > 0 ? (
                   <div className="chip-list">
-                    {factors.slice(0, 4).map((factor) => (
-                      <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
-                        {String(factor.factor_name ?? factor.factor_key)}
-                        {factor.factor_value ? `: ${String(factor.factor_value)}` : ""}
-                      </span>
-                    ))}
+                    {factors.slice(0, 4).map((factor) => {
+                      const value = displayFactorValue(factor);
+                      return (
+                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
+                          {String(factor.factor_name ?? factor.factor_key)}
+                          {value ? `: ${value}` : ""}
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : (
                   <span>상세 요인은 분석 입력값과 질환별 기준에 따라 표시됩니다.</span>

@@ -117,4 +117,4 @@ class ChallengeRecommendationResponse(BaseSerializerModel):
 
 class ChallengeActionResponse(BaseModel):
     message: str
-    result: Any
+    result: dict[str, Any]

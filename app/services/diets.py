@@ -370,7 +370,7 @@ def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
             ],
             {"calories": 620, "carbohydrate_g": 72, "protein_g": 38, "fat_g": 18, "sodium_mg": 780},
             82.5,
-            "단백질과 채소 구성이 좋은 편입니다. 나트륨은 조금만 더 낮춰보세요.",
+            "단백질과 채소 구성이 적절한 편입니다. 나트륨은 조금만 더 낮춰보세요.",
             ["소스류 나트륨 확인 필요"],
             ["드레싱은 절반만 사용", "식후 10분 산책"],
             0.88,

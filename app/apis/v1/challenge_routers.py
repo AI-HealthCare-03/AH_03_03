@@ -22,6 +22,14 @@ from app.services import challenges as challenge_service
 challenge_router = APIRouter(prefix="/challenges", tags=["challenges"])
 
 
+def _challenge_log_payload(log: object) -> dict:
+    return ChallengeLogResponse.model_validate(log).model_dump(mode="json")
+
+
+def _user_challenge_payload(user_challenge: object) -> dict:
+    return UserChallengeResponse.model_validate(user_challenge).model_dump(mode="json")
+
+
 @challenge_router.get("", response_model=list[ChallengeResponse])
 async def list_active_challenges(
     category: str | None = None,
@@ -98,7 +106,7 @@ async def complete_today_challenge(user_challenge_id: int, user: Annotated[User,
     )
     ensure_owner(user_challenge.user_id, user)
     result = await challenge_service.complete_today_challenge(user_challenge_id)
-    return {"message": "오늘 챌린지를 완료 처리했습니다.", "result": result}
+    return {"message": "오늘 챌린지를 완료 처리했습니다.", "result": _challenge_log_payload(result)}
 
 
 @challenge_router.patch("/my/{user_challenge_id}/give-up", response_model=ChallengeActionResponse)
@@ -112,7 +120,7 @@ async def give_up_challenge(user_challenge_id: int, user: Annotated[User, Depend
         await challenge_service.give_up_challenge(user_challenge_id),
         "사용자 챌린지를 찾을 수 없습니다.",
     )
-    return {"message": "챌린지를 포기 처리했습니다.", "result": result}
+    return {"message": "챌린지를 포기 처리했습니다.", "result": _user_challenge_payload(result)}
 
 
 @challenge_router.post(
