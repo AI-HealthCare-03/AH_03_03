@@ -31,7 +31,8 @@ from app.services.jwt import JwtService
 
 VERIFICATION_CODE_TTL_MINUTES = 10
 PASSWORD_RESET_TOKEN_TTL_MINUTES = 30
-INVALID_LOGIN_MESSAGE = "아이디 또는 비밀번호가 올바르지 않습니다."
+ACCOUNT_NOT_FOUND_MESSAGE = "가입되지 않은 아이디 또는 이메일입니다."
+INVALID_LOGIN_MESSAGE = "비밀번호가 올바르지 않습니다."
 ACCOUNT_LOCKED_MESSAGE = "로그인 시도가 여러 번 실패했습니다. 잠시 후 다시 시도하거나 추가 확인을 진행해주세요."
 EMAIL_VERIFICATION_PURPOSE = "EMAIL_VERIFICATION"
 EMAIL_VERIFICATION_SIGNUP_TTL_MINUTES = 30
@@ -91,7 +92,7 @@ class AuthService:
         else:
             user = await self.user_repo.get_user_by_email(str(data.email))
         if not user:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_LOGIN_MESSAGE)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ACCOUNT_NOT_FOUND_MESSAGE)
 
         now = datetime.now(config.TIMEZONE)
         if user.locked_until is not None and user.locked_until > now:
