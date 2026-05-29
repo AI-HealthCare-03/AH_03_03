@@ -155,7 +155,8 @@ EXPERIMENTS = [
     # selective_log: 대사 지표만 선택적 로그 변환
     # 파생변수: TG/HDL비율, 비HDL콜레스테롤, 트리글리세라이드 포함
     # {"tag": "R_selective_log_derived", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
-    {"tag": "S_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "S_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    {"tag": "T_k7_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 7, "scaler": "standard", "cat_cols": "default"},
 ]
 
 
