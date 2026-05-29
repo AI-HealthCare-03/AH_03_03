@@ -21,12 +21,12 @@ from sklearn.preprocessing import StandardScaler
 # ────────────────────────────────────────────────
 ROOT = Path(__file__).parent.parent.parent  # ai_worker/
 DATA_PATH = ROOT / "data/lipid_only.csv"
-OUTPUT_DIR = Path(__file__).parent / "outputs" / "gender_split_v2_derived"
+OUTPUT_DIR = Path(__file__).parent / "outputs" / "gender_split_v3_k5"
 
 # ────────────────────────────────────────────────
 # 설정
 # ────────────────────────────────────────────────
-K = 4
+K = 5
 BEST_GAMMA_SEARCH = [0.01, 0.05, 0.1, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 5.0]
 N_INIT_SEARCH = 3
 N_INIT_FINAL = 20
