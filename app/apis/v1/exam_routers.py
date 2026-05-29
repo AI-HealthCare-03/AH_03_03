@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 
+from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.exams import (
     ExamConfirmRequest,
@@ -97,12 +98,21 @@ async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | N
     form = await request.form()
     upload = form.get("image") or form.get("file")
     if _is_upload(upload):
-        return await upload.read(), upload.content_type, getattr(upload, "filename", None)
+        filename = getattr(upload, "filename", None)
+        normalized_image = _normalize_uploaded_image(await upload.read(), upload.content_type, filename)
+        return normalized_image.data, normalized_image.media_type, filename
     return None, None, None
 
 
 def _is_upload(value: object) -> bool:
     return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
+
+
+def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
+    try:
+        return normalize_upload_image(image_bytes, media_type, filename)
+    except ImageNormalizationError as exc:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
 
 
 @exam_router.patch("/{exam_id}", response_model=ExamReportResponse)

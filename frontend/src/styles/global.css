@@ -2955,6 +2955,23 @@ pre {
   width: 100%;
 }
 
+.upload-selected-file {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.upload-selected-file strong {
+  overflow-wrap: anywhere;
+}
+
+.heic-preview-notice {
+  background: var(--color-yellow-soft);
+  color: var(--color-text);
+  font-weight: 800;
+  justify-self: stretch;
+}
+
 .ocr-card-icon {
   align-items: center;
   background: var(--color-primary-soft);
