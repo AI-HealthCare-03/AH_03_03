@@ -472,6 +472,7 @@ PASSWORD_RESET_DEBUG=false
 ```
 
 이 상태에서는 실제 SMTP 발송 없이 인증코드가 debug 응답으로 표시될 수 있습니다.
+실제 시연/서비스 테스트에서는 인증코드가 화면에 노출되지 않도록 `EMAIL_VERIFICATION_DEBUG=false`를 사용합니다.
 
 Brevo SMTP 등 실제 이메일 발송을 쓰려면:
 
