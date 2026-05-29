@@ -80,11 +80,12 @@ CONT_COLS_NO_DBP = [
 ]  # 14개
 CAT_COLS_NO_GENDER = ["연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
 
-# N2 베이스 + 파생변수(TG/HDL, 비HDL) + 트리글리세라이드 포함 (17개)
+# N2 베이스 + 파생변수 전체 포함 (19개)
+# 트리글리세라이드: TG/HDL 계산용으로만 사용, CONT_COLS에 미포함
 CONT_COLS_WITH_DERIVED = [
     c for c in CONT_COLS_WITH_HW
     if c != "이완기혈압"  # 이완기 제거
-] + ["트리글리세라이드", "TG_HDL비율", "비HDL콜레스테롤"]  # 파생변수 추가
+] + ["TG_HDL비율", "비HDL콜레스테롤", "맥압", "AST_ALT비율", "심혈관위험지수"]
 
 # 로그 변환 대상 변수 (대사 지표만 선택적 적용)
 LOG_COLS_SELECTIVE = [
@@ -95,6 +96,7 @@ LOG_COLS_SELECTIVE = [
     "감마지티피",
     "혈청크레아티닌",
     "TG_HDL비율",
+    # 맥압, AST_ALT비율, 심혈관위험지수는 로그 변환 불필요
 ]
 
 # ────────────────────────────────────────────────
@@ -152,7 +154,8 @@ EXPERIMENTS = [
     # 신규 — 코치님 피드백 반영
     # selective_log: 대사 지표만 선택적 로그 변환
     # 파생변수: TG/HDL비율, 비HDL콜레스테롤, 트리글리세라이드 포함
-    {"tag": "R_selective_log_derived", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "R_selective_log_derived", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    {"tag": "S_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
 ]
 
 
@@ -175,10 +178,13 @@ def add_bmi(df):
 
 
 def add_derived_features(df):
-    """파생변수 생성 — TG/HDL 비율, 비HDL 콜레스테롤"""
+    """파생변수 생성"""
     df = df.copy()
-    df["TG_HDL비율"] = df["트리글리세라이드"] / df["HDL콜레스테롤"].replace(0, np.nan)
+    df["TG_HDL비율"]    = df["트리글리세라이드"] / df["HDL콜레스테롤"].replace(0, np.nan)
     df["비HDL콜레스테롤"] = df["총콜레스테롤"] - df["HDL콜레스테롤"]
+    df["맥압"]          = df["수축기혈압"] - df["이완기혈압"]
+    df["AST_ALT비율"]   = df["혈청지오티(AST)"] / df["혈청지피티(ALT)"].replace(0, np.nan)
+    df["심혈관위험지수"] = df["총콜레스테롤"] / df["HDL콜레스테롤"].replace(0, np.nan)
     return df
 
 
@@ -415,7 +421,7 @@ def main():
     df = remove_outliers_clinical(df)
     df = add_bmi(df)
 
-    all_cont = list(set(CONT_COLS_WITH_HW + CONT_COLS_BMI_ONLY + ["트리글리세라이드"]))
+    all_cont = list(set(CONT_COLS_WITH_HW + CONT_COLS_BMI_ONLY + ["트리글리세라이드", "이완기혈압"]))
     df = df.dropna(subset=all_cont + CAT_COLS)
     print(f"  outlier 제거 + dropna 후: {len(df):,}명")
 
