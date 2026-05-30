@@ -27,6 +27,12 @@ class NotificationLogStatus(StrEnum):
     CANCELED = "CANCELED"
 
 
+class FCMTokenPlatform(StrEnum):
+    WEB = "web"
+    ANDROID = "android"
+    IOS = "ios"
+
+
 class Notification(models.Model):
     """User-facing notification inbox item.
 
@@ -132,4 +138,29 @@ class NotificationLog(models.Model):
             ("status",),
             ("channel",),
             ("created_at",),
+        )
+
+
+class UserFCMToken(models.Model):
+    """FCM registration token for one signed-in user device/browser."""
+
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="fcm_tokens", on_delete=fields.CASCADE)
+    token = fields.CharField(max_length=512, unique=True)
+    platform = fields.CharEnumField(enum_type=FCMTokenPlatform)
+    device_id = fields.CharField(max_length=128, null=True)
+    user_agent = fields.CharField(max_length=500, null=True)
+    is_active = fields.BooleanField(default=True)
+    last_seen_at = fields.DatetimeField()
+    revoked_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_fcm_tokens"
+        indexes = (
+            ("user_id",),
+            ("user_id", "is_active"),
+            ("platform",),
+            ("last_seen_at",),
         )
