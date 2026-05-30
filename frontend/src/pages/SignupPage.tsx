@@ -32,6 +32,7 @@ export default function SignupPage() {
   const [gender, setGender] = useState<"MALE" | "FEMALE">("MALE");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [privacyConsentAgreed, setPrivacyConsentAgreed] = useState(false);
   const [lifestyle, setLifestyle] = useState({
     smoking_status: "NON_SMOKER",
     drinking_frequency: "RARE",
@@ -147,6 +148,9 @@ export default function SignupPage() {
       }
       if (password !== passwordConfirm) {
         nextErrors.password_confirm = "비밀번호 확인이 일치하지 않습니다.";
+      }
+      if (!privacyConsentAgreed) {
+        nextErrors.privacy_consent = "개인정보 수집·이용 안내를 확인하고 동의해주세요.";
       }
     }
 
@@ -371,6 +375,7 @@ export default function SignupPage() {
         birth_date: birthDate,
         ...(hasPhoneInput ? { phone_number: normalizedPhoneNumber } : {}),
         nickname: name.trim(),
+        privacy_consent_agreed: privacyConsentAgreed,
         sensitive_data_agreed: true,
       });
       try {
@@ -612,6 +617,34 @@ export default function SignupPage() {
                 />
                 {fieldErrors.password_confirm && <span className="field-error">{fieldErrors.password_confirm}</span>}
               </label>
+              <div className="state-box signup-privacy-consent">
+                <strong>개인정보 수집·이용 안내</strong>
+                <p>
+                  AI HealthCare는 회원가입 및 건강관리 기능 제공을 위해 이름, 이메일, 휴대폰 번호, 닉네임 등
+                  계정 정보를 수집할 수 있습니다. 또한 건강검진 결과, 복약 정보, 식단 기록, 챌린지 수행 기록 등
+                  사용자가 직접 입력하거나 업로드한 건강 관련 정보를 분석 및 맞춤 안내 제공 목적으로 사용할 수 있습니다.
+                </p>
+                <p>
+                  입력한 건강정보는 본인 계정의 건강관리 참고 정보를 제공하기 위한 목적으로 사용되며, 본인 외 다른
+                  사용자에게 자동 공개되지 않습니다. 본 서비스의 분석 결과는 의료기관의 진단을 대체하지 않으며,
+                  건강관리 참고용 정보입니다.
+                </p>
+                <label className="checkbox-row">
+                  <input
+                    checked={privacyConsentAgreed}
+                    onChange={(event) => {
+                      setPrivacyConsentAgreed(event.target.checked);
+                      setFieldErrors((prev) => {
+                        const { privacy_consent, ...rest } = prev;
+                        return rest;
+                      });
+                    }}
+                    type="checkbox"
+                  />
+                  위 내용을 확인하고 개인정보 수집·이용에 동의합니다.
+                </label>
+                {fieldErrors.privacy_consent && <span className="field-error">{fieldErrors.privacy_consent}</span>}
+              </div>
             </>
           )}
 

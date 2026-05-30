@@ -158,6 +158,11 @@ export default function ExamOcrPage() {
           <div className="upload-box">
             <strong>검진표 이미지/PDF 업로드</strong>
             <span>촬영/업로드 후 생성된 후보 값을 확인하고 저장해주세요.</span>
+            <p className="warning-text">
+              업로드한 이미지는 건강정보 추출 및 분석을 위해 사용됩니다. 자동 인식 결과는 오류가 있을 수 있으므로
+              저장 또는 분석 전에 내용을 확인해주세요. 건강검진 결과는 민감한 건강정보일 수 있으므로 본인 자료만
+              업로드해주세요.
+            </p>
             <div className="upload-action-grid">
               <label className="upload-action-button">
                 파일에서 선택
