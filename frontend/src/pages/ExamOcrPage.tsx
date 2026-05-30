@@ -10,10 +10,11 @@ import {
   type ExamMeasurement,
   type ExamReport,
 } from "../api/exams";
-import { getAsyncJob } from "../api/jobs";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import { isHeicFile } from "../utils/files";
 
 export default function ExamOcrPage() {
@@ -24,10 +25,12 @@ export default function ExamOcrPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [exam, setExam] = useState<ExamReport | null>(null);
   const [measurements, setMeasurements] = useState<ExamMeasurement[]>([]);
+  const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunningOcr, setIsRunningOcr] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [canRetryOcr, setCanRetryOcr] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -47,6 +50,52 @@ export default function ExamOcrPage() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  const { latestJob: latestOcrJob } = useAsyncJobPolling({
+    jobId: ocrJobId,
+    enabled: isRunningOcr && ocrJobId !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      if (!exam) {
+        setError("검진표 정보를 찾지 못했습니다. 파일을 다시 선택해주세요.");
+        setIsRunningOcr(false);
+        setOcrJobId(null);
+        return;
+      }
+      try {
+        const latestMeasurements = await listMeasurements(exam.id);
+        setMeasurements(latestMeasurements);
+        setCanRetryOcr(false);
+        setMessage(
+          latestMeasurements.length > 0
+            ? `${getAsyncJobStatusMessage("SUCCESS")} 저장 전 검진 수치를 확인해주세요.`
+            : `${getAsyncJobStatusMessage("SUCCESS")} 인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.`,
+        );
+      } catch (err) {
+        setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
+        setCanRetryOcr(true);
+      } finally {
+        setIsRunningOcr(false);
+        setOcrJobId(null);
+      }
+    },
+    onFailure: (job) => {
+      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setCanRetryOcr(true);
+      setIsRunningOcr(false);
+      setOcrJobId(null);
+    },
+    onTimeout: () => {
+      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setCanRetryOcr(true);
+      setIsRunningOcr(false);
+      setOcrJobId(null);
+    },
+  });
+
+  const ocrStatusMessage =
+    isRunningOcr && ocrJobId !== null ? getAsyncJobStatusMessage(latestOcrJob?.status ?? "PENDING") : "";
 
   const handleFileSelection = async (file: File | null) => {
     if (selectedPreviewUrl) {
@@ -85,6 +134,7 @@ export default function ExamOcrPage() {
     setError("");
     setMessage("");
     setMeasurements([]);
+    setCanRetryOcr(false);
     if (!selectedFile) {
       setError("검진표 이미지 또는 PDF 파일을 먼저 선택해주세요.");
       return;
@@ -101,36 +151,12 @@ export default function ExamOcrPage() {
       setExam(report);
       const job = await runExamOcr(report.id, selectedFile);
       setMessage("검진표 분석 요청을 접수했습니다. 측정값 후보가 생성될 때까지 잠시 기다려주세요.");
-      await waitForExamOcrJob(job.id, report.id);
+      setOcrJobId(job.id);
     } catch (err) {
-      setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
-    } finally {
+      setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
+      setCanRetryOcr(true);
       setIsRunningOcr(false);
     }
-  };
-
-  const waitForExamOcrJob = async (jobId: number, examId: number) => {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
-      await delay(1500);
-      const job = await getAsyncJob(jobId);
-      if (job.status === "SUCCESS") {
-        const latestMeasurements = await listMeasurements(examId);
-        setMeasurements(latestMeasurements);
-        setMessage(
-          latestMeasurements.length > 0
-            ? "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요."
-            : "인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.",
-        );
-        return;
-      }
-      if (job.status === "FAILED") {
-        throw new Error(job.error_message || "측정값 후보 생성에 실패했습니다.");
-      }
-      if (attempt === 0) {
-        setMessage("건강검진표를 분석 중입니다. PDF 페이지 수에 따라 시간이 걸릴 수 있습니다.");
-      }
-    }
-    throw new Error("검진표 분석이 지연되고 있습니다. 잠시 후 측정값 후보를 다시 확인해주세요.");
   };
 
   const updateLocalMeasurement = (measurementId: number, value: string) => {
@@ -178,6 +204,14 @@ export default function ExamOcrPage() {
         </Link>
       </div>
       {error && <ErrorMessage message={error} />}
+      {canRetryOcr ? (
+        <div className="button-row">
+          <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
+      {ocrStatusMessage && <div className="state-box">{ocrStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
       <div className="page-grid">
         <Card title="파일 업로드">
@@ -225,9 +259,6 @@ export default function ExamOcrPage() {
           <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
             {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
           </button>
-          {isRunningOcr ? (
-            <div className="state-box">건강검진표를 분석 중입니다. PDF 페이지 수에 따라 시간이 걸릴 수 있습니다.</div>
-          ) : null}
         </Card>
         <Card title="저장 전 확인">
           <p className="warning-text">자동 인식으로 생성된 후보값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
@@ -288,8 +319,4 @@ function toUserMessage(message: string): string {
 
 function isPdfFile(file: File): boolean {
   return file.type.toLowerCase() === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
