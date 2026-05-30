@@ -14,6 +14,7 @@ class TestSignupAPI(TestCase):
             "gender": "MALE",
             "birth_date": "1990-01-01",
             "phone_number": "01012345678",
+            "privacy_consent_agreed": True,
         }
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -29,6 +30,7 @@ class TestSignupAPI(TestCase):
             "gender": "MALE",
             "birth_date": "1990-01-01",
             "phone_number": "01012345678",
+            "privacy_consent_agreed": True,
         }
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post("/api/v1/auth/signup", json=signup_data)
