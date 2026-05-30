@@ -4,6 +4,7 @@ from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
 from app.core import config
@@ -19,6 +20,7 @@ from app.dtos.exams import (
 from app.models.exams import ExamMeasurement, ExamReport, OCRStatus
 from app.repositories import exam_repository, health_repository
 from app.services.health import _with_calculated_bmi
+from app.services.storage import get_storage_service, normalize_storage_key
 
 EXAM_MEASUREMENT_METADATA = {
     "height": ("키", "cm"),
@@ -104,13 +106,12 @@ async def store_exam_ocr_upload(
     image_media_type: str | None,
     image_filename: str | None,
 ) -> ExamReport:
-    path = _build_exam_upload_path(report, image_media_type, image_filename)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(image_bytes)
+    storage_key = _build_exam_upload_key(report, image_media_type, image_filename)
+    stored_key = get_storage_service().save_bytes(image_bytes, storage_key, content_type=image_media_type)
     updated = await update_exam_report(
         int(report.id),
         ExamReportUpdateRequest(
-            file_path=_stored_path_for_db(path),
+            file_path=stored_key,
             original_filename=image_filename or report.original_filename,
             ocr_status=OCRStatus.PENDING,
         ),
@@ -123,6 +124,15 @@ def _upload_storage_root() -> Path:
     if not root.is_absolute():
         root = Path.cwd() / root
     return root
+
+
+def _build_exam_upload_key(
+    report: ExamReport,
+    image_media_type: str | None,
+    image_filename: str | None,
+) -> str:
+    extension = _upload_extension(image_media_type, image_filename)
+    return normalize_storage_key(f"exams/{report.user_id}/{report.id}/{uuid4().hex}/source{extension}")
 
 
 def _build_exam_upload_path(
@@ -368,18 +378,44 @@ async def run_exam_ocr_from_report(exam_report_id: int) -> ExamOCRResponse:
     if report is None:
         raise ValueError(f"exam_report_not_found:{exam_report_id}")
 
-    upload_path = _resolve_stored_upload_path(report.file_path)
-    if not upload_path.exists() or not upload_path.is_file():
+    stored_upload = _read_stored_exam_upload(report.file_path)
+    if stored_upload is None:
         await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.FAILED))
         raise FileNotFoundError(f"exam_upload_file_not_found:{exam_report_id}")
 
+    image_bytes, media_type, filename = stored_upload
     await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.PROCESSING))
     return await run_exam_ocr(
         exam_report_id=exam_report_id,
-        image_bytes=upload_path.read_bytes(),
-        image_media_type=_media_type_from_upload_path(upload_path, report.original_filename),
-        image_filename=report.original_filename or upload_path.name,
+        image_bytes=image_bytes,
+        image_media_type=media_type,
+        image_filename=report.original_filename or filename,
     )
+
+
+def _read_stored_exam_upload(file_path: str | None) -> tuple[bytes, str, str] | None:
+    if not file_path:
+        return None
+
+    storage = get_storage_service()
+    try:
+        if storage.exists(file_path):
+            return storage.read_bytes(file_path), _media_type_from_storage_key(file_path), Path(file_path).name
+    except Exception:
+        logger.warning("Storage 기반 건강검진 업로드 읽기 실패: %s", file_path, exc_info=True)
+
+    legacy_path = _resolve_stored_upload_path(file_path)
+    if legacy_path.exists() and legacy_path.is_file():
+        return legacy_path.read_bytes(), _media_type_from_upload_path(legacy_path), legacy_path.name
+    return None
+
+
+def _media_type_from_storage_key(key: str, filename: str | None = None) -> str:
+    suffix = Path(key).suffix.lower()
+    if suffix in EXAM_UPLOAD_MEDIA_TYPES:
+        return EXAM_UPLOAD_MEDIA_TYPES[suffix]
+    filename_suffix = Path(filename or "").suffix.lower()
+    return EXAM_UPLOAD_MEDIA_TYPES.get(filename_suffix, "image/jpeg")
 
 
 async def _extract_exam_measurements_with_provider(
