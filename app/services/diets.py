@@ -20,6 +20,7 @@ from app.dtos.diets import (
 )
 from app.models.diets import DietPhotoResult, DietRecord
 from app.repositories import diet_repository
+from app.services.storage import get_storage_service, normalize_storage_key
 
 SCORING_SOURCE = "nutrition_rule_table"
 FOOD_DETECTION_SOURCE = "rule_based_food_detection"
@@ -181,12 +182,16 @@ def store_diet_analysis_upload(
     filename: str | None,
 ) -> dict[str, str]:
     suffix = _safe_image_suffix(filename, image_media_type)
-    upload_path = _build_diet_analysis_upload_path(user_id=user_id, suffix=suffix)
-    upload_path.write_bytes(image_bytes)
+    upload_key = _build_diet_analysis_upload_key(user_id=user_id, suffix=suffix)
+    stored_key = get_storage_service().save_bytes(
+        image_bytes,
+        upload_key,
+        content_type=image_media_type or DIET_ANALYSIS_MEDIA_TYPES.get(suffix),
+    )
     return {
-        "upload_path": str(upload_path),
-        "image_media_type": image_media_type or _media_type_from_upload_path(str(upload_path)),
-        "image_filename": filename or upload_path.name,
+        "upload_path": stored_key,
+        "image_media_type": image_media_type or _media_type_from_upload_path(stored_key),
+        "image_filename": filename or Path(stored_key).name,
     }
 
 
@@ -285,19 +290,8 @@ def _is_number(value: Any) -> bool:
     return True
 
 
-def _upload_storage_root() -> Path:
-    root = Path(config.UPLOAD_STORAGE_DIR)
-    if not root.is_absolute():
-        root = Path.cwd() / root
-    path = root / DIET_ANALYSIS_UPLOAD_DIR
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _build_diet_analysis_upload_path(*, user_id: int, suffix: str) -> Path:
-    user_dir = _upload_storage_root() / str(user_id)
-    user_dir.mkdir(parents=True, exist_ok=True)
-    return user_dir / f"{uuid4().hex}{suffix}"
+def _build_diet_analysis_upload_key(*, user_id: int, suffix: str) -> str:
+    return normalize_storage_key(f"diet-analysis/{user_id}/{uuid4().hex}/source{suffix}")
 
 
 def _safe_image_suffix(filename: str | None, media_type: str | None) -> str:
@@ -314,6 +308,13 @@ def _safe_image_suffix(filename: str | None, media_type: str | None) -> str:
 def _read_diet_analysis_bytes(path_value: str) -> bytes | None:
     if not path_value:
         return None
+    try:
+        storage = get_storage_service()
+        if storage.exists(path_value):
+            return storage.read_bytes(path_value)
+    except ValueError:
+        pass
+
     path = Path(path_value)
     if not path.exists() or not path.is_file():
         raise ValueError("diet_analysis_upload_missing")
