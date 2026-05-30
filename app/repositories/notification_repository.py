@@ -77,12 +77,31 @@ async def delete_reminder_schedule(schedule_id: int) -> int:
     return await ReminderSchedule.filter(id=schedule_id).delete()
 
 
+async def list_due_reminder_schedules(now, limit: int = 100) -> list[ReminderSchedule]:
+    return (
+        await ReminderSchedule.filter(
+            is_active=True,
+            next_trigger_at__isnull=False,
+            next_trigger_at__lte=now,
+        )
+        .order_by("next_trigger_at", "id")
+        .limit(limit)
+    )
+
+
 async def create_notification_log(user_id: int, data: dict[str, Any]) -> NotificationLog:
     return await NotificationLog.create(user_id=user_id, **data)
 
 
 async def list_notification_logs_by_user(user_id: int, limit: int = 50, offset: int = 0) -> list[NotificationLog]:
     return await NotificationLog.filter(user_id=user_id).order_by("-created_at").offset(offset).limit(limit)
+
+
+async def has_notification_log_for_reminder_since(reminder_schedule_id: int, since) -> bool:
+    return await NotificationLog.filter(
+        reminder_schedule_id=reminder_schedule_id,
+        created_at__gte=since,
+    ).exists()
 
 
 async def get_fcm_token_by_token(token: str) -> UserFCMToken | None:
