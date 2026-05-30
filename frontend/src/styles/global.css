@@ -2547,12 +2547,77 @@ pre {
 }
 
 .signup-privacy-consent {
+  background: color-mix(in srgb, var(--color-blue-soft) 72%, white);
+  border: 1px solid var(--color-border);
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .signup-privacy-consent p {
   margin: 0;
+}
+
+.privacy-consent-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.privacy-detail-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 900;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.privacy-consent-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.privacy-consent-details {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.privacy-consent-details section {
+  display: grid;
+  gap: 8px;
+}
+
+.privacy-consent-details h3 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.privacy-consent-details ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.privacy-consent-details li {
+  line-height: 1.55;
+}
+
+.privacy-consent-check {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 12px;
 }
 
 .checkbox-row {
@@ -2762,6 +2827,39 @@ pre {
 
 .toggle-row input {
   width: auto;
+}
+
+.browser-push-box {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-section-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.settings-section-header p {
+  margin: 4px 0 0;
+}
+
+.status-pill {
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  color: var(--color-primary-dark);
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.browser-push-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .family-section-grid {
