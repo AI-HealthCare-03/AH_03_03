@@ -96,9 +96,9 @@ export default function MedicationOcrPage() {
     setIsRunning(true);
     try {
       const job = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
-      setMessage("복약 정보 분석 요청을 접수했습니다. 후보가 생성될 때까지 잠시 기다려주세요.");
+      setMessage("");
       setOcrJobId(job.id);
-    } catch (err) {
+    } catch {
       setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
       setCanRetryOcr(true);
       setIsRunning(false);

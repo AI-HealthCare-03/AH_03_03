@@ -72,7 +72,7 @@ export default function ExamOcrPage() {
             ? `${getAsyncJobStatusMessage("SUCCESS")} 저장 전 검진 수치를 확인해주세요.`
             : `${getAsyncJobStatusMessage("SUCCESS")} 인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.`,
         );
-      } catch (err) {
+      } catch {
         setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
         setCanRetryOcr(true);
       } finally {
@@ -150,7 +150,7 @@ export default function ExamOcrPage() {
       }));
       setExam(report);
       const job = await runExamOcr(report.id, selectedFile);
-      setMessage("검진표 분석 요청을 접수했습니다. 측정값 후보가 생성될 때까지 잠시 기다려주세요.");
+      setMessage("");
       setOcrJobId(job.id);
     } catch (err) {
       setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
@@ -308,13 +308,6 @@ export default function ExamOcrPage() {
       </Card>
     </div>
   );
-}
-
-function toUserMessage(message: string): string {
-  if (message.includes("provider") || message.includes("fallback")) {
-    return "자동 인식으로 측정값 후보를 찾지 못했습니다. 파일을 다시 확인해주세요.";
-  }
-  return message.replaceAll("OCR", "자동 인식");
 }
 
 function isPdfFile(file: File): boolean {

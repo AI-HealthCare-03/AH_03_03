@@ -163,7 +163,7 @@ export default function DietPage() {
         setCanRetryAnalysis(false);
         setMessage(`${getAsyncJobStatusMessage("SUCCESS")} 저장된 결과를 확인해주세요.`);
         await load();
-      } catch (err) {
+      } catch {
         setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
         setCanRetryAnalysis(true);
       } finally {
@@ -285,7 +285,7 @@ export default function DietPage() {
             image_path: null,
           };
       const job = await analyzeDiet(payload);
-      setMessage("식단 분석 요청을 접수했습니다. 결과가 생성될 때까지 잠시 기다려주세요.");
+      setMessage("");
       setAnalysisJobId(job.id);
     } catch (err) {
       setError("분석 요청을 시작하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해주세요.");
