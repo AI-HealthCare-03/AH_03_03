@@ -89,18 +89,84 @@ def test_invalid_or_none_values_do_not_overwrite_health_record_fields() -> None:
     assert data == {}
 
 
-def test_exam_upload_path_uses_shared_storage_root(monkeypatch, tmp_path: Path) -> None:
+def test_exam_upload_key_uses_user_exam_and_unique_segment() -> None:
     report = SimpleNamespace(id=7, user_id=3)
-    monkeypatch.setattr(exam_service.config, "UPLOAD_STORAGE_DIR", str(tmp_path))
 
-    path = exam_service._build_exam_upload_path(report, "image/jpeg", "checkup.heic")
+    key = exam_service._build_exam_upload_key(report, "image/jpeg", "checkup.heic")
 
-    assert path == tmp_path / "exams" / "3" / "7" / "source.jpg"
+    assert key.startswith("exams/3/7/")
+    assert key.endswith("/source.jpg")
+    assert ".." not in key
 
 
 def test_exam_upload_media_type_is_inferred_from_stored_path() -> None:
     assert exam_service._media_type_from_upload_path(Path("var/uploads/exams/1/2/source.pdf")) == "application/pdf"
     assert exam_service._media_type_from_upload_path(Path("var/uploads/exams/1/2/source.webp")) == "image/webp"
+    assert exam_service._media_type_from_storage_key("exams/1/2/source.pdf") == "application/pdf"
+
+
+@pytest.mark.asyncio
+async def test_store_exam_ocr_upload_uses_local_storage_backend(monkeypatch, tmp_path: Path) -> None:
+    report = SimpleNamespace(id=7, user_id=3, original_filename=None)
+    captured_update: dict[str, object] = {}
+    monkeypatch.setattr(exam_service.config, "STORAGE_BACKEND", "local")
+    monkeypatch.setattr(exam_service.config, "LOCAL_STORAGE_ROOT", str(tmp_path))
+
+    async def fake_update_exam_report(exam_report_id: int, request):
+        assert exam_report_id == 7
+        captured_update.update(request.model_dump(exclude_unset=True))
+        return SimpleNamespace(**{**report.__dict__, **captured_update})
+
+    monkeypatch.setattr(exam_service, "update_exam_report", fake_update_exam_report)
+
+    updated = await exam_service.store_exam_ocr_upload(
+        report,
+        b"exam-image",
+        "image/jpeg",
+        "checkup.jpg",
+    )
+
+    stored_key = str(captured_update["file_path"])
+    assert stored_key.startswith("exams/3/7/")
+    assert stored_key.endswith("/source.jpg")
+    assert (tmp_path / stored_key).read_bytes() == b"exam-image"
+    assert updated.file_path == stored_key
+
+
+@pytest.mark.asyncio
+async def test_run_exam_ocr_from_report_reads_upload_via_storage(monkeypatch, tmp_path: Path) -> None:
+    stored_key = "exams/3/7/test/source.png"
+    storage_path = tmp_path / stored_key
+    storage_path.parent.mkdir(parents=True)
+    storage_path.write_bytes(b"stored-image")
+    report = SimpleNamespace(id=7, user_id=3, file_path=stored_key, original_filename="checkup.png")
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(exam_service.config, "STORAGE_BACKEND", "local")
+    monkeypatch.setattr(exam_service.config, "LOCAL_STORAGE_ROOT", str(tmp_path))
+
+    async def fake_get_exam_report(exam_report_id: int):
+        assert exam_report_id == 7
+        return report
+
+    async def fake_update_exam_report(exam_report_id: int, request):
+        assert exam_report_id == 7
+        return report
+
+    async def fake_run_exam_ocr(**kwargs):
+        captured.update(kwargs)
+        return "ocr-response"
+
+    monkeypatch.setattr(exam_service, "get_exam_report", fake_get_exam_report)
+    monkeypatch.setattr(exam_service, "update_exam_report", fake_update_exam_report)
+    monkeypatch.setattr(exam_service, "run_exam_ocr", fake_run_exam_ocr)
+
+    response = await exam_service.run_exam_ocr_from_report(7)
+
+    assert response == "ocr-response"
+    assert captured["image_bytes"] == b"stored-image"
+    assert captured["image_media_type"] == "image/png"
+    assert captured["image_filename"] == "checkup.png"
 
 
 @pytest.mark.asyncio
