@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-ai_health}
       POSTGRES_USER: ${DB_USER:-ozcoding}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pw1234}
       TZ: Asia/Seoul
     ports:
       - "${DB_EXPOSE_PORT:-5432}:5432"
@@ -51,7 +51,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-ozcoding}
-      DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      DB_PASSWORD: ${DB_PASSWORD:-pw1234}
       DB_NAME: ${DB_NAME:-ai_health}
       DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
       DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-5}
@@ -135,7 +135,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-ozcoding}
-      DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      DB_PASSWORD: ${DB_PASSWORD:-pw1234}
       DB_NAME: ${DB_NAME:-ai_health}
       DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
       DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-5}

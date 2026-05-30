@@ -107,7 +107,7 @@ Node.js 20 이상과 npm은 프론트 단독 개발, `npm run build`, `npm run d
 cp envs/example.local.env .env
 ```
 
-`.env`는 git에 커밋하지 않습니다. 실제 OpenAI, Langfuse, SMTP key는 각자 로컬 `.env`에만 넣습니다.
+`.env`는 git에 커밋하지 않습니다. 실제 OpenAI, Langfuse, SMTP key는 각자 로컬 `.env`에만 넣습니다. Docker Compose의 `${...}` 치환은 `env_file`이 아니라 루트 `.env` 또는 `--env-file` 값으로 처리됩니다. dev stack은 아래처럼 `--env-file .env`를 붙여 실행하는 것을 권장합니다.
 
 최소 로컬/시연 기본값:
 
@@ -116,7 +116,7 @@ ENV=local
 DB_HOST=postgres
 DB_PORT=5432
 DB_USER=ozcoding
-DB_PASSWORD=PLEASE_CHANGE_ME
+DB_PASSWORD=pw1234
 DB_NAME=ai_health
 
 EMAIL_ENABLED=false
