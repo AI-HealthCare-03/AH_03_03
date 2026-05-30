@@ -20,6 +20,7 @@ from app.dtos.medications import (
 )
 from app.models.medications import Medication, MedicationRecord
 from app.repositories import medication_repository
+from app.services.storage import get_storage_service, normalize_storage_key
 
 MEDICATION_NOT_FOUND_MESSAGE = "복약/영양제 정보를 찾을 수 없습니다."
 MEDICATION_RECORD_NOT_FOUND_MESSAGE = "복약 기록을 찾을 수 없습니다."
@@ -150,20 +151,20 @@ def store_medication_ocr_upload(
     filename: str | None,
 ) -> dict[str, str]:
     suffix = _safe_file_suffix(filename, image_media_type)
-    upload_path = _build_medication_ocr_path(user_id=user_id, suffix=suffix)
-    upload_path.write_bytes(image_bytes)
+    storage_key = _build_medication_ocr_key(user_id=user_id, suffix=suffix)
+    stored_key = get_storage_service().save_bytes(image_bytes, storage_key, content_type=image_media_type)
     return {
-        "upload_path": str(upload_path),
-        "image_media_type": image_media_type or _media_type_from_upload_path(str(upload_path)),
-        "image_filename": filename or upload_path.name,
+        "upload_path": stored_key,
+        "image_media_type": image_media_type or _media_type_from_upload_path(stored_key),
+        "image_filename": filename or Path(stored_key).name,
     }
 
 
 def store_medication_ocr_text(*, user_id: int, text: str) -> dict[str, str]:
-    text_path = _build_medication_ocr_path(user_id=user_id, suffix=".txt")
-    text_path.write_text(text, encoding="utf-8")
+    storage_key = _build_medication_ocr_key(user_id=user_id, suffix=".txt")
+    text_path = get_storage_service().save_bytes(text.encode("utf-8"), storage_key, content_type="text/plain")
     return {
-        "text_path": str(text_path),
+        "text_path": text_path,
     }
 
 
@@ -470,6 +471,10 @@ def _build_medication_ocr_path(*, user_id: int, suffix: str) -> Path:
     return user_dir / f"{uuid4().hex}{suffix}"
 
 
+def _build_medication_ocr_key(*, user_id: int, suffix: str) -> str:
+    return normalize_storage_key(f"medication-ocr/{user_id}/{uuid4().hex}/source{suffix}")
+
+
 def _safe_file_suffix(filename: str | None, media_type: str | None) -> str:
     suffix = Path(filename or "").suffix.lower()
     if suffix in MEDICATION_OCR_MEDIA_TYPES:
@@ -486,6 +491,13 @@ def _safe_file_suffix(filename: str | None, media_type: str | None) -> str:
 def _read_medication_ocr_bytes(path_value: object) -> bytes | None:
     if not path_value:
         return None
+    try:
+        storage = get_storage_service()
+        if storage.exists(str(path_value)):
+            return storage.read_bytes(str(path_value))
+    except Exception:
+        pass
+
     path = Path(str(path_value))
     if not path.exists() or not path.is_file():
         raise ValueError("medication_ocr_upload_missing")
@@ -495,6 +507,14 @@ def _read_medication_ocr_bytes(path_value: object) -> bytes | None:
 def _read_medication_ocr_text(path_value: object) -> str | None:
     if not path_value:
         return None
+    try:
+        storage = get_storage_service()
+        if storage.exists(str(path_value)):
+            text = storage.read_bytes(str(path_value)).decode("utf-8").strip()
+            return text or None
+    except Exception:
+        pass
+
     path = Path(str(path_value))
     if not path.exists() or not path.is_file():
         raise ValueError("medication_ocr_text_missing")
