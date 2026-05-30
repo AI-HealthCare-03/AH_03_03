@@ -3,10 +3,13 @@ services:
     image: redis:alpine
     container_name: redis
     restart: always
+    command: ["redis-server", "--appendonly", "yes"]
     networks:
       - ws
     expose:
       - "6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -64,7 +67,7 @@ services:
       LOCAL_STORAGE_ROOT: ${LOCAL_STORAGE_ROOT:-var/storage}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
       S3_REGION: ${S3_REGION:-ap-northeast-2}
-      S3_PREFIX: ${S3_PREFIX:-ai-health/prod}
+      S3_PREFIX: ${S3_PREFIX:-ai-health/}
       S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
       EMAIL_VERIFICATION_DEBUG: ${EMAIL_VERIFICATION_DEBUG:-false}
@@ -150,7 +153,7 @@ services:
       LOCAL_STORAGE_ROOT: ${LOCAL_STORAGE_ROOT:-var/storage}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
       S3_REGION: ${S3_REGION:-ap-northeast-2}
-      S3_PREFIX: ${S3_PREFIX:-ai-health/prod}
+      S3_PREFIX: ${S3_PREFIX:-ai-health/}
       S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -245,6 +248,8 @@ services:
 volumes:
   postgres_data:
     name: postgres_data
+  redis_data:
+    name: redis_data
   static_volume:
     name: static_volume
   media_volume:
