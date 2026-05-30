@@ -294,9 +294,12 @@ async def complete_today_challenge(user_challenge_id: int) -> ChallengeLog:
     )
     _attach_challenge_log_dates(log)
     try:
-        from app.services import family as family_service
+        from app.services import service_jobs
 
-        await family_service.notify_family_challenge_completed(user_challenge_id)
+        await service_jobs.enqueue_family_notification_create(
+            alert_type="challenge_completed",
+            user_challenge_id=user_challenge_id,
+        )
     except Exception:  # noqa: BLE001
         # 가족 알림은 부가 기능이므로 챌린지 완료 기록 자체를 실패시키지 않는다.
         pass

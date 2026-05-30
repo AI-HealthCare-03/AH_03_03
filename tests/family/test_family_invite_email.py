@@ -19,7 +19,7 @@ from app.services.email_service import EmailService
 
 @pytest.mark.asyncio
 async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: pytest.MonkeyPatch) -> None:
-    email_calls: list[dict[str, str]] = []
+    email_jobs: list[dict[str, str]] = []
     create_payloads: list[dict[str, object]] = []
     inviter = SimpleNamespace(id=1, nickname="동욱", name="홍동욱", login_id="dongwook")
     family = SimpleNamespace(id=10)
@@ -46,15 +46,17 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
             created_at=datetime(2026, 5, 30, 10, 0, 0),
         )
 
-    class FakeEmailService:
-        async def send_family_invite_email(self, email: str, **kwargs: str) -> bool:
-            email_calls.append({"email": email, **kwargs})
-            return True
+    async def fake_enqueue_family_invite_email_send(**kwargs: str) -> None:
+        email_jobs.append(kwargs)
 
     monkeypatch.setattr(family_service, "_ensure_owner", fake_ensure_owner)
     monkeypatch.setattr(family_service.secrets, "token_urlsafe", lambda length: "invite-token")
     monkeypatch.setattr(family_service.FamilyInvite, "create", staticmethod(fake_create_invite))
-    monkeypatch.setattr(family_service, "EmailService", FakeEmailService)
+    monkeypatch.setattr(
+        family_service.service_jobs,
+        "enqueue_family_invite_email_send",
+        fake_enqueue_family_invite_email_send,
+    )
     monkeypatch.setattr(family_service.config, "FRONTEND_BASE_URL", "http://localhost:8080")
 
     invite, invite_code = await family_service.create_family_invite(
@@ -71,9 +73,9 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
     assert invite_code == "invite-token"
     assert create_payloads[0]["invitee_email"] == "family@example.com"
     assert create_payloads[0]["code_hash"] == family_service._digest("invite-token")
-    assert email_calls == [
+    assert email_jobs == [
         {
-            "email": "family@example.com",
+            "recipient_email": "family@example.com",
             "inviter_display_name": "동욱",
             "invite_url": "http://localhost:8080/family/invitations/accept?code=invite-token",
             "expires_at_text": invite.expires_at.astimezone(family_service.config.TIMEZONE).strftime("%Y-%m-%d %H:%M"),

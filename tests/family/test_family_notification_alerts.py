@@ -157,8 +157,7 @@ async def test_family_challenge_alert_sends_push_when_enabled_with_active_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     created: list[SimpleNamespace] = []
-    push_calls: list[dict[str, object]] = []
-    log_calls: list[dict[str, object]] = []
+    push_jobs: list[dict[str, object]] = []
     _patch_family_alert_base(
         monkeypatch,
         share_settings=[SimpleNamespace(viewer_user_id=2)],
@@ -167,34 +166,25 @@ async def test_family_challenge_alert_sends_push_when_enabled_with_active_token(
         patch_push=False,
     )
 
-    async def fake_list_active_fcm_tokens(user_id: int) -> list[str]:
-        assert user_id == 2
-        return ["family-token"]
+    async def fake_enqueue_fcm_push_send(**kwargs: object) -> None:
+        push_jobs.append(kwargs)
 
-    async def fake_record_push_result(**kwargs: object) -> None:
-        log_calls.append(kwargs)
-
-    class FakeFCMService:
-        def send_to_tokens(self, **kwargs: object) -> SimpleNamespace:
-            push_calls.append(kwargs)
-            return SimpleNamespace(success_count=1, failure_count=0, provider_message_ids=["msg-1"])
-
-    monkeypatch.setattr(family_service, "_list_active_fcm_tokens", fake_list_active_fcm_tokens)
-    monkeypatch.setattr(family_service, "_record_push_result", fake_record_push_result)
-    monkeypatch.setattr(family_service, "FCMService", FakeFCMService)
+    monkeypatch.setattr(family_service.service_jobs, "enqueue_fcm_push_send", fake_enqueue_fcm_push_send)
 
     result = await family_service.notify_family_challenge_completed(77)
 
     assert len(result) == 1
-    assert push_calls == [
+    assert push_jobs == [
         {
-            "tokens": ["family-token"],
+            "user_id": 2,
             "title": "가족 챌린지 알림",
             "body": "동욱님이 이번 챌린지 목표를 달성했어요.",
             "data": {"type": family_service.FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE, "user_challenge_id": "77"},
+            "notification_type": "FAMILY_ALERT",
+            "related_type": family_service.FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE,
+            "related_id": 77,
         }
     ]
-    assert log_calls
 
 
 @pytest.mark.asyncio
@@ -211,20 +201,15 @@ async def test_family_challenge_alert_keeps_internal_notification_when_push_fail
         patch_push=False,
     )
 
-    async def fake_list_active_fcm_tokens(user_id: int) -> list[str]:
-        assert user_id == 2
-        return ["family-token"]
-
     async def fake_record_push_result(**kwargs: object) -> None:
         log_calls.append(kwargs)
 
-    class FailingFCMService:
-        def send_to_tokens(self, **kwargs: object) -> SimpleNamespace:
-            raise RuntimeError("provider unavailable")
+    async def fake_enqueue_fcm_push_send(**kwargs: object) -> None:
+        _ = kwargs
+        raise RuntimeError("provider unavailable")
 
-    monkeypatch.setattr(family_service, "_list_active_fcm_tokens", fake_list_active_fcm_tokens)
     monkeypatch.setattr(family_service, "_record_push_result", fake_record_push_result)
-    monkeypatch.setattr(family_service, "FCMService", FailingFCMService)
+    monkeypatch.setattr(family_service.service_jobs, "enqueue_fcm_push_send", fake_enqueue_fcm_push_send)
 
     result = await family_service.notify_family_challenge_completed(77)
 

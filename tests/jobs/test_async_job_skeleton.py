@@ -16,6 +16,7 @@ from ai_runtime.jobs.redis_stream import (
     parse_stream_job,
 )
 from app.services import async_jobs as async_job_service
+from app.services import service_jobs as service_job_service
 
 
 class FakeRedis:
@@ -174,6 +175,211 @@ async def test_create_diet_analyze_image_job_enqueues_slim_stream_payload(monkey
     assert calls[1][1]["job_type"] == "diet.analyze_image"
     assert calls[1][1]["payload"] == {"resource_type": "diet_analysis_request"}
     assert calls[1][1]["user_id"] == 10
+
+
+@pytest.mark.asyncio
+async def test_email_verification_job_enqueue_uses_service_stream_and_slim_payload(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    async def fake_create_async_job(**kwargs):
+        calls.append(("create_async_job", kwargs))
+
+    monkeypatch.setattr(service_job_service.async_job_service, "create_async_job", fake_create_async_job)
+
+    await service_job_service.enqueue_email_verification_send(email="demo@example.com", code="123456")
+
+    assert calls[0][1]["job_type"] == "email.verification.send"
+    assert calls[0][1]["stream"] == "ai_health:jobs:service"
+    assert calls[0][1]["request_payload"]["code"] == "123456"
+    assert calls[0][1]["stream_payload"] == {"resource_type": "email_verification"}
+
+
+@pytest.mark.asyncio
+async def test_family_invite_email_job_enqueue_uses_service_stream_and_slim_payload(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    async def fake_create_async_job(**kwargs):
+        calls.append(("create_async_job", kwargs))
+
+    monkeypatch.setattr(service_job_service.async_job_service, "create_async_job", fake_create_async_job)
+
+    await service_job_service.enqueue_family_invite_email_send(
+        recipient_email="family@example.com",
+        inviter_display_name="동욱",
+        invite_url="http://localhost:8080/family/invitations/accept?code=invite-token",
+        expires_at_text="2026-05-31 10:00",
+    )
+
+    assert calls[0][1]["job_type"] == "family.invite.email.send"
+    assert calls[0][1]["stream"] == "ai_health:jobs:service"
+    assert calls[0][1]["request_payload"]["recipient_email"] == "family@example.com"
+    assert calls[0][1]["stream_payload"] == {"resource_type": "family_invite_email"}
+
+
+@pytest.mark.asyncio
+async def test_fcm_push_service_job_handler_sends_to_active_tokens(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+    payload = {
+        "user_id": 7,
+        "title": "챌린지 알림",
+        "body": "동욱님이 이번 챌린지 목표를 달성했어요.",
+        "data": {"type": "challenge_completed"},
+        "notification_type": "FAMILY_ALERT",
+        "related_type": "challenge_completed",
+        "related_id": 30,
+    }
+
+    async def fake_get_job(job_id: int):
+        assert job_id == 41
+        return SimpleNamespace(request_payload=payload)
+
+    async def fake_mark_processing(job_id: int):
+        calls.append(("processing", {"job_id": job_id}))
+
+    async def fake_mark_success(job_id: int, result_payload: dict):
+        calls.append(("success", {"job_id": job_id, "result": result_payload}))
+
+    async def fake_list_active_fcm_tokens(user_id: int):
+        assert user_id == 7
+        return ["token-1"]
+
+    async def fake_record_notification_log(**kwargs):
+        calls.append(("notification_log", kwargs))
+
+    class FakeFCMService:
+        def send_to_tokens(self, **kwargs):
+            calls.append(("send_to_tokens", kwargs))
+            return SimpleNamespace(success_count=1, failure_count=0, provider_message_ids=["message-1"])
+
+    monkeypatch.setattr(service_job_service.async_job_service, "get_job", fake_get_job)
+    monkeypatch.setattr(service_job_service.async_job_service, "mark_processing", fake_mark_processing)
+    monkeypatch.setattr(service_job_service.async_job_service, "mark_success", fake_mark_success)
+    monkeypatch.setattr(service_job_service, "_list_active_fcm_tokens", fake_list_active_fcm_tokens)
+    monkeypatch.setattr(service_job_service, "FCMService", FakeFCMService)
+    monkeypatch.setattr(
+        service_job_service.notification_service, "record_notification_log", fake_record_notification_log
+    )
+
+    await handlers.handle_stream_job(41, "fcm.push.send", {})
+
+    assert calls[0] == ("processing", {"job_id": 41})
+    assert calls[1][0] == "send_to_tokens"
+    assert calls[1][1]["tokens"] == ["token-1"]
+    assert calls[1][1]["title"] == "챌린지 알림"
+    assert calls[2][0] == "notification_log"
+    assert calls[2][1]["message_summary"] == "동욱님이 이번 챌린지 목표를 달성했어요."
+    assert calls[3][0] == "success"
+    assert calls[3][1]["result"]["success_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_fcm_push_service_job_handler_retries_provider_errors(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+    payload = {
+        "user_id": 7,
+        "title": "챌린지 알림",
+        "body": "동욱님이 이번 챌린지 목표를 달성했어요.",
+        "data": {},
+        "notification_type": "FAMILY_ALERT",
+    }
+
+    async def fake_get_job(job_id: int):
+        assert job_id == 42
+        return SimpleNamespace(request_payload=payload)
+
+    async def fake_mark_processing(job_id: int):
+        calls.append(("processing", {"job_id": job_id}))
+
+    async def fake_list_active_fcm_tokens(user_id: int):
+        assert user_id == 7
+        return ["token-1"]
+
+    async def fake_record_notification_log(**kwargs):
+        calls.append(("notification_log", kwargs))
+
+    class FakeFCMService:
+        def send_to_tokens(self, **kwargs):
+            _ = kwargs
+            raise RuntimeError("temporary fcm outage")
+
+    monkeypatch.setattr(service_job_service.async_job_service, "get_job", fake_get_job)
+    monkeypatch.setattr(service_job_service.async_job_service, "mark_processing", fake_mark_processing)
+    monkeypatch.setattr(service_job_service, "_list_active_fcm_tokens", fake_list_active_fcm_tokens)
+    monkeypatch.setattr(service_job_service, "FCMService", FakeFCMService)
+    monkeypatch.setattr(
+        service_job_service.notification_service, "record_notification_log", fake_record_notification_log
+    )
+
+    with pytest.raises(RuntimeError, match="temporary fcm outage"):
+        await handlers.handle_stream_job(42, "fcm.push.send", {})
+
+    assert calls[0] == ("processing", {"job_id": 42})
+    assert calls[1][0] == "notification_log"
+    assert calls[1][1]["error_code"] == "RuntimeError"
+    assert calls[1][1]["error_message"] == "temporary fcm outage"
+
+
+@pytest.mark.asyncio
+async def test_fcm_push_service_job_handler_marks_missing_provider_non_retryable(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+    payload = {
+        "user_id": 7,
+        "title": "챌린지 알림",
+        "body": "동욱님이 이번 챌린지 목표를 달성했어요.",
+        "data": {},
+        "notification_type": "FAMILY_ALERT",
+    }
+
+    async def fake_get_job(job_id: int):
+        assert job_id == 43
+        return SimpleNamespace(request_payload=payload)
+
+    async def fake_mark_processing(job_id: int):
+        calls.append(("processing", {"job_id": job_id}))
+
+    async def fake_mark_failed(job_id: int, error_message: str):
+        calls.append(("failed", {"job_id": job_id, "error_message": error_message}))
+
+    async def fake_list_active_fcm_tokens(user_id: int):
+        assert user_id == 7
+        return ["token-1"]
+
+    async def fake_record_notification_log(**kwargs):
+        calls.append(("notification_log", kwargs))
+
+    class FakeFCMService:
+        def send_to_tokens(self, **kwargs):
+            _ = kwargs
+            raise service_job_service.FCMProviderUnavailableError("firebase not configured")
+
+    monkeypatch.setattr(service_job_service.async_job_service, "get_job", fake_get_job)
+    monkeypatch.setattr(service_job_service.async_job_service, "mark_processing", fake_mark_processing)
+    monkeypatch.setattr(service_job_service.async_job_service, "mark_failed", fake_mark_failed)
+    monkeypatch.setattr(service_job_service, "_list_active_fcm_tokens", fake_list_active_fcm_tokens)
+    monkeypatch.setattr(service_job_service, "FCMService", FakeFCMService)
+    monkeypatch.setattr(
+        service_job_service.notification_service, "record_notification_log", fake_record_notification_log
+    )
+
+    with pytest.raises(handlers.NonRetryableJobError):
+        await handlers.handle_stream_job(43, "fcm.push.send", {})
+
+    assert calls[0] == ("processing", {"job_id": 43})
+    assert calls[1][0] == "notification_log"
+    assert calls[1][1]["error_code"] == "FCMProviderUnavailableError"
+    assert calls[2] == ("failed", {"job_id": 43, "error_message": "fcm_provider_unavailable"})
+
+
+def test_family_push_job_payload_uses_action_message_without_sensitive_health_values() -> None:
+    payload = {
+        "title": "챌린지 알림",
+        "body": "동욱님이 이번 챌린지 목표를 달성했어요.",
+    }
+    sensitive_terms = ("혈압", "혈당", "체중", "위험도", "OCR", "mg/dL", "mmHg")
+
+    combined_message = f"{payload['title']} {payload['body']}"
+
+    assert not any(term in combined_message for term in sensitive_terms)
 
 
 @pytest.mark.asyncio

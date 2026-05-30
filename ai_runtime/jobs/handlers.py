@@ -113,6 +113,47 @@ async def handle_diet_analyze_image(job_id: int, payload: dict[str, Any]) -> Non
     )
 
 
+def _register_service_job_handler(job_type: str, handler: Callable[[int], Awaitable[dict[str, Any]]]) -> None:
+    @register_job_handler(job_type)
+    async def _handle_service_job(job_id: int, payload: dict[str, Any]) -> None:
+        _ = payload
+        from app.services import service_jobs as service_job_service
+
+        try:
+            await handler(job_id)
+        except service_job_service.ServiceJobNonRetryableError as exc:
+            await async_job_service.mark_failed(job_id, str(exc))
+            raise NonRetryableJobError(str(exc)) from exc
+
+
+def _register_service_job_handlers() -> None:
+    from app.services import service_jobs as service_job_service
+
+    _register_service_job_handler(
+        service_job_service.EMAIL_VERIFICATION_SEND_JOB_TYPE,
+        service_job_service.handle_email_verification_send,
+    )
+    _register_service_job_handler(
+        service_job_service.PASSWORD_RESET_EMAIL_SEND_JOB_TYPE,
+        service_job_service.handle_password_reset_email_send,
+    )
+    _register_service_job_handler(
+        service_job_service.FAMILY_INVITE_EMAIL_SEND_JOB_TYPE,
+        service_job_service.handle_family_invite_email_send,
+    )
+    _register_service_job_handler(
+        service_job_service.FCM_PUSH_SEND_JOB_TYPE,
+        service_job_service.handle_fcm_push_send,
+    )
+    _register_service_job_handler(
+        service_job_service.FAMILY_NOTIFICATION_CREATE_JOB_TYPE,
+        service_job_service.handle_family_notification_create,
+    )
+
+
+_register_service_job_handlers()
+
+
 def _payload_int(payload: dict[str, Any], key: str) -> int | None:
     value = payload.get(key)
     if value in (None, ""):

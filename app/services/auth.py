@@ -26,7 +26,8 @@ from app.dtos.settings import UserSettingCreateRequest
 from app.models.users import User
 from app.repositories import setting_repository
 from app.repositories.user_repository import UserRepository
-from app.services.email_service import EmailConfigurationError, EmailDeliveryError, EmailService
+from app.services import service_jobs
+from app.services.email_service import EmailService
 from app.services.jwt import JwtService
 
 VERIFICATION_CODE_TTL_MINUTES = 10
@@ -187,18 +188,7 @@ class AuthService:
             code_hash=self._digest(code),
             expires_at=expires_at,
         )
-        try:
-            await self.email_service.send_email_verification_code(str(email), code)
-        except EmailConfigurationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="이메일 발송 설정이 필요합니다.",
-            ) from exc
-        except EmailDeliveryError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="이메일 발송을 처리할 수 없습니다.",
-            ) from exc
+        await service_jobs.enqueue_email_verification_send(email=str(email), code=code)
         return code
 
     async def send_phone_verification_code(self, phone_number: str) -> str | None:
@@ -246,18 +236,7 @@ class AuthService:
                 expires_at=expires_at,
             )
             reset_url = self._password_reset_url(token)
-            try:
-                await self.email_service.send_password_reset_email(str(email), reset_url)
-            except EmailConfigurationError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="이메일 발송 설정이 필요합니다.",
-                ) from exc
-            except EmailDeliveryError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="이메일 발송을 처리할 수 없습니다.",
-                ) from exc
+            await service_jobs.enqueue_password_reset_email_send(email=str(email), reset_url=reset_url)
         return token
 
     async def confirm_password_reset(self, data: PasswordResetConfirmRequest) -> None:
