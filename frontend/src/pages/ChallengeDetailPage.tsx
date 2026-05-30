@@ -164,7 +164,7 @@ function getProgress(userChallenge: Challenge | null, challenge: Challenge | nul
     return Math.max(0, Math.min(explicit > 1 ? explicit : explicit * 100, 100));
   }
   if (logs.length > 0) {
-    const completedCount = logs.filter((log) => Boolean(log.is_completed)).length;
+    const completedCount = logs.filter((log) => Boolean(log.is_completed) && Boolean(log.completed_at ?? log.completed_date)).length;
     return Math.max(0, Math.min(Math.round((completedCount / getDurationDays(challenge, userChallenge)) * 100), 100));
   }
   const completedDays = Number(userChallenge.completed_days ?? userChallenge.completed_count);
@@ -172,7 +172,7 @@ function getProgress(userChallenge: Challenge | null, challenge: Challenge | nul
     return Math.max(0, Math.min(Math.round((completedDays / getDurationDays(challenge, userChallenge)) * 100), 100));
   }
   const status = normalizeStatus(userChallenge.status);
-  if (status === "COMPLETED") {
+  if (userChallenge.completed_at) {
     return 100;
   }
   if (["ACTIVE", "IN_PROGRESS", "JOINED"].includes(status)) {
@@ -204,13 +204,39 @@ function getTodayKey(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+function getDateKey(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw.slice(0, 10);
+  }
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${parsed.getFullYear()}-${month}-${day}`;
+}
+
+function formatDateLabel(value: unknown): string {
+  const key = getDateKey(value);
+  if (!key) {
+    return "-";
+  }
+  const [year, month, day] = key.split("-");
+  return `${year}. ${Number(month)}. ${Number(day)}.`;
+}
+
 function getCompletedCount(logs: ChallengeLog[]): number {
-  return logs.filter((log) => Boolean(log.is_completed)).length;
+  return logs.filter((log) => Boolean(log.is_completed) && Boolean(log.completed_at ?? log.completed_date)).length;
 }
 
 function getTodayCompletedCount(logs: ChallengeLog[]): number {
   const today = getTodayKey();
-  return logs.filter((log) => String(log.log_date ?? "").slice(0, 10) === today && Boolean(log.is_completed)).length;
+  return logs.filter((log) => getDateKey(log.completed_date ?? log.completed_at ?? log.log_date) === today && Boolean(log.is_completed)).length;
 }
 
 function isTodayCompleted(logs: ChallengeLog[], dailyGoalCount: number): boolean {
@@ -221,6 +247,9 @@ function isActiveUserChallenge(userChallenge: Challenge | null): boolean {
   if (!userChallenge) {
     return false;
   }
+  if (userChallenge.completed_at || userChallenge.canceled_at) {
+    return false;
+  }
   return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(userChallenge.status));
 }
 
@@ -228,7 +257,10 @@ function isEndedUserChallenge(userChallenge: Challenge | null): boolean {
   if (!userChallenge) {
     return false;
   }
-  return ["COMPLETED", "GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(normalizeStatus(userChallenge.status));
+  if (userChallenge.completed_at) {
+    return true;
+  }
+  return ["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(normalizeStatus(userChallenge.status));
 }
 
 function getStatusBadgeLabel(userChallenge: Challenge | null, logs: ChallengeLog[]): string {
@@ -410,6 +442,8 @@ export default function ChallengeDetailPage() {
   const ended = isEndedUserChallenge(userChallenge);
   const nextActionLabel =
     dailyGoalCount > 1 ? `${Math.min(todayCompletedCount + 1, dailyGoalCount)}/${dailyGoalCount} 수행하기` : "오늘 수행 완료";
+  const startedLabel = formatDateLabel(userChallenge?.started_date ?? userChallenge?.started_at);
+  const expectedDoneLabel = formatDateLabel(userChallenge?.expected_done_date ?? userChallenge?.expected_done_at);
 
   return (
     <div className="page-stack">
@@ -460,6 +494,18 @@ export default function ChallengeDetailPage() {
               <span>상태</span>
               <strong>{getStatusBadgeLabel(userChallenge, logs)}</strong>
             </div>
+            {userChallenge && (
+              <>
+                <div>
+                  <span>실행일</span>
+                  <strong>{startedLabel}</strong>
+                </div>
+                <div>
+                  <span>완료 예정일</span>
+                  <strong>{expectedDoneLabel}</strong>
+                </div>
+              </>
+            )}
           </div>
           {Boolean(challenge?.caution_message) && <div className="state-box warning-card">{String(challenge?.caution_message)}</div>}
           {Boolean(challenge?.contraindication_message) && (
@@ -489,7 +535,7 @@ export default function ChallengeDetailPage() {
           <div className="challenge-detail-actions">
             {!userChallenge && (
               <button disabled={actionLoading !== null} onClick={join} type="button">
-                {actionLoading === "join" ? "참여 처리 중..." : "참여하기"}
+                {actionLoading === "join" ? "시작 중..." : "지금 수행하기"}
               </button>
             )}
             {active && (

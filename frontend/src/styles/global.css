@@ -2546,6 +2546,27 @@ pre {
   font-weight: 900;
 }
 
+.signup-privacy-consent {
+  display: grid;
+  gap: 10px;
+}
+
+.signup-privacy-consent p {
+  margin: 0;
+}
+
+.checkbox-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  line-height: 1.5;
+}
+
+.checkbox-row input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
 .progress-bar,
 .bar-track {
   background: var(--color-muted-surface);
@@ -3565,6 +3586,7 @@ pre {
 
 .challenge-list-card .challenge-card-header,
 .challenge-list-card .challenge-card-meta,
+.challenge-list-card .challenge-date-meta,
 .challenge-list-card .challenge-progress,
 .challenge-list-card > .muted {
   grid-column: 1;
@@ -3579,6 +3601,27 @@ pre {
 .challenge-card-meta .badge {
   font-size: 11px;
   padding: 5px 8px;
+}
+
+.challenge-date-meta {
+  color: var(--color-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px 12px;
+}
+
+.challenge-date-meta span {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 5px 9px;
+}
+
+.challenge-date-meta.compact {
+  font-size: 11px;
+  gap: 5px;
 }
 
 .challenge-card-actions {

@@ -212,21 +212,23 @@ async def _build_challenge_completion_rates(
     challenge_rates = []
     user_challenges = await challenge_service.list_user_challenges(user_id, limit=1000)
     for user_challenge in user_challenges:
-        logs = [
-            log
-            for log in await challenge_service.list_challenge_logs(user_challenge.id)
-            if _in_range(log.log_date, date_from, date_to)
-        ]
-        if not logs and not _in_range(user_challenge.started_at.date(), date_from, date_to):
+        logs = []
+        for log in await challenge_service.list_challenge_logs(user_challenge.id):
+            if log.completed_at is None:
+                continue
+            completed_date = log.completed_at.astimezone(config.TIMEZONE).date()
+            if _in_range(completed_date, date_from, date_to):
+                logs.append((log, completed_date))
+        if not logs:
             continue
         if logs:
-            completed_count = sum(1 for log in logs if log.is_completed)
+            completed_count = sum(1 for log, _ in logs if log.is_completed)
             rate = round(completed_count / len(logs) * 100, 2)
         else:
             rate = 0.0
         challenge_rates.append(
             {
-                "date": user_challenge.started_at.date().isoformat(),
+                "date": logs[-1][1].isoformat(),
                 "value": rate,
                 "user_challenge_id": user_challenge.id,
             }

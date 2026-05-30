@@ -197,7 +197,7 @@ function getProgressLabel(item: Challenge, challengeList: Challenge[] = []): str
   const status = normalizeStatus(item.status);
   const durationDays = getDurationDays(item, challengeList);
   const completedDays = getCompletedDays(item, challengeList);
-  if (status === "COMPLETED") {
+  if (item.completed_at) {
     return `${durationDays}/${durationDays}일 완료`;
   }
   if (["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(status)) {
@@ -259,6 +259,42 @@ function getLocalDateKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function getDateKey(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw.slice(0, 10);
+  }
+  return getLocalDateKey(parsed);
+}
+
+function formatDateLabel(value: unknown): string {
+  const key = getDateKey(value);
+  if (!key) {
+    return "-";
+  }
+  const [year, month, day] = key.split("-");
+  return `${year}. ${Number(month)}. ${Number(day)}.`;
+}
+
+function getStartedDate(item: Challenge | undefined): string {
+  return getDateKey(item?.started_date ?? item?.started_at);
+}
+
+function getExpectedDoneDate(item: Challenge | undefined): string {
+  return getDateKey(item?.expected_done_date ?? item?.due_date ?? item?.expected_done_at ?? item?.due_at);
+}
+
+function getCompletedDate(log: ChallengeLog): string {
+  return getDateKey(log.completed_date ?? log.completed_at);
+}
+
 function getProgress(item: Challenge, challengeList: Challenge[] = []): number {
   const explicit = Number(item.progress ?? item.progress_rate);
   if (Number.isFinite(explicit)) {
@@ -270,7 +306,7 @@ function getProgress(item: Challenge, challengeList: Challenge[] = []): number {
     return Math.max(0, Math.min(Math.round((completedDays / durationDays) * 100), 100));
   }
   const status = normalizeStatus(item.status);
-  if (status === "COMPLETED") {
+  if (item.completed_at) {
     return 100;
   }
   if (["ACTIVE", "IN_PROGRESS", "JOINED"].includes(status)) {
@@ -291,6 +327,9 @@ function isJoinedStatus(item: Challenge | undefined): boolean {
 
 function isActiveChallengeStatus(item: Challenge | undefined): boolean {
   if (!item) {
+    return false;
+  }
+  if (item.completed_at || item.canceled_at) {
     return false;
   }
   return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status));
@@ -399,11 +438,11 @@ export default function ChallengePage() {
 
   const getCalendarDayState = (day: number) => {
     const key = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const done = Object.values(logsByUserChallengeId)
+    const completedLogs = Object.values(logsByUserChallengeId)
       .flat()
-      .filter((log) => String(log.log_date ?? "").slice(0, 10) === key && Boolean(log.is_completed)).length;
-    const goal = activeMyChallenges.reduce((sum, item) => sum + getDailyGoalCount(item, challenges), 0);
-    return { done, goal, isToday: key === todayKey };
+      .filter((log) => Boolean(log.is_completed) && getCompletedDate(log) === key);
+    const started = activeMyChallenges.filter((item) => getStartedDate(item) === key).length;
+    return { done: completedLogs.length, started, isToday: key === todayKey };
   };
 
   const handleJoin = async (challengeId: number) => {
@@ -526,12 +565,18 @@ export default function ChallengePage() {
                       <div className="state-box warning-card">{String(challenge.contraindication_message)}</div>
                     )}
                     {joinedChallenge ? (
-                      <div className="challenge-progress">
-                        <span className="muted">{getProgressLabel(joinedChallenge, challenges)}</span>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${progress}%` }} />
+                      <>
+                        <div className="challenge-date-meta">
+                          <span>실행일: {formatDateLabel(joinedChallenge.started_date ?? joinedChallenge.started_at)}</span>
+                          <span>완료 예정일: {formatDateLabel(joinedChallenge.expected_done_date ?? joinedChallenge.expected_done_at)}</span>
                         </div>
-                      </div>
+                        <div className="challenge-progress">
+                          <span className="muted">{getProgressLabel(joinedChallenge, challenges)}</span>
+                          <div className="progress-bar">
+                            <div className="progress-fill" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <p className="muted">아직 참여 전입니다.</p>
                     )}
@@ -553,7 +598,7 @@ export default function ChallengePage() {
                         </button>
                       ) : (
                         <button disabled={actionId === `join-${String(challenge.id)}`} onClick={() => void handleJoin(Number(challenge.id))} type="button">
-                          {actionId === `join-${String(challenge.id)}` ? "참여 중..." : "참여하기"}
+                          {actionId === `join-${String(challenge.id)}` ? "시작 중..." : "지금 수행하기"}
                         </button>
                       )}
                     </div>
@@ -616,6 +661,10 @@ export default function ChallengePage() {
                       <div className="progress-bar">
                         <div className="progress-fill" style={{ width: `${progress}%` }} />
                       </div>
+                    </div>
+                    <div className="challenge-date-meta compact">
+                      <span>실행일: {formatDateLabel(challenge.started_date ?? challenge.started_at)}</span>
+                      <span>완료 예정일: {formatDateLabel(challenge.expected_done_date ?? challenge.expected_done_at)}</span>
                     </div>
                     <div className="button-row">
                       <span className={isTodayCompleted(challenge) ? "badge risk-low" : "badge badge-missing"}>
@@ -685,8 +734,8 @@ export default function ChallengePage() {
                   return <span className="challenge-calendar-cell empty" key={cell.key} />;
                 }
                 const state = getCalendarDayState(cell.day);
-                const complete = state.goal > 0 && state.done >= state.goal;
-                const partial = state.done > 0 && !complete;
+                const complete = state.done > 0;
+                const partial = state.started > 0 && !complete;
                 return (
                   <span
                     className={`challenge-calendar-cell ${state.isToday ? "today" : ""} ${complete ? "complete" : ""} ${partial ? "partial" : ""}`}
@@ -694,7 +743,7 @@ export default function ChallengePage() {
                   >
                     <strong>{cell.day}</strong>
                     {complete ? <em>✅</em> : null}
-                    {partial ? <small>{state.done}/{state.goal}</small> : null}
+                    {partial ? <small>진행 {state.started}</small> : null}
                   </span>
                 );
               })}

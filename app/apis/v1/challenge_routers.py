@@ -1,10 +1,12 @@
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user, require_operator_user
 from app.dtos.challenges import (
     ChallengeActionResponse,
+    ChallengeCalendarResponse,
     ChallengeCreateRequest,
     ChallengeLogCreateRequest,
     ChallengeLogResponse,
@@ -55,6 +57,14 @@ async def create_challenge(request: ChallengeCreateRequest, user: Annotated[User
 @challenge_router.get("/my", response_model=list[UserChallengeResponse])
 async def list_user_challenges(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
     return await challenge_service.list_user_challenges(user.id, limit=limit, offset=offset)
+
+
+@challenge_router.get("/calendar", response_model=ChallengeCalendarResponse)
+async def get_challenge_calendar(
+    calendar_date: Annotated[date, Query(alias="date")],
+    user: Annotated[User, Depends(get_request_user)],
+):
+    return await challenge_service.get_challenge_calendar(user.id, calendar_date)
 
 
 @challenge_router.patch("/my/{user_challenge_id}", response_model=UserChallengeResponse | None)
