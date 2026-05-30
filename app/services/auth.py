@@ -56,7 +56,7 @@ class AuthService:
         await self.ensure_email_verified(data.email)
 
         # 휴대폰 번호는 MVP 시연 범위에서 인증 필수값이 아니며, 기존 DB 호환용으로만 보존한다.
-        normalized_phone_number = ""
+        normalized_phone_number = None
         if data.phone_number:
             normalized_phone_number = self._normalize_phone_for_db(data.phone_number)
             await self.check_phone_number_exists(normalized_phone_number)

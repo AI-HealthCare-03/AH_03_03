@@ -25,7 +25,7 @@ class User(models.Model):
     nickname = fields.CharField(max_length=30, null=True)
     gender = fields.CharEnumField(enum_type=Gender)
     birthday = fields.DateField()
-    phone_number = fields.CharField(max_length=11)
+    phone_number = fields.CharField(max_length=11, null=True)
     address = fields.CharField(max_length=255, null=True)
     profile_image_url = fields.CharField(max_length=500, null=True)
     role = fields.CharField(max_length=20, default="USER")

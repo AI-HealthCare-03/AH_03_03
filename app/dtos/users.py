@@ -40,7 +40,7 @@ class UserInfoResponse(BaseSerializerModel):
     name: str
     nickname: str | None = None
     email: str
-    phone_number: str
+    phone_number: str | None = None
     birthday: date
     gender: Gender
     address: str | None = None
