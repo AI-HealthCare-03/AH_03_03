@@ -5,6 +5,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import {
   disableBrowserPushNotifications,
+  getFirebaseMessagingConfigStatus,
   enableBrowserPushNotifications,
   getBrowserNotificationPermission,
   getBrowserPushSupport,
@@ -31,6 +32,11 @@ export default function SettingsPage() {
   const [hasFcmToken, setHasFcmToken] = useState(Boolean(getStoredFcmToken()));
   const [pushLoading, setPushLoading] = useState(false);
   const pushSupport = getBrowserPushSupport();
+  const firebaseConfigStatus = getFirebaseMessagingConfigStatus();
+  const isFirebaseConfigMissing = !firebaseConfigStatus.configured;
+  const firebaseMissingMessage = import.meta.env.DEV
+    ? `Firebase 웹푸시 설정값 누락: ${firebaseConfigStatus.missingKeys.join(", ")}`
+    : "Firebase 웹푸시 설정값 누락";
 
   const load = async () => {
     setError("");
@@ -112,7 +118,9 @@ export default function SettingsPage() {
   };
 
   const pushStateText =
-    pushPermission === "unsupported"
+    isFirebaseConfigMissing
+      ? "Firebase 설정 필요"
+      : pushPermission === "unsupported"
       ? "지원 안 됨"
       : pushPermission === "granted"
         ? hasFcmToken
@@ -120,7 +128,7 @@ export default function SettingsPage() {
           : "권한 허용됨 · 기기 등록 필요"
         : pushPermission === "denied"
           ? "차단됨"
-          : "미설정";
+          : "권한 미허용";
 
   return (
     <Card title="설정">
@@ -148,7 +156,11 @@ export default function SettingsPage() {
             <span className="status-pill">{pushStateText}</span>
           </div>
           <p className="muted">알림 권한은 브라우저 설정에서 언제든 변경할 수 있습니다.</p>
-          {!pushSupport.supported && <p className="muted">{pushSupport.reason}</p>}
+          {isFirebaseConfigMissing && <p className="muted">{firebaseMissingMessage}</p>}
+          {!isFirebaseConfigMissing && !pushSupport.supported && <p className="muted">{pushSupport.reason}</p>}
+          {!isFirebaseConfigMissing && pushPermission === "default" && (
+            <p className="muted">브라우저 알림 권한 미허용: 버튼을 눌러 알림 권한을 허용해주세요.</p>
+          )}
           {pushPermission === "denied" && (
             <p className="muted">알림이 차단되어 있습니다. 브라우저 사이트 설정에서 알림 권한을 허용해주세요.</p>
           )}
@@ -158,7 +170,7 @@ export default function SettingsPage() {
               onClick={() => void enablePush()}
               type="button"
             >
-              {pushLoading ? "처리 중..." : "브라우저 알림 허용"}
+              {pushLoading ? "처리 중..." : isFirebaseConfigMissing ? "Firebase 설정 필요" : "브라우저 알림 허용"}
             </button>
             <button disabled={!hasFcmToken || pushLoading} onClick={() => void disablePush()} type="button">
               이 기기 알림 해제

@@ -44,13 +44,25 @@ function getFirebasePublicConfig(): FirebasePublicConfig {
 
 function getMissingFirebaseConfigKeys(): string[] {
   const config = getFirebasePublicConfig();
-  return Object.entries(config)
+  const missingKeys = Object.entries(config)
     .filter(([, value]) => !value)
     .map(([key]) => key);
+  if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) {
+    missingKeys.push("vapidKey");
+  }
+  return missingKeys;
 }
 
 export function isFirebaseMessagingConfigured(): boolean {
-  return getMissingFirebaseConfigKeys().length === 0 && Boolean(import.meta.env.VITE_FIREBASE_VAPID_KEY);
+  return getMissingFirebaseConfigKeys().length === 0;
+}
+
+export function getFirebaseMessagingConfigStatus(): { configured: boolean; missingKeys: string[] } {
+  const missingKeys = getMissingFirebaseConfigKeys();
+  return {
+    configured: missingKeys.length === 0,
+    missingKeys,
+  };
 }
 
 export function getBrowserNotificationPermission(): NotificationPermission | "unsupported" {

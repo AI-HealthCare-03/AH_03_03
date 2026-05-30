@@ -338,6 +338,19 @@ async def run_exam_ocr(
         image_media_type=image_media_type,
         image_filename=image_filename,
     )
+    parsed_candidate_count = len(provider_result["measurements"])
+    if parsed_candidate_count == 0:
+        raw_text_preview = provider_result.get("raw_text_preview")
+        logger.info(
+            "건강검진 OCR 후보 없음 | provider=%s provider_message=%s content_type=%s file_extension=%s "
+            "extracted_text_length=%s parsed_candidate_count=%s",
+            provider_result["provider"],
+            provider_result["provider_message"],
+            image_media_type,
+            Path(image_filename or "").suffix.lower() or None,
+            len(raw_text_preview or ""),
+            parsed_candidate_count,
+        )
     existing_measurements = await list_exam_measurements(exam_report_id)
     existing_by_key = {measurement.measurement_key: measurement for measurement in existing_measurements}
     saved_measurements: list[ExamMeasurement] = []
@@ -491,6 +504,8 @@ async def _extract_exam_measurements_with_gpt_vision(
 ) -> dict[str, Any] | None:
     if not image_bytes or not config.OPENAI_API_KEY:
         return None
+    if _is_pdf_upload(image_media_type, None):
+        logger.info("GPT Vision 건강검진 OCR PDF 직접 입력 시도 | pdf_to_image_conversion=false")
     try:
         client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.EXAM_GPT_VISION_MODEL)
         raw = await client.analyze(
@@ -504,9 +519,14 @@ async def _extract_exam_measurements_with_gpt_vision(
 
     extracted_data = raw.get("extracted_data") if isinstance(raw, dict) else None
     if not isinstance(extracted_data, dict):
+        logger.info("GPT Vision 건강검진 OCR 응답에 extracted_data 없음")
         return None
     measurements = _measurement_tuples_from_mapping(extracted_data)
     if not measurements:
+        logger.info(
+            "GPT Vision 건강검진 OCR 파싱 후보 없음 | extracted_field_count=%s parsed_candidate_count=0",
+            len(extracted_data),
+        )
         return None
     return {
         "provider": "gpt_vision",
@@ -544,6 +564,12 @@ async def _extract_exam_measurements_with_paddleocr(
     values = data.model_dump() if hasattr(data, "model_dump") else {}
     measurements = _measurement_tuples_from_mapping(values)
     if not measurements:
+        logger.info(
+            "PaddleOCR 건강검진 OCR 파싱 후보 없음 | extracted_text_length=%s extracted_field_count=%s "
+            "parsed_candidate_count=0",
+            sum(len(str(line[0] if isinstance(line, tuple) else line)) for line in raw_text),
+            len(values),
+        )
         return None
     confidence = Decimal("0.7000") if low_confidence_fields else Decimal("0.9000")
     raw_preview = "\n".join(str(line[0] if isinstance(line, tuple) else line) for line in raw_text[:8])
