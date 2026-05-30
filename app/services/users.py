@@ -11,7 +11,7 @@ from app.models.analysis import AnalysisResult, AnalysisResultFactor, AnalysisSn
 from app.models.challenges import ChallengeLog, ChallengeRecommendation, UserChallenge
 from app.models.diets import DietPhotoResult, DietRecord
 from app.models.exams import ExamMeasurement, ExamReport
-from app.models.family import FamilyMember, FamilyMemberStatus, FamilyShareSetting
+from app.models.family import FamilyMember, FamilyMemberStatus, FamilyNotificationSetting, FamilyShareSetting
 from app.models.faqs import Inquiry
 from app.models.health import HealthRecord
 from app.models.llm_logs import LLMGenerationLog
@@ -136,6 +136,8 @@ class UserManageService:
         )
         await FamilyShareSetting.filter(owner_user_id=user_id).delete()
         await FamilyShareSetting.filter(viewer_user_id=user_id).delete()
+        await FamilyNotificationSetting.filter(owner_user_id=user_id).delete()
+        await FamilyNotificationSetting.filter(family_user_id=user_id).delete()
 
     async def _detach_llm_and_rag_logs(self, user_id: int) -> None:
         await LLMGenerationLog.filter(user_id=user_id).update(

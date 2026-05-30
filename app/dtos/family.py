@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -103,6 +103,12 @@ class FamilyShareSettingUpdateRequest(BaseModel):
     share_medications: bool | None = None
     share_challenges: bool | None = None
     share_exam_reports: bool | None = None
+    share_challenge_status: bool | None = None
+    share_medication_status: bool | None = None
+    share_diet_status: bool | None = None
+    share_health_report_summary: bool | None = None
+    share_raw_health_values: bool | None = None
+    share_ocr_original: bool | None = None
     receive_analysis_alerts: bool | None = None
     receive_abnormal_value_alerts: bool | None = None
     receive_medication_alerts: bool | None = None
@@ -121,8 +127,54 @@ class FamilyShareSettingResponse(BaseModel):
     share_medications: bool
     share_challenges: bool
     share_exam_reports: bool
+    share_challenge_status: bool
+    share_medication_status: bool
+    share_diet_status: bool
+    share_health_report_summary: bool
+    share_raw_health_values: bool
+    share_ocr_original: bool
     receive_analysis_alerts: bool
     receive_abnormal_value_alerts: bool
     receive_medication_alerts: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class FamilyActionShareSettingUpdateRequest(BaseModel):
+    share_challenge_status: bool | None = None
+    share_medication_status: bool | None = None
+    share_diet_status: bool | None = None
+    share_health_report_summary: bool | None = None
+    share_raw_health_values: bool | None = None
+    share_ocr_original: bool | None = None
+
+
+class FamilyNotificationSettingUpdateRequest(BaseModel):
+    notify_challenge_missed: bool | None = None
+    notify_challenge_completed: bool | None = None
+    notify_medication_missed: bool | None = None
+    notify_diet_missed: bool | None = None
+    notify_report_updated: bool | None = None
+    channel_in_app: bool | None = None
+    channel_push: bool | None = None
+    quiet_hours_start: time | None = None
+    quiet_hours_end: time | None = None
+
+
+class FamilyNotificationSettingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    owner_user_id: int
+    family_user_id: int
+    notify_challenge_missed: bool
+    notify_challenge_completed: bool
+    notify_medication_missed: bool
+    notify_diet_missed: bool
+    notify_report_updated: bool
+    channel_in_app: bool
+    channel_push: bool
+    quiet_hours_start: time | None
+    quiet_hours_end: time | None
     created_at: datetime
     updated_at: datetime

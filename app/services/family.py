@@ -1,6 +1,9 @@
 import hashlib
 import secrets
+import urllib.parse
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from math import ceil
 
 from fastapi import HTTPException
 from starlette import status
@@ -10,12 +13,15 @@ from tortoise.transactions import in_transaction
 from app.core import config
 from app.core.utils.common import normalize_phone_number
 from app.dtos.family import (
+    FamilyActionShareSettingUpdateRequest,
     FamilyGroupCreateRequest,
     FamilyGroupUpdateRequest,
     FamilyInviteCreateRequest,
     FamilyMemberCreateUnregisteredRequest,
+    FamilyNotificationSettingUpdateRequest,
     FamilyShareSettingUpdateRequest,
 )
+from app.dtos.notifications import NotificationCreateRequest
 from app.models.family import (
     Family,
     FamilyInvite,
@@ -23,12 +29,26 @@ from app.models.family import (
     FamilyMember,
     FamilyMemberRole,
     FamilyMemberStatus,
+    FamilyNotificationSetting,
     FamilyShareSetting,
     FamilyStatus,
 )
+from app.models.notifications import Notification, NotificationChannel, NotificationLogStatus, UserFCMToken
 from app.models.users import User
+from app.services import notifications as notification_service
+from app.services.email_service import EmailService
+from app.services.fcm import FCMService
 
 FAMILY_INVITE_TTL_HOURS = 24
+FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE = "family_challenge_completed"
+FAMILY_CHALLENGE_MISSED_RELATED_TYPE = "family_challenge_missed"
+
+
+@dataclass(frozen=True)
+class FamilyChallengeAlertContext:
+    owner_user_id: int
+    owner_display_name: str
+    user_challenge_id: int
 
 
 def _normalize_email(email: str | None) -> str | None:
@@ -59,6 +79,49 @@ def _bad_request(message: str) -> None:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
 
+def _display_name(user: User) -> str:
+    return user.nickname or user.name or user.login_id or "회원"
+
+
+def _family_invite_accept_url(invite_code: str) -> str:
+    base_url = config.FRONTEND_BASE_URL.rstrip("/")
+    encoded_code = urllib.parse.quote(invite_code, safe="")
+    return f"{base_url}/family/invitations/accept?code={encoded_code}"
+
+
+def _format_invite_expiration(expires_at: datetime) -> str:
+    return expires_at.astimezone(config.TIMEZONE).strftime("%Y-%m-%d %H:%M")
+
+
+async def _resolve_invite_recipient_email(payload: FamilyInviteCreateRequest) -> str | None:
+    if payload.invitee_email:
+        return _normalize_email(str(payload.invitee_email))
+    if payload.invitee_user_id is None:
+        return None
+
+    invitee = await User.get_or_none(id=payload.invitee_user_id)
+    if invitee is None:
+        _bad_request("초대받는 사용자를 찾을 수 없습니다.")
+    return _normalize_email(invitee.email)
+
+
+async def _send_family_invite_email(
+    *,
+    recipient_email: str | None,
+    inviter: User,
+    invite_code: str,
+    expires_at: datetime,
+) -> bool:
+    if recipient_email is None:
+        return False
+    return await EmailService().send_family_invite_email(
+        recipient_email,
+        inviter_display_name=_display_name(inviter),
+        invite_url=_family_invite_accept_url(invite_code),
+        expires_at_text=_format_invite_expiration(expires_at),
+    )
+
+
 async def _get_active_member(user_id: int, family_id: int) -> FamilyMember | None:
     return await FamilyMember.filter(
         family_id=family_id,
@@ -87,6 +150,24 @@ async def _ensure_owner(user: User, family_id: int) -> Family:
     if int(family.owner_user_id) != int(user.id) and (member is None or member.member_role != FamilyMemberRole.OWNER):
         _forbidden("가족 그룹 소유자만 처리할 수 있습니다.")
     return family
+
+
+async def _find_common_active_family_id(owner_user_id: int, family_user_id: int) -> int:
+    owner_family_ids = await FamilyMember.filter(
+        user_id=owner_user_id,
+        status=FamilyMemberStatus.ACTIVE,
+        is_registered=True,
+        family__status=FamilyStatus.ACTIVE,
+    ).values_list("family_id", flat=True)
+    member = await FamilyMember.filter(
+        user_id=family_user_id,
+        status=FamilyMemberStatus.ACTIVE,
+        is_registered=True,
+        family_id__in=list(owner_family_ids),
+    ).first()
+    if member is None:
+        _forbidden("연결된 가족 사용자만 설정할 수 있습니다.")
+    return int(member.family_id)
 
 
 def _invite_matches_user(invite: FamilyInvite, user: User, *, allow_open_code: bool) -> bool:
@@ -144,7 +225,7 @@ async def create_family_group(user: User, payload: FamilyGroupCreateRequest) -> 
         await FamilyMember.create(
             family=family,
             user_id=user.id,
-            display_name=user.name,
+            display_name=_display_name(user),
             phone_number=_normalize_phone(user.phone_number),
             email=_normalize_email(user.email),
             relation_type="SELF",
@@ -256,17 +337,24 @@ async def create_family_invite(
     family = await _ensure_owner(user, family_id)
     invite_code = secrets.token_urlsafe(32)
     expires_at = _now() + timedelta(hours=FAMILY_INVITE_TTL_HOURS)
+    invitee_email = await _resolve_invite_recipient_email(payload)
     invite = await FamilyInvite.create(
         family=family,
         inviter_user_id=user.id,
         invitee_user_id=payload.invitee_user_id,
-        invitee_email=_normalize_email(str(payload.invitee_email)) if payload.invitee_email else None,
+        invitee_email=invitee_email,
         invitee_phone=_normalize_phone(payload.invitee_phone),
         code_hash=_digest(invite_code),
         relation_type=payload.relation_type,
         member_role=payload.member_role,
         expires_at=expires_at,
         status=FamilyInviteStatus.PENDING,
+    )
+    await _send_family_invite_email(
+        recipient_email=invitee_email,
+        inviter=user,
+        invite_code=invite_code,
+        expires_at=expires_at,
     )
     return invite, invite_code
 
@@ -324,7 +412,7 @@ async def _accept_invite(user: User, invite: FamilyInvite) -> FamilyMember:
             member = await FamilyMember.create(
                 family_id=invite.family_id,
                 user_id=user.id,
-                display_name=user.name,
+                display_name=_display_name(user),
                 phone_number=_normalize_phone(user.phone_number),
                 email=_normalize_email(user.email),
                 relation_type=invite.relation_type,
@@ -334,7 +422,7 @@ async def _accept_invite(user: User, invite: FamilyInvite) -> FamilyMember:
             )
         else:
             await FamilyMember.filter(id=existing.id).update(
-                display_name=user.name,
+                display_name=_display_name(user),
                 phone_number=_normalize_phone(user.phone_number),
                 email=_normalize_email(user.email),
                 relation_type=invite.relation_type,
@@ -378,3 +466,248 @@ async def update_family_share_setting(
         await FamilyShareSetting.filter(id=setting.id).update(**data)
         setting = await FamilyShareSetting.get(id=setting.id)
     return setting
+
+
+async def get_family_action_share_setting(user: User, family_user_id: int) -> FamilyShareSetting:
+    family_id = await _find_common_active_family_id(int(user.id), int(family_user_id))
+    setting, _ = await FamilyShareSetting.get_or_create(
+        family_id=family_id,
+        owner_user_id=user.id,
+        viewer_user_id=family_user_id,
+    )
+    return setting
+
+
+async def update_family_action_share_setting(
+    user: User,
+    family_user_id: int,
+    payload: FamilyActionShareSettingUpdateRequest,
+) -> FamilyShareSetting:
+    setting = await get_family_action_share_setting(user, family_user_id)
+    data = payload.model_dump(exclude_unset=True)
+    if data:
+        await FamilyShareSetting.filter(id=setting.id).update(**data)
+        setting = await FamilyShareSetting.get(id=setting.id)
+    return setting
+
+
+async def get_family_notification_setting(user: User, owner_user_id: int) -> FamilyNotificationSetting:
+    await _find_common_active_family_id(int(owner_user_id), int(user.id))
+    setting, _ = await FamilyNotificationSetting.get_or_create(
+        owner_user_id=owner_user_id,
+        family_user_id=user.id,
+    )
+    return setting
+
+
+async def update_family_notification_setting(
+    user: User,
+    owner_user_id: int,
+    payload: FamilyNotificationSettingUpdateRequest,
+) -> FamilyNotificationSetting:
+    setting = await get_family_notification_setting(user, owner_user_id)
+    data = payload.model_dump(exclude_unset=True)
+    if data:
+        await FamilyNotificationSetting.filter(id=setting.id).update(**data)
+        setting = await FamilyNotificationSetting.get(id=setting.id)
+    return setting
+
+
+async def _list_active_fcm_tokens(user_id: int) -> list[str]:
+    return list(await UserFCMToken.filter(user_id=user_id, is_active=True).values_list("token", flat=True))
+
+
+async def _record_push_result(
+    *,
+    user_id: int,
+    title: str,
+    message_summary: str,
+    status_value: NotificationLogStatus,
+    provider_message_id: str | None = None,
+    error_code: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    await notification_service.record_notification_log(
+        user_id=user_id,
+        notification_type="FAMILY_ALERT",
+        channel=NotificationChannel.PUSH,
+        title=title,
+        status=status_value,
+        message_summary=message_summary,
+        provider="firebase_fcm",
+        provider_message_id=provider_message_id,
+        error_code=error_code,
+        error_message=error_message[:255] if error_message else None,
+        sent_at=_now() if status_value == NotificationLogStatus.SENT else None,
+        failed_at=_now() if status_value == NotificationLogStatus.FAILED else None,
+    )
+
+
+async def _send_family_push_if_allowed(
+    *,
+    family_user_id: int,
+    setting: FamilyNotificationSetting,
+    title: str,
+    message: str,
+    data: dict[str, str],
+) -> None:
+    if not setting.channel_push:
+        return
+
+    tokens = await _list_active_fcm_tokens(family_user_id)
+    if not tokens:
+        return
+
+    try:
+        result = FCMService().send_to_tokens(tokens=tokens, title=title, body=message, data=data)
+    except Exception as exc:  # noqa: BLE001 - push 실패는 내부 알림 생성을 롤백하지 않는다.
+        await _record_push_result(
+            user_id=family_user_id,
+            title=title,
+            message_summary=message,
+            status_value=NotificationLogStatus.FAILED,
+            error_code=type(exc).__name__,
+            error_message=str(exc),
+        )
+        return
+
+    await _record_push_result(
+        user_id=family_user_id,
+        title=title,
+        message_summary=message,
+        status_value=NotificationLogStatus.SENT if result.success_count > 0 else NotificationLogStatus.FAILED,
+        provider_message_id=result.provider_message_ids[0] if result.provider_message_ids else None,
+        error_code=None if result.failure_count == 0 else "PARTIAL_FAILURE",
+        error_message=None if result.failure_count == 0 else f"failure_count={result.failure_count}",
+    )
+
+
+async def _create_family_alerts(
+    *,
+    context: FamilyChallengeAlertContext,
+    share_field: str,
+    notify_field: str,
+    related_type: str,
+    title: str,
+    message: str,
+) -> list[Notification]:
+    share_settings = await FamilyShareSetting.filter(owner_user_id=context.owner_user_id, **{share_field: True})
+    created: list[Notification] = []
+    for share_setting in share_settings:
+        family_user_id = int(share_setting.viewer_user_id)
+        notification_setting = await FamilyNotificationSetting.get_or_none(
+            owner_user_id=context.owner_user_id,
+            family_user_id=family_user_id,
+        )
+        if notification_setting is None or not getattr(notification_setting, notify_field):
+            continue
+        if not notification_setting.channel_in_app and not notification_setting.channel_push:
+            continue
+
+        existing = await Notification.filter(
+            user_id=family_user_id,
+            notification_type="FAMILY_ALERT",
+            related_type=related_type,
+            related_id=context.user_challenge_id,
+        ).exists()
+        if existing:
+            continue
+
+        notification = await notification_service.create_notification(
+            family_user_id,
+            NotificationCreateRequest(
+                notification_type="FAMILY_ALERT",
+                title=title,
+                message=message,
+                related_type=related_type,
+                related_id=context.user_challenge_id,
+            ),
+        )
+        created.append(notification)
+        await _send_family_push_if_allowed(
+            family_user_id=family_user_id,
+            setting=notification_setting,
+            title=title,
+            message=message,
+            data={"type": related_type, "user_challenge_id": str(context.user_challenge_id)},
+        )
+    return created
+
+
+async def _get_completed_challenge_alert_context(user_challenge_id: int) -> FamilyChallengeAlertContext | None:
+    from app.models.challenges import ChallengeLog, UserChallenge, UserChallengeStatus
+    from app.services import challenges as challenge_service
+
+    user_challenge = await UserChallenge.get_or_none(id=user_challenge_id).select_related("challenge", "user")
+    if user_challenge is None:
+        return None
+    if user_challenge.status == UserChallengeStatus.CANCELED or user_challenge.canceled_at is not None:
+        return None
+
+    challenge = user_challenge.challenge
+    duration_days = challenge.duration_days if challenge and challenge.duration_days > 0 else 7
+    required_days = max(1, ceil(duration_days * 0.8))
+    expected_done_at = user_challenge.expected_done_at or user_challenge.started_at + timedelta(days=duration_days)
+    if expected_done_at > _now():
+        return None
+
+    daily_goal_count = challenge_service._get_daily_goal_count(challenge)
+    completed_dates = [
+        completed_date
+        for completed_date in [
+            challenge_service._to_kst_date(log.completed_at)
+            for log in await ChallengeLog.filter(user_challenge_id=user_challenge.id, is_completed=True).only(
+                "completed_at"
+            )
+        ]
+        if completed_date is not None
+    ]
+    if challenge_service._count_completed_days(completed_dates, daily_goal_count) < required_days:
+        return None
+
+    return FamilyChallengeAlertContext(
+        owner_user_id=int(user_challenge.user_id),
+        owner_display_name=_display_name(user_challenge.user),
+        user_challenge_id=int(user_challenge.id),
+    )
+
+
+async def notify_family_challenge_completed(user_challenge_id: int) -> list[Notification]:
+    context = await _get_completed_challenge_alert_context(user_challenge_id)
+    if context is None:
+        return []
+    message = f"{context.owner_display_name}님이 이번 챌린지 목표를 달성했어요."
+    return await _create_family_alerts(
+        context=context,
+        share_field="share_challenge_status",
+        notify_field="notify_challenge_completed",
+        related_type=FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE,
+        title="가족 챌린지 알림",
+        message=message,
+    )
+
+
+async def notify_family_challenge_missed(user_challenge_id: int) -> list[Notification]:
+    # TODO: 스케줄러에서 7일 기간 종료 후 미기록/미달성 챌린지를 찾아 호출한다.
+    from app.models.challenges import UserChallenge, UserChallengeStatus
+
+    user_challenge = await UserChallenge.get_or_none(id=user_challenge_id).select_related("user")
+    if user_challenge is None:
+        return []
+    if user_challenge.status == UserChallengeStatus.CANCELED or user_challenge.canceled_at is not None:
+        return []
+
+    context = FamilyChallengeAlertContext(
+        owner_user_id=int(user_challenge.user_id),
+        owner_display_name=_display_name(user_challenge.user),
+        user_challenge_id=int(user_challenge.id),
+    )
+    message = f"{context.owner_display_name}님이 오늘 챌린지를 아직 기록하지 않았어요."
+    return await _create_family_alerts(
+        context=context,
+        share_field="share_challenge_status",
+        notify_field="notify_challenge_missed",
+        related_type=FAMILY_CHALLENGE_MISSED_RELATED_TYPE,
+        title="가족 챌린지 알림",
+        message=message,
+    )

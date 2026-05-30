@@ -3,7 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.apis.v1.dependencies import get_request_user
+from app.core import config
 from app.dtos.family import (
+    FamilyActionShareSettingUpdateRequest,
     FamilyGroupCreateRequest,
     FamilyGroupDetailResponse,
     FamilyGroupResponse,
@@ -13,14 +15,21 @@ from app.dtos.family import (
     FamilyInviteResponse,
     FamilyMemberCreateUnregisteredRequest,
     FamilyMemberResponse,
+    FamilyNotificationSettingResponse,
+    FamilyNotificationSettingUpdateRequest,
     FamilyShareSettingResponse,
     FamilyShareSettingUpdateRequest,
 )
-from app.models.family import Family, FamilyInvite, FamilyMember, FamilyShareSetting
+from app.models.family import Family, FamilyInvite, FamilyMember, FamilyNotificationSetting, FamilyShareSetting
 from app.models.users import User
 from app.services import family as family_service
 
 family_router = APIRouter(prefix="/family", tags=["family"])
+
+
+def _allow_family_invite_debug_response() -> bool:
+    # 초대코드는 이메일 인증코드와 같은 민감한 일회성 값이므로 local/demo 디버그에서만 응답에 노출한다.
+    return config.EMAIL_VERIFICATION_DEBUG and not config.is_production
 
 
 def _family_response(family: Family) -> FamilyGroupResponse:
@@ -39,6 +48,10 @@ def _invite_response(invite: FamilyInvite, invite_code: str | None = None) -> Fa
 
 def _share_setting_response(setting: FamilyShareSetting) -> FamilyShareSettingResponse:
     return FamilyShareSettingResponse.model_validate(setting)
+
+
+def _notification_setting_response(setting: FamilyNotificationSetting) -> FamilyNotificationSettingResponse:
+    return FamilyNotificationSettingResponse.model_validate(setting)
 
 
 @family_router.post("/groups", response_model=FamilyGroupResponse, status_code=status.HTTP_201_CREATED)
@@ -114,6 +127,7 @@ async def remove_family_member(member_id: int, user: Annotated[User, Depends(get
 @family_router.post(
     "/groups/{family_id}/invites",
     response_model=FamilyInviteResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_family_invite(
@@ -122,7 +136,7 @@ async def create_family_invite(
     user: Annotated[User, Depends(get_request_user)],
 ) -> FamilyInviteResponse:
     invite, invite_code = await family_service.create_family_invite(user, family_id, request)
-    return _invite_response(invite, invite_code)
+    return _invite_response(invite, invite_code if _allow_family_invite_debug_response() else None)
 
 
 @family_router.get("/invites/me", response_model=list[FamilyInviteResponse])
@@ -183,3 +197,41 @@ async def update_family_share_setting(
 ) -> FamilyShareSettingResponse:
     setting = await family_service.update_family_share_setting(user, setting_id, request)
     return _share_setting_response(setting)
+
+
+@family_router.get("/{family_user_id}/share-settings", response_model=FamilyShareSettingResponse)
+async def get_family_action_share_setting(
+    family_user_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+) -> FamilyShareSettingResponse:
+    setting = await family_service.get_family_action_share_setting(user, family_user_id)
+    return _share_setting_response(setting)
+
+
+@family_router.put("/{family_user_id}/share-settings", response_model=FamilyShareSettingResponse)
+async def update_family_action_share_setting(
+    family_user_id: int,
+    request: FamilyActionShareSettingUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+) -> FamilyShareSettingResponse:
+    setting = await family_service.update_family_action_share_setting(user, family_user_id, request)
+    return _share_setting_response(setting)
+
+
+@family_router.get("/{owner_user_id}/notification-settings", response_model=FamilyNotificationSettingResponse)
+async def get_family_notification_setting(
+    owner_user_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+) -> FamilyNotificationSettingResponse:
+    setting = await family_service.get_family_notification_setting(user, owner_user_id)
+    return _notification_setting_response(setting)
+
+
+@family_router.put("/{owner_user_id}/notification-settings", response_model=FamilyNotificationSettingResponse)
+async def update_family_notification_setting(
+    owner_user_id: int,
+    request: FamilyNotificationSettingUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+) -> FamilyNotificationSettingResponse:
+    setting = await family_service.update_family_notification_setting(user, owner_user_id, request)
+    return _notification_setting_response(setting)
