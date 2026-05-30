@@ -6,9 +6,10 @@
 
 - 시연/운영 스택 기준 파일: `infra/docker/docker-compose.prod.yml`
 - 로컬 개발 스택 기준 파일: `infra/docker/docker-compose.dev.yml`
-- prod compose는 외부에 `nginx:80`만 노출합니다.
+- prod compose는 외부에 `nginx:80`, `nginx:443`만 노출합니다.
 - Postgres와 Redis는 Docker network 내부 `expose`만 사용하며 EC2 보안 그룹에서 직접 열지 않습니다.
 - FastAPI와 ai-worker는 각각 DB connection pool을 만들기 때문에 `DB_POOL_MAX_SIZE`는 작게 시작합니다.
+- HTTPS 운영 기본 Nginx 설정은 `infra/nginx/prod_https.conf`입니다.
 
 ## EC2에서 준비할 환경 파일
 
@@ -31,6 +32,7 @@ cp envs/example.prod.env .env.prod
 - `CLOVA_OCR_API_URL`, `CLOVA_OCR_SECRET_KEY`를 사용하는 경우
 - `S3_BUCKET_NAME`
 - Firebase Admin SDK를 쓰는 경우 `GOOGLE_APPLICATION_CREDENTIALS` 경로
+- `NGINX_CONF`는 기본 `../nginx/prod_https.conf`, 최초 인증서 발급 전에는 `../nginx/prod_http.conf`
 
 작성하지 말아야 하는 값:
 
@@ -66,6 +68,69 @@ LOCAL_STORAGE_ROOT=var/storage
 ```
 
 local backend는 public URL을 만들지 않으며, prod compose는 `/app/var/storage`를 Docker volume으로 보존합니다. 다중 인스턴스나 무중단 배포에는 S3로 전환해야 합니다.
+
+## Domain and HTTPS
+
+### DNS
+
+도메인 DNS에서 EC2 public IPv4 주소를 가리키는 A record를 설정합니다.
+
+- 예: `your-domain.example A <EC2_PUBLIC_IP>`
+- `COOKIE_DOMAIN`, `CORS_ALLOW_ORIGINS`, `FRONTEND_BASE_URL`, Nginx `server_name`은 같은 운영 도메인 기준으로 맞춥니다.
+
+### Nginx 설정
+
+- HTTP bootstrap 설정: `infra/nginx/prod_http.conf`
+- HTTPS 운영 설정: `infra/nginx/prod_https.conf`
+- prod compose는 `NGINX_CONF` 값으로 mount할 Nginx 설정 파일을 고를 수 있습니다.
+
+`prod_https.conf`의 placeholder는 운영 도메인으로 교체해야 합니다.
+
+- `server_name your-domain.example;`
+- `/etc/letsencrypt/live/your-domain.example/fullchain.pem`
+- `/etc/letsencrypt/live/your-domain.example/privkey.pem`
+
+실제 인증서 파일은 Git에 커밋하지 않습니다. `certbot-conf` Docker volume 또는 운영 서버의 secret mount로 관리합니다.
+
+### Certbot bootstrap 예시
+
+인증서가 아직 없으면 HTTPS Nginx가 시작되지 않을 수 있습니다. 처음에는 HTTP 설정으로 Nginx를 띄운 뒤 certbot으로 인증서를 발급합니다.
+
+```bash
+NGINX_CONF=../nginx/prod_http.conf \
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d nginx
+```
+
+certbot webroot 발급 예시:
+
+```bash
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml run --rm certbot \
+  certonly --webroot -w /var/www/certbot \
+  -d your-domain.example \
+  --email admin@example.com \
+  --agree-tos \
+  --no-eff-email
+```
+
+인증서 발급 후 `.env.prod`의 `NGINX_CONF=../nginx/prod_https.conf`를 확인하고 Nginx를 재시작합니다.
+
+```bash
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+### Security headers
+
+`prod_https.conf`는 HTTPS server block에서 다음 헤더를 적용합니다.
+
+- `Strict-Transport-Security`
+- `X-Content-Type-Options`
+- `X-Frame-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+
+`Strict-Transport-Security`는 브라우저가 HTTPS를 강하게 기억하게 하므로, 도메인/인증서/HTTPS 운영이 안정화된 뒤 적용 상태를 유지하세요. Content-Security-Policy는 프론트 asset, Firebase, API endpoint를 모두 확인한 뒤 별도 강화하는 편이 안전합니다.
 
 ## 실행 순서
 
@@ -108,11 +173,8 @@ curl -fsS https://your-domain.example/api/v1/system/health
 기본 운영 HTTP 구성:
 
 - `80/tcp`: nginx HTTP
+- `443/tcp`: nginx HTTPS
 - `22/tcp`: SSH, 운영자 IP로 제한
-
-TLS를 직접 붙이는 경우:
-
-- `443/tcp`: HTTPS
 
 열지 말아야 하는 포트:
 
