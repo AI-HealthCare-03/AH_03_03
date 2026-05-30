@@ -4,7 +4,7 @@ from typing import Any
 from app.core import config
 from app.dtos.challenges import ChallengeResponse, UserChallengeResponse
 from app.dtos.diets import DietRecordResponse
-from app.models.analysis import RiskLevel
+from app.models.analysis import AnalysisResult, AnalysisType, RiskLevel
 from app.services import analysis as analysis_service
 from app.services import challenges as challenge_service
 from app.services import diets as diet_service
@@ -167,6 +167,37 @@ async def get_dashboard_trends(user_id: int, period: str) -> dict[str, Any]:
         "weight": _build_weight_series(health_records),
         "challenge_completion_rate": await _build_challenge_completion_rates(user_id, date_from, date_to),
         "diet_score": _build_diet_score_series(diet_records),
+    }
+
+
+async def get_dashboard_risk_trend(user_id: int, period: str = "all") -> dict[str, Any]:
+    normalized_period, date_from, date_to = normalize_period(period)
+    results = await AnalysisResult.filter(user_id=user_id).order_by("analysis_type", "analyzed_at").limit(1000)
+    series_by_disease: dict[AnalysisType, list[dict[str, Any]]] = {}
+
+    for result in results:
+        analyzed_at = result.analyzed_at.astimezone(config.TIMEZONE)
+        if not _in_range(analyzed_at.date(), date_from, date_to):
+            continue
+        series_by_disease.setdefault(result.analysis_type, []).append(
+            {
+                "analyzed_at": analyzed_at.isoformat(),
+                "risk_score": float(result.risk_score),
+                "risk_level": result.risk_level,
+            }
+        )
+
+    return {
+        "period": normalized_period,
+        "date_from": date_from.isoformat() if date_from is not None else None,
+        "date_to": date_to.isoformat(),
+        "series": [
+            {
+                "disease_type": disease_type,
+                "points": points,
+            }
+            for disease_type, points in series_by_disease.items()
+        ],
     }
 
 

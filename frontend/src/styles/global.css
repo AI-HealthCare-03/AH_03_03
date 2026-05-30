@@ -1791,6 +1791,24 @@ pre {
   text-align: center;
 }
 
+.today-recommendation-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.today-recommendation-item {
+  gap: 12px;
+  min-height: 150px;
+}
+
+.today-recommendation-item p {
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+
 .dashboard-support-grid {
   grid-template-columns: minmax(0, 1fr);
 }
