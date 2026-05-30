@@ -16,7 +16,13 @@ from app.models.faqs import Inquiry
 from app.models.health import HealthRecord
 from app.models.llm_logs import LLMGenerationLog
 from app.models.medications import Medication, MedicationRecord
-from app.models.notifications import Notification, NotificationLog, NotificationLogStatus, ReminderSchedule
+from app.models.notifications import (
+    Notification,
+    NotificationLog,
+    NotificationLogStatus,
+    ReminderSchedule,
+    UserFCMToken,
+)
 from app.models.rag import RAGRetrievalLog
 from app.models.settings import UserSetting
 from app.models.users import User, UserConsent
@@ -104,6 +110,12 @@ class UserManageService:
         await UserConsent.filter(user_id=user_id).delete()
 
     async def _disable_notification_delivery(self, user_id: int) -> None:
+        now = datetime.now(config.TIMEZONE)
+        await UserFCMToken.filter(user_id=user_id, is_active=True).update(
+            is_active=False,
+            revoked_at=now,
+            updated_at=now,
+        )
         await ReminderSchedule.filter(user_id=user_id).update(is_active=False)
         await Notification.filter(user_id=user_id).delete()
         await NotificationLog.filter(user_id=user_id).update(

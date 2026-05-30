@@ -2,6 +2,8 @@ from datetime import datetime
 
 from app.core import config
 from app.dtos.notifications import (
+    FCMTokenDeleteRequest,
+    FCMTokenRegisterRequest,
     NotificationCreateRequest,
     NotificationUpdateRequest,
     ReminderScheduleCreateRequest,
@@ -13,6 +15,7 @@ from app.models.notifications import (
     NotificationLog,
     NotificationLogStatus,
     ReminderSchedule,
+    UserFCMToken,
 )
 from app.repositories import notification_repository
 
@@ -153,3 +156,27 @@ async def record_notification_log(
         "failed_at": failed_at,
     }
     return await notification_repository.create_notification_log(user_id, data)
+
+
+async def register_fcm_token(
+    user_id: int,
+    request: FCMTokenRegisterRequest,
+    *,
+    request_user_agent: str | None = None,
+) -> UserFCMToken:
+    now = datetime.now(config.TIMEZONE)
+    data = request.model_dump()
+    data["user_agent"] = data.get("user_agent") or request_user_agent
+    data["is_active"] = True
+    data["last_seen_at"] = now
+    data["revoked_at"] = None
+    return await notification_repository.upsert_fcm_token(user_id, data)
+
+
+async def deactivate_fcm_token(user_id: int, request: FCMTokenDeleteRequest) -> int:
+    revoked_at = datetime.now(config.TIMEZONE)
+    return await notification_repository.deactivate_fcm_token(user_id, request.token, revoked_at)
+
+
+async def deactivate_fcm_tokens_by_user(user_id: int, revoked_at: datetime) -> int:
+    return await notification_repository.deactivate_fcm_tokens_by_user(user_id, revoked_at)
