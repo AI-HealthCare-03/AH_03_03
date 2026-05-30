@@ -19,27 +19,25 @@ from app.models.exams import ExamMeasurement, ExamReport, OCRStatus
 from app.repositories import exam_repository, health_repository
 from app.services.health import _with_calculated_bmi
 
-FALLBACK_OCR_MEASUREMENTS = [
-    ("height_cm", "키", "172.4", "cm"),
-    ("weight_kg", "몸무게", "76.8", "kg"),
-    ("bmi", "체질량지수", "25.8", "kg/m2"),
-    ("waist_cm", "허리둘레", "89.0", "cm"),
-    ("systolic_bp", "수축기혈압", "132", "mmHg"),
-    ("diastolic_bp", "이완기혈압", "84", "mmHg"),
-    ("fasting_glucose", "공복혈당", "108", "mg/dL"),
-    ("hba1c", "당화혈색소", "5.8", "%"),
-    ("total_cholesterol", "총콜레스테롤", "210", "mg/dL"),
-    ("ldl", "LDL 콜레스테롤", "132", "mg/dL"),
-    ("hdl", "HDL 콜레스테롤", "46", "mg/dL"),
-    ("triglyceride", "중성지방", "158", "mg/dL"),
-    ("ast", "AST", "26", "U/L"),
-    ("alt", "ALT", "31", "U/L"),
-    ("gamma_gtp", "감마지티피", "42", "U/L"),
-    ("creatinine", "혈청크레아티닌", "0.92", "mg/dL"),
-    ("egfr", "eGFR", "91", "mL/min/1.73m2"),
-    ("hemoglobin", "혈색소", "14.8", "g/dL"),
-    ("urine_protein", "요단백", "음성", None),
-]
+EXAM_MEASUREMENT_METADATA = {
+    "height": ("키", "cm"),
+    "height_cm": ("키", "cm"),
+    "weight": ("몸무게", "kg"),
+    "weight_kg": ("몸무게", "kg"),
+    "bmi": ("체질량지수", "kg/m2"),
+    "waist": ("허리둘레", "cm"),
+    "waist_cm": ("허리둘레", "cm"),
+    "systolic_bp": ("수축기혈압", "mmHg"),
+    "diastolic_bp": ("이완기혈압", "mmHg"),
+    "fasting_glucose": ("공복혈당", "mg/dL"),
+    "hba1c": ("당화혈색소", "%"),
+    "total_cholesterol": ("총콜레스테롤", "mg/dL"),
+    "ldl": ("LDL 콜레스테롤", "mg/dL"),
+    "ldl_cholesterol": ("LDL 콜레스테롤", "mg/dL"),
+    "hdl": ("HDL 콜레스테롤", "mg/dL"),
+    "hdl_cholesterol": ("HDL 콜레스테롤", "mg/dL"),
+    "triglyceride": ("중성지방", "mg/dL"),
+}
 
 EXAM_MEASUREMENT_TO_HEALTH_FIELD = {
     "height": "height_cm",
@@ -271,7 +269,10 @@ async def run_exam_ocr(
         updated = await update_exam_measurement(existing.id, ExamMeasurementUpdateRequest(**request.model_dump()))
         saved_measurements.append(updated or existing)
 
-    await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS))
+    await update_exam_report(
+        exam_report_id,
+        ExamReportUpdateRequest(ocr_status=OCRStatus.SUCCESS if saved_measurements else OCRStatus.FAILED),
+    )
     return ExamOCRResponse(
         message=provider_result["message"],
         measurements=saved_measurements,
@@ -319,7 +320,7 @@ async def _extract_exam_measurements_with_provider(
             failure_reasons.append("gpt_vision_failed_or_unavailable")
 
     reason = ";".join(failure_reasons) if failure_reasons else f"{provider}_disabled"
-    return _fallback_exam_ocr_result(reason)
+    return _empty_exam_ocr_result(reason)
 
 
 def _select_exam_ocr_provider_order(
@@ -422,21 +423,19 @@ async def _extract_exam_measurements_with_paddleocr(
     }
 
 
-def _fallback_exam_ocr_result(reason: str) -> dict[str, Any]:
+def _empty_exam_ocr_result(reason: str) -> dict[str, Any]:
     return {
-        "provider": "fallback",
-        "fallback_used": True,
+        "provider": "none",
+        "fallback_used": False,
         "provider_message": reason,
-        "message": "측정값 후보가 생성되었습니다. 현재 fallback 기반 결과이므로 검진 수치를 확인한 뒤 저장해주세요.",
-        "measurements": FALLBACK_OCR_MEASUREMENTS,
-        "confidence": Decimal("0.9700"),
+        "message": "인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.",
+        "measurements": [],
+        "confidence": None,
         "raw_text_preview": None,
     }
 
 
 def _measurement_tuples_from_mapping(values: dict[str, Any]) -> list[tuple[str, str, str, str | None]]:
-    names = {key: name for key, name, _value, _unit in FALLBACK_OCR_MEASUREMENTS}
-    units = {key: unit for key, _name, _value, unit in FALLBACK_OCR_MEASUREMENTS}
     measurements = []
     for key, health_key in EXAM_MEASUREMENT_TO_HEALTH_FIELD.items():
         if key not in values:
@@ -445,8 +444,9 @@ def _measurement_tuples_from_mapping(values: dict[str, Any]) -> list[tuple[str, 
         if value is None or value == "":
             continue
         measurement_key = key
-        measurement_name = names.get(measurement_key) or names.get(health_key) or measurement_key
-        measurements.append(
-            (measurement_key, measurement_name, str(value), units.get(measurement_key) or units.get(health_key))
+        measurement_name, unit = EXAM_MEASUREMENT_METADATA.get(
+            measurement_key,
+            EXAM_MEASUREMENT_METADATA.get(health_key, (measurement_key, None)),
         )
+        measurements.append((measurement_key, measurement_name, str(value), unit))
     return measurements

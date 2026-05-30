@@ -53,13 +53,10 @@ export async function createExam(payload: {
   return apiRequest<ExamReport>("/exams", { method: "POST", body: payload });
 }
 
-export async function runExamOcr(examId: number, file?: File | null): Promise<ExamOcrResponse> {
-  if (file) {
-    const formData = new FormData();
-    formData.append("image", file);
-    return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST", body: formData });
-  }
-  return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST" });
+export async function runExamOcr(examId: number, file: File): Promise<ExamOcrResponse> {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST", body: formData });
 }
 
 export async function listMeasurements(examId: number): Promise<ExamMeasurement[]> {

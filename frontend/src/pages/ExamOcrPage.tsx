@@ -16,7 +16,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import { isHeicFile } from "../utils/files";
 
 export default function ExamOcrPage() {
-  const [selectedFileName, setSelectedFileName] = useState("health-exam-upload.pdf");
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const [previewMessage, setPreviewMessage] = useState("");
@@ -83,6 +83,11 @@ export default function ExamOcrPage() {
   const startExamOcr = async () => {
     setError("");
     setMessage("");
+    setMeasurements([]);
+    if (!selectedFile) {
+      setError("검진표 이미지 또는 PDF 파일을 먼저 선택해주세요.");
+      return;
+    }
     setIsRunningOcr(true);
     try {
       const report =
@@ -96,9 +101,9 @@ export default function ExamOcrPage() {
       const result = await runExamOcr(report.id, selectedFile);
       setMeasurements(result.measurements);
       setMessage(
-        result.fallback_used
-          ? "측정값 후보가 생성되었습니다. 자동 인식 결과가 부정확할 수 있으니 저장 전 검진 수치를 확인해주세요."
-          : "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요.",
+        result.measurements.length > 0
+          ? "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요."
+          : "인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.",
       );
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
@@ -255,7 +260,7 @@ export default function ExamOcrPage() {
 
 function toUserMessage(message: string): string {
   if (message.includes("provider") || message.includes("fallback")) {
-    return "자동 인식 후보값을 생성했습니다. 저장 전 내용을 확인해주세요.";
+    return "자동 인식으로 측정값 후보를 찾지 못했습니다. 파일을 다시 확인해주세요.";
   }
   return message.replaceAll("OCR", "자동 인식");
 }
