@@ -36,9 +36,9 @@ const challengeStatusLabels: Record<string, string> = {
   IN_PROGRESS: "진행 중",
   JOINED: "진행 중",
   COMPLETED: "완료",
-  GIVEN_UP: "포기",
-  CANCELED: "포기",
-  CANCELLED: "포기",
+  GIVEN_UP: "참여 전",
+  CANCELED: "참여 전",
+  CANCELLED: "참여 전",
   PENDING: "대기",
 };
 
@@ -437,8 +437,29 @@ function getChallengeDuration(challenge: AnyRecord): string {
 }
 
 function getChallengeProgress(challenge: AnyRecord): number {
+  if (Boolean(challenge.completed_at) || (Boolean(challenge.is_finalized) && Boolean(challenge.has_met_completion_condition))) {
+    return 100;
+  }
   const value = Number(challenge.progress ?? challenge.progress_rate ?? 0);
-  return Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 0;
+  if (Number.isFinite(value)) {
+    return Math.max(0, Math.min(value, 100));
+  }
+  const completionRate = Number(challenge.completion_rate);
+  return Number.isFinite(completionRate) ? Math.max(0, Math.min(completionRate, 100)) : 0;
+}
+
+function getChallengeDisplayStatus(challenge: AnyRecord): string {
+  const status = String(challenge.status ?? "").toUpperCase();
+  if (["GIVE_UP", "GIVEN_UP", "CANCELED", "CANCELLED"].includes(status)) {
+    return "참여 가능";
+  }
+  if (Boolean(challenge.is_finalized)) {
+    return Boolean(challenge.has_met_completion_condition) || Boolean(challenge.completed_at) ? "완료" : "미달성";
+  }
+  if (Boolean(challenge.has_met_completion_condition)) {
+    return "완료 조건 충족";
+  }
+  return challengeStatusLabels[status] ?? (status ? status : "참여 가능");
 }
 
 export default function DashboardPage() {
@@ -868,7 +889,7 @@ export default function DashboardPage() {
                       <strong>{getChallengeTitle(challenge)}</strong>
                       <p>
                         {getChallengeDuration(challenge)} ·{" "}
-                        {challengeStatusLabels[status] ?? (status ? status : "참여 가능")}
+                        {getChallengeDisplayStatus(challenge)}
                       </p>
                     </div>
                     <div className="progress-bar">

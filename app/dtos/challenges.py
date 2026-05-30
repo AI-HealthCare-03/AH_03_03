@@ -75,9 +75,15 @@ class UserChallengeResponse(BaseSerializerModel):
     canceled_at: datetime | None
     started_date: date | None = None
     expected_done_date: date | None = None
+    end_date: date | None = None
     completed_date: date | None = None
     is_completed: bool = False
     completed_days: int = 0
+    total_days: int = 7
+    required_days: int = 6
+    completion_rate: float = 0.0
+    has_met_completion_condition: bool = False
+    is_finalized: bool = False
     progress: int = 0
     today_completed: bool = False
     today_completed_count: int = 0
@@ -112,6 +118,9 @@ class ChallengeCalendarItemResponse(BaseModel):
     challenge_log_id: int | None = None
     title: str | None = None
     status: str
+    total_count: int = 1
+    completed_count: int = 0
+    is_completed: bool = False
     started_at: datetime | None = None
     expected_done_at: datetime | None = None
     due_at: datetime | None = None
@@ -124,6 +133,9 @@ class ChallengeCalendarItemResponse(BaseModel):
 
 class ChallengeCalendarResponse(BaseModel):
     date: date
+    total_count: int = 0
+    completed_count: int = 0
+    is_completed: bool = False
     items: list[ChallengeCalendarItemResponse]
 
 

@@ -62,9 +62,9 @@ async def test_join_challenge_stores_started_and_expected_done_at(monkeypatch) -
     joined = await challenge_service.join_challenge(user_id=10, challenge_id=20)
 
     assert joined.started_at == started_at
-    assert joined.expected_done_at == started_at + timedelta(days=1)
+    assert joined.expected_done_at == started_at + timedelta(days=7)
     assert captured_payload["started_at"] == started_at
-    assert captured_payload["expected_done_at"] == started_at + timedelta(days=1)
+    assert captured_payload["expected_done_at"] == started_at + timedelta(days=7)
 
 
 @pytest.mark.asyncio
@@ -124,6 +124,7 @@ async def test_started_at_without_completed_at_is_not_completed_progress(monkeyp
 
     monkeypatch.setattr(challenge_service.Challenge, "get_or_none", fake_get_challenge)
     monkeypatch.setattr(challenge_service.ChallengeLog, "filter", lambda **kwargs: _AwaitableList([]))
+    monkeypatch.setattr(challenge_service, "_now", lambda: started_at + timedelta(days=1))
 
     result = await challenge_service._with_user_challenge_progress(user_challenge)
 
@@ -148,12 +149,101 @@ async def test_completed_at_is_only_completed_progress_signal(monkeypatch) -> No
 
     monkeypatch.setattr(challenge_service.Challenge, "get_or_none", fake_get_challenge)
     monkeypatch.setattr(challenge_service.ChallengeLog, "filter", lambda **kwargs: _AwaitableList([]))
+    monkeypatch.setattr(challenge_service, "_now", lambda: completed_at)
 
     result = await challenge_service._with_user_challenge_progress(user_challenge)
 
     assert result.is_completed is True
     assert result.completed_date == date(2026, 5, 30)
     assert result.progress == 100
+
+
+@pytest.mark.asyncio
+async def test_challenge_completion_condition_is_not_final_before_period_end(monkeypatch) -> None:
+    started_at = datetime(2026, 5, 1, 9, 0, tzinfo=config.TIMEZONE)
+    user_challenge = SimpleNamespace(
+        id=1,
+        challenge_id=2,
+        status=UserChallengeStatus.JOINED,
+        started_at=started_at,
+        expected_done_at=started_at + timedelta(days=7),
+        completed_at=None,
+    )
+    logs = [SimpleNamespace(completed_at=started_at + timedelta(days=offset, hours=1)) for offset in range(6)]
+
+    async def fake_get_challenge(id: int):
+        return SimpleNamespace(duration_days=7, target_metric="minutes", target_value="30")
+
+    monkeypatch.setattr(challenge_service.Challenge, "get_or_none", fake_get_challenge)
+    monkeypatch.setattr(challenge_service.ChallengeLog, "filter", lambda **kwargs: _AwaitableList(logs))
+    monkeypatch.setattr(challenge_service, "_now", lambda: started_at + timedelta(days=6))
+
+    result = await challenge_service._with_user_challenge_progress(user_challenge)
+
+    assert result.completed_days == 6
+    assert result.required_days == 6
+    assert result.has_met_completion_condition is True
+    assert result.is_finalized is False
+    assert result.is_completed is False
+    assert result.completion_rate == 85.7
+
+
+@pytest.mark.asyncio
+async def test_challenge_completion_is_final_after_period_end_when_threshold_met(monkeypatch) -> None:
+    started_at = datetime(2026, 5, 1, 9, 0, tzinfo=config.TIMEZONE)
+    user_challenge = SimpleNamespace(
+        id=1,
+        challenge_id=2,
+        status=UserChallengeStatus.JOINED,
+        started_at=started_at,
+        expected_done_at=started_at + timedelta(days=7),
+        completed_at=None,
+    )
+    logs = [SimpleNamespace(completed_at=started_at + timedelta(days=offset, hours=1)) for offset in range(6)]
+
+    async def fake_get_challenge(id: int):
+        return SimpleNamespace(duration_days=7, target_metric="minutes", target_value="30")
+
+    monkeypatch.setattr(challenge_service.Challenge, "get_or_none", fake_get_challenge)
+    monkeypatch.setattr(challenge_service.ChallengeLog, "filter", lambda **kwargs: _AwaitableList(logs))
+    monkeypatch.setattr(challenge_service, "_now", lambda: started_at + timedelta(days=8))
+
+    result = await challenge_service._with_user_challenge_progress(user_challenge)
+
+    assert result.completed_days == 6
+    assert result.has_met_completion_condition is True
+    assert result.is_finalized is True
+    assert result.is_completed is True
+    assert result.progress == 100
+
+
+@pytest.mark.asyncio
+async def test_challenge_completion_is_unmet_after_period_end_when_threshold_missed(monkeypatch) -> None:
+    started_at = datetime(2026, 5, 1, 9, 0, tzinfo=config.TIMEZONE)
+    user_challenge = SimpleNamespace(
+        id=1,
+        challenge_id=2,
+        status=UserChallengeStatus.JOINED,
+        started_at=started_at,
+        expected_done_at=started_at + timedelta(days=7),
+        completed_at=None,
+    )
+    logs = [SimpleNamespace(completed_at=started_at + timedelta(days=offset, hours=1)) for offset in range(5)]
+
+    async def fake_get_challenge(id: int):
+        return SimpleNamespace(duration_days=7, target_metric="minutes", target_value="30")
+
+    monkeypatch.setattr(challenge_service.Challenge, "get_or_none", fake_get_challenge)
+    monkeypatch.setattr(challenge_service.ChallengeLog, "filter", lambda **kwargs: _AwaitableList(logs))
+    monkeypatch.setattr(challenge_service, "_now", lambda: started_at + timedelta(days=8))
+
+    result = await challenge_service._with_user_challenge_progress(user_challenge)
+
+    assert result.completed_days == 5
+    assert result.has_met_completion_condition is False
+    assert result.is_finalized is True
+    assert result.is_completed is False
+    assert result.progress == 71
 
 
 @pytest.mark.asyncio
@@ -244,3 +334,143 @@ async def test_calendar_completed_items_are_filtered_by_completed_at(monkeypatch
     assert may_30["items"] == []
     assert may_31["items"][0]["status"] == "COMPLETED"
     assert may_31["items"][0]["completed_date"] == date(2026, 5, 31)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("completed_items", "expected_completed", "expected_total", "expected_is_completed"),
+    [
+        (1, 1, 3, False),
+        (2, 2, 3, False),
+        (3, 3, 3, True),
+        (0, 0, 3, False),
+    ],
+)
+async def test_calendar_counts_partial_and_full_completion(
+    monkeypatch,
+    completed_items: int,
+    expected_completed: int,
+    expected_total: int,
+    expected_is_completed: bool,
+) -> None:
+    target_date = date(2026, 5, 30)
+    started_at = datetime(2026, 5, 30, 9, 0, tzinfo=config.TIMEZONE)
+    completed_at = datetime(2026, 5, 30, 12, 0, tzinfo=config.TIMEZONE)
+    user_challenges = [
+        _calendar_user_challenge(id=challenge_id, challenge_id=challenge_id, started_at=started_at)
+        for challenge_id in range(1, 4)
+    ]
+    logs = [
+        SimpleNamespace(
+            id=100 + index,
+            user_challenge_id=user_challenge.id,
+            user_challenge=user_challenge,
+            log_date=target_date,
+            is_completed=True,
+            completed_at=completed_at,
+        )
+        for index, user_challenge in enumerate(user_challenges[:completed_items])
+    ]
+    challenges = [
+        SimpleNamespace(id=challenge_id, title=f"챌린지 {challenge_id}", target_metric="minutes", target_value="30")
+        for challenge_id in range(1, 4)
+    ]
+
+    async def fake_started_between(user_id: int, started_at: datetime, ended_before: datetime):
+        return user_challenges
+
+    async def fake_completed_between(user_id: int, completed_at: datetime, ended_before: datetime):
+        return logs
+
+    monkeypatch.setattr(
+        challenge_service.challenge_repository, "list_user_challenges_started_between", fake_started_between
+    )
+    monkeypatch.setattr(
+        challenge_service.challenge_repository, "list_challenge_logs_completed_between", fake_completed_between
+    )
+    monkeypatch.setattr(challenge_service.Challenge, "filter", lambda **kwargs: _AwaitableList(challenges))
+
+    calendar = await challenge_service.get_challenge_calendar(user_id=3, target_date=target_date)
+
+    assert calendar["completed_count"] == expected_completed
+    assert calendar["total_count"] == expected_total
+    assert calendar["is_completed"] is expected_is_completed
+    assert [item["is_completed"] for item in calendar["items"]].count(True) == expected_completed
+
+
+@pytest.mark.asyncio
+async def test_calendar_empty_day_has_no_completion_summary(monkeypatch) -> None:
+    async def fake_started_between(user_id: int, started_at: datetime, ended_before: datetime):
+        return []
+
+    async def fake_completed_between(user_id: int, completed_at: datetime, ended_before: datetime):
+        return []
+
+    monkeypatch.setattr(
+        challenge_service.challenge_repository, "list_user_challenges_started_between", fake_started_between
+    )
+    monkeypatch.setattr(
+        challenge_service.challenge_repository, "list_challenge_logs_completed_between", fake_completed_between
+    )
+
+    calendar = await challenge_service.get_challenge_calendar(user_id=3, target_date=date(2026, 5, 30))
+
+    assert calendar["completed_count"] == 0
+    assert calendar["total_count"] == 0
+    assert calendar["is_completed"] is False
+    assert calendar["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_calendar_excludes_canceled_challenge_from_progress_summary(monkeypatch) -> None:
+    target_date = date(2026, 5, 30)
+    started_at = datetime(2026, 5, 30, 9, 0, tzinfo=config.TIMEZONE)
+    user_challenge = _calendar_user_challenge(id=1, challenge_id=1, started_at=started_at)
+    user_challenge.status = UserChallengeStatus.CANCELED
+    user_challenge.canceled_at = datetime(2026, 5, 30, 10, 0, tzinfo=config.TIMEZONE)
+    log = SimpleNamespace(
+        id=100,
+        user_challenge_id=user_challenge.id,
+        user_challenge=user_challenge,
+        log_date=target_date,
+        is_completed=True,
+        completed_at=datetime(2026, 5, 30, 11, 0, tzinfo=config.TIMEZONE),
+    )
+
+    async def fake_started_between(user_id: int, started_at: datetime, ended_before: datetime):
+        return [user_challenge]
+
+    async def fake_completed_between(user_id: int, completed_at: datetime, ended_before: datetime):
+        return [log]
+
+    monkeypatch.setattr(
+        challenge_service.challenge_repository, "list_user_challenges_started_between", fake_started_between
+    )
+    monkeypatch.setattr(
+        challenge_service.challenge_repository, "list_challenge_logs_completed_between", fake_completed_between
+    )
+    monkeypatch.setattr(
+        challenge_service.Challenge,
+        "filter",
+        lambda **kwargs: _AwaitableList([SimpleNamespace(id=1, title="취소된 챌린지")]),
+    )
+
+    calendar = await challenge_service.get_challenge_calendar(user_id=3, target_date=target_date)
+
+    assert calendar["completed_count"] == 0
+    assert calendar["total_count"] == 0
+    assert calendar["is_completed"] is False
+    assert calendar["items"] == []
+
+
+def _calendar_user_challenge(id: int, challenge_id: int, started_at: datetime) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=id,
+        user_id=3,
+        challenge_id=challenge_id,
+        status=UserChallengeStatus.JOINED,
+        started_at=started_at,
+        expected_done_at=started_at + timedelta(days=1),
+        completed_at=None,
+        canceled_at=None,
+    )

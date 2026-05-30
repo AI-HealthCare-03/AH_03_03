@@ -70,10 +70,10 @@ const statusLabel: Record<string, string> = {
   IN_PROGRESS: "진행 중",
   JOINED: "진행 중",
   COMPLETED: "완료",
-  GIVEN_UP: "포기",
-  GIVE_UP: "포기",
-  CANCELED: "포기",
-  CANCELLED: "포기",
+  GIVEN_UP: "참여 전",
+  GIVE_UP: "참여 전",
+  CANCELED: "참여 전",
+  CANCELLED: "참여 전",
   PENDING: "대기",
 };
 
@@ -95,6 +95,10 @@ function normalizeStatus(value: unknown): string {
 function getDisplayStatus(value: unknown): string {
   const status = normalizeStatus(value);
   return statusLabel[status] ?? "진행 중";
+}
+
+function isRejoinableChallengeStatus(value: unknown): boolean {
+  return ["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(normalizeStatus(value));
 }
 
 function getCategory(challenge: Challenge | null): string {
@@ -151,37 +155,117 @@ function getDisplayMetric(value: unknown): string {
 }
 
 function getDurationDays(challenge: Challenge | null, userChallenge?: Challenge | null): number {
-  const parsed = Number(userChallenge?.duration_days ?? challenge?.duration_days);
+  const parsed = Number(userChallenge?.total_days ?? userChallenge?.duration_days ?? challenge?.duration_days);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+}
+
+function getRequiredDays(challenge: Challenge | null, userChallenge?: Challenge | null): number {
+  const parsed = Number(userChallenge?.required_days ?? userChallenge?.required_count);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.round(parsed);
+  }
+  return Math.ceil(getDurationDays(challenge, userChallenge) * 0.8);
+}
+
+function getCompletedDays(userChallenge: Challenge | null, logs: ChallengeLog[]): number {
+  const parsed = Number(userChallenge?.completed_days ?? userChallenge?.completed_count);
+  if (Number.isFinite(parsed) && parsed >= 0) {
+    return Math.round(parsed);
+  }
+  const completedDates = new Set(
+    logs
+      .filter((log) => Boolean(log.is_completed) && Boolean(log.completed_at ?? log.completed_date))
+      .map((log) => getDateKey(log.completed_date ?? log.completed_at ?? log.log_date)),
+  );
+  return completedDates.size;
+}
+
+function hasMetCompletionCondition(challenge: Challenge | null, userChallenge: Challenge | null, logs: ChallengeLog[]): boolean {
+  if (!userChallenge) {
+    return false;
+  }
+  if (userChallenge.has_met_completion_condition !== undefined) {
+    return Boolean(userChallenge.has_met_completion_condition);
+  }
+  return getCompletedDays(userChallenge, logs) >= getRequiredDays(challenge, userChallenge);
+}
+
+function isFinalizedUserChallenge(userChallenge: Challenge | null): boolean {
+  if (!userChallenge) {
+    return false;
+  }
+  if (Boolean(userChallenge.is_finalized) || Boolean(userChallenge.completed_at)) {
+    return true;
+  }
+  return ["COMPLETED", "EXPIRED", "FAILED"].includes(normalizeStatus(userChallenge.status));
+}
+
+function isFinalCompletedChallenge(challenge: Challenge | null, userChallenge: Challenge | null, logs: ChallengeLog[]): boolean {
+  if (!userChallenge) {
+    return false;
+  }
+  if (Boolean(userChallenge.completed_at)) {
+    return true;
+  }
+  return isFinalizedUserChallenge(userChallenge) && hasMetCompletionCondition(challenge, userChallenge, logs);
 }
 
 function getProgress(userChallenge: Challenge | null, challenge: Challenge | null, logs: ChallengeLog[]): number {
   if (!userChallenge) {
     return 0;
   }
+  if (isRejoinableChallengeStatus(userChallenge.status)) {
+    return 0;
+  }
+  if (isFinalCompletedChallenge(challenge, userChallenge, logs)) {
+    return 100;
+  }
   const explicit = Number(userChallenge.progress ?? userChallenge.progress_rate);
   if (Number.isFinite(explicit)) {
     return Math.max(0, Math.min(explicit > 1 ? explicit : explicit * 100, 100));
   }
-  if (logs.length > 0) {
-    const completedCount = logs.filter((log) => Boolean(log.is_completed) && Boolean(log.completed_at ?? log.completed_date)).length;
-    return Math.max(0, Math.min(Math.round((completedCount / getDurationDays(challenge, userChallenge)) * 100), 100));
+  const completionRate = Number(userChallenge.completion_rate);
+  if (Number.isFinite(completionRate)) {
+    return Math.max(0, Math.min(completionRate, 100));
   }
-  const completedDays = Number(userChallenge.completed_days ?? userChallenge.completed_count);
-  if (Number.isFinite(completedDays) && completedDays >= 0) {
-    return Math.max(0, Math.min(Math.round((completedDays / getDurationDays(challenge, userChallenge)) * 100), 100));
+  const completedDays = getCompletedDays(userChallenge, logs);
+  return Math.max(0, Math.min(Math.round((completedDays / getDurationDays(challenge, userChallenge)) * 100), 100));
+}
+
+function getProgressSummary(challenge: Challenge | null, userChallenge: Challenge | null, logs: ChallengeLog[]): string {
+  if (!userChallenge) {
+    return "아직 참여 전입니다.";
+  }
+  const durationDays = getDurationDays(challenge, userChallenge);
+  const completedDays = Math.min(getCompletedDays(userChallenge, logs), durationDays);
+  const requiredDays = getRequiredDays(challenge, userChallenge);
+  if (isFinalCompletedChallenge(challenge, userChallenge, logs)) {
+    return `${durationDays}/${durationDays}일 완료`;
+  }
+  if (isFinalizedUserChallenge(userChallenge)) {
+    return `${completedDays}/${durationDays}일 완료 · 목표 ${requiredDays}일 미달성`;
+  }
+  if (hasMetCompletionCondition(challenge, userChallenge, logs)) {
+    return `${completedDays}/${durationDays}일 완료 · 목표 ${requiredDays}일 충족, 진행 중`;
+  }
+  return `${completedDays}/${durationDays}일 완료 · 목표 ${requiredDays}일`;
+}
+
+function getStatusLabelForUserChallenge(challenge: Challenge | null, userChallenge: Challenge | null, logs: ChallengeLog[]): string {
+  if (!userChallenge || isRejoinableChallengeStatus(userChallenge.status)) {
+    return "참여 전";
+  }
+  if (isFinalCompletedChallenge(challenge, userChallenge, logs)) {
+    return "완료";
+  }
+  if (isFinalizedUserChallenge(userChallenge)) {
+    return "미달성";
+  }
+  if (hasMetCompletionCondition(challenge, userChallenge, logs)) {
+    return "완료 조건 충족";
   }
   const status = normalizeStatus(userChallenge.status);
-  if (userChallenge.completed_at) {
-    return 100;
-  }
-  if (["ACTIVE", "IN_PROGRESS", "JOINED"].includes(status)) {
-    return 40;
-  }
-  if (["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(status)) {
-    return 0;
-  }
-  return 0;
+  return getDisplayStatus(status);
 }
 
 function getDailyGoalCount(challenge: Challenge | null, userChallenge?: Challenge | null): number {
@@ -230,10 +314,6 @@ function formatDateLabel(value: unknown): string {
   return `${year}. ${Number(month)}. ${Number(day)}.`;
 }
 
-function getCompletedCount(logs: ChallengeLog[]): number {
-  return logs.filter((log) => Boolean(log.is_completed) && Boolean(log.completed_at ?? log.completed_date)).length;
-}
-
 function getTodayCompletedCount(logs: ChallengeLog[]): number {
   const today = getTodayKey();
   return logs.filter((log) => getDateKey(log.completed_date ?? log.completed_at ?? log.log_date) === today && Boolean(log.is_completed)).length;
@@ -250,20 +330,17 @@ function isActiveUserChallenge(userChallenge: Challenge | null): boolean {
   if (userChallenge.completed_at || userChallenge.canceled_at) {
     return false;
   }
+  if (isFinalizedUserChallenge(userChallenge)) {
+    return false;
+  }
   return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(userChallenge.status));
 }
 
 function isEndedUserChallenge(userChallenge: Challenge | null): boolean {
-  if (!userChallenge) {
-    return false;
-  }
-  if (userChallenge.completed_at) {
-    return true;
-  }
-  return ["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(normalizeStatus(userChallenge.status));
+  return isFinalizedUserChallenge(userChallenge);
 }
 
-function getStatusBadgeLabel(userChallenge: Challenge | null, logs: ChallengeLog[]): string {
+function getStatusBadgeLabel(challenge: Challenge | null, userChallenge: Challenge | null, logs: ChallengeLog[]): string {
   if (!userChallenge) {
     return "참여 전";
   }
@@ -271,17 +348,19 @@ function getStatusBadgeLabel(userChallenge: Challenge | null, logs: ChallengeLog
   if (isTodayCompleted(logs, dailyGoalCount) && isActiveUserChallenge(userChallenge)) {
     return "오늘 완료";
   }
-  return getDisplayStatus(userChallenge.status);
+  return getStatusLabelForUserChallenge(challenge, userChallenge, logs);
 }
 
 function buildHowToItems(challenge: Challenge | null): string[] {
   const category = getCategory(challenge);
   const duration = getDurationDays(challenge);
+  const requiredDays = Math.ceil(duration * 0.8);
   const dailyGoalCount = getDailyGoalCount(challenge);
   const metric = getDisplayMetric(challenge?.target_metric);
   const targetValue = String(challenge?.target_value ?? "").trim();
   const base = [
     `${duration}일 동안 하루 ${dailyGoalCount}회 목표를 실천한 뒤 완료 버튼을 눌러 기록하세요.`,
+    `${duration}일 기간이 끝난 뒤 ${requiredDays}일 이상 이행하면 챌린지 완료로 판정됩니다.`,
     targetValue ? `하루 수행 기준은 ${metric} ${targetValue}입니다.` : `하루 수행 기준은 ${metric} 실천 여부입니다.`,
   ];
 
@@ -348,7 +427,10 @@ export default function ChallengeDetailPage() {
     }
     try {
       const myItems = await listMyChallenges<Challenge[]>({ limit: 100, offset: 0 });
-      const matched = myItems.find((item) => Number(item.challenge_id) === Number(challengeId)) ?? null;
+      const matched =
+        myItems.find(
+          (item) => Number(item.challenge_id) === Number(challengeId) && !isRejoinableChallengeStatus(item.status),
+        ) ?? null;
       setUserChallenge(matched);
       if (matched?.id) {
         setLogs(await listChallengeLogs<ChallengeLog[]>(Number(matched.id)));
@@ -413,7 +495,7 @@ export default function ChallengeDetailPage() {
       setMessage("참여 중인 챌린지가 없습니다.");
       return;
     }
-    const confirmed = window.confirm("챌린지를 포기하면 현재 진행 상태가 중단됩니다. 계속하시겠습니까?");
+    const confirmed = window.confirm("챌린지 참여를 취소하면 현재 진행 상태가 중단됩니다. 계속하시겠습니까?");
     if (!confirmed) {
       return;
     }
@@ -422,10 +504,12 @@ export default function ChallengeDetailPage() {
     setActionLoading("give-up");
     try {
       await giveUpChallenge(Number(userChallenge.id));
-      setMessage("챌린지를 포기 처리했습니다.");
+      setUserChallenge(null);
+      setLogs([]);
+      setMessage("챌린지 참여를 취소했습니다. 다시 시작할 수 있습니다.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "챌린지 포기 처리에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "챌린지 참여 취소 처리에 실패했습니다.");
     } finally {
       setActionLoading(null);
     }
@@ -435,7 +519,7 @@ export default function ChallengeDetailPage() {
   const progress = getProgress(userChallenge, challenge, logs);
   const durationDays = getDurationDays(challenge, userChallenge);
   const dailyGoalCount = getDailyGoalCount(challenge, userChallenge);
-  const completedCount = getCompletedCount(logs);
+  const completedCount = getCompletedDays(userChallenge, logs);
   const todayCompletedCount = getTodayCompletedCount(logs);
   const active = isActiveUserChallenge(userChallenge);
   const todayCompleted = isTodayCompleted(logs, dailyGoalCount);
@@ -443,7 +527,7 @@ export default function ChallengeDetailPage() {
   const nextActionLabel =
     dailyGoalCount > 1 ? `${Math.min(todayCompletedCount + 1, dailyGoalCount)}/${dailyGoalCount} 수행하기` : "오늘 수행 완료";
   const startedLabel = formatDateLabel(userChallenge?.started_date ?? userChallenge?.started_at);
-  const expectedDoneLabel = formatDateLabel(userChallenge?.expected_done_date ?? userChallenge?.expected_done_at);
+  const expectedDoneLabel = formatDateLabel(userChallenge?.end_date ?? userChallenge?.expected_done_date ?? userChallenge?.expected_done_at);
 
   return (
     <div className="page-stack">
@@ -492,7 +576,7 @@ export default function ChallengeDetailPage() {
             </div>
             <div>
               <span>상태</span>
-              <strong>{getStatusBadgeLabel(userChallenge, logs)}</strong>
+              <strong>{getStatusBadgeLabel(challenge, userChallenge, logs)}</strong>
             </div>
             {userChallenge && (
               <>
@@ -517,7 +601,7 @@ export default function ChallengeDetailPage() {
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
             <p className="muted">
-              {userChallenge ? `${Math.min(completedCount, durationDays)}일 / ${durationDays}일 완료 (${progress}%)` : "아직 참여 전입니다."}
+              {getProgressSummary(challenge, userChallenge, logs)} {userChallenge ? `(${Math.round(progress)}%)` : ""}
             </p>
           </div>
           <div className="challenge-log-grid">
@@ -544,11 +628,19 @@ export default function ChallengeDetailPage() {
                   {actionLoading === "complete" ? "저장 중..." : todayCompleted ? "오늘 완료됨" : nextActionLabel}
                 </button>
                 <button className="danger" disabled={actionLoading !== null} onClick={giveUp} type="button">
-                  {actionLoading === "give-up" ? "처리 중..." : "포기하기"}
+                  {actionLoading === "give-up" ? "처리 중..." : "참여 취소하기"}
                 </button>
               </>
             )}
-            {ended && <span className="badge badge-reference">{getDisplayStatus(userChallenge?.status)}</span>}
+            {ended && (
+              <>
+                <span className="badge badge-reference">{getStatusBadgeLabel(challenge, userChallenge, logs)}</span>
+                {/* TODO: 재도전은 기존 기록과 새 시도 분리를 위한 attempt 구조가 정리되면 활성화한다. */}
+                <button className="secondary" disabled type="button">
+                  다시 도전하기 준비 중
+                </button>
+              </>
+            )}
           </div>
         </div>
       </Card>
@@ -578,7 +670,7 @@ export default function ChallengeDetailPage() {
       <Card title="추천 이유">
         <div className="timeline-list">
           <div>혈당/혈압 추적 결과와 생활습관 입력을 바탕으로 추천되는 챌린지입니다.</div>
-          <div>오늘 수행 완료와 포기 처리는 내 챌린지 기록에 바로 반영됩니다.</div>
+          <div>오늘 수행 완료와 참여 취소 처리는 내 챌린지 기록에 바로 반영됩니다.</div>
         </div>
       </Card>
     </div>
