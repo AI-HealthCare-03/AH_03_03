@@ -21,7 +21,7 @@ async def _main() -> None:
     for signum in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(signum, request_shutdown)
 
-    logger.info("AI Worker started. Redis Stream DEMO_ECHO consumer is enabled.")
+    logger.info("AI Worker started. Redis Stream consumer is enabled.")
     await run_consumer_forever(stop_event)
     logger.info("AI Worker stopped.")
 
