@@ -166,6 +166,12 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 
 이미지를 먼저 push한 뒤 EC2에서 실행합니다.
 
+`docker-compose.prod.yml`은 외부 Docker network `ai-health-shared`를 사용합니다. EC2 최초 배포 전 한 번 생성합니다.
+
+```bash
+docker network create ai-health-shared || true
+```
+
 ```bash
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
