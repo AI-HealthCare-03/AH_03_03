@@ -61,6 +61,16 @@ async def mark_success(job_id: int, result_payload: dict[str, Any]) -> AsyncJob 
     return job
 
 
+async def mark_retry_scheduled(job_id: int, error_message: str) -> AsyncJob | None:
+    job = await get_job(job_id)
+    if job is None:
+        return None
+    job.status = AsyncJobStatus.PENDING
+    job.error_message = error_message
+    await job.save(update_fields=["status", "error_message", "updated_at"])
+    return job
+
+
 async def mark_failed(job_id: int, error_message: str) -> AsyncJob | None:
     job = await get_job(job_id)
     if job is None:
