@@ -78,6 +78,11 @@ async def _run_exam_ocr(
 @exam_router.post("/{exam_id}/ocr", response_model=ExamOCRResponse)
 async def run_exam_ocr(exam_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     image_bytes, image_media_type, image_filename = await _read_optional_upload(request)
+    if image_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="검진표 이미지 또는 PDF 파일을 업로드해주세요.",
+        )
     return await _run_exam_ocr(
         exam_id,
         user,
@@ -89,7 +94,10 @@ async def run_exam_ocr(exam_id: int, request: Request, user: Annotated[User, Dep
 
 @exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamOCRResponse, deprecated=True, include_in_schema=False)
 async def run_legacy_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
-    return await _run_exam_ocr(exam_id, user)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="더미 OCR 경로는 사용하지 않습니다. 실제 검진표 파일 업로드 경로를 사용해주세요.",
+    )
 
 
 async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | None, str | None]:

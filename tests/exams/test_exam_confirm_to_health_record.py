@@ -123,16 +123,39 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_exam_ocr_marks_fallback_when_provider_unavailable(monkeypatch) -> None:
+async def test_exam_ocr_returns_empty_measurements_when_provider_unavailable(monkeypatch) -> None:
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", None)
 
     result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
 
-    assert result["provider"] == "fallback"
-    assert result["fallback_used"] is True
-    assert result["measurements"] == exam_service.FALLBACK_OCR_MEASUREMENTS
+    assert result["provider"] == "none"
+    assert result["fallback_used"] is False
+    assert result["measurements"] == []
+    assert result["message"] == "인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요."
+
+
+@pytest.mark.asyncio
+async def test_exam_ocr_returns_empty_measurements_when_parser_extracts_no_values(monkeypatch) -> None:
+    class FakeVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            return {"analysis_status": "success", "extracted_data": {}}
+
+    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
+
+    result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
+
+    assert result["provider"] == "none"
+    assert result["fallback_used"] is False
+    assert result["measurements"] == []
 
 
 @pytest.mark.asyncio
