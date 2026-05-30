@@ -36,6 +36,8 @@ class User(models.Model):
     locked_until = fields.DatetimeField(null=True)
     deactivated_at = fields.DatetimeField(null=True)
     email_verified_at = fields.DatetimeField(null=True)
+    privacy_consent_agreed_at = fields.DatetimeField(null=True)
+    privacy_consent_version = fields.CharField(max_length=30, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

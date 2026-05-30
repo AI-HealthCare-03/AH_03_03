@@ -2,10 +2,11 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from app.dtos.auth import SignUpRequest
 from app.services import auth as auth_service_module
-from app.services.auth import AuthService
+from app.services.auth import PRIVACY_CONSENT_VERSION, AuthService
 
 
 class DummyTransaction:
@@ -33,9 +34,16 @@ class FakeSignupRepository:
         self.created_user_payload = kwargs
         return SimpleNamespace(id=1, **kwargs)
 
-    async def create_user_consent(self, user_id: int, sensitive_data_agreed: bool, marketing_agreed: bool):
+    async def create_user_consent(
+        self,
+        user_id: int,
+        privacy_agreed: bool = True,
+        sensitive_data_agreed: bool = False,
+        marketing_agreed: bool = False,
+    ):
         return SimpleNamespace(
             user_id=user_id,
+            privacy_agreed=privacy_agreed,
             sensitive_data_agreed=sensitive_data_agreed,
             marketing_agreed=marketing_agreed,
         )
@@ -74,11 +82,14 @@ async def test_signup_without_phone_number_stores_none(signup_service):
             name="테스터",
             gender="MALE",
             birth_date=date(1990, 1, 1),
+            privacy_consent_agreed=True,
         )
     )
 
     assert repository.created_user_payload is not None
     assert repository.created_user_payload["phone_number"] is None
+    assert repository.created_user_payload["privacy_consent_agreed_at"] is not None
+    assert repository.created_user_payload["privacy_consent_version"] == PRIVACY_CONSENT_VERSION
 
 
 @pytest.mark.asyncio
@@ -94,8 +105,30 @@ async def test_signup_with_phone_number_stores_normalized_value(signup_service):
             gender="MALE",
             birth_date=date(1990, 1, 1),
             phone_number="+82 10-1234-5678",
+            privacy_consent_agreed=True,
         )
     )
 
     assert repository.created_user_payload is not None
     assert repository.created_user_payload["phone_number"] == "01012345678"
+
+
+@pytest.mark.asyncio
+async def test_signup_requires_privacy_consent(signup_service):
+    service, repository = signup_service
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.signup(
+            SignUpRequest(
+                login_id="signupdeny",
+                email="signup-deny@example.com",
+                password="Password123!",
+                name="테스터",
+                gender="MALE",
+                birth_date=date(1990, 1, 1),
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "개인정보 수집·이용 동의가 필요합니다."
+    assert repository.created_user_payload is None

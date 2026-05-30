@@ -21,6 +21,7 @@ class SignUpRequest(BaseModel):
     nickname: Annotated[str | None, Field(None, max_length=30)] = None
     address: Annotated[str | None, Field(None, max_length=255)] = None
     profile_image_url: Annotated[str | None, Field(None, max_length=500)] = None
+    privacy_consent_agreed: bool = False
     sensitive_data_agreed: bool = False
     marketing_agreed: bool = False
 

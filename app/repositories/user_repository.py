@@ -44,6 +44,8 @@ class UserRepository:
         address: str | None = None,
         profile_image_url: str | None = None,
         email_verified_at: datetime | None = None,
+        privacy_consent_agreed_at: datetime | None = None,
+        privacy_consent_version: str | None = None,
         is_active: bool = True,
         is_admin: bool = False,
         role: str = "USER",
@@ -63,6 +65,8 @@ class UserRepository:
             is_admin=is_admin,
             role=role,
             email_verified_at=email_verified_at,
+            privacy_consent_agreed_at=privacy_consent_agreed_at,
+            privacy_consent_version=privacy_consent_version,
         )
 
     async def get_user_by_email(self, email: str) -> User | None:
@@ -226,11 +230,13 @@ class UserRepository:
     async def create_user_consent(
         self,
         user_id: int,
+        privacy_agreed: bool = True,
         sensitive_data_agreed: bool = False,
         marketing_agreed: bool = False,
     ) -> UserConsent:
         return await UserConsent.create(
             user_id=user_id,
+            privacy_agreed=privacy_agreed,
             sensitive_data_agreed=sensitive_data_agreed,
             marketing_agreed=marketing_agreed,
         )
