@@ -36,6 +36,12 @@ class Config(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str | None = None
     UPLOAD_STORAGE_DIR: str = "var/uploads"
+    STORAGE_BACKEND: str = "local"
+    LOCAL_STORAGE_ROOT: str = "var/storage"
+    S3_BUCKET_NAME: str | None = None
+    S3_REGION: str = "ap-northeast-2"
+    S3_PREFIX: str = ""
+    S3_PRESIGNED_URL_EXPIRES_SECONDS: int = 3600
     LOGIN_FAILURE_LIMIT: int = 5
     LOGIN_SOFT_LOCK_MINUTES: int = 1
     ACCOUNT_LOCK_MINUTES: int = 15

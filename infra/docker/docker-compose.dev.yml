@@ -59,6 +59,12 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_ROOT: ${LOCAL_STORAGE_ROOT:-var/storage}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-ap-northeast-2}
+      S3_PREFIX: ${S3_PREFIX:-ai-health/dev}
+      S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       EMAIL_VERIFICATION_DEBUG: ${EMAIL_VERIFICATION_DEBUG:-true}
       PASSWORD_RESET_DEBUG: ${PASSWORD_RESET_DEBUG:-false}
@@ -92,6 +98,7 @@ services:
     volumes:
       - ../../app:/app/app
       - ai_health_dev_uploads:/app/var/uploads
+      - ai_health_dev_storage:/app/var/storage
     ports:
       - "8000:8000"
     networks:
@@ -134,6 +141,12 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_ROOT: ${LOCAL_STORAGE_ROOT:-var/storage}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-ap-northeast-2}
+      S3_PREFIX: ${S3_PREFIX:-ai-health/dev}
+      S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
       CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
@@ -156,6 +169,7 @@ services:
     restart: unless-stopped
     volumes:
       - ai_health_dev_uploads:/app/var/uploads
+      - ai_health_dev_storage:/app/var/storage
     networks:
       - app
       - ai-health-shared
@@ -208,6 +222,7 @@ services:
 volumes:
   ai_health_dev_postgres_data:
   ai_health_dev_uploads:
+  ai_health_dev_storage:
 
 networks:
   app:
