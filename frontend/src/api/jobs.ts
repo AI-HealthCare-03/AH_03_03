@@ -1,6 +1,6 @@
 import { apiRequest } from "./client";
 
-export type AsyncJobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED";
+export type AsyncJobStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "CANCELED";
 
 export type AsyncJob = {
   id: number;
