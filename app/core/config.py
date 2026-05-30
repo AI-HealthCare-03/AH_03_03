@@ -35,6 +35,8 @@ class Config(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str | None = None
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_INTERVAL_SECONDS: int = 60
     UPLOAD_STORAGE_DIR: str = "var/uploads"
     STORAGE_BACKEND: str = "local"
     LOCAL_STORAGE_ROOT: str = "var/storage"
