@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import type { AsyncJob } from "./jobs";
 
 export type ExamReport = {
   id: number;
@@ -53,10 +54,10 @@ export async function createExam(payload: {
   return apiRequest<ExamReport>("/exams", { method: "POST", body: payload });
 }
 
-export async function runExamOcr(examId: number, file: File): Promise<ExamOcrResponse> {
+export async function runExamOcr(examId: number, file: File): Promise<AsyncJob> {
   const formData = new FormData();
   formData.append("image", file);
-  return apiRequest<ExamOcrResponse>(`/exams/${examId}/ocr`, { method: "POST", body: formData });
+  return apiRequest<AsyncJob>(`/exams/${examId}/ocr`, { method: "POST", body: formData });
 }
 
 export async function listMeasurements(examId: number): Promise<ExamMeasurement[]> {

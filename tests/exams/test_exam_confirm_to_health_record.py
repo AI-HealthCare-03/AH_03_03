@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -86,6 +87,20 @@ def test_invalid_or_none_values_do_not_overwrite_health_record_fields() -> None:
     )
 
     assert data == {}
+
+
+def test_exam_upload_path_uses_shared_storage_root(monkeypatch, tmp_path: Path) -> None:
+    report = SimpleNamespace(id=7, user_id=3)
+    monkeypatch.setattr(exam_service.config, "UPLOAD_STORAGE_DIR", str(tmp_path))
+
+    path = exam_service._build_exam_upload_path(report, "image/jpeg", "checkup.heic")
+
+    assert path == tmp_path / "exams" / "3" / "7" / "source.jpg"
+
+
+def test_exam_upload_media_type_is_inferred_from_stored_path() -> None:
+    assert exam_service._media_type_from_upload_path(Path("var/uploads/exams/1/2/source.pdf")) == "application/pdf"
+    assert exam_service._media_type_from_upload_path(Path("var/uploads/exams/1/2/source.webp")) == "image/webp"
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,7 @@
 import logging
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
 from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
@@ -11,6 +13,7 @@ from ai_runtime.llm.schemas import DietScoreExplanationInput
 from app.core import config
 from app.dtos.diets import (
     DietAnalyzeRequest,
+    DietAnalyzeResponse,
     DietPhotoResultCreateRequest,
     DietRecordCreateRequest,
     DietRecordUpdateRequest,
@@ -21,6 +24,13 @@ from app.repositories import diet_repository
 SCORING_SOURCE = "nutrition_rule_table"
 FOOD_DETECTION_SOURCE = "rule_based_food_detection"
 SCORING_FALLBACK_SOURCE = "nutrition_rule_table_unavailable"
+DIET_ANALYSIS_UPLOAD_DIR = "diet_analysis"
+DIET_ANALYSIS_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
 logger = logging.getLogger(__name__)
 
 
@@ -163,6 +173,52 @@ async def run_diet_analysis(
     }
 
 
+def store_diet_analysis_upload(
+    *,
+    user_id: int,
+    image_bytes: bytes,
+    image_media_type: str | None,
+    filename: str | None,
+) -> dict[str, str]:
+    suffix = _safe_image_suffix(filename, image_media_type)
+    upload_path = _build_diet_analysis_upload_path(user_id=user_id, suffix=suffix)
+    upload_path.write_bytes(image_bytes)
+    return {
+        "upload_path": str(upload_path),
+        "image_media_type": image_media_type or _media_type_from_upload_path(str(upload_path)),
+        "image_filename": filename or upload_path.name,
+    }
+
+
+async def run_diet_analysis_from_job(job_id: int) -> DietAnalyzeResponse:
+    from app.services import async_jobs as async_job_service
+
+    job = await async_job_service.get_job(job_id)
+    if job is None:
+        raise ValueError("diet_analysis_job_not_found")
+
+    payload = job.request_payload or {}
+    user_id = _payload_int(payload, "user_id")
+    if user_id is None:
+        raise ValueError("diet_analysis_user_id_missing")
+
+    upload_path = str(payload.get("upload_path") or "")
+    request = DietAnalyzeRequest(
+        meal_type=str(payload.get("meal_type") or "") or None,
+        meal_time=payload.get("meal_time") or None,
+        description=str(payload.get("description") or "") or None,
+        image_path=str(payload.get("image_path") or upload_path or "") or None,
+        memo=str(payload.get("memo") or "") or None,
+    )
+    response = await run_diet_analysis(
+        user_id,
+        request,
+        image_bytes=_read_diet_analysis_bytes(upload_path),
+        image_media_type=str(payload.get("image_media_type") or "") or _media_type_from_upload_path(upload_path),
+    )
+    return DietAnalyzeResponse.model_validate(response)
+
+
 async def _detect_foods_with_provider(
     image_bytes: bytes | None,
     image_media_type: str | None,
@@ -227,6 +283,57 @@ def _is_number(value: Any) -> bool:
     except (TypeError, ValueError):
         return False
     return True
+
+
+def _upload_storage_root() -> Path:
+    root = Path(config.UPLOAD_STORAGE_DIR)
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    path = root / DIET_ANALYSIS_UPLOAD_DIR
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _build_diet_analysis_upload_path(*, user_id: int, suffix: str) -> Path:
+    user_dir = _upload_storage_root() / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir / f"{uuid4().hex}{suffix}"
+
+
+def _safe_image_suffix(filename: str | None, media_type: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in DIET_ANALYSIS_MEDIA_TYPES:
+        return suffix
+    if media_type == "image/png":
+        return ".png"
+    if media_type == "image/webp":
+        return ".webp"
+    return ".jpg"
+
+
+def _read_diet_analysis_bytes(path_value: str) -> bytes | None:
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if not path.exists() or not path.is_file():
+        raise ValueError("diet_analysis_upload_missing")
+    return path.read_bytes()
+
+
+def _media_type_from_upload_path(path_value: str) -> str | None:
+    if not path_value:
+        return None
+    return DIET_ANALYSIS_MEDIA_TYPES.get(Path(path_value).suffix.lower())
+
+
+def _payload_int(payload: dict[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def build_nutrition_scoring_result(

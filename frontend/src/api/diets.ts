@@ -1,4 +1,5 @@
 import { apiRequest, type ApiValue } from "./client";
+import type { AsyncJob } from "./jobs";
 
 export type DietFoodItem = {
   name: string;
@@ -66,6 +67,6 @@ export async function createDietRecord<T>(payload: DietRecordPayload): Promise<T
   return apiRequest<T>("/diets", { method: "POST", body: payload as Record<string, ApiValue> });
 }
 
-export async function analyzeDiet<T>(payload: Record<string, ApiValue> | FormData): Promise<T> {
-  return apiRequest<T>("/diets/analyze", { method: "POST", body: payload });
+export async function analyzeDiet(payload: Record<string, ApiValue> | FormData): Promise<AsyncJob> {
+  return apiRequest<AsyncJob>("/diets/analyze", { method: "POST", body: payload });
 }

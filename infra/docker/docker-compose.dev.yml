@@ -55,6 +55,7 @@ services:
       DB_NAME: ${DB_NAME:-ai_health}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       EMAIL_VERIFICATION_DEBUG: ${EMAIL_VERIFICATION_DEBUG:-true}
       PASSWORD_RESET_DEBUG: ${PASSWORD_RESET_DEBUG:-false}
@@ -87,6 +88,7 @@ services:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     volumes:
       - ../../app:/app/app
+      - ai_health_dev_uploads:/app/var/uploads
     ports:
       - "8000:8000"
     networks:
@@ -125,6 +127,7 @@ services:
       DB_NAME: ${DB_NAME:-ai_health}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
       CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
@@ -145,6 +148,8 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     restart: unless-stopped
+    volumes:
+      - ai_health_dev_uploads:/app/var/uploads
     networks:
       - app
       - ai-health-shared
@@ -196,6 +201,7 @@ services:
 
 volumes:
   ai_health_dev_postgres_data:
+  ai_health_dev_uploads:
 
 networks:
   app:

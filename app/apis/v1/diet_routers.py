@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, stat
 
 from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
+from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.diets import (
     DietAnalyzeRequest,
     DietAnalyzeResponse,
@@ -14,6 +15,7 @@ from app.dtos.diets import (
     DietRecordUpdateRequest,
 )
 from app.models.users import User
+from app.services import async_jobs as async_job_service
 from app.services import diets as diet_service
 
 diet_router = APIRouter(prefix="/diets", tags=["diets"])
@@ -53,13 +55,23 @@ async def _run_diet_analysis(
     )
 
 
-@diet_router.post("/analyze", response_model=DietAnalyzeResponse, status_code=status.HTTP_201_CREATED)
+@diet_router.post("/analyze", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def run_diet_analysis(
     request: Request,
     user: Annotated[User, Depends(get_request_user)],
 ):
     payload, image_bytes, image_media_type = await _parse_diet_analyze_request(request)
-    return await _run_diet_analysis(payload, user, image_bytes=image_bytes, image_media_type=image_media_type)
+    request_payload = payload.model_dump(mode="json", exclude_none=True)
+    if image_bytes:
+        request_payload.update(
+            diet_service.store_diet_analysis_upload(
+                user_id=int(user.id),
+                image_bytes=image_bytes,
+                image_media_type=image_media_type,
+                filename=str(request_payload.get("image_path") or "") or None,
+            )
+        )
+    return await async_job_service.create_diet_analyze_image_job(int(user.id), request_payload)
 
 
 @diet_router.post(

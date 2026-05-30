@@ -6,9 +6,11 @@ import {
   createDietRecord,
   listDietRecords,
   type DietFoodItem,
+  type DietAnalyzeResponse,
   type DietNutritionSummary,
   type DietRecordPayload,
 } from "../api/diets";
+import { getAsyncJob } from "../api/jobs";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
@@ -119,6 +121,7 @@ export default function DietPage() {
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -226,6 +229,8 @@ export default function DietPage() {
 
   const runDietAnalysis = async () => {
     setError("");
+    setMessage("");
+    setAnalysisResult(null);
     setIsAnalyzing(true);
     try {
       const payload = selectedImageFile
@@ -235,14 +240,38 @@ export default function DietPage() {
             meal_time: new Date().toISOString(),
             image_path: null,
           };
-      const result = await analyzeDiet<Record<string, unknown>>(payload);
-      setAnalysisResult(result);
+      const job = await analyzeDiet(payload);
+      setMessage("식단 분석 요청을 접수했습니다. 결과가 생성될 때까지 잠시 기다려주세요.");
+      await waitForDietAnalysisJob(job.id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "식단 분석에 실패했습니다.");
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const waitForDietAnalysisJob = async (jobId: number) => {
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      await delay(1500);
+      const job = await getAsyncJob(jobId);
+      if (job.status === "SUCCESS") {
+        const result = dietAnalysisResultFromPayload(job.result_payload);
+        if (!result) {
+          throw new Error("식단 분석 결과를 불러오지 못했습니다.");
+        }
+        setAnalysisResult(result as unknown as Record<string, unknown>);
+        setMessage("식단 분석이 완료되었습니다. 저장된 결과를 확인해주세요.");
+        return;
+      }
+      if (job.status === "FAILED") {
+        throw new Error(job.error_message || "식단 분석에 실패했습니다.");
+      }
+      if (attempt === 0) {
+        setMessage("식단을 분석 중입니다. 이미지 분석과 질환별 점수 계산에 잠시 시간이 걸릴 수 있습니다.");
+      }
+    }
+    throw new Error("식단 분석이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
   };
 
   const detectedFoods = Array.isArray(analysisResult?.detected_foods)
@@ -265,6 +294,7 @@ export default function DietPage() {
   return (
     <div className="page-grid">
       {error && <ErrorMessage message={error} />}
+      {message && <div className="state-box">{message}</div>}
       <Card
         title="식단 이미지 분석"
         actions={
@@ -608,4 +638,15 @@ function buildDietAnalysisFormData(file: File, description: string): FormData {
   formData.append("meal_time", new Date().toISOString());
   formData.append("image_path", file.name);
   return formData;
+}
+
+function dietAnalysisResultFromPayload(payload: Record<string, unknown> | null | undefined): DietAnalyzeResponse | null {
+  if (!payload || !payload.diet_record || !payload.photo_result) {
+    return null;
+  }
+  return payload as unknown as DietAnalyzeResponse;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

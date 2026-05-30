@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -190,3 +191,76 @@ async def test_run_diet_analysis_falls_back_when_gpt_vision_key_missing(monkeypa
     assert response["vision_provider"] == "rule_based_food_detection"
     assert response["fallback_used"] is True
     assert response["raw_output"]["source"] == "rule_based_food_detection"
+
+
+@pytest.mark.asyncio
+async def test_run_diet_analysis_from_job_loads_uploaded_image(monkeypatch, tmp_path) -> None:
+    upload_path = tmp_path / "diet.jpg"
+    upload_path.write_bytes(b"diet-image")
+    now = datetime.now(UTC)
+    captured: dict[str, object] = {}
+
+    async def fake_get_job(job_id: int):
+        assert job_id == 88
+        return SimpleNamespace(
+            request_payload={
+                "user_id": 10,
+                "meal_type": "LUNCH",
+                "description": "사진 식단",
+                "upload_path": str(upload_path),
+                "image_media_type": "image/jpeg",
+            }
+        )
+
+    async def fake_run_diet_analysis(user_id: int, request, image_bytes=None, image_media_type=None):
+        captured["user_id"] = user_id
+        captured["description"] = request.description
+        captured["image_bytes"] = image_bytes
+        captured["image_media_type"] = image_media_type
+        return {
+            "message": "식단 분석이 완료되었습니다.",
+            "diet_record": SimpleNamespace(
+                id=1,
+                user_id=user_id,
+                meal_type=request.meal_type,
+                meal_time=now,
+                description=request.description,
+                image_path=None,
+                detected_foods=[{"name": "현미밥"}],
+                nutrition_summary={"calories": 620},
+                diet_score=82.5,
+                diet_feedback="ok",
+                analysis_method="IMAGE_ANALYSIS",
+                is_user_corrected=False,
+                memo=None,
+                created_at=now,
+                updated_at=now,
+            ),
+            "photo_result": SimpleNamespace(
+                id=2,
+                diet_record_id=1,
+                detected_foods=[{"name": "현미밥"}],
+                confidence_payload={"method": "rule_based_food_detection"},
+                raw_output={"source": "rule_based_food_detection"},
+                created_at=now,
+            ),
+            "detected_foods": [{"name": "현미밥"}],
+            "nutrition_summary": {"calories": 620},
+            "diet_score": 82.5,
+            "diet_feedback": "ok",
+            "vision_provider": "rule_based_food_detection",
+            "fallback_used": True,
+        }
+
+    monkeypatch.setattr("app.services.async_jobs.get_job", fake_get_job)
+    monkeypatch.setattr(diet_service, "run_diet_analysis", fake_run_diet_analysis)
+
+    response = await diet_service.run_diet_analysis_from_job(88)
+
+    assert response.diet_record.id == 1
+    assert captured == {
+        "user_id": 10,
+        "description": "사진 식단",
+        "image_bytes": b"diet-image",
+        "image_media_type": "image/jpeg",
+    }

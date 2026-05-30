@@ -10,6 +10,7 @@ import {
   type ExamMeasurement,
   type ExamReport,
 } from "../api/exams";
+import { getAsyncJob } from "../api/jobs";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
@@ -96,20 +97,40 @@ export default function ExamOcrPage() {
           original_filename: selectedFileName,
           file_path: `exam-upload/${selectedFileName}`,
           uploaded_at: new Date().toISOString(),
-        }));
+      }));
       setExam(report);
-      const result = await runExamOcr(report.id, selectedFile);
-      setMeasurements(result.measurements);
-      setMessage(
-        result.measurements.length > 0
-          ? "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요."
-          : "인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.",
-      );
+      const job = await runExamOcr(report.id, selectedFile);
+      setMessage("검진표 분석 요청을 접수했습니다. 측정값 후보가 생성될 때까지 잠시 기다려주세요.");
+      await waitForExamOcrJob(job.id, report.id);
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
     } finally {
       setIsRunningOcr(false);
     }
+  };
+
+  const waitForExamOcrJob = async (jobId: number, examId: number) => {
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      await delay(1500);
+      const job = await getAsyncJob(jobId);
+      if (job.status === "SUCCESS") {
+        const latestMeasurements = await listMeasurements(examId);
+        setMeasurements(latestMeasurements);
+        setMessage(
+          latestMeasurements.length > 0
+            ? "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요."
+            : "인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.",
+        );
+        return;
+      }
+      if (job.status === "FAILED") {
+        throw new Error(job.error_message || "측정값 후보 생성에 실패했습니다.");
+      }
+      if (attempt === 0) {
+        setMessage("건강검진표를 분석 중입니다. PDF 페이지 수에 따라 시간이 걸릴 수 있습니다.");
+      }
+    }
+    throw new Error("검진표 분석이 지연되고 있습니다. 잠시 후 측정값 후보를 다시 확인해주세요.");
   };
 
   const updateLocalMeasurement = (measurementId: number, value: string) => {
@@ -267,4 +288,8 @@ function toUserMessage(message: string): string {
 
 function isPdfFile(file: File): boolean {
   return file.type.toLowerCase() === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
