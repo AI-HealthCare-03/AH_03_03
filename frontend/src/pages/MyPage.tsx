@@ -35,6 +35,18 @@ const riskFallbackScores: Record<string, number> = {
   LOW: 25,
 };
 
+const challengeStatusLabels: Record<string, string> = {
+  ACTIVE: "진행 중",
+  IN_PROGRESS: "진행 중",
+  JOINED: "진행 중",
+  COMPLETED: "완료",
+  CANCELED: "참여 전",
+  CANCELLED: "참여 전",
+  FAILED: "종료",
+  GIVE_UP: "참여 전",
+  GIVEN_UP: "참여 전",
+};
+
 const myPageMenuItems = [
   { label: "프로필", status: "active" },
   { label: "기본 건강정보", to: "/health/profile" },
@@ -81,6 +93,42 @@ function normalizeStatus(value: unknown): string {
   return String(value ?? "").toUpperCase();
 }
 
+function hasMetCompletionCondition(item: Item): boolean {
+  if (item.has_met_completion_condition !== undefined) {
+    return Boolean(item.has_met_completion_condition);
+  }
+  const completedDays = Number(item.completed_days ?? item.completed_count ?? 0);
+  const totalDays = Number(item.total_days ?? item.duration_days ?? 7);
+  return Number.isFinite(completedDays) && Number.isFinite(totalDays) && completedDays >= Math.ceil(totalDays * 0.8);
+}
+
+function isFinalizedChallenge(item: Item): boolean {
+  if (Boolean(item.is_finalized) || Boolean(item.completed_at)) {
+    return true;
+  }
+  return ["COMPLETED", "EXPIRED", "FAILED"].includes(normalizeStatus(item.status));
+}
+
+function getChallengeStatusLabel(item: Item): string {
+  if (["GIVE_UP", "GIVEN_UP", "CANCELED", "CANCELLED"].includes(normalizeStatus(item.status))) {
+    return "참여 전";
+  }
+  if (isFinalizedChallenge(item)) {
+    return hasMetCompletionCondition(item) || Boolean(item.completed_at) ? "완료" : "미달성";
+  }
+  if (hasMetCompletionCondition(item)) {
+    return "완료 조건 충족";
+  }
+  return challengeStatusLabels[normalizeStatus(item.status)] ?? "진행 중";
+}
+
+function isVisibleMyChallenge(item: Item): boolean {
+  return (
+    !["GIVE_UP", "GIVEN_UP", "CANCELED", "CANCELLED"].includes(normalizeStatus(item.status)) &&
+    !isFinalizedChallenge(item)
+  );
+}
+
 function getChallengeId(item: Item): number | null {
   const nested = item.challenge as Item | undefined;
   const raw = item.challenge_id ?? nested?.id;
@@ -101,20 +149,33 @@ function getChallengeProgress(item: Item): number {
     return Math.max(0, Math.min(explicit > 1 ? explicit : explicit * 100, 100));
   }
 
+  if (Boolean(item.completed_at) || (isFinalizedChallenge(item) && hasMetCompletionCondition(item))) {
+    return 100;
+  }
+
+  const rate = Number(item.completion_rate);
+  if (Number.isFinite(rate)) {
+    return Math.max(0, Math.min(rate, 100));
+  }
+
   const completedDays = Number(item.completed_days ?? item.completed_count);
-  const durationDays = Number(item.duration_days ?? 7);
+  const durationDays = Number(item.total_days ?? item.duration_days ?? 7);
   if (Number.isFinite(completedDays) && completedDays >= 0 && Number.isFinite(durationDays) && durationDays > 0) {
     return Math.max(0, Math.min(Math.round((completedDays / durationDays) * 100), 100));
   }
 
-  const status = normalizeStatus(item.status);
-  if (status === "COMPLETED") {
-    return 100;
-  }
-  if (["ACTIVE", "IN_PROGRESS", "JOINED"].includes(status)) {
+  if (["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status))) {
     return 40;
   }
   return 0;
+}
+
+function validateNickname(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed.length < 2 || trimmed.length > 20) {
+    return "닉네임은 2자 이상 20자 이하로 입력해주세요.";
+  }
+  return null;
 }
 
 export default function MyPage() {
@@ -170,6 +231,7 @@ export default function MyPage() {
   }, []);
 
   const latestHealth = health[0];
+  const visibleChallenges = challenges.filter(isVisibleMyChallenge);
   const displayName = backendUser?.nickname ?? backendUser?.name ?? backendUser?.login_id ?? "사용자";
   const profileInitial = displayName.slice(0, 1).toUpperCase();
 
@@ -188,12 +250,26 @@ export default function MyPage() {
   const saveProfileDraft = async () => {
     setError("");
     setNotice("");
+    const nextNickname = profileDraft.nickname.trim();
+    const nicknameError = validateNickname(nextNickname);
+    if (nicknameError) {
+      setError(nicknameError);
+      return;
+    }
+
     try {
-      await updateMe({
-        nickname: profileDraft.nickname.trim() || undefined,
-        phone_number: profileDraft.phoneNumber.replace(/\D/g, "") || undefined,
-      });
+      const currentPhoneNumber = backendUser?.phone_number ?? "";
+      const nextPhoneNumber = profileDraft.phoneNumber.replace(/\D/g, "");
+      const payload = {
+        nickname: nextNickname,
+        ...(nextPhoneNumber && nextPhoneNumber !== currentPhoneNumber ? { phone_number: nextPhoneNumber } : {}),
+      };
+      const updatedUser = await updateMe(payload);
       await refreshBackendUser();
+      setProfileDraft({
+        nickname: updatedUser.nickname ?? nextNickname,
+        phoneNumber: updatedUser.phone_number ?? nextPhoneNumber,
+      });
       setNotice("프로필 정보가 수정되었습니다.");
       setIsEditingProfile(false);
     } catch (err) {
@@ -487,14 +563,14 @@ export default function MyPage() {
 
           <Card title="진행 중 챌린지">
             <div className="card-list">
-              {challenges.length === 0 && <div className="state-box">진행 중인 챌린지가 없습니다.</div>}
-              {challenges.map((challenge) => {
+              {visibleChallenges.length === 0 && <div className="state-box">진행 중인 챌린지가 없습니다.</div>}
+              {visibleChallenges.map((challenge) => {
                 const progress = getChallengeProgress(challenge);
                 return (
                   <div className="mini-card" key={String(challenge.id)}>
                     <div>
                       <strong>{getChallengeTitle(challenge, challengeMasters)}</strong>
-                      <p className="muted">{normalizeStatus(challenge.status) || "JOINED"}</p>
+                      <p className="muted">{getChallengeStatusLabel(challenge)}</p>
                     </div>
                     <div className="progress-bar">
                       <div className="progress-fill" style={{ width: `${progress}%` }} />
