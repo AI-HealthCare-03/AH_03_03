@@ -36,8 +36,8 @@ from app.models.family import (
 from app.models.notifications import Notification, NotificationChannel, NotificationLogStatus, UserFCMToken
 from app.models.users import User
 from app.services import notifications as notification_service
+from app.services import service_jobs
 from app.services.email_service import EmailService
-from app.services.fcm import FCMService
 
 FAMILY_INVITE_TTL_HOURS = 24
 FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE = "family_challenge_completed"
@@ -350,12 +350,13 @@ async def create_family_invite(
         expires_at=expires_at,
         status=FamilyInviteStatus.PENDING,
     )
-    await _send_family_invite_email(
-        recipient_email=invitee_email,
-        inviter=user,
-        invite_code=invite_code,
-        expires_at=expires_at,
-    )
+    if invitee_email:
+        await service_jobs.enqueue_family_invite_email_send(
+            recipient_email=invitee_email,
+            inviter_display_name=_display_name(user),
+            invite_url=_family_invite_accept_url(invite_code),
+            expires_at_text=_format_invite_expiration(expires_at),
+        )
     return invite, invite_code
 
 
@@ -554,13 +555,17 @@ async def _send_family_push_if_allowed(
     if not setting.channel_push:
         return
 
-    tokens = await _list_active_fcm_tokens(family_user_id)
-    if not tokens:
-        return
-
     try:
-        result = FCMService().send_to_tokens(tokens=tokens, title=title, body=message, data=data)
-    except Exception as exc:  # noqa: BLE001 - push 실패는 내부 알림 생성을 롤백하지 않는다.
+        await service_jobs.enqueue_fcm_push_send(
+            user_id=family_user_id,
+            title=title,
+            body=message,
+            data=data,
+            notification_type="FAMILY_ALERT",
+            related_type=data.get("type"),
+            related_id=int(data["user_challenge_id"]) if data.get("user_challenge_id") else None,
+        )
+    except Exception as exc:  # noqa: BLE001 - push enqueue 실패는 내부 알림 생성을 롤백하지 않는다.
         await _record_push_result(
             user_id=family_user_id,
             title=title,
@@ -569,17 +574,6 @@ async def _send_family_push_if_allowed(
             error_code=type(exc).__name__,
             error_message=str(exc),
         )
-        return
-
-    await _record_push_result(
-        user_id=family_user_id,
-        title=title,
-        message_summary=message,
-        status_value=NotificationLogStatus.SENT if result.success_count > 0 else NotificationLogStatus.FAILED,
-        provider_message_id=result.provider_message_ids[0] if result.provider_message_ids else None,
-        error_code=None if result.failure_count == 0 else "PARTIAL_FAILURE",
-        error_message=None if result.failure_count == 0 else f"failure_count={result.failure_count}",
-    )
 
 
 async def _create_family_alerts(
