@@ -73,7 +73,7 @@ class AuthService:
                 login_id=login_id,
                 email=data.email,
                 hashed_password=hash_password(data.password),  # 해시화된 비밀번호를 사용
-                name=data.name,
+                name=data.name.strip(),
                 nickname=data.nickname,
                 phone_number=normalized_phone_number,
                 gender=data.gender,

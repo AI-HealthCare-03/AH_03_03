@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.dtos.auth import SignUpRequest
 from app.services import auth as auth_service_module
@@ -80,6 +81,7 @@ async def test_signup_without_phone_number_stores_none(signup_service):
             email="signup-none@example.com",
             password="Password123!",
             name="테스터",
+            nickname="테스트닉",
             gender="MALE",
             birth_date=date(1990, 1, 1),
             privacy_consent_agreed=True,
@@ -88,6 +90,7 @@ async def test_signup_without_phone_number_stores_none(signup_service):
 
     assert repository.created_user_payload is not None
     assert repository.created_user_payload["phone_number"] is None
+    assert repository.created_user_payload["nickname"] == "테스트닉"
     assert repository.created_user_payload["privacy_consent_agreed_at"] is not None
     assert repository.created_user_payload["privacy_consent_version"] == PRIVACY_CONSENT_VERSION
 
@@ -102,6 +105,7 @@ async def test_signup_with_phone_number_stores_normalized_value(signup_service):
             email="signup-phone@example.com",
             password="Password123!",
             name="테스터",
+            nickname="폰테스터",
             gender="MALE",
             birth_date=date(1990, 1, 1),
             phone_number="+82 10-1234-5678",
@@ -124,6 +128,7 @@ async def test_signup_requires_privacy_consent(signup_service):
                 email="signup-deny@example.com",
                 password="Password123!",
                 name="테스터",
+                nickname="동의거부",
                 gender="MALE",
                 birth_date=date(1990, 1, 1),
             )
@@ -132,3 +137,32 @@ async def test_signup_requires_privacy_consent(signup_service):
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "개인정보 수집·이용 동의가 필요합니다."
     assert repository.created_user_payload is None
+
+
+def test_signup_requires_non_blank_nickname() -> None:
+    with pytest.raises(ValidationError):
+        SignUpRequest(
+            login_id="signupnick",
+            email="signup-nick@example.com",
+            password="Password123!",
+            name="테스터",
+            nickname="   ",
+            gender="MALE",
+            birth_date=date(1990, 1, 1),
+            privacy_consent_agreed=True,
+        )
+
+
+def test_signup_trims_nickname() -> None:
+    request = SignUpRequest(
+        login_id="signuptrim",
+        email="signup-trim@example.com",
+        password="Password123!",
+        name="테스터",
+        nickname="  표시명  ",
+        gender="MALE",
+        birth_date=date(1990, 1, 1),
+        privacy_consent_agreed=True,
+    )
+
+    assert request.nickname == "표시명"
