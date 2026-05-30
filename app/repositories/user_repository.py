@@ -35,7 +35,7 @@ class UserRepository:
         email: str | EmailStr,
         hashed_password: str,
         name: str,
-        phone_number: str,
+        phone_number: str | None,
         gender: Gender,
         birthday: date,
         *,
@@ -114,6 +114,16 @@ class UserRepository:
             update_fields.append(UPDATED_AT_FIELD)
             await user.save(update_fields=update_fields)
 
+    async def update_instance_allow_none(self, user: User, data: dict[str, Any]) -> None:
+        update_fields = []
+        for key, value in data.items():
+            setattr(user, key, value)
+            update_fields.append(key)
+        if update_fields:
+            user.updated_at = datetime.now(config.TIMEZONE)
+            update_fields.append(UPDATED_AT_FIELD)
+            await user.save(update_fields=update_fields)
+
     async def update_user_fields(self, user_id: int, data: dict[str, Any]) -> User | None:
         user = await self.get_user(user_id)
         if user is None:
@@ -172,6 +182,9 @@ class UserRepository:
         await code.save(update_fields=["is_used", "verified_at"])
         return code
 
+    async def delete_verification_codes_by_email(self, email: str) -> int:
+        return await VerificationCode.filter(email=email).delete()
+
     async def create_password_reset_token(
         self,
         user_id: int,
@@ -189,6 +202,9 @@ class UserRepository:
         await token.save(update_fields=["is_used", "used_at"])
         return token
 
+    async def delete_password_reset_tokens_by_user(self, user_id: int) -> int:
+        return await PasswordResetToken.filter(user_id=user_id).delete()
+
     async def update_password(self, user_id: int, hashed_password: str) -> None:
         await self._model.filter(id=user_id).update(
             hashed_password=hashed_password, updated_at=datetime.now(config.TIMEZONE)
@@ -199,6 +215,9 @@ class UserRepository:
 
     async def revoke_refresh_token(self, token_jti: str, revoked_at: datetime) -> int:
         return await RefreshToken.filter(token_jti=token_jti, revoked_at=None).update(revoked_at=revoked_at)
+
+    async def revoke_refresh_tokens_by_user(self, user_id: int, revoked_at: datetime) -> int:
+        return await RefreshToken.filter(user_id=user_id, revoked_at=None).update(revoked_at=revoked_at)
 
     async def is_refresh_token_revoked(self, token_jti: str) -> bool:
         token = await RefreshToken.get_or_none(token_jti=token_jti)
