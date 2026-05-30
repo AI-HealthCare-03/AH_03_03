@@ -13,6 +13,7 @@ class TestUserMeApis(TestCase):
             "email": email,
             "password": "Password123!",
             "name": "내정보테스터",
+            "nickname": "내정보닉",
             "gender": "FEMALE",
             "birth_date": "1992-02-02",
             "phone_number": "01055556666",
@@ -30,6 +31,7 @@ class TestUserMeApis(TestCase):
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["email"] == email
         assert response.json()["name"] == "내정보테스터"
+        assert response.json()["nickname"] == "내정보닉"
 
     async def test_update_user_me_success(self):
         # 사용자 등록 및 로그인
@@ -38,6 +40,7 @@ class TestUserMeApis(TestCase):
             "email": email,
             "password": "Password123!",
             "name": "수정전",
+            "nickname": "수정전닉",
             "gender": "MALE",
             "birth_date": "1990-10-10",
             "phone_number": "01077778888",

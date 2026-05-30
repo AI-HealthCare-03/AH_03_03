@@ -7,6 +7,13 @@ from app.core.validators import optional_after_validator, validate_birthday, val
 from app.models.users import Gender
 
 
+def validate_nickname(value: str) -> str:
+    normalized = value.strip()
+    if len(normalized) < 2:
+        raise ValueError("닉네임은 2자 이상 입력해주세요.")
+    return normalized
+
+
 class SignUpRequest(BaseModel):
     login_id: Annotated[str | None, Field(None, min_length=6, max_length=40)] = None
     email: Annotated[
@@ -18,7 +25,7 @@ class SignUpRequest(BaseModel):
     gender: Gender
     birth_date: Annotated[date, AfterValidator(validate_birthday)]
     phone_number: Annotated[str | None, optional_after_validator(validate_phone_number)] = None
-    nickname: Annotated[str | None, Field(None, max_length=30)] = None
+    nickname: Annotated[str, Field(min_length=2, max_length=20), AfterValidator(validate_nickname)]
     address: Annotated[str | None, Field(None, max_length=255)] = None
     profile_image_url: Annotated[str | None, Field(None, max_length=500)] = None
     privacy_consent_agreed: bool = False
