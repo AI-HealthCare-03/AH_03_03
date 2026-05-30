@@ -5,8 +5,10 @@ import {
   confirmMedicationOcr,
   type MedicationOcrItem,
   type MedicationOcrRequest,
+  type MedicationOcrResponse,
   runMedicationOcr,
 } from "../api/medications";
+import { getAsyncJob } from "../api/jobs";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
@@ -47,16 +49,46 @@ export default function MedicationOcrPage() {
   const runMedicationRecognition = async () => {
     setError("");
     setMessage("");
+    setItems([]);
+    if (!selectedImageFile) {
+      setError("처방전 또는 약봉투 이미지 파일을 먼저 선택해주세요.");
+      return;
+    }
     setIsRunning(true);
     try {
-      const response = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
-      setItems(response.items);
-      setMessage("복약 정보 후보를 생성했습니다. 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.");
+      const job = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
+      setMessage("복약 정보 분석 요청을 접수했습니다. 후보가 생성될 때까지 잠시 기다려주세요.");
+      await waitForMedicationOcrJob(job.id);
     } catch (err) {
       setError(err instanceof Error ? toUserMessage(err.message) : "복약정보 후보 생성에 실패했습니다.");
     } finally {
       setIsRunning(false);
     }
+  };
+
+  const waitForMedicationOcrJob = async (jobId: number) => {
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      await delay(1500);
+      const job = await getAsyncJob(jobId);
+      if (job.status === "SUCCESS") {
+        const result = medicationResultFromPayload(job.result_payload);
+        const nextItems = result?.items ?? [];
+        setItems(nextItems);
+        setMessage(
+          nextItems.length > 0
+            ? "복약 정보 후보가 생성되었습니다. 저장 전 약 이름과 복용 정보를 반드시 확인해주세요."
+            : "인식된 복약 정보 후보가 없습니다. 파일을 다시 확인해주세요.",
+        );
+        return;
+      }
+      if (job.status === "FAILED") {
+        throw new Error(job.error_message || "복약정보 후보 생성에 실패했습니다.");
+      }
+      if (attempt === 0) {
+        setMessage("처방전 또는 약봉투 이미지를 분석 중입니다. 이미지 상태에 따라 시간이 걸릴 수 있습니다.");
+      }
+    }
+    throw new Error("복약 정보 분석이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
   };
 
   const updateItem = (index: number, key: keyof MedicationOcrItem, value: string | number | string[] | null) => {
@@ -267,6 +299,17 @@ function buildMedicationOcrPayload(sourceType: string, file: File | null, imageF
   formData.append("source_type", sourceType);
   formData.append("image_filename", file.name);
   return formData;
+}
+
+function medicationResultFromPayload(payload: Record<string, unknown> | null | undefined): MedicationOcrResponse | null {
+  if (!payload || !Array.isArray(payload.items)) {
+    return null;
+  }
+  return payload as MedicationOcrResponse;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function toUserMessage(message: string): string {

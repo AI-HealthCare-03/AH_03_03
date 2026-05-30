@@ -2,6 +2,7 @@ import logging
 import re
 from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 
 from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
@@ -71,6 +72,13 @@ HEALTH_INT_FIELDS = {
 
 NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:\.\d+)?")
 logger = logging.getLogger(__name__)
+EXAM_UPLOAD_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+}
 
 
 async def create_exam_report(user_id: int, request: ExamReportCreateRequest) -> ExamReport:
@@ -88,6 +96,78 @@ async def list_exam_reports(user_id: int, limit: int = 20, offset: int = 0) -> l
 async def update_exam_report(exam_report_id: int, request: ExamReportUpdateRequest) -> ExamReport | None:
     data = request.model_dump(exclude_unset=True)
     return await exam_repository.update_exam_report(exam_report_id, data)
+
+
+async def store_exam_ocr_upload(
+    report: ExamReport,
+    image_bytes: bytes,
+    image_media_type: str | None,
+    image_filename: str | None,
+) -> ExamReport:
+    path = _build_exam_upload_path(report, image_media_type, image_filename)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(image_bytes)
+    updated = await update_exam_report(
+        int(report.id),
+        ExamReportUpdateRequest(
+            file_path=_stored_path_for_db(path),
+            original_filename=image_filename or report.original_filename,
+            ocr_status=OCRStatus.PENDING,
+        ),
+    )
+    return updated or report
+
+
+def _upload_storage_root() -> Path:
+    root = Path(config.UPLOAD_STORAGE_DIR)
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    return root
+
+
+def _build_exam_upload_path(
+    report: ExamReport,
+    image_media_type: str | None,
+    image_filename: str | None,
+) -> Path:
+    extension = _upload_extension(image_media_type, image_filename)
+    return _upload_storage_root() / "exams" / str(report.user_id) / str(report.id) / f"source{extension}"
+
+
+def _stored_path_for_db(path: Path) -> str:
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
+def _upload_extension(image_media_type: str | None, image_filename: str | None) -> str:
+    media_type = (image_media_type or "").lower().split(";", 1)[0].strip()
+    if media_type == "application/pdf":
+        return ".pdf"
+    if media_type == "image/png":
+        return ".png"
+    if media_type == "image/webp":
+        return ".webp"
+    if media_type in {"image/jpeg", "image/jpg"}:
+        return ".jpg"
+    suffix = Path(image_filename or "").suffix.lower()
+    return suffix if suffix in EXAM_UPLOAD_MEDIA_TYPES else ".jpg"
+
+
+def _resolve_stored_upload_path(file_path: str) -> Path:
+    path = Path(file_path)
+    if path.is_absolute():
+        return path
+    return Path.cwd() / path
+
+
+def _media_type_from_upload_path(path: Path, filename: str | None = None) -> str:
+    suffix = path.suffix.lower()
+    if suffix in EXAM_UPLOAD_MEDIA_TYPES:
+        return EXAM_UPLOAD_MEDIA_TYPES[suffix]
+    filename_suffix = Path(filename or "").suffix.lower()
+    return EXAM_UPLOAD_MEDIA_TYPES.get(filename_suffix, "image/jpeg")
 
 
 async def create_exam_measurement(exam_report_id: int, request: ExamMeasurementCreateRequest) -> ExamMeasurement:
@@ -280,6 +360,25 @@ async def run_exam_ocr(
         fallback_used=provider_result["fallback_used"],
         provider_message=provider_result["provider_message"],
         raw_text_preview=provider_result["raw_text_preview"],
+    )
+
+
+async def run_exam_ocr_from_report(exam_report_id: int) -> ExamOCRResponse:
+    report = await get_exam_report(exam_report_id)
+    if report is None:
+        raise ValueError(f"exam_report_not_found:{exam_report_id}")
+
+    upload_path = _resolve_stored_upload_path(report.file_path)
+    if not upload_path.exists() or not upload_path.is_file():
+        await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.FAILED))
+        raise FileNotFoundError(f"exam_upload_file_not_found:{exam_report_id}")
+
+    await update_exam_report(exam_report_id, ExamReportUpdateRequest(ocr_status=OCRStatus.PROCESSING))
+    return await run_exam_ocr(
+        exam_report_id=exam_report_id,
+        image_bytes=upload_path.read_bytes(),
+        image_media_type=_media_type_from_upload_path(upload_path, report.original_filename),
+        image_filename=report.original_filename or upload_path.name,
     )
 
 

@@ -5,17 +5,30 @@ from typing import Any
 
 from tortoise.timezone import now
 
-from ai_runtime.jobs.redis_stream import enqueue_async_job
+from ai_runtime.jobs.redis_stream import AI_JOB_STREAM, JobStream, enqueue_async_job
 from app.models.async_jobs import AsyncJob, AsyncJobStatus
 
 logger = logging.getLogger(__name__)
 
 DEMO_ECHO_JOB_TYPE = "DEMO_ECHO"
+EXAM_OCR_JOB_TYPE = "exam_ocr.run"
+MEDICATION_OCR_JOB_TYPE = "medication_ocr.run"
+DIET_ANALYZE_IMAGE_JOB_TYPE = "diet.analyze_image"
 
 
-async def create_demo_job(request_payload: dict[str, Any]) -> AsyncJob:
+async def create_async_job(
+    *,
+    job_type: str,
+    request_payload: dict[str, Any],
+    stream: str | JobStream = AI_JOB_STREAM,
+    user_id: int | None = None,
+    resource_id: int | None = None,
+    idempotency_key: str | None = None,
+    max_attempts: int = 3,
+    stream_payload: dict[str, Any] | None = None,
+) -> AsyncJob:
     job = await AsyncJob.create(
-        job_type=DEMO_ECHO_JOB_TYPE,
+        job_type=job_type,
         status=AsyncJobStatus.PENDING,
         request_payload=request_payload,
     )
@@ -23,15 +36,77 @@ async def create_demo_job(request_payload: dict[str, Any]) -> AsyncJob:
         stream_id = await enqueue_async_job(
             job_id=int(job.id),
             job_type=job.job_type,
-            payload=request_payload,
+            payload=stream_payload or request_payload,
+            stream=stream,
+            user_id=user_id,
+            resource_id=resource_id,
+            idempotency_key=idempotency_key,
+            max_attempts=max_attempts,
         )
     except Exception as exc:
-        logger.exception("Failed to enqueue async demo job", extra={"job_id": int(job.id)})
+        logger.exception("Failed to enqueue async job", extra={"job_id": int(job.id), "job_type": job_type})
         return await mark_failed(int(job.id), f"enqueue_failed: {exc.__class__.__name__}")
 
     job.stream_id = stream_id
     await job.save(update_fields=["stream_id", "updated_at"])
     return job
+
+
+async def create_demo_job(request_payload: dict[str, Any]) -> AsyncJob:
+    return await create_async_job(
+        job_type=DEMO_ECHO_JOB_TYPE,
+        request_payload=request_payload,
+        stream=AI_JOB_STREAM,
+    )
+
+
+async def create_exam_ocr_job(user_id: int, exam_report_id: int) -> AsyncJob:
+    return await create_async_job(
+        job_type=EXAM_OCR_JOB_TYPE,
+        request_payload={
+            "user_id": user_id,
+            "exam_report_id": exam_report_id,
+            "resource_type": "exam_report",
+        },
+        stream=AI_JOB_STREAM,
+        user_id=user_id,
+        resource_id=exam_report_id,
+        idempotency_key=f"exam_ocr:{exam_report_id}",
+    )
+
+
+async def create_medication_ocr_job(user_id: int, request_payload: dict[str, Any]) -> AsyncJob:
+    return await create_async_job(
+        job_type=MEDICATION_OCR_JOB_TYPE,
+        request_payload={
+            **request_payload,
+            "user_id": user_id,
+            "resource_type": "medication_ocr_request",
+        },
+        stream=AI_JOB_STREAM,
+        user_id=user_id,
+        idempotency_key=request_payload.get("idempotency_key"),
+        stream_payload={
+            "resource_type": "medication_ocr_request",
+        },
+    )
+
+
+async def create_diet_analyze_image_job(user_id: int, request_payload: dict[str, Any]) -> AsyncJob:
+    return await create_async_job(
+        job_type=DIET_ANALYZE_IMAGE_JOB_TYPE,
+        request_payload={
+            **request_payload,
+            "user_id": user_id,
+            "resource_type": "diet_analysis_request",
+        },
+        stream=AI_JOB_STREAM,
+        user_id=user_id,
+        idempotency_key=request_payload.get("idempotency_key"),
+        stream_payload={
+            "resource_type": "diet_analysis_request",
+        },
+    )
 
 
 async def get_job(job_id: int) -> AsyncJob | None:

@@ -39,6 +39,90 @@ async def handle_demo_echo(job_id: int, payload: dict[str, Any]) -> None:
     )
 
 
+@register_job_handler(async_job_service.EXAM_OCR_JOB_TYPE)
+async def handle_exam_ocr(job_id: int, payload: dict[str, Any]) -> None:
+    exam_report_id = _payload_int(payload, "exam_report_id") or _payload_int(payload, "resource_id")
+    if exam_report_id is None:
+        await async_job_service.mark_failed(job_id, "missing_exam_report_id")
+        raise NonRetryableJobError("missing_exam_report_id")
+
+    await async_job_service.mark_processing(job_id)
+    from app.services import exams as exam_service
+
+    response = await exam_service.run_exam_ocr_from_report(exam_report_id)
+    await async_job_service.mark_success(
+        job_id,
+        {
+            "exam_report_id": exam_report_id,
+            "measurement_count": len(response.measurements),
+            "ocr_provider": response.ocr_provider,
+            "fallback_used": response.fallback_used,
+            "provider_message": response.provider_message,
+        },
+    )
+
+
+@register_job_handler(async_job_service.MEDICATION_OCR_JOB_TYPE)
+async def handle_medication_ocr(job_id: int, payload: dict[str, Any]) -> None:
+    _ = payload
+    await async_job_service.mark_processing(job_id)
+    from app.services import medications as medication_service
+
+    try:
+        response = await medication_service.run_medication_ocr_from_job(job_id)
+    except ValueError as exc:
+        error_message = str(exc)
+        if error_message in {
+            "medication_ocr_job_not_found",
+            "medication_ocr_source_missing",
+            "medication_ocr_upload_missing",
+            "medication_ocr_text_missing",
+        }:
+            await async_job_service.mark_failed(job_id, error_message)
+            raise NonRetryableJobError(error_message) from exc
+        raise
+
+    await async_job_service.mark_success(
+        job_id,
+        response.model_dump(mode="json"),
+    )
+
+
+@register_job_handler(async_job_service.DIET_ANALYZE_IMAGE_JOB_TYPE)
+async def handle_diet_analyze_image(job_id: int, payload: dict[str, Any]) -> None:
+    _ = payload
+    await async_job_service.mark_processing(job_id)
+    from app.services import diets as diet_service
+
+    try:
+        response = await diet_service.run_diet_analysis_from_job(job_id)
+    except ValueError as exc:
+        error_message = str(exc)
+        if error_message in {
+            "diet_analysis_job_not_found",
+            "diet_analysis_user_id_missing",
+            "diet_analysis_upload_missing",
+        }:
+            await async_job_service.mark_failed(job_id, error_message)
+            raise NonRetryableJobError(error_message) from exc
+        raise
+
+    await async_job_service.mark_success(
+        job_id,
+        response.model_dump(mode="json"),
+    )
+
+
+def _payload_int(payload: dict[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 async def handle_stream_job(job_id: int, job_type: str, payload: dict[str, Any]) -> None:
     handler = JOB_HANDLERS.get(job_type)
     if handler is None:
