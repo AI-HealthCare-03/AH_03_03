@@ -53,6 +53,9 @@ services:
       DB_USER: ${DB_USER:-ozcoding}
       DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
       DB_NAME: ${DB_NAME:-ai_health}
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-5}
+      DB_COMMAND_TIMEOUT: ${DB_COMMAND_TIMEOUT:-60}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
@@ -125,6 +128,9 @@ services:
       DB_USER: ${DB_USER:-ozcoding}
       DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
       DB_NAME: ${DB_NAME:-ai_health}
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-5}
+      DB_COMMAND_TIMEOUT: ${DB_COMMAND_TIMEOUT:-60}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}

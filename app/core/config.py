@@ -28,7 +28,10 @@ class Config(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = "pw1234"
     DB_NAME: str = "ai_health"
-    DB_CONNECTION_POOL_MAXSIZE: int = 10
+    DB_POOL_MIN_SIZE: int = 1
+    DB_POOL_MAX_SIZE: int = 5
+    DB_COMMAND_TIMEOUT: int = 60
+    DB_CONNECTION_POOL_MAXSIZE: int | None = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str | None = None
@@ -88,6 +91,10 @@ class Config(BaseSettings):
     @property
     def cors_allow_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def db_pool_max_size(self) -> int:
+        return self.DB_CONNECTION_POOL_MAXSIZE or self.DB_POOL_MAX_SIZE
 
     @property
     def is_production(self) -> bool:
