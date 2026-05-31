@@ -1,5 +1,6 @@
 import logging
 import re
+from dataclasses import dataclass
 from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -74,6 +75,15 @@ HEALTH_INT_FIELDS = {
 
 NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:\.\d+)?")
 logger = logging.getLogger(__name__)
+NON_NUMERIC_EXAM_VALUE_MARKERS = {
+    "-",
+    "비해당",
+    "해당없음",
+    "해당없슴",
+    "없음",
+    "미실시",
+    "검사안함",
+}
 EXAM_UPLOAD_MEDIA_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -81,6 +91,34 @@ EXAM_UPLOAD_MEDIA_TYPES = {
     ".webp": "image/webp",
     ".pdf": "application/pdf",
 }
+PDF_RENDER_ZOOM = 2.0
+EXAM_MEASUREMENT_PAGE_KEYWORDS = {
+    "검사항목": 3,
+    "참고치": 3,
+    "결과": 1,
+    "공복혈당": 4,
+    "총콜레스테롤": 4,
+    "중성지방": 4,
+    "HDL": 3,
+    "LDL": 3,
+    "AST": 2,
+    "ALT": 2,
+    "혈색소": 3,
+    "수축기": 2,
+    "이완기": 2,
+    "혈압": 2,
+    "신장": 2,
+    "체중": 2,
+    "허리둘레": 2,
+    "BMI": 2,
+}
+MEASUREMENT_PAGE_MIN_SCORE = 6
+
+
+@dataclass(frozen=True)
+class ExamPdfImageConversionResult:
+    page_count: int
+    images: list[bytes]
 
 
 async def create_exam_report(user_id: int, request: ExamReportCreateRequest) -> ExamReport:
@@ -312,6 +350,11 @@ def parse_exam_measurement_number(value: object) -> Decimal | None:
     text = str(value).strip()
     if not text:
         return None
+    normalized_text = re.sub(r"\s+", "", text)
+    if normalized_text == "-" or any(
+        marker in normalized_text for marker in NON_NUMERIC_EXAM_VALUE_MARKERS if marker != "-"
+    ):
+        return None
     match = NUMBER_PATTERN.search(text.replace(",", ""))
     if match is None:
         return None
@@ -454,6 +497,8 @@ async def _extract_exam_measurements_with_provider(
                 continue
             result = await _extract_exam_measurements_with_paddleocr(image_bytes, image_media_type, image_filename)
             if result is not None:
+                if failure_reasons:
+                    result["fallback_used"] = True
                 return result
             failure_reasons.append("paddleocr_failed_or_unavailable")
             continue
@@ -462,8 +507,10 @@ async def _extract_exam_measurements_with_provider(
             if not config.EXAM_GPT_VISION_ENABLED:
                 failure_reasons.append("gpt_vision_disabled")
                 continue
-            result = await _extract_exam_measurements_with_gpt_vision(image_bytes, image_media_type)
+            result = await _extract_exam_measurements_with_gpt_vision(image_bytes, image_media_type, image_filename)
             if result is not None:
+                if failure_reasons:
+                    result["fallback_used"] = True
                 return result
             failure_reasons.append("gpt_vision_failed_or_unavailable")
 
@@ -481,7 +528,9 @@ def _select_exam_ocr_provider_order(
 
     if configured_provider == "fallback":
         return []
-    if is_pdf and configured_provider in {"auto", "gpt_vision", "paddleocr"}:
+    if is_pdf and configured_provider == "gpt_vision":
+        return ["gpt_vision", "paddleocr"]
+    if is_pdf and configured_provider in {"auto", "paddleocr"}:
         return ["paddleocr", "gpt_vision"]
     if is_image and configured_provider in {"auto", "gpt_vision"}:
         return ["gpt_vision", "paddleocr"]
@@ -498,45 +547,190 @@ def _is_pdf_upload(image_media_type: str | None, image_filename: str | None) -> 
     return media_type == "application/pdf" or filename.endswith(".pdf")
 
 
+def _convert_exam_pdf_to_png_images(pdf_bytes: bytes) -> ExamPdfImageConversionResult:
+    try:
+        import fitz
+    except Exception as exc:
+        raise RuntimeError("PyMuPDF is required to convert health exam PDF uploads for GPT Vision.") from exc
+
+    images: list[bytes] = []
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+        page_count = document.page_count
+        matrix = fitz.Matrix(PDF_RENDER_ZOOM, PDF_RENDER_ZOOM)
+        for page in document:
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            images.append(pixmap.tobytes("png"))
+    return ExamPdfImageConversionResult(page_count=page_count, images=images)
+
+
+def _extract_exam_pdf_page_texts(pdf_bytes: bytes) -> list[str]:
+    try:
+        import fitz
+    except Exception:
+        return []
+
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+            return [page.get_text("text") or "" for page in document]
+    except Exception:
+        logger.info("건강검진 PDF 페이지 텍스트 메타 추출 실패", exc_info=True)
+        return []
+
+
+def _score_exam_measurement_page(text: str) -> int:
+    normalized = text.upper()
+    return sum(weight * normalized.count(keyword.upper()) for keyword, weight in EXAM_MEASUREMENT_PAGE_KEYWORDS.items())
+
+
+def _select_exam_measurement_page_indices(page_texts: list[str]) -> list[int]:
+    if not page_texts:
+        return []
+    scores = [_score_exam_measurement_page(text) for text in page_texts]
+    max_score = max(scores, default=0)
+    if max_score < MEASUREMENT_PAGE_MIN_SCORE:
+        return []
+    return [index for index, score in enumerate(scores) if score == max_score]
+
+
+def _merge_exam_extracted_data(target: dict[str, Any], page_data: dict[str, Any]) -> None:
+    for key, value in page_data.items():
+        existing = target.get(key)
+        if existing is None or existing == "":
+            target[key] = value
+            continue
+        if parse_exam_measurement_number(existing) is None and parse_exam_measurement_number(value) is not None:
+            target[key] = value
+
+
+def _gpt_vision_response_text_length(raw: object) -> int:
+    if not isinstance(raw, dict):
+        return 0
+    text_fields = ("raw_text_preview", "raw_text", "text", "ocr_text")
+    return sum(len(value) for key, value in raw.items() if key in text_fields and isinstance(value, str))
+
+
 async def _extract_exam_measurements_with_gpt_vision(
     image_bytes: bytes | None,
     image_media_type: str | None,
+    image_filename: str | None = None,
 ) -> dict[str, Any] | None:
     if not image_bytes or not config.OPENAI_API_KEY:
         return None
-    if _is_pdf_upload(image_media_type, None):
-        logger.info("GPT Vision 건강검진 OCR PDF 직접 입력 시도 | pdf_to_image_conversion=false")
+    file_extension = Path(image_filename or "").suffix.lower() or None
+    vision_inputs: list[tuple[bytes, str]] = [(image_bytes, image_media_type or "image/jpeg")]
+    all_pdf_vision_inputs: list[tuple[bytes, str]] = []
+    page_count: int | None = None
+    converted_image_count = 0
+    selected_page_indices: list[int] = []
+    page_selection_fallback_used = False
+
+    if _is_pdf_upload(image_media_type, image_filename):
+        conversion = _convert_exam_pdf_to_png_images(image_bytes)
+        page_count = conversion.page_count
+        converted_image_count = len(conversion.images)
+        page_texts = _extract_exam_pdf_page_texts(image_bytes)
+        selected_page_indices = _select_exam_measurement_page_indices(page_texts)
+        logger.info(
+            "GPT Vision 건강검진 OCR PDF 이미지 변환 | provider=gpt_vision content_type=%s file_ext=%s "
+            "page_count=%s converted_image_count=%s selected_page_count=%s",
+            image_media_type,
+            file_extension,
+            page_count,
+            converted_image_count,
+            len(selected_page_indices),
+        )
+        if not conversion.images:
+            return None
+        all_pdf_vision_inputs = [(converted_image, "image/png") for converted_image in conversion.images]
+        if selected_page_indices:
+            vision_inputs = [
+                all_pdf_vision_inputs[index] for index in selected_page_indices if index < len(all_pdf_vision_inputs)
+            ]
+        else:
+            vision_inputs = all_pdf_vision_inputs
+
+    extracted_data: dict[str, Any] = {}
+    extracted_text_length = 0
     try:
         client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.EXAM_GPT_VISION_MODEL)
-        raw = await client.analyze(
-            analysis_type=AnalysisType.CHECKUP,
-            image_bytes=image_bytes,
-            media_type=image_media_type or "image/jpeg",
-        )
+        extracted_data, extracted_text_length = await _collect_gpt_vision_exam_data(client, vision_inputs)
     except Exception as exc:
         logger.warning("GPT Vision 건강검진 OCR 실패: %s", exc, exc_info=True)
         return None
 
-    extracted_data = raw.get("extracted_data") if isinstance(raw, dict) else None
-    if not isinstance(extracted_data, dict):
-        logger.info("GPT Vision 건강검진 OCR 응답에 extracted_data 없음")
-        return None
     measurements = _measurement_tuples_from_mapping(extracted_data)
+    if not measurements and selected_page_indices and len(vision_inputs) < len(all_pdf_vision_inputs):
+        page_selection_fallback_used = True
+        logger.info(
+            "GPT Vision 건강검진 OCR 측정 페이지 후보 부족으로 전체 페이지 fallback | provider=gpt_vision "
+            "content_type=%s file_ext=%s page_count=%s converted_image_count=%s",
+            image_media_type,
+            file_extension,
+            page_count,
+            converted_image_count,
+        )
+        try:
+            client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.EXAM_GPT_VISION_MODEL)
+            extracted_data, extracted_text_length = await _collect_gpt_vision_exam_data(client, all_pdf_vision_inputs)
+            measurements = _measurement_tuples_from_mapping(extracted_data)
+        except Exception as exc:
+            logger.warning("GPT Vision 건강검진 OCR 전체 페이지 fallback 실패: %s", exc, exc_info=True)
+            return None
+
+    if not extracted_data:
+        logger.info(
+            "GPT Vision 건강검진 OCR 추출 데이터 없음 | provider=gpt_vision content_type=%s file_ext=%s "
+            "page_count=%s converted_image_count=%s extracted_text_length=%s candidate_count=0",
+            image_media_type,
+            file_extension,
+            page_count,
+            converted_image_count,
+            extracted_text_length,
+        )
+        return None
     if not measurements:
         logger.info(
-            "GPT Vision 건강검진 OCR 파싱 후보 없음 | extracted_field_count=%s parsed_candidate_count=0",
+            "GPT Vision 건강검진 OCR 파싱 후보 없음 | provider=gpt_vision content_type=%s file_ext=%s "
+            "page_count=%s converted_image_count=%s extracted_text_length=%s extracted_field_count=%s "
+            "candidate_count=0",
+            image_media_type,
+            file_extension,
+            page_count,
+            converted_image_count,
+            extracted_text_length,
             len(extracted_data),
         )
         return None
     return {
         "provider": "gpt_vision",
-        "fallback_used": False,
+        "fallback_used": page_selection_fallback_used,
         "provider_message": "gpt_vision_checkup_ocr",
         "message": "GPT Vision으로 측정값 후보를 생성했습니다. 검진 수치를 확인한 뒤 저장해주세요.",
         "measurements": measurements,
         "confidence": Decimal("0.9000"),
         "raw_text_preview": None,
     }
+
+
+async def _collect_gpt_vision_exam_data(
+    client: VisionClient,
+    vision_inputs: list[tuple[bytes, str]],
+) -> tuple[dict[str, Any], int]:
+    extracted_data: dict[str, Any] = {}
+    extracted_text_length = 0
+    for vision_image_bytes, vision_media_type in vision_inputs:
+        raw = await client.analyze(
+            analysis_type=AnalysisType.CHECKUP,
+            image_bytes=vision_image_bytes,
+            media_type=vision_media_type,
+        )
+        extracted_text_length += _gpt_vision_response_text_length(raw)
+        page_data = raw.get("extracted_data") if isinstance(raw, dict) else None
+        if not isinstance(page_data, dict):
+            logger.info("GPT Vision 건강검진 OCR 응답에 extracted_data 없음")
+            continue
+        _merge_exam_extracted_data(extracted_data, page_data)
+    return extracted_data, extracted_text_length
 
 
 async def _extract_exam_measurements_with_paddleocr(
@@ -603,6 +797,8 @@ def _measurement_tuples_from_mapping(values: dict[str, Any]) -> list[tuple[str, 
             continue
         value = values.get(key)
         if value is None or value == "":
+            continue
+        if parse_exam_measurement_number(value) is None:
             continue
         measurement_key = key
         measurement_name, unit = EXAM_MEASUREMENT_METADATA.get(

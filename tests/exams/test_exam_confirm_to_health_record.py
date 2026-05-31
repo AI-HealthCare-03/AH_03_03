@@ -32,6 +32,57 @@ def test_numeric_string_with_unit_is_parsed() -> None:
     assert parse_exam_measurement_number("5.8 %") == Decimal("5.8")
     assert parse_exam_measurement_number("") is None
     assert parse_exam_measurement_number("음성") is None
+    assert parse_exam_measurement_number("비해당") is None
+    assert parse_exam_measurement_number("해당 없음") is None
+    assert parse_exam_measurement_number("-") is None
+    assert parse_exam_measurement_number("없음") is None
+    assert parse_exam_measurement_number("미실시") is None
+    assert parse_exam_measurement_number("검사안함") is None
+
+
+def test_non_numeric_exam_values_are_not_measurement_candidates() -> None:
+    measurements = exam_service._measurement_tuples_from_mapping(
+        {
+            "systolic_bp": "비해당",
+            "diastolic_bp": "-",
+            "fasting_glucose": "검사안함",
+            "ldl": "132 mg/dL",
+        }
+    )
+
+    assert measurements == [("ldl", "LDL 콜레스테롤", "132 mg/dL", "mg/dL")]
+
+
+def test_numeric_exam_value_takes_priority_over_later_non_numeric_value() -> None:
+    merged: dict[str, object] = {}
+
+    exam_service._merge_exam_extracted_data(merged, {"ldl": "67", "hdl": "비해당"})
+    exam_service._merge_exam_extracted_data(merged, {"ldl": "비해당", "hdl": "49"})
+
+    assert merged == {"ldl": "67", "hdl": "49"}
+
+
+def test_exam_pdf_measurement_page_scoring_selects_table_page() -> None:
+    page_indices = exam_service._select_exam_measurement_page_indices(
+        [
+            "종합소견 결과 안내 HDL",
+            "검사항목 결과 참고치 공복혈당 총콜레스테롤 HDL LDL 중성지방 AST ALT 혈색소",
+            "발급 안내문 결과",
+        ]
+    )
+
+    assert page_indices == [1]
+
+
+def test_auto_exam_ocr_provider_order_uses_file_type_policy() -> None:
+    assert exam_service._select_exam_ocr_provider_order("auto", "application/pdf", "checkup.pdf") == [
+        "paddleocr",
+        "gpt_vision",
+    ]
+    assert exam_service._select_exam_ocr_provider_order("auto", "image/png", "checkup.png") == [
+        "gpt_vision",
+        "paddleocr",
+    ]
 
 
 def test_exam_measurements_build_health_record_x2_fields() -> None:
@@ -201,6 +252,184 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
     assert result["provider"] == "gpt_vision"
     assert result["fallback_used"] is False
     assert ("systolic_bp", "수축기혈압", "132", "mmHg") in result["measurements"]
+
+
+def test_convert_exam_pdf_to_png_images_with_pymupdf() -> None:
+    import fitz
+
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "health exam")
+    pdf_bytes = document.tobytes()
+    document.close()
+
+    result = exam_service._convert_exam_pdf_to_png_images(pdf_bytes)
+
+    assert result.page_count == 1
+    assert len(result.images) == 1
+    assert result.images[0].startswith(b"\x89PNG")
+
+
+@pytest.mark.asyncio
+async def test_exam_ocr_converts_pdf_before_gpt_vision(monkeypatch) -> None:
+    calls: list[tuple[bytes, str]] = []
+    converted: dict[str, bool] = {}
+
+    class FakeVisionClient:
+        def __init__(self, api_key: str, model: str):
+            assert api_key == "test-key"
+            assert model == "gpt-4o-mini"
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            assert analysis_type == "checkup"
+            calls.append((image_bytes, media_type))
+            if image_bytes == b"page-1-png":
+                return {
+                    "analysis_status": "success",
+                    "extracted_data": {
+                        "systolic_bp": 131,
+                        "diastolic_bp": 83,
+                    },
+                }
+            return {
+                "analysis_status": "success",
+                "extracted_data": {
+                    "fasting_glucose": 105,
+                },
+            }
+
+    def fake_convert(pdf_bytes: bytes):
+        assert pdf_bytes == b"%PDF-test"
+        converted["called"] = True
+        return exam_service.ExamPdfImageConversionResult(page_count=2, images=[b"page-1-png", b"page-2-png"])
+
+    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_service, "_convert_exam_pdf_to_png_images", fake_convert)
+    monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
+
+    result = await exam_service._extract_exam_measurements_with_provider(
+        b"%PDF-test",
+        "application/pdf",
+        "checkup.pdf",
+    )
+
+    assert converted["called"] is True
+    assert calls == [(b"page-1-png", "image/png"), (b"page-2-png", "image/png")]
+    assert result["provider"] == "gpt_vision"
+    assert ("systolic_bp", "수축기혈압", "131", "mmHg") in result["measurements"]
+    assert ("fasting_glucose", "공복혈당", "105", "mg/dL") in result["measurements"]
+
+
+@pytest.mark.asyncio
+async def test_exam_ocr_pdf_gpt_vision_prioritizes_measurement_page(monkeypatch) -> None:
+    calls: list[bytes] = []
+
+    class FakeVisionClient:
+        def __init__(self, api_key: str, model: str):
+            assert api_key == "test-key"
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            assert analysis_type == "checkup"
+            assert media_type == "image/png"
+            calls.append(image_bytes)
+            assert image_bytes == b"page-2-png"
+            return {
+                "analysis_status": "success",
+                "extracted_data": {
+                    "total_cholesterol": "137",
+                    "hdl": "49",
+                    "triglyceride": "105",
+                    "ldl": "67",
+                },
+            }
+
+    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(
+        exam_service,
+        "_convert_exam_pdf_to_png_images",
+        lambda _: exam_service.ExamPdfImageConversionResult(
+            page_count=3,
+            images=[b"page-1-png", b"page-2-png", b"page-3-png"],
+        ),
+    )
+    monkeypatch.setattr(
+        exam_service,
+        "_extract_exam_pdf_page_texts",
+        lambda _: [
+            "종합소견 결과 안내",
+            "검사항목 결과 참고치 공복혈당 총콜레스테롤 HDL LDL 중성지방 AST ALT 혈색소",
+            "발급 안내문 결과",
+        ],
+    )
+    monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
+
+    result = await exam_service._extract_exam_measurements_with_provider(
+        b"%PDF-test",
+        "application/pdf",
+        "checkup.pdf",
+    )
+
+    assert calls == [b"page-2-png"]
+    assert result["provider"] == "gpt_vision"
+    assert ("total_cholesterol", "총콜레스테롤", "137", "mg/dL") in result["measurements"]
+    assert ("hdl", "HDL 콜레스테롤", "49", "mg/dL") in result["measurements"]
+    assert ("triglyceride", "중성지방", "105", "mg/dL") in result["measurements"]
+    assert ("ldl", "LDL 콜레스테롤", "67", "mg/dL") in result["measurements"]
+
+
+@pytest.mark.asyncio
+async def test_exam_ocr_pdf_gpt_vision_falls_back_to_all_pages_when_selected_page_has_no_candidates(
+    monkeypatch,
+) -> None:
+    calls: list[bytes] = []
+
+    class FakeVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            calls.append(image_bytes)
+            if image_bytes == b"page-3-png":
+                return {"extracted_data": {"fasting_glucose": "101"}}
+            return {"extracted_data": {}}
+
+    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(
+        exam_service,
+        "_convert_exam_pdf_to_png_images",
+        lambda _: exam_service.ExamPdfImageConversionResult(
+            page_count=3,
+            images=[b"page-1-png", b"page-2-png", b"page-3-png"],
+        ),
+    )
+    monkeypatch.setattr(
+        exam_service,
+        "_extract_exam_pdf_page_texts",
+        lambda _: [
+            "종합소견 결과 안내",
+            "검사항목 결과 참고치 공복혈당 총콜레스테롤 HDL LDL 중성지방 AST ALT 혈색소",
+            "발급 안내문 결과",
+        ],
+    )
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
+
+    result = await exam_service._extract_exam_measurements_with_gpt_vision(
+        b"%PDF-test",
+        "application/pdf",
+        "checkup.pdf",
+    )
+
+    assert calls == [b"page-2-png", b"page-1-png", b"page-2-png", b"page-3-png"]
+    assert result is not None
+    assert result["fallback_used"] is True
+    assert ("fasting_glucose", "공복혈당", "101", "mg/dL") in result["measurements"]
 
 
 @pytest.mark.asyncio
