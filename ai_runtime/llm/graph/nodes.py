@@ -23,11 +23,14 @@ SOURCE_GRAPH = "langgraph_chatbot"
 
 def normalize_input(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     message = str(state.get("user_message") or "").strip()
-    metadata = {
-        **state.get("metadata", {}),
-        "graph_version": "health_chatbot_langgraph_v1",
-        "message_length": len(message),
-    }
+    metadata = _metadata_with_node(
+        {
+            **state.get("metadata", {}),
+            "graph_version": "health_chatbot_langgraph_v1",
+            "message_length": len(message),
+        },
+        "normalize_input",
+    )
     trace_metadata = {
         **state.get("trace_metadata", {}),
         "sanitized_message_preview": sanitize_for_trace(message),
@@ -63,12 +66,17 @@ def normalize_input(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
 def check_mental_health_safety(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     result = detect_mental_health_safety(state["user_message"])
     if result is None:
-        trace_graph_node("check_mental_health_safety", state, {"safety_level": None, "should_bypass_llm": False})
-        return state
+        next_state = {
+            **state,
+            "metadata": _metadata_with_node(state.get("metadata", {}), "check_mental_health_safety"),
+        }
+        trace_graph_node("check_mental_health_safety", next_state, {"safety_level": None, "should_bypass_llm": False})
+        return next_state
 
     should_bypass = result.level == "crisis"
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "check_mental_health_safety"),
         "intent": result.intent,
         "safety_level": result.level,
         "safety_response": result.response,
@@ -90,12 +98,17 @@ def check_mental_health_safety(state: HealthChatbotGraphState) -> HealthChatbotG
 
 def classify_intent(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     if state.get("intent"):
-        trace_graph_node("classify_intent", state, {"intent": state["intent"], "source": "safety_policy"})
-        return state
+        next_state = {
+            **state,
+            "metadata": _metadata_with_node(state.get("metadata", {}), "classify_intent"),
+        }
+        trace_graph_node("classify_intent", next_state, {"intent": next_state["intent"], "source": "safety_policy"})
+        return next_state
 
     intent = infer_main_health_chatbot_intent(state["user_message"])
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "classify_intent"),
         "intent": intent,
     }
     trace_graph_node("classify_intent", next_state, {"intent": intent})
@@ -106,6 +119,7 @@ def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphSt
     if not state.get("use_rag") or not config.RAG_ENABLED:
         next_state = {
             **state,
+            "metadata": _metadata_with_node(state.get("metadata", {}), "retrieve_rag_context"),
             "fallback_reason": state.get("fallback_reason") or "rag_disabled",
             "trace_metadata": {
                 **state.get("trace_metadata", {}),
@@ -127,6 +141,7 @@ def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphSt
     reference_summary = build_reference_summary(contexts)
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "retrieve_rag_context"),
         "retrieved_docs": [_document_to_payload(document) for document in documents],
         "reference_sources": reference_sources,
         "reference_summary": reference_summary,
@@ -160,6 +175,7 @@ def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphSta
         safety_result = check_medical_safety(final_answer)
         next_state = {
             **state,
+            "metadata": _metadata_with_node(state.get("metadata", {}), "generate_llm_answer"),
             "llm_answer": final_answer,
             "source": "safety_policy",
             "is_safe": safety_result["is_safe"],
@@ -194,6 +210,7 @@ def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphSta
 
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "generate_llm_answer"),
         "intent": output.intent,
         "llm_answer": output.answer,
         "source": output.source,
@@ -231,6 +248,7 @@ def check_grounding_or_fallback(state: HealthChatbotGraphState) -> HealthChatbot
     if safety_result["is_safe"]:
         next_state = {
             **state,
+            "metadata": _metadata_with_node(state.get("metadata", {}), "check_grounding_or_fallback"),
             "is_safe": bool(state.get("is_safe", True)),
             "safety_result": _with_graph_metadata(
                 {
@@ -252,6 +270,7 @@ def check_grounding_or_fallback(state: HealthChatbotGraphState) -> HealthChatbot
     fallback_safety = check_medical_safety(fallback_answer)
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "check_grounding_or_fallback"),
         "llm_answer": fallback_answer,
         "fallback_reason": "medical_safety_check_failed",
         "source": "rule_based_graph_fallback",
@@ -275,6 +294,7 @@ def build_recommended_actions(state: HealthChatbotGraphState) -> HealthChatbotGr
     )
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "build_recommended_actions"),
         "recommended_actions": actions,
     }
     trace_graph_node("build_recommended_actions", next_state, {"action_count": len(actions)})
@@ -293,6 +313,7 @@ def format_final_response(state: HealthChatbotGraphState) -> HealthChatbotGraphS
     )
     next_state = {
         **state,
+        "metadata": _metadata_with_node(state.get("metadata", {}), "format_final_response"),
         "final_answer": final_answer,
         "recommended_actions": actions,
         "caution_message": CAUTION_MESSAGE,
@@ -348,6 +369,31 @@ def sanitize_for_trace(value: str, limit: int = 80) -> str:
     sanitized = re.sub(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[email]", value)
     sanitized = re.sub(r"01[016789][- ]?\d{3,4}[- ]?\d{4}", "[phone]", sanitized)
     sanitized = re.sub(r"\d{2,3}[- ]?\d{3,4}[- ]?\d{4}", "[phone]", sanitized)
+    health_terms = (
+        "공복혈당",
+        "혈당",
+        "혈압",
+        "수축기",
+        "이완기",
+        "콜레스테롤",
+        "중성지방",
+        "hdl",
+        "ldl",
+        "bmi",
+        "체중",
+        "몸무게",
+        "허리둘레",
+        "키",
+        "신장",
+    )
+    term_pattern = "|".join(re.escape(term) for term in health_terms)
+    sanitized = re.sub(
+        rf"({term_pattern})\s*[:=]?\s*\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?",
+        r"\1 [health_value]",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(r"\b\d{4,}(?:\.\d+)?\b", "[number]", sanitized)
     return sanitized[:limit]
 
 
@@ -404,6 +450,14 @@ def _with_graph_metadata(safety_result: dict[str, Any], state: HealthChatbotGrap
     return {
         **safety_result,
         "metadata": metadata,
+    }
+
+
+def _metadata_with_node(metadata: dict[str, Any], node: str) -> dict[str, Any]:
+    node_path = list(metadata.get("node_path") or [])
+    return {
+        **metadata,
+        "node_path": [*node_path, node],
     }
 
 

@@ -4,7 +4,7 @@ from typing import Any, NotRequired, TypedDict
 
 
 class HealthChatbotGraphState(TypedDict):
-    user_message: str
+    user_message: str | None
     user_context: dict[str, Any]
     intent: str | None
     safety_level: str | None
