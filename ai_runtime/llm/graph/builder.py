@@ -4,6 +4,7 @@ from functools import lru_cache
 
 from langgraph.graph import END, START, StateGraph
 
+from .analysis_nodes import build_analysis_explanation
 from .nodes import (
     build_recommended_actions,
     check_grounding_or_fallback,
@@ -36,7 +37,7 @@ def build_health_chatbot_graph():
         "check_mental_health_safety",
         should_bypass_llm,
         {
-            "bypass": "format_final_response",
+            "bypass": "build_recommended_actions",
             "continue": "classify_intent",
         },
     )
@@ -46,4 +47,13 @@ def build_health_chatbot_graph():
     graph.add_edge("check_grounding_or_fallback", "build_recommended_actions")
     graph.add_edge("build_recommended_actions", "format_final_response")
     graph.add_edge("format_final_response", END)
+    return graph.compile()
+
+
+@lru_cache
+def build_analysis_explanation_graph():
+    graph = StateGraph(HealthChatbotGraphState)
+    graph.add_node("build_analysis_explanation", build_analysis_explanation)
+    graph.add_edge(START, "build_analysis_explanation")
+    graph.add_edge("build_analysis_explanation", END)
     return graph.compile()
