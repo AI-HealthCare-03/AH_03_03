@@ -31,6 +31,8 @@ dependencies = [
     "pillow-heif>=1.3.0",
     "boto3>=1.43.18",
     "pymupdf>=1.27.2.3",
+    "langgraph>=1.2.2",
+    "langchain-core>=1.4.0",
 ]
 
 [dependency-groups]
