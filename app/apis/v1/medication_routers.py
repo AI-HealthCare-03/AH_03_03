@@ -10,7 +10,6 @@ from app.dtos.medications import (
     MedicationOCRConfirmRequest,
     MedicationOCRConfirmResponse,
     MedicationOCRRequest,
-    MedicationOCRResponse,
     MedicationRecordCreateRequest,
     MedicationRecordResponse,
     MedicationRecordUpdateRequest,
@@ -55,20 +54,6 @@ async def list_medications(
     )
 
 
-async def _run_medication_ocr(
-    request: MedicationOCRRequest,
-    user: User,
-    image_bytes: bytes | None = None,
-    image_media_type: str | None = None,
-) -> MedicationOCRResponse:
-    _ = user
-    return await medication_service.run_medication_ocr(
-        request,
-        image_bytes=image_bytes,
-        image_media_type=image_media_type,
-    )
-
-
 @medication_router.post("/ocr", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def run_medication_ocr(
     request: Request,
@@ -104,14 +89,6 @@ async def run_medication_ocr(
         )
 
     return await async_job_service.create_medication_ocr_job(int(user.id), request_payload)
-
-
-@medication_router.post("/dummy-ocr", response_model=MedicationOCRResponse, deprecated=True, include_in_schema=False)
-async def run_legacy_medication_ocr(
-    request: MedicationOCRRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await _run_medication_ocr(request, user)
 
 
 async def _parse_medication_ocr_request(request: Request) -> tuple[MedicationOCRRequest, bytes | None, str | None]:

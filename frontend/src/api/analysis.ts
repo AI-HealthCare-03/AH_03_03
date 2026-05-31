@@ -48,16 +48,6 @@ export async function getAnalysisResultDetail<T>(analysisId: number): Promise<T>
   return apiRequest<T>(`/analysis/results/${analysisId}/detail`);
 }
 
-export async function runAnalysis<T = AnalysisRunResponse[]>(
-  healthRecordId: number,
-  mode: AnalysisMode = "BASIC",
-): Promise<T> {
-  return apiRequest<T>("/analysis/run", {
-    method: "POST",
-    body: { health_record_id: healthRecordId, mode },
-  });
-}
-
 export async function runAnalysisAsync(
   healthRecordId: number,
   mode: AnalysisMode = "BASIC",

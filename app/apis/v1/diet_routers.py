@@ -7,7 +7,6 @@ from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_use
 from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.diets import (
     DietAnalyzeRequest,
-    DietAnalyzeResponse,
     DietPhotoResultCreateRequest,
     DietPhotoResultResponse,
     DietRecordCreateRequest,
@@ -41,20 +40,6 @@ async def list_diet_records(
     )
 
 
-async def _run_diet_analysis(
-    request: DietAnalyzeRequest,
-    user: User,
-    image_bytes: bytes | None = None,
-    image_media_type: str | None = None,
-) -> DietAnalyzeResponse:
-    return await diet_service.run_diet_analysis(
-        user.id,
-        request,
-        image_bytes=image_bytes,
-        image_media_type=image_media_type,
-    )
-
-
 @diet_router.post("/analyze", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def run_diet_analysis(
     request: Request,
@@ -72,20 +57,6 @@ async def run_diet_analysis(
             )
         )
     return await async_job_service.create_diet_analyze_image_job(int(user.id), request_payload)
-
-
-@diet_router.post(
-    "/dummy-analyze",
-    response_model=DietAnalyzeResponse,
-    status_code=status.HTTP_201_CREATED,
-    deprecated=True,
-    include_in_schema=False,
-)
-async def run_legacy_diet_analysis(
-    request: DietAnalyzeRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await _run_diet_analysis(request, user)
 
 
 async def _parse_diet_analyze_request(request: Request) -> tuple[DietAnalyzeRequest, bytes | None, str | None]:
