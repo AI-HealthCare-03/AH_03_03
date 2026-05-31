@@ -23,6 +23,9 @@ def route_result_chatbot_response(
     use_real_llm: bool = False,
 ) -> ResultChatbotOutput:
     rule_result = generate_result_chatbot_response(input_data)
+    if is_safety_policy_response(rule_result):
+        return rule_result
+
     if use_llm_rewrite:
         if rule_result.intent == "medical_consult_required":
             return rule_result
@@ -55,6 +58,9 @@ def route_main_health_chatbot_response(
     use_real_llm: bool = False,
 ) -> MainHealthChatbotOutput:
     rule_result = generate_main_health_chatbot_response(input_data)
+    if is_safety_policy_response(rule_result):
+        return rule_result
+
     if use_llm_rewrite:
         if rule_result.intent == "medical_consult_required":
             return rule_result
@@ -78,6 +84,10 @@ def route_main_health_chatbot_response(
         input_data,
         use_real_llm=use_real_llm,
     )
+
+
+def is_safety_policy_response(response) -> bool:
+    return response.source == "safety_policy" or str(response.intent).startswith("mental_health_")
 
 
 def with_fallback_metadata(rule_response, failed_rewrite_response):

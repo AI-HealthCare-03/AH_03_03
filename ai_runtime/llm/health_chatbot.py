@@ -96,7 +96,7 @@ def generate_result_chatbot_response(
         intent=intent,
         source=source,
         referenced_health_factors=factor_names,
-        recommended_challenges=input_data.recommended_challenges,
+        recommended_challenges=[] if intent == "mental_health_crisis_support" else input_data.recommended_challenges,
         caution_message=CAUTION_MESSAGE,
         tone=input_data.tone,
         is_safe=safety_result["is_safe"],
