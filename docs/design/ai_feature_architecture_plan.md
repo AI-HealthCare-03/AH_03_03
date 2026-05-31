@@ -7,6 +7,7 @@
 - `docs/design/ai_worker_structure.md`: `ai_runtime` 패키지와 Redis Stream worker 구조
 - `docs/design/ai_worker_model_scope.md`: 현재 AI 모델/룰/provider 범위
 - `docs/design/llm_runtime_scope.md`: LLM/RAG runtime 공식 경로와 PoC 범위
+- `docs/design/llm_langgraph_runtime_plan.md`: LangGraph 기반 LLM 상담 graph, safety, RAG grounding, Langfuse trace 구조
 - `docs/design/cv_food_fallback_policy.md`: 식단 CV/GPT Vision fallback 정책
 - `docs/design/challenge_recommendation_design.md`: 챌린지 추천 데이터와 정책
 - `docs/design/disease_scope_policy.md`: 공식 질환 분석 저장 범위
@@ -52,6 +53,18 @@ RAG 검색 대상 문서는 아래 후보를 우선 chunking 후 embedding하여
 - 서비스 내부 안전/개인정보/민감정보 정책 문서
 
 1차 런타임은 LangGraph `StateGraph` skeleton으로 상담 흐름을 제어하고, LangChain은 RAG node 내부의 `Document` 등 필요한 부품으로 제한해서 사용한다. 이 구조는 API 응답 contract를 유지하면서 안전 분기, RAG fallback, 답변 생성 흐름을 분리하기 위한 기준이다.
+
+RAG 검색은 retriever interface를 기준으로 분리한다. 현재는 로컬 markdown keyword retriever adapter를 사용하되, 후속 단계에서 embedding model, vector store, pgvector, similarity score, source trust level을 가진 vector retriever로 교체할 수 있게 유지한다.
+
+LLM prompt는 `prompt_version` 단위로 관리하고, LangGraph generation node와 Langfuse trace metadata에 연결 가능한 구조를 유지한다. 위기 키워드 safety 응답은 LLM rewrite/generation prompt를 타지 않고 정책 응답을 우선한다.
+
+Langfuse trace에는 전체 사용자 입력이나 RAG 문서 본문을 남기지 않고, `graph_run_id`, node 실행 순서, node duration, sanitized preview, retrieval source id/title/source type, prompt version 같은 축약 metadata 중심으로 기록한다.
+
+간편/정밀 분석 결과 설명은 LangGraph의 별도 `build_analysis_explanation` node에서 처리하며, 확정 진단이 아닌 위험요인 참고와 관리 우선순위 안내로 제한한다.
+
+챌린지 추천 action은 LangGraph의 `build_recommended_actions` node에서 생성하며, 분석 결과/위험요인, context, safety level을 함께 고려한다. 외부 API contract는 문자열 action 목록을 유지하되 내부 trace metadata에는 action type, 우선순위, 관련 위험요인, 전문 도움 필요 여부를 민감 원문 없이 기록한다.
+
+RAG source는 `source_trust_level`로 공식 가이드라인, 공공/학회 자료, 내부 정책, FAQ/챌린지 정책, unknown을 구분한다. `check_grounding_or_fallback` node는 retrieved document 수, trust level, reference summary 존재 여부를 확인해 근거가 없거나 약한 경우 단정 표현을 줄이고 안전 fallback 문구를 우선한다.
 
 - 질의 분기
 - 검색 대상 선택
@@ -309,6 +322,9 @@ Fallback 정책 후보:
 | 구현 완료 | `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run` job type | 구현 완료 | 실제 provider 활성화 여부는 env와 handler 정책에 따른다. |
 | 구현 완료 | 식단 질환군별 nutrition scorer | 구현 완료 | 현재 점수표/rule 기반을 사용한다. |
 | 부분 구현 | LLM/RAG 설명 생성 | 부분 구현 | rule 기반 설명과 keyword RAG/trace 보조 경로가 있으며 vector RAG는 계획 영역이다. |
+| 부분 구현 | RAG retriever interface | 부분 구현 | 현재는 keyword retriever adapter를 사용하며 embedding/vector/pgvector retriever는 후속 확장 영역이다. |
+| 부분 구현 | LLM prompt version registry | 부분 구현 | health chat, RAG grounded answer, analysis explanation, challenge recommendation, safe fallback prompt를 version 단위로 관리한다. |
+| 부분 구현 | 분석 결과 설명 LangGraph node | 부분 구현 | 간편/정밀 분석 설명을 별도 node로 분리하고, 위험요인/관리 우선순위 중심의 안전한 fallback 설명을 사용한다. |
 | 부분 구현 | GPT Vision provider | 부분 구현 | env flag와 fallback 정책에 따라 사용할 수 있으나 비용/안전 정책이 필요하다. |
 | 부분 구현 | 챌린지 추천 | 부분 구현 | master data와 분석 결과 기반 추천 구조가 있으며, LLM 설명 고도화는 계획 영역이다. |
 | 구현 예정 | AI-Hub 1000개 음식 분류 CV 모델 공식 연결 | 구현 예정 | 모델 학습/평가/배포 기준과 fallback threshold 정의가 필요하다. |
