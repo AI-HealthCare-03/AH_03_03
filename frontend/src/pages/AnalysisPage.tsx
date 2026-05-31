@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysis } from "../api/analysis";
+import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysisAsync } from "../api/analysis";
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -52,6 +53,14 @@ const riskFallbackScores: Record<string, number> = {
   HIGH: 80,
   MEDIUM: 55,
   LOW: 25,
+};
+
+const asyncJobStatusMessages: Record<string, string> = {
+  PENDING: "분석 작업 대기 중입니다.",
+  PROCESSING: "분석 중입니다.",
+  SUCCESS: "분석이 완료되었습니다.",
+  FAILED: "분석에 실패했습니다.",
+  CANCELED: "분석 작업이 취소되었습니다.",
 };
 
 const missingFieldLabels: Record<string, string> = {
@@ -147,6 +156,34 @@ export default function AnalysisPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
+  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
+
+  const { latestJob, isPolling, pollingError } = useAsyncJobPolling({
+    jobId: analysisJobId,
+    enabled: analysisJobId !== null && runningMode !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      await load();
+      setNotice("분석이 완료되었습니다.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onFailure: (job) => {
+      setError(
+        job.status === "CANCELED"
+          ? "분석 작업이 취소되었습니다."
+          : "분석에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      );
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onTimeout: () => {
+      setNotice("분석 시간이 길어지고 있습니다. 잠시 후 결과를 다시 확인해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+  });
 
   const load = async () => {
     const latestResults = await getLatestAnalysisResults<AnalysisResult[]>();
@@ -198,6 +235,7 @@ export default function AnalysisPage() {
   const run = async (mode: AnalysisMode) => {
     setError("");
     setNotice("");
+    setAnalysisJobId(null);
     setRunningMode(mode);
     try {
       const readiness = await getAnalysisReadiness<Readiness>();
@@ -220,16 +258,21 @@ export default function AnalysisPage() {
         setNotice("건강검진 데이터를 입력해주세요.");
         return;
       }
-      await runAnalysis(readiness.latest_health_record_id, mode);
-      await load();
+      const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);
+      setAnalysisJobId(job.id);
+      setNotice(asyncJobStatusMessages[job.status] ?? "분석 작업을 시작했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
-    } finally {
       setRunningMode(null);
     }
   };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
+  const jobStatusMessage = latestJob
+    ? asyncJobStatusMessages[latestJob.status] ?? "분석 작업 상태를 확인하고 있습니다."
+    : analysisJobId
+      ? "분석 작업 대기 중입니다."
+      : "";
 
   return (
     <div className="page-stack">
@@ -251,7 +294,16 @@ export default function AnalysisPage() {
         </div>
       </div>
       {error && <ErrorMessage message={error} />}
+      {pollingError && <ErrorMessage message={pollingError.message} />}
       {notice && <div className="state-box">{notice}</div>}
+      {(isPolling || jobStatusMessage) && (
+        <div className="state-box">
+          {jobStatusMessage}
+          {latestJob?.status && latestJob.status !== "SUCCESS" && latestJob.status !== "FAILED" && (
+            <span className="muted"> 현재 상태: {latestJob.status}</span>
+          )}
+        </div>
+      )}
       {missingFields.length > 0 && (
         <Card title="분석에 필요한 정보가 부족합니다">
           <div className="readiness-card">

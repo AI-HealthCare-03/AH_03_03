@@ -178,6 +178,48 @@ async def test_create_diet_analyze_image_job_enqueues_slim_stream_payload(monkey
 
 
 @pytest.mark.asyncio
+async def test_create_analysis_run_job_enqueues_ai_stream_payload(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    class FakeAsyncJob:
+        id = 33
+        job_type = async_job_service.ANALYSIS_RUN_JOB_TYPE
+        stream_id = None
+
+        async def save(self, update_fields):
+            _ = update_fields
+            calls.append(("save", {"stream_id": self.stream_id}))
+
+    async def fake_create(**kwargs):
+        calls.append(("create", kwargs))
+        return FakeAsyncJob()
+
+    async def fake_enqueue_async_job(**kwargs):
+        calls.append(("enqueue", kwargs))
+        return "33-0"
+
+    monkeypatch.setattr(async_job_service.AsyncJob, "create", fake_create)
+    monkeypatch.setattr(async_job_service, "enqueue_async_job", fake_enqueue_async_job)
+
+    job = await async_job_service.create_analysis_run_job(user_id=12, health_record_id=88, mode="PRECISION")
+
+    assert job.stream_id == "33-0"
+    assert calls[0][0] == "create"
+    assert calls[0][1]["request_payload"] == {
+        "user_id": 12,
+        "health_record_id": 88,
+        "mode": "PRECISION",
+        "resource_type": "health_record",
+    }
+    assert calls[1][0] == "enqueue"
+    assert calls[1][1]["job_type"] == "analysis.run"
+    assert calls[1][1]["payload"] == calls[0][1]["request_payload"]
+    assert calls[1][1]["stream"] == AI_JOB_STREAM
+    assert calls[1][1]["user_id"] == 12
+    assert calls[1][1]["resource_id"] == 88
+
+
+@pytest.mark.asyncio
 async def test_email_verification_job_enqueue_uses_service_stream_and_slim_payload(monkeypatch) -> None:
     calls: list[tuple[str, dict]] = []
 
@@ -615,6 +657,98 @@ async def test_diet_analyze_image_handler_rejects_missing_user(monkeypatch) -> N
         await handlers.handle_stream_job(24, "diet.analyze_image", {})
 
     assert calls == [("processing", 24), (24, "diet_analysis_user_id_missing")]
+
+
+@pytest.mark.asyncio
+async def test_analysis_run_handler_calls_analysis_service_and_marks_success(monkeypatch) -> None:
+    from app.models.users import User
+    from app.services import analysis as analysis_service
+    from app.services import health as health_service
+
+    health_record = SimpleNamespace(id=88, user_id=12)
+    user = SimpleNamespace(id=12)
+    calls: list[tuple[str, object, object | None]] = []
+
+    async def fake_get_health_record(health_record_id: int):
+        calls.append(("health_record", health_record_id, None))
+        return health_record
+
+    async def fake_get_or_none(**kwargs):
+        calls.append(("user", kwargs, None))
+        return user
+
+    async def fake_get_missing_fields_for_mode(user_arg, health_record_arg, mode):
+        calls.append(("missing_fields", user_arg, mode))
+        assert health_record_arg is health_record
+        return []
+
+    async def fake_mark_processing(job_id: int):
+        calls.append(("processing", job_id, None))
+
+    async def fake_run_analysis(user_id: int, health_record_arg, mode):
+        calls.append(("analysis", user_id, mode))
+        assert health_record_arg is health_record
+        return [
+            {"analysis_result_id": 101},
+            {"analysis_result_id": 102},
+        ]
+
+    async def fake_mark_success(job_id: int, result_payload: dict):
+        calls.append(("success", job_id, result_payload))
+
+    monkeypatch.setattr(health_service, "get_health_record", fake_get_health_record)
+    monkeypatch.setattr(User, "get_or_none", fake_get_or_none)
+    monkeypatch.setattr(analysis_service, "get_missing_fields_for_mode", fake_get_missing_fields_for_mode)
+    monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
+    monkeypatch.setattr(analysis_service, "run_analysis", fake_run_analysis)
+    monkeypatch.setattr(handlers.async_job_service, "mark_success", fake_mark_success)
+
+    await handlers.handle_stream_job(
+        34,
+        "analysis.run",
+        {"user_id": 12, "health_record_id": 88, "mode": "PRECISION"},
+    )
+
+    assert calls[0] == ("health_record", 88, None)
+    assert calls[3] == ("processing", 34, None)
+    assert calls[4][0] == "analysis"
+    assert calls[5] == (
+        "success",
+        34,
+        {
+            "user_id": 12,
+            "health_record_id": 88,
+            "mode": "PRECISION",
+            "analysis_result_ids": [101, 102],
+            "result_count": 2,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_analysis_run_handler_rejects_missing_health_record(monkeypatch) -> None:
+    from app.services import health as health_service
+
+    calls: list[tuple[int, str]] = []
+
+    async def fake_get_health_record(health_record_id: int):
+        assert health_record_id == 404
+        return None
+
+    async def fake_mark_failed(job_id: int, error_message: str):
+        calls.append((job_id, error_message))
+
+    monkeypatch.setattr(health_service, "get_health_record", fake_get_health_record)
+    monkeypatch.setattr(handlers.async_job_service, "mark_failed", fake_mark_failed)
+
+    with pytest.raises(handlers.NonRetryableJobError):
+        await handlers.handle_stream_job(
+            35,
+            "analysis.run",
+            {"user_id": 12, "health_record_id": 404, "mode": "BASIC"},
+        )
+
+    assert calls == [(35, "health_record_not_found")]
 
 
 @pytest.mark.asyncio

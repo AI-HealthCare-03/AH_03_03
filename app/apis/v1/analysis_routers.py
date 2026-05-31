@@ -13,8 +13,10 @@ from app.dtos.analysis import (
     AnalysisSnapshotCreateRequest,
     AnalysisSnapshotResponse,
 )
+from app.dtos.async_jobs import AsyncJobResponse
 from app.models.users import User
 from app.services import analysis as analysis_service
+from app.services import async_jobs as async_job_service
 from app.services import health as health_service
 from app.services.sensitive_access_logs import safe_record_sensitive_access
 
@@ -50,6 +52,34 @@ async def run_analysis(
     user: Annotated[User, Depends(get_request_user)],
 ):
     return await _run_analysis(request, user)
+
+
+@analysis_router.post(
+    "/run-async",
+    response_model=AsyncJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def run_analysis_async(
+    request: AnalysisRunByHealthRecordRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    health_record = ensure_found(
+        await health_service.get_health_record(request.health_record_id),
+        "건강 기록을 찾을 수 없습니다.",
+    )
+    ensure_owner(health_record.user_id, user)
+    missing_fields = await analysis_service.get_missing_fields_for_mode(user, health_record, request.mode)
+    if missing_fields:
+        mode_label = "정밀 분석" if request.mode.value == "PRECISION" else "간편 분석"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{mode_label}에 필요한 정보가 부족합니다: {', '.join(missing_fields)}",
+        )
+    return await async_job_service.create_analysis_run_job(
+        user_id=int(user.id),
+        health_record_id=request.health_record_id,
+        mode=request.mode.value,
+    )
 
 
 @analysis_router.post(
