@@ -13,6 +13,8 @@ import { deactivateFcmToken, registerFcmToken } from "../api/notifications";
 
 const FCM_TOKEN_STORAGE_KEY = "ai_health_fcm_token";
 const FCM_DEVICE_ID_STORAGE_KEY = "ai_health_fcm_device_id";
+const FIREBASE_MESSAGING_SW_PATH = "/firebase-messaging-sw.js";
+const SERVICE_WORKER_READY_TIMEOUT_MS = 10000;
 
 type FirebasePublicConfig = {
   apiKey: string;
@@ -44,11 +46,17 @@ function getFirebasePublicConfig(): FirebasePublicConfig {
 
 function getMissingFirebaseConfigKeys(): string[] {
   const config = getFirebasePublicConfig();
-  const missingKeys = Object.entries(config)
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
+  const requiredEntries: Array<[keyof FirebasePublicConfig, string]> = [
+    ["apiKey", "VITE_FIREBASE_API_KEY"],
+    ["authDomain", "VITE_FIREBASE_AUTH_DOMAIN"],
+    ["projectId", "VITE_FIREBASE_PROJECT_ID"],
+    ["appId", "VITE_FIREBASE_APP_ID"],
+    ["messagingSenderId", "VITE_FIREBASE_MESSAGING_SENDER_ID"],
+    ["storageBucket", "VITE_FIREBASE_STORAGE_BUCKET"],
+  ];
+  const missingKeys = requiredEntries.filter(([key]) => !config[key]).map(([, envKey]) => envKey);
   if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) {
-    missingKeys.push("vapidKey");
+    missingKeys.push("VITE_FIREBASE_VAPID_KEY");
   }
   return missingKeys;
 }
@@ -136,16 +144,88 @@ async function getFirebaseMessaging(): Promise<Messaging | null> {
 }
 
 async function registerFirebaseMessagingServiceWorker(): Promise<ServiceWorkerRegistration> {
-  const config = getFirebasePublicConfig();
-  const search = new URLSearchParams({
-    apiKey: config.apiKey,
-    authDomain: config.authDomain,
-    projectId: config.projectId,
-    storageBucket: config.storageBucket,
-    messagingSenderId: config.messagingSenderId,
-    appId: config.appId,
+  await assertFirebaseMessagingServiceWorkerScript();
+
+  let registration: ServiceWorkerRegistration;
+  try {
+    registration = await navigator.serviceWorker.register(FIREBASE_MESSAGING_SW_PATH);
+  } catch (err) {
+    throw new Error("Firebase service worker 등록에 실패했습니다.");
+  }
+
+  const readyRegistration = await waitForFirebaseMessagingServiceWorkerReady();
+  postFirebaseConfigToServiceWorker(readyRegistration);
+  logFirebaseServiceWorkerDiagnostics(readyRegistration);
+  return readyRegistration;
+}
+
+async function assertFirebaseMessagingServiceWorkerScript(): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(FIREBASE_MESSAGING_SW_PATH, { cache: "no-store" });
+  } catch {
+    throw new Error("Firebase service worker 파일에 접근하지 못했습니다.");
+  }
+
+  if (!response.ok) {
+    throw new Error("Firebase service worker 파일을 불러오지 못했습니다.");
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = await response.text();
+  const looksLikeHtmlFallback = contentType.includes("text/html") || /^\s*<!doctype html/i.test(body);
+  if (looksLikeHtmlFallback) {
+    throw new Error("Firebase service worker 경로가 index.html로 fallback되고 있습니다.");
+  }
+}
+
+async function waitForFirebaseMessagingServiceWorkerReady(): Promise<ServiceWorkerRegistration> {
+  try {
+    return await withTimeout(
+      navigator.serviceWorker.ready,
+      SERVICE_WORKER_READY_TIMEOUT_MS,
+      "Firebase service worker가 활성화되지 않았습니다.",
+    );
+  } catch (err) {
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error("Firebase service worker 준비 중 오류가 발생했습니다.");
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise
+      .then((value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err: unknown) => {
+        window.clearTimeout(timer);
+        reject(err);
+      });
   });
-  return navigator.serviceWorker.register(`/firebase-messaging-sw.js?${search.toString()}`);
+}
+
+function postFirebaseConfigToServiceWorker(registration: ServiceWorkerRegistration): void {
+  const target = registration.active ?? registration.waiting ?? registration.installing;
+  target?.postMessage({
+    type: "AI_HEALTH_FIREBASE_CONFIG",
+    config: getFirebasePublicConfig(),
+  });
+}
+
+function logFirebaseServiceWorkerDiagnostics(registration: ServiceWorkerRegistration): void {
+  if (!import.meta.env.DEV) return;
+  console.info("[Firebase Web Push] service worker", {
+    scriptURL: registration.active?.scriptURL ?? null,
+    scope: registration.scope,
+    active: Boolean(registration.active),
+    installing: Boolean(registration.installing),
+    waiting: Boolean(registration.waiting),
+  });
 }
 
 export async function enableBrowserPushNotifications(): Promise<string> {
@@ -169,20 +249,29 @@ export async function enableBrowserPushNotifications(): Promise<string> {
   }
 
   const registration = await registerFirebaseMessagingServiceWorker();
-  const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-    serviceWorkerRegistration: registration,
-  });
+  let token = "";
+  try {
+    token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+  } catch {
+    throw new Error("Firebase 브라우저 알림 토큰 발급에 실패했습니다.");
+  }
   if (!token) {
     throw new Error("브라우저 알림 토큰을 발급받지 못했습니다.");
   }
 
-  await registerFcmToken({
-    token,
-    platform: "web",
-    device_id: getOrCreateDeviceId(),
-    user_agent: navigator.userAgent,
-  });
+  try {
+    await registerFcmToken({
+      token,
+      platform: "web",
+      device_id: getOrCreateDeviceId(),
+      user_agent: navigator.userAgent,
+    });
+  } catch {
+    throw new Error("FCM token 서버 등록에 실패했습니다.");
+  }
   setStoredFcmToken(token);
   return token;
 }

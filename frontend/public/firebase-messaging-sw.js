@@ -2,23 +2,18 @@
 importScripts("https://www.gstatic.com/firebasejs/12.14.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.14.0/firebase-messaging-compat.js");
 
-const params = new URLSearchParams(self.location.search);
-const firebaseConfig = {
-  apiKey: params.get("apiKey") || "",
-  authDomain: params.get("authDomain") || "",
-  projectId: params.get("projectId") || "",
-  storageBucket: params.get("storageBucket") || "",
-  messagingSenderId: params.get("messagingSenderId") || "",
-  appId: params.get("appId") || "",
-};
+let firebaseMessagingInitialized = false;
 
-const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
+function initializeFirebaseMessaging(firebaseConfig) {
+  const hasFirebaseConfig = Object.values(firebaseConfig || {}).every(Boolean);
+  if (!hasFirebaseConfig || !self.firebase || firebaseMessagingInitialized) {
+    return;
+  }
 
-if (hasFirebaseConfig && self.firebase) {
   firebase.initializeApp(firebaseConfig);
+  firebaseMessagingInitialized = true;
 
-  const messaging = firebase.messaging();
-  messaging.onBackgroundMessage((payload) => {
+  firebase.messaging().onBackgroundMessage((payload) => {
     const title = payload.notification?.title || payload.data?.title || "AI HealthCare 알림";
     const options = {
       body: payload.notification?.body || payload.data?.body || "새 알림이 도착했습니다.",
@@ -29,3 +24,10 @@ if (hasFirebaseConfig && self.firebase) {
     self.registration.showNotification(title, options);
   });
 }
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "AI_HEALTH_FIREBASE_CONFIG") {
+    return;
+  }
+  initializeFirebaseMessaging(event.data.config);
+});

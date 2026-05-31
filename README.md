@@ -109,6 +109,35 @@ cp envs/example.local.env .env
 
 `.env`는 git에 커밋하지 않습니다. 실제 OpenAI, Langfuse, SMTP key는 각자 로컬 `.env`에만 넣습니다. Docker Compose의 `${...}` 치환은 `env_file`이 아니라 루트 `.env` 또는 `--env-file` 값으로 처리됩니다. dev stack은 아래처럼 `--env-file .env`를 붙여 실행하는 것을 권장합니다.
 
+로컬 개발에서 실제 provider를 켜고 끄기 위해 `.env`를 매번 손으로 바꾸지 않도록, 아래 두 프로필을 사용할 수 있습니다. 예시 파일에는 secret 값을 넣지 않았으므로 각자 로컬 파일에만 값을 채웁니다.
+
+```bash
+cp .env.local.real.example .env.local.real
+cp .env.local.mock.example .env.local.mock
+```
+
+- `dev-real`: OpenAI, SMTP, Firebase Web Push 등 실제 provider 연결을 검증할 때 사용합니다.
+- `dev-mock`: 외부 provider 없이 rule/fallback/mock 흐름을 안정적으로 확인할 때 사용합니다.
+
+```bash
+docker compose --env-file .env.local.real -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+docker compose --env-file .env.local.mock -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+```
+
+단축 명령:
+
+```bash
+make dev-up-real
+make dev-up-mock
+```
+
+건강검진 OCR은 `EXAM_OCR_PROVIDER=auto`를 기본 정책으로 사용합니다.
+
+- PDF: PaddleOCR 우선, GPT Vision fallback
+- 이미지: GPT Vision 우선, PaddleOCR fallback
+- `EXAM_GPT_VISION_ENABLED=false`이면 GPT Vision은 건너뜁니다.
+- `PADDLE_OCR_ENABLED=false`이면 PaddleOCR은 건너뜁니다.
+
 최소 로컬/시연 기본값:
 
 ```env
@@ -131,7 +160,7 @@ RAG_ENABLED=false
 DIET_VISION_PROVIDER=rule_based
 DIET_GPT_VISION_ENABLED=false
 
-EXAM_OCR_PROVIDER=fallback
+EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=false
 PADDLE_OCR_ENABLED=false
 
@@ -155,8 +184,9 @@ CHATBOT_USE_REAL_LLM=true
 DIET_VISION_PROVIDER=gpt_vision
 DIET_GPT_VISION_ENABLED=true
 
-EXAM_OCR_PROVIDER=gpt_vision
+EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=true
+PADDLE_OCR_ENABLED=true
 
 MEDICATION_OCR_PROVIDER=gpt_vision
 MEDICATION_GPT_VISION_ENABLED=true
@@ -367,23 +397,25 @@ DIET_GPT_VISION_ENABLED=true
 기본값:
 
 ```env
-EXAM_OCR_PROVIDER=fallback
+EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=false
 PADDLE_OCR_ENABLED=false
 ```
+
+`auto` 정책은 PDF는 PaddleOCR 우선, 이미지는 GPT Vision 우선으로 처리합니다. 각 provider는 enabled flag가 켜진 경우에만 실행됩니다.
 
 GPT Vision 경로를 테스트하려면:
 
 ```env
 OPENAI_API_KEY=<key>
-EXAM_OCR_PROVIDER=gpt_vision
+EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=true
 ```
 
 PaddleOCR/text extraction 경로를 테스트하려면:
 
 ```env
-EXAM_OCR_PROVIDER=paddleocr
+EXAM_OCR_PROVIDER=auto
 PADDLE_OCR_ENABLED=true
 ```
 
@@ -607,7 +639,7 @@ DB_HOST=localhost uv run python scripts/seed_demo_users.py
 `.env`의 provider flag를 확인합니다.
 
 ```env
-EXAM_OCR_PROVIDER=gpt_vision
+EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=true
 OPENAI_API_KEY=<key>
 ```
@@ -615,7 +647,7 @@ OPENAI_API_KEY=<key>
 또는 PaddleOCR/text extraction 경로:
 
 ```env
-EXAM_OCR_PROVIDER=paddleocr
+EXAM_OCR_PROVIDER=auto
 PADDLE_OCR_ENABLED=true
 ```
 

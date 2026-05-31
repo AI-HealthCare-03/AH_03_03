@@ -69,7 +69,7 @@ class Config(BaseSettings):
     DIET_GPT_VISION_ENABLED: bool = False
     DIET_GPT_VISION_MODEL: str = "gpt-4o-mini"
     DIET_VISION_PROVIDER: str = "rule_based"
-    EXAM_OCR_PROVIDER: str = "fallback"
+    EXAM_OCR_PROVIDER: str = "auto"
     EXAM_GPT_VISION_ENABLED: bool = False
     EXAM_GPT_VISION_MODEL: str = "gpt-4o-mini"
     PADDLE_OCR_ENABLED: bool = False
