@@ -84,7 +84,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 pythonpath = ["."]
 testpaths = ["tests"]
-norecursedirs = ["app/tests", ".git", ".venv", "node_modules", "frontend/node_modules"]
+norecursedirs = [".git", ".venv", "node_modules", "frontend/node_modules"]
 
 [tool.ruff]
 # 기본 라인 길이 설정
