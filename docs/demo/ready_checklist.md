@@ -25,8 +25,8 @@ uv run python scripts/verify_demo_ready.py
 
 ## 2. Docker compose 실행
 
-프론트 포함 전체 시연은 dev compose 스택을 표준으로 사용한다. 접속 주소는 `http://localhost:8080`이다.
-루트 `docker-compose.yml`은 백엔드/AI 검증용이며 `http://localhost`가 404를 반환하는 것은 정상이다.
+프론트 포함 전체 시연은 `infra/docker/docker-compose.dev.yml` dev compose 스택을 표준으로 사용한다. 접속 주소는 `http://localhost:8080`이다.
+루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이며 frontend, Firebase Web Push build args, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 정상이다.
 
 ```bash
 make demo-up
@@ -112,7 +112,7 @@ uv run python scripts/verify_precision_analysis_api.py --warmup-ml
 
 - 로그인 성공
 - `precision_ready=true`
-- `/analysis/run` `PRECISION` 성공
+- `/analysis/run-async` `PRECISION` job 생성 및 SUCCESS
 - DM/HTN/DL은 `model_name=catboost`
 - OBESITY는 `rule_based`
 

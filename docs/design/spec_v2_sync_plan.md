@@ -79,7 +79,7 @@
 - 현재 Swagger 노출 path는 106개이다.
 - deprecated dummy 호환 endpoint는 삭제하지 않지만 OpenAPI에서는 숨김 처리된 상태로 별도 호환 부록에만 기록한다.
 - 아래 공식 endpoint를 우선 명세한다.
-  - `POST /api/v1/analysis/run`
+  - `POST /api/v1/analysis/run-async`
   - `POST /api/v1/diets/analyze`
   - `POST /api/v1/exams/{exam_id}/ocr`
   - `POST /api/v1/exams/{exam_id}/confirm`
@@ -164,7 +164,7 @@
   - `/exams/{exam_id}/confirm`
   - `HealthRecord` X2 필드 반영
   - readiness `precision_ready=true`
-  - `/analysis/run` `mode=PRECISION`
+  - `/analysis/run-async` `mode=PRECISION`
 - CatBoost 모델 적용 범위를 반영한다.
   - `DM / DIABETES`: CatBoost
   - `HTN / HYPERTENSION`: CatBoost
