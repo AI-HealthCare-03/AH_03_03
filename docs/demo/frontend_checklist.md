@@ -122,7 +122,7 @@ docker compose logs --tail=100 fastapi
 ## 6. 간편분석 실행
 
 - 화면 경로: `/analysis`
-- API 연결: `POST /api/v1/analysis/run`
+- API 연결: `POST /api/v1/analysis/run-async`, `GET /api/v1/jobs/{job_id}`
 - 요청 핵심: `mode=BASIC`
 - 확인 항목:
   - 버튼 클릭 후 결과 카드 갱신
@@ -138,7 +138,7 @@ docker compose logs --tail=100 fastapi
 ## 7. 정밀분석 실행
 
 - 화면 경로: `/analysis`
-- API 연결: `POST /api/v1/analysis/run`
+- API 연결: `POST /api/v1/analysis/run-async`, `GET /api/v1/jobs/{job_id}`
 - 요청 핵심: `mode=PRECISION`
 - 확인 항목:
   - 정밀분석 버튼이 precision_ready일 때 활성화

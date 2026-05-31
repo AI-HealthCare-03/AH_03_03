@@ -1,3 +1,16 @@
+#
+# Legacy/minimal backend/AI verification stack.
+#
+# Keep this file for quick FastAPI/PostgreSQL/Redis/AI Worker checks only.
+# It is not the standard local demo stack and does not cover the current
+# frontend, Firebase Web Push build args, storage, scheduler, or full async UX.
+#
+# Standard local/dev stack:
+#   docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+#
+# Standard EC2/prod stack:
+#   docker compose --env-file .env -f infra/docker/docker-compose.prod.yml up -d --build --force-recreate
+#
 services:
   # 1. Redis (메시지 브로커 및 캐싱)
   redis:

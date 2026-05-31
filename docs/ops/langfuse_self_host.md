@@ -1,6 +1,6 @@
 # Langfuse Self-Host
 
-이 디렉터리는 LLM/GPT Vision/RAG/챗봇 관측 도구인 Langfuse를 Docker Compose로 셀프호스팅하기 위한 로컬 인프라 설정이다.
+이 문서는 `infra/langfuse/`의 Langfuse Docker Compose 설정을 설명한다. Langfuse는 LLM/GPT Vision/RAG/챗봇 관측 도구다.
 
 Langfuse는 앱 필수 실행 요소가 아니다. `LANGFUSE_ENABLED=false`이면 FastAPI와 AI Worker는 trace 없이 정상 동작한다. 또한 Langfuse는 RAG/LLM 실행 엔진이 아니라 trace, prompt, evaluation metadata를 관리하는 관측 도구다. 현재 keyword RAG도 루트 앱 환경변수 `RAG_ENABLED=false`가 기본값이라 비활성화되어 있다.
 

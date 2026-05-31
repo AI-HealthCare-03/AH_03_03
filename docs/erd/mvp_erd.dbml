@@ -24,7 +24,7 @@
 // - 소셜 로그인
 //
 // MVP 범위 안의 후속 구현 단계:
-// - 외부 알림 SMS/Email/Push/Kakao 발송 worker
+// - SMS/Kakao 알림 provider
 // - pgvector / RAG 검색 고도화
 
 Project ai_health_mvp {
@@ -37,16 +37,11 @@ Enum gender {
   FEMALE
 }
 
-Enum async_job_type {
-  HEALTH_ANALYSIS
-}
-
 Enum async_job_status {
   PENDING
-  RUNNING
+  PROCESSING
   SUCCESS
   FAILED
-  CANCELED
 }
 
 Enum analysis_type {
@@ -152,13 +147,13 @@ Enum family_invite_status {
 Table users {
   id bigint [pk, increment]
   login_id varchar(40) [unique]
-  email varchar(40) [not null, unique]
+  email varchar(40) [not null]
   hashed_password varchar(255) [not null]
   name varchar(20) [not null]
   nickname varchar(30)
   gender gender [not null]
   birthday date [not null]
-  phone_number varchar(11) [not null, unique]
+  phone_number varchar(11)
   address varchar(255)
   profile_image_url varchar(500)
   role varchar(20) [not null, default: 'USER']
@@ -169,10 +164,12 @@ Table users {
   locked_until timestamptz
   deactivated_at timestamptz
   email_verified_at timestamptz
+  privacy_consent_agreed_at timestamptz
+  privacy_consent_version varchar(30)
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "AUTH / USER 기준 테이블. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase/소셜 로그인 전용 컬럼은 제거했고, 향후 소셜 로그인 재도입 시 별도 user_oauth_accounts 테이블을 권장한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
+  Note: "AUTH / USER 기준 테이블. phone_number는 선택 입력이므로 nullable이다. privacy_consent_*는 신규 회원가입 시 개인정보 수집·이용 동의 시각/버전을 기록한다. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase Auth/소셜 로그인 전용 컬럼은 제거했고, FCM 토큰은 user_fcm_tokens에서 관리한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
 }
 
 Table families {
@@ -256,6 +253,12 @@ Table family_share_settings {
   share_medications boolean [not null, default: false]
   share_challenges boolean [not null, default: false]
   share_exam_reports boolean [not null, default: false]
+  share_challenge_status boolean [not null, default: false]
+  share_medication_status boolean [not null, default: false]
+  share_diet_status boolean [not null, default: false]
+  share_health_report_summary boolean [not null, default: false]
+  share_raw_health_values boolean [not null, default: false]
+  share_ocr_original boolean [not null, default: false]
   receive_analysis_alerts boolean [not null, default: false]
   receive_abnormal_value_alerts boolean [not null, default: false]
   receive_medication_alerts boolean [not null, default: false]
@@ -269,7 +272,32 @@ Table family_share_settings {
     (family_id, owner_user_id, viewer_user_id)
   }
 
-  Note: "가족 공유 권한. 기본값은 모두 false이며 가족 연결만으로 자동 공유하지 않는다."
+  Note: "가족 공유 권한. 기본값은 모두 false이며 가족 연결만으로 자동 공유하지 않는다. 행동 기반 상태 공유와 원본/민감값 공유 권한을 분리한다."
+}
+
+Table family_notification_settings {
+  id bigint [pk, increment]
+  owner_user_id bigint [not null, ref: > users.id]
+  family_user_id bigint [not null, ref: > users.id]
+  notify_challenge_missed boolean [not null, default: false]
+  notify_challenge_completed boolean [not null, default: false]
+  notify_medication_missed boolean [not null, default: false]
+  notify_diet_missed boolean [not null, default: false]
+  notify_report_updated boolean [not null, default: false]
+  channel_in_app boolean [not null, default: true]
+  channel_push boolean [not null, default: false]
+  quiet_hours_start time
+  quiet_hours_end time
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (owner_user_id)
+    (family_user_id)
+    (owner_user_id, family_user_id) [unique]
+  }
+
+  Note: "가족 알림 수신 설정. owner_user가 공유를 허용하고 family_user가 수신을 허용한 항목만 내부 알림/FCM push 대상으로 삼는다."
 }
 
 Table health_records {
@@ -331,7 +359,7 @@ Table exam_reports {
     (ocr_status)
   }
 
-  Note: "건강검진표 업로드 파일과 OCR 처리 상태를 관리하는 MVP Dummy 테이블."
+  Note: "건강검진표 업로드 파일과 OCR 처리 상태를 관리한다. file_path는 storage backend local/S3의 private object key 또는 legacy local path를 저장한다."
 }
 
 Table exam_measurements {
@@ -356,32 +384,31 @@ Table exam_measurements {
 
 Table async_jobs {
   id bigint [pk, increment]
-  user_id bigint [not null, ref: > users.id]
-  job_type async_job_type [not null]
+  job_type varchar(50) [not null]
   status async_job_status [not null, default: 'PENDING']
-  target_table varchar(50)
-  target_id bigint
+  request_payload jsonb
+  result_payload jsonb
   error_message text
-  requested_at timestamptz [not null]
-  started_at timestamptz
-  finished_at timestamptz
+  stream_id varchar(100)
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+  started_at timestamptz
+  finished_at timestamptz
 
   indexes {
-    (user_id, status)
     (job_type, status)
+    (status, created_at)
+    (stream_id)
   }
 
-  Note: "Backend가 생성하고 AI Worker가 처리 상태를 갱신하는 비동기 작업 테이블."
+  Note: "Backend가 생성하고 Redis Stream worker가 처리 상태를 갱신하는 비동기 작업 테이블. user_id/resource_id/stream/max_attempts 등 Redis 표준 job payload 메타는 request_payload 또는 stream message에 보관하며 DB 컬럼으로 직접 분리하지 않는다."
 }
 
 Table analysis_results {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
   health_record_id bigint [not null, ref: > health_records.id]
-  // TODO: async_jobs 모델 및 FK 연동은 후속 PR에서 처리한다.
-  async_job_id bigint [note: "Nullable BIGINT로 유지. async_jobs 모델/FK 연동은 후속 PR에서 처리한다."]
+  async_job_id bigint [note: "Nullable BIGINT. 현재 analysis.run async job은 작업 상태를 async_jobs에 저장하고, 분석 결과는 analysis_results에 저장한다. DB FK는 아직 연결하지 않는다."]
   analysis_type analysis_type [not null]
   analysis_mode analysis_mode [not null, default: 'BASIC', note: "BASIC=x1 기본정보 기반, PRECISION=x1+x2 검진/혈액검사 수치 기반"]
   risk_score decimal(6,5) [not null]
@@ -398,7 +425,7 @@ Table analysis_results {
     (health_record_id, analysis_type)
   }
 
-  Note: "당뇨/비만/이상지질혈증 위험도 분석 최종 결과."
+  Note: "당뇨/비만/이상지질혈증/고혈압 위험도 분석 최종 결과. 긴 분석 실행은 analysis.run async worker가 담당하며 /analysis/run 동기 실행 경로는 410 Gone으로 막는다."
 }
 
 Table analysis_result_factors {
@@ -462,6 +489,7 @@ Table user_challenges {
   challenge_id bigint [not null, ref: > challenges.id]
   status user_challenge_status [not null, default: 'JOINED']
   started_at timestamptz [not null]
+  expected_done_at timestamptz
   completed_at timestamptz
   canceled_at timestamptz
   created_at timestamptz [not null]
@@ -472,7 +500,7 @@ Table user_challenges {
     (challenge_id)
   }
 
-  Note: "사용자 챌린지 참여/완료 상태."
+  Note: "사용자 챌린지 참여/완료 상태. started_at은 수행 시작 시각, expected_done_at은 완료 예정 시각, completed_at은 최종 완료 시각이다."
 }
 
 Table challenge_logs {
@@ -480,6 +508,7 @@ Table challenge_logs {
   user_challenge_id bigint [not null, ref: > user_challenges.id]
   log_date date [not null]
   is_completed boolean [not null, default: false]
+  completed_at timestamptz
   memo varchar(255)
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
@@ -488,7 +517,7 @@ Table challenge_logs {
     (user_challenge_id, log_date)
   }
 
-  Note: "사용자 챌린지 일별 수행 기록."
+  Note: "사용자 챌린지 일별 수행 기록. 달력 완료 표시는 해당 날짜의 completed_count/total_count 기준이며 completed_at이 실제 완료 시각이다."
 }
 
 Table challenge_recommendations {
@@ -607,6 +636,29 @@ Table notifications {
   Note: "사용자 화면에 표시되는 알림 inbox. 발송 예약과 발송 이력은 reminder_schedules/notification_logs에서 분리 관리한다."
 }
 
+Table user_fcm_tokens {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  token varchar(512) [not null, unique]
+  platform varchar(20) [not null, note: "web/android/ios"]
+  device_id varchar(128)
+  user_agent varchar(500)
+  is_active boolean [not null, default: true]
+  last_seen_at timestamptz [not null]
+  revoked_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id)
+    (user_id, is_active)
+    (platform)
+    (last_seen_at)
+  }
+
+  Note: "브라우저/모바일 FCM registration token. Firebase Auth가 아니라 Web Push/FCM 발송 대상 기기를 관리한다."
+}
+
 Table reminder_schedules {
   id bigint [pk, increment]
   user_id bigint [not null, ref: > users.id]
@@ -633,7 +685,7 @@ Table reminder_schedules {
     (next_trigger_at)
   }
 
-  Note: "복약/챌린지/건강기록/가족/시스템 알림 예약 설정. 실제 외부 발송 worker는 후속 구현 범위."
+  Note: "복약/챌린지/건강기록/가족/시스템 알림 예약 설정. ai-worker scheduler가 next_trigger_at 기준으로 내부 알림을 만들고, push 허용 시 service job/FCM 발송으로 이어질 수 있다."
 }
 
 Table notification_logs {
@@ -681,7 +733,7 @@ Table user_settings {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "사용자별 알림/마케팅/민감정보 동의 설정. MyPage는 이 테이블과 사용자/건강정보 테이블을 조회해 구성한다."
+  Note: "사용자별 알림 설정. 개인정보/민감정보/마케팅 동의 이력의 기준은 user_consents이며, 이 테이블의 동의성 필드는 legacy/정리 후보로 남아 있다."
 }
 
 Table faqs {
@@ -746,7 +798,7 @@ Table diet_records {
     (analysis_method)
   }
 
-  Note: "식단 기록 및 더미 분석 결과 저장. 실제 CV/ML 식단 분석 로직은 이번 범위에서 제외한다."
+  Note: "식단 기록 및 record-level 분석 결과. detected_foods는 화면 표시와 질환별 식단 점수 계산에 사용하는 결과이며, image_path는 storage backend local/S3의 private object key 또는 legacy local path를 저장한다."
 }
 
 Table diet_photo_results {
@@ -762,7 +814,7 @@ Table diet_photo_results {
     (diet_record_id)
   }
 
-  Note: "식단 사진 분석 결과 원본 저장 구조. 실제 모델 추론은 이번 범위에서 제외한다."
+  Note: "식단 사진 분석 provider/raw 결과 스냅샷. detected_foods는 provider가 반환한 원본 후보이며, 최종 화면/점수 기준은 diet_records.detected_foods를 우선한다."
 }
 
 Table medications {
@@ -784,7 +836,7 @@ Table medications {
     (medication_type)
   }
 
-  Note: "복약/영양제 등록 최소 기능. 외부 알림 발송 로그는 이번 범위에서 제외한다."
+  Note: "복약/영양제 등록 최소 기능. 알림 예약/발송 이력은 reminder_schedules와 notification_logs에서 분리 관리한다."
 }
 
 Table medication_records {
@@ -836,7 +888,7 @@ Table llm_generation_logs {
     (status)
   }
 
-  Note: "LLM 더미/생성 결과 추적용 로그. 실제 LLM 호출 로직과 운영 모니터링 고도화는 이번 범위에서 제외한다."
+  Note: "LLM/설명 생성 결과 추적용 로그. prompt 원문 대신 요약 메타데이터 중심으로 저장한다."
 }
 
 Table system_error_logs {
