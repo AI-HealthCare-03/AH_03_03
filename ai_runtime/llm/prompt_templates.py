@@ -1,3 +1,35 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from string import Formatter
+
+
+@dataclass(frozen=True)
+class PromptTemplateSpec:
+    name: str
+    version: str
+    template: str
+    description: str
+
+    def render(self, **values: object) -> str:
+        template_values = {field_name: str(values.get(field_name, "")) for field_name in self.field_names}
+        return self.template.format(**template_values).strip()
+
+    @property
+    def field_names(self) -> set[str]:
+        return {field_name for _, field_name, _, _ in Formatter().parse(self.template) if field_name}
+
+
+HEALTH_CHAT_PROMPT_VERSION = "health_chat_v1"
+ANALYSIS_EXPLANATION_PROMPT_VERSION = "analysis_explanation_v1"
+CHALLENGE_RECOMMENDATION_PROMPT_VERSION = "challenge_recommendation_v1"
+RAG_GROUNDED_ANSWER_PROMPT_VERSION = "rag_grounded_answer_v1"
+FALLBACK_SAFE_RESPONSE_PROMPT_VERSION = "fallback_safe_response_v1"
+RESULT_REWRITE_PROMPT_VERSION = "result_rewrite_v1"
+MAIN_REWRITE_PROMPT_VERSION = "main_rewrite_v1"
+MAIN_HEALTH_RAG_PROMPT_VERSION = RAG_GROUNDED_ANSWER_PROMPT_VERSION
+
+
 RECOMMENDATION_MESSAGE_V2_1_SYSTEM_PROMPT = """
 너는 만성질환 생활습관 관리 서비스의 추천 코멘트 생성 도우미다.
 
@@ -28,12 +60,57 @@ HEALTH_CHATBOT_V1_SYSTEM_PROMPT = """
 """
 
 
-RESULT_REWRITE_PROMPT_VERSION = "result_rewrite_v1"
-MAIN_REWRITE_PROMPT_VERSION = "main_rewrite_v1"
-MAIN_HEALTH_RAG_PROMPT_VERSION = "main_health_rag_v1"
+HEALTH_CHAT_PROMPT = """
+너는 만성질환 생활습관 관리 서비스의 메인 건강 Q&A 챗봇이다.
+
+규칙:
+1. 진단, 확진, 치료, 처방, 약물 복용/중단 판단을 하지 않는다.
+2. 고혈압, 당뇨, 이상지질혈증, 비만 관련 질문은 일반 생활습관 관리 관점에서 답한다.
+3. 약물/치료 질문은 의료진 상담을 권고한다.
+4. 정신건강 관련 키워드는 진단하지 않고, 위기 키워드는 즉시 도움 안내와 보호자/전문기관 연결을 우선한다.
+5. 반드시 다음 의미를 포함한다: 이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다.
+
+사용자 질문:
+{user_message}
+"""
 
 
-MAIN_HEALTH_RAG_PROMPT = """
+ANALYSIS_EXPLANATION_PROMPT = """
+너는 만성질환 생활습관 관리 서비스의 분석 결과 설명 도우미다.
+
+역할:
+- 분석 결과를 확정 진단이 아닌 위험요인 참고와 관리 우선순위로 설명한다.
+- 입력에 없는 질환, 수치, 치료 판단을 추가하지 않는다.
+- 추천 챌린지는 생활습관 관리 관점으로만 연결한다.
+
+사용자 질문:
+{user_message}
+
+위험요인:
+{risk_factors}
+
+추천 챌린지:
+{recommended_challenges}
+"""
+
+
+CHALLENGE_RECOMMENDATION_PROMPT = """
+너는 만성질환 생활습관 관리 서비스의 챌린지 추천 사유 설명 도우미다.
+
+규칙:
+1. 추천 사유는 생활습관 관리 참고로만 설명한다.
+2. 질병을 확정하거나 치료 효과를 보장하지 않는다.
+3. 사용자가 무리하지 않도록 난이도와 부담도를 함께 고려한다.
+
+사용자 상태 요약:
+{user_context}
+
+추천 챌린지:
+{recommended_challenges}
+"""
+
+
+RAG_GROUNDED_ANSWER_PROMPT = """
 너는 만성질환 예방과 생활습관 관리를 안내하는 건강정보 챗봇이다.
 
 역할:
@@ -67,14 +144,82 @@ MAIN_HEALTH_RAG_PROMPT = """
 - 출처 불명 문서
 
 출력 JSON 예시:
-{
+{{
   "answer": "...",
   "intent": "...",
   "source": "rag_llm",
   "caution_message": "...",
   "is_safe": true
-}
+}}
+
+사용자 질문:
+{user_message}
+
+RAG context:
+{retrieved_context}
+
+context sources:
+{context_sources}
+
+reference summary:
+{reference_summary}
 """
+
+
+FALLBACK_SAFE_RESPONSE_PROMPT = """
+현재 질문에 답변할 수 있는 신뢰 가능한 근거 자료가 충분하지 않습니다.
+일반적인 건강정보는 참고용으로만 확인하고, 증상이나 검사 결과 해석이 필요하면 의료진과 상담해 주세요.
+이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다.
+"""
+
+
+PROMPT_REGISTRY = {
+    "health_chat_prompt": PromptTemplateSpec(
+        name="health_chat_prompt",
+        version=HEALTH_CHAT_PROMPT_VERSION,
+        template=HEALTH_CHAT_PROMPT,
+        description="Main health chatbot direct generation prompt.",
+    ),
+    "analysis_explanation_prompt": PromptTemplateSpec(
+        name="analysis_explanation_prompt",
+        version=ANALYSIS_EXPLANATION_PROMPT_VERSION,
+        template=ANALYSIS_EXPLANATION_PROMPT,
+        description="Analysis result explanation prompt for risk-factor summaries.",
+    ),
+    "challenge_recommendation_prompt": PromptTemplateSpec(
+        name="challenge_recommendation_prompt",
+        version=CHALLENGE_RECOMMENDATION_PROMPT_VERSION,
+        template=CHALLENGE_RECOMMENDATION_PROMPT,
+        description="Challenge recommendation rationale prompt.",
+    ),
+    "rag_grounded_answer_prompt": PromptTemplateSpec(
+        name="rag_grounded_answer_prompt",
+        version=RAG_GROUNDED_ANSWER_PROMPT_VERSION,
+        template=RAG_GROUNDED_ANSWER_PROMPT,
+        description="Grounded RAG answer prompt for vetted health sources.",
+    ),
+    "fallback_safe_response_prompt": PromptTemplateSpec(
+        name="fallback_safe_response_prompt",
+        version=FALLBACK_SAFE_RESPONSE_PROMPT_VERSION,
+        template=FALLBACK_SAFE_RESPONSE_PROMPT,
+        description="Safe fallback wording when retrieval or grounding is insufficient.",
+    ),
+}
+
+
+MAIN_HEALTH_RAG_PROMPT = RAG_GROUNDED_ANSWER_PROMPT
+
+
+def get_prompt_spec(name: str) -> PromptTemplateSpec:
+    return PROMPT_REGISTRY[name]
+
+
+def render_prompt(name: str, **values: object) -> str:
+    return get_prompt_spec(name).render(**values)
+
+
+def get_prompt_version(name: str) -> str:
+    return get_prompt_spec(name).version
 
 
 # Prompt version: RESULT_REWRITE_PROMPT_VERSION

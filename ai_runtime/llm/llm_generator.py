@@ -3,10 +3,13 @@ import json
 from ai_runtime.llm.grounding import check_result_chatbot_grounding
 from ai_runtime.llm.llm_client import call_llm, call_llm_json, get_openai_model
 from ai_runtime.llm.prompt_templates import (
+    ANALYSIS_EXPLANATION_PROMPT_VERSION,
+    HEALTH_CHAT_PROMPT_VERSION,
     MAIN_REWRITE_PROMPT_VERSION,
     RESULT_REWRITE_PROMPT_VERSION,
     RULE_BASED_MAIN_CHATBOT_REWRITE_PROMPT,
     RULE_BASED_RESULT_CHATBOT_REWRITE_PROMPT,
+    render_prompt,
 )
 from ai_runtime.llm.rule_engine import has_medical_consult_keyword
 from ai_runtime.llm.safety import check_medical_safety
@@ -30,7 +33,7 @@ def generate_result_chatbot_llm_response(
         answer = call_llm(
             build_result_chatbot_prompt(input_data),
             metadata={
-                "prompt_version": None,
+                "prompt_version": ANALYSIS_EXPLANATION_PROMPT_VERSION,
                 "source": "llm",
                 "chatbot_type": "result_chatbot",
                 "use_real_llm": True,
@@ -54,7 +57,7 @@ def generate_result_chatbot_llm_response(
     safety_result = merge_grounding_result(safety_result, grounding_result)
     safety_result = add_llm_metadata(
         safety_result,
-        prompt_version=None,
+        prompt_version=ANALYSIS_EXPLANATION_PROMPT_VERSION,
         model=get_openai_model() if use_real_llm else None,
     )
 
@@ -79,7 +82,7 @@ def generate_main_health_chatbot_llm_response(
         answer = call_llm(
             build_main_health_chatbot_prompt(input_data),
             metadata={
-                "prompt_version": None,
+                "prompt_version": HEALTH_CHAT_PROMPT_VERSION,
                 "source": "llm",
                 "chatbot_type": "main_health_chatbot",
                 "use_real_llm": True,
@@ -95,7 +98,7 @@ def generate_main_health_chatbot_llm_response(
     final_answer, safety_result = ensure_safe_answer(answer)
     safety_result = add_llm_metadata(
         safety_result,
-        prompt_version=None,
+        prompt_version=HEALTH_CHAT_PROMPT_VERSION,
         model=get_openai_model() if use_real_llm else None,
     )
 
@@ -217,26 +220,12 @@ def build_result_chatbot_prompt(input_data: ResultChatbotInput) -> str:
         f"- {challenge.name}: reason={challenge.reason}" for challenge in input_data.recommended_challenges
     )
 
-    return f"""
-너는 만성질환 생활습관 관리 서비스의 결과 기반 챗봇이다.
-
-규칙:
-1. 진단, 확진, 치료, 처방, 약물 복용/중단 판단을 하지 않는다.
-2. 입력된 건강정보 기준이라는 표현을 사용한다.
-3. 추천 챌린지는 생활습관 관리 관점으로만 설명한다.
-4. 약물/치료 질문은 의료진 상담을 권고한다.
-5. 정신건강 관련 위기 키워드가 있으면 챌린지 추천보다 즉시 도움 안내와 보호자/전문기관 연결을 우선한다.
-6. 반드시 다음 의미를 포함한다: {CAUTION_MESSAGE}
-
-사용자 질문:
-{input_data.user_message}
-
-위험요인:
-{factor_text or "- 없음"}
-
-추천 챌린지:
-{challenge_text or "- 없음"}
-""".strip()
+    return render_prompt(
+        "analysis_explanation_prompt",
+        user_message=input_data.user_message,
+        risk_factors=factor_text or "- 없음",
+        recommended_challenges=challenge_text or "- 없음",
+    )
 
 
 def build_result_chatbot_rewrite_prompt(
@@ -271,19 +260,7 @@ rule_engine_answer:
 
 
 def build_main_health_chatbot_prompt(input_data: MainHealthChatbotInput) -> str:
-    return f"""
-너는 만성질환 생활습관 관리 서비스의 메인 건강 Q&A 챗봇이다.
-
-규칙:
-1. 진단, 확진, 치료, 처방, 약물 복용/중단 판단을 하지 않는다.
-2. 고혈압, 당뇨, 이상지질혈증, 비만 관련 질문은 일반 생활습관 관리 관점에서 답한다.
-3. 약물/치료 질문은 의료진 상담을 권고한다.
-4. 정신건강 관련 키워드는 진단하지 않고, 위기 키워드는 즉시 도움 안내와 보호자/전문기관 연결을 우선한다.
-5. 반드시 다음 의미를 포함한다: {CAUTION_MESSAGE}
-
-사용자 질문:
-{input_data.user_message}
-""".strip()
+    return render_prompt("health_chat_prompt", user_message=input_data.user_message)
 
 
 def build_main_health_chatbot_rewrite_prompt(

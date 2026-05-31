@@ -26,3 +26,9 @@ class HealthChatbotGraphState(TypedDict):
     use_real_llm: bool
     use_rag: bool
     context_type: NotRequired[str | None]
+    analysis_result: NotRequired[dict[str, Any] | None]
+    analysis_type: NotRequired[str | None]
+    analysis_explanation: NotRequired[dict[str, Any] | None]
+    risk_factors: NotRequired[list[dict[str, Any]]]
+    management_priorities: NotRequired[list[str]]
+    analysis_contexts: NotRequired[list[Any]]

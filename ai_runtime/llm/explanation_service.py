@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 from ai_runtime.llm.rag import retrieve_keyword_rag_contexts
-from ai_runtime.llm.rag.rag_context_builder import build_reference_sources, build_reference_summary
 from ai_runtime.llm.rag.tracing import trace_keyword_rag_retrieval
 from ai_runtime.llm.schemas import (
     AnalysisExplanationInput,
@@ -127,18 +126,18 @@ def generate_explanation_with_context(
     contexts: list[RetrievedContext] | None = None,
     use_real_llm: bool = False,
 ) -> ExplanationOutput:
-    """RAG-ready 연결점이지만 기본 설명 생성은 항상 룰 기반으로 유지한다."""
-    _ = use_real_llm
-    explanation = generate_analysis_explanation(input_data)
-    reference_contexts = contexts or []
-    if not reference_contexts:
-        return explanation
-    return explanation.model_copy(
-        update={
-            "reference_summary": build_reference_summary(reference_contexts),
-            "reference_sources": build_reference_sources(reference_contexts),
-        }
-    )
+    """LangGraph analysis explanation node entrypoint.
+
+    The node currently uses safe rule/fallback wording and optional RAG
+    references. Real LLM calls are intentionally not required for this path.
+    """
+    from ai_runtime.llm.graph import run_analysis_explanation_graph
+
+    return run_analysis_explanation_graph(
+        input_data=input_data,
+        contexts=contexts or [],
+        use_real_llm=use_real_llm,
+    ).explanation
 
 
 def _disease_label(disease_type: str) -> str:
