@@ -260,7 +260,6 @@ export default function AnalysisPage() {
       }
       const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);
       setAnalysisJobId(job.id);
-      setNotice(asyncJobStatusMessages[job.status] ?? "분석 작업을 시작했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
       setRunningMode(null);
@@ -273,6 +272,7 @@ export default function AnalysisPage() {
     : analysisJobId
       ? "분석 작업 대기 중입니다."
       : "";
+  const showJobStatus = analysisJobId !== null && (isPolling || Boolean(jobStatusMessage));
 
   return (
     <div className="page-stack">
@@ -296,7 +296,7 @@ export default function AnalysisPage() {
       {error && <ErrorMessage message={error} />}
       {pollingError && <ErrorMessage message={pollingError.message} />}
       {notice && <div className="state-box">{notice}</div>}
-      {(isPolling || jobStatusMessage) && (
+      {showJobStatus && (
         <div className="state-box">
           {jobStatusMessage}
           {latestJob?.status && latestJob.status !== "SUCCESS" && latestJob.status !== "FAILED" && (

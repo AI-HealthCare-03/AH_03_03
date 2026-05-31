@@ -1,10 +1,23 @@
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from app.apis.v1 import analysis_routers
 from app.dtos.analysis import AnalysisRunByHealthRecordRequest
 from app.models.analysis import AnalysisMode
+
+
+@pytest.mark.asyncio
+async def test_sync_analysis_endpoint_is_gone() -> None:
+    user = SimpleNamespace(id=12)
+    request = AnalysisRunByHealthRecordRequest(health_record_id=88, mode=AnalysisMode.PRECISION)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await analysis_routers.run_analysis(request, user)
+
+    assert exc_info.value.status_code == 410
+    assert "run-async" in str(exc_info.value.detail)
 
 
 @pytest.mark.asyncio
