@@ -51,7 +51,7 @@ RAG 검색 대상 문서는 아래 후보를 우선 chunking 후 embedding하여
 - 공공기관 건강 가이드
 - 서비스 내부 안전/개인정보/민감정보 정책 문서
 
-LangChain 또는 LangGraph는 아래 흐름을 제어하는 후보 기술로 둔다.
+1차 런타임은 LangGraph `StateGraph` skeleton으로 상담 흐름을 제어하고, LangChain은 RAG node 내부의 `Document` 등 필요한 부품으로 제한해서 사용한다. 이 구조는 API 응답 contract를 유지하면서 안전 분기, RAG fallback, 답변 생성 흐름을 분리하기 위한 기준이다.
 
 - 질의 분기
 - 검색 대상 선택
@@ -313,9 +313,9 @@ Fallback 정책 후보:
 | 부분 구현 | 챌린지 추천 | 부분 구현 | master data와 분석 결과 기반 추천 구조가 있으며, LLM 설명 고도화는 계획 영역이다. |
 | 구현 예정 | AI-Hub 1000개 음식 분류 CV 모델 공식 연결 | 구현 예정 | 모델 학습/평가/배포 기준과 fallback threshold 정의가 필요하다. |
 | 구현 예정 | 영양성분 DB source 우선순위와 표준화 파이프라인 | 구현 예정 | 공공 DB별 필드 차이와 음식명 canonical mapping 정책이 필요하다. |
-| 구현 예정 | LangChain/LangGraph 기반 질의 분기 orchestration | 구현 예정 | 현재는 설계 후보이며 공식 runtime 채택 여부는 별도 검토한다. |
-| 정책 검토 필요 | 정신건강 위기 키워드 안전 분기 | 정책 검토 필요 | 챌린지 추천보다 즉시 도움 안내를 우선하는 문구/운영 기준 필요. |
-| 정책 검토 필요 | LLM/RAG 로그와 민감정보 마스킹 | 정책 검토 필요 | 관측 도구 연동 시 prompt/response 보관 범위 확정 필요. |
+| 부분 구현 | LangGraph 기반 질의 분기 orchestration | 부분 구현 | API contract를 유지한 채 safety bypass, RAG fallback, 답변 formatting 흐름을 1차 연결했다. |
+| 부분 구현 | 정신건강 위기 키워드 안전 분기 | 부분 구현 | 위기 키워드는 LLM generation을 우회하고 챌린지 추천보다 즉시 도움 안내를 우선한다. |
+| 부분 구현 | LLM/RAG 로그와 민감정보 마스킹 | 부분 구현 | Langfuse 비활성 환경에서도 동작하며 trace metadata는 preview/length 중심으로 축약한다. |
 | 정책 검토 필요 | GPT Vision fallback 비용/호출 제한 | 정책 검토 필요 | 데모/운영 환경별 호출량, 실패 처리, 사용자 안내 기준 필요. |
 
 ## 다음 정리 후보

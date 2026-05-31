@@ -22,6 +22,38 @@ async def test_chatbot_uses_local_llm_rule_router_without_dummy_source(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_chatbot_response_contract_keeps_frontend_fields(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", False)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)
+
+    response = await ask_chatbot(
+        ChatbotAskRequest(message="만성질환 예방은 어떻게 시작하면 좋나요?", context_type=ChatbotContextType.GENERAL)
+    )
+    payload = response.model_dump()
+
+    assert set(payload) == {"answer", "source", "context_type", "recommended_actions", "safety_notice"}
+    assert response.source == "rule_engine_unmatched"
+    assert response.context_type == ChatbotContextType.GENERAL
+    assert isinstance(response.recommended_actions, list)
+    assert response.safety_notice
+
+
+@pytest.mark.asyncio
+async def test_chatbot_can_return_rag_llm_source_without_api_contract_change(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", False)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+
+    response = await ask_chatbot(
+        ChatbotAskRequest(message="공복혈당 관리 방법을 알려줘", context_type=ChatbotContextType.MAIN)
+    )
+
+    assert response.source == "rag_llm"
+    assert response.context_type == ChatbotContextType.MAIN
+    assert response.recommended_actions
+    assert "진단이 아니" in response.answer
+
+
+@pytest.mark.asyncio
 async def test_chatbot_real_llm_flag_without_openai_key_falls_back_to_rule_engine(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", True)
     monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)

@@ -16,6 +16,7 @@ class ChatbotGraphResult:
     recommended_actions: list[str]
     caution_message: str
     is_safe: bool
+    fallback_reason: str | None = None
     safety_result: dict[str, Any] = field(default_factory=dict)
     reference_sources: list[dict[str, Any]] = field(default_factory=list)
     reference_summary: str | None = None
@@ -25,7 +26,7 @@ class ChatbotGraphResult:
 
 def run_chatbot_graph(
     *,
-    user_message: str,
+    user_message: str | None,
     user_context: dict[str, Any] | None = None,
     context_type: str | None = None,
     use_real_llm: bool = False,
@@ -65,6 +66,7 @@ def run_chatbot_graph(
         recommended_actions=list(final_state.get("recommended_actions") or []),
         caution_message=str(final_state.get("caution_message") or ""),
         is_safe=bool(final_state.get("is_safe", True)),
+        fallback_reason=final_state.get("fallback_reason"),
         safety_result=dict(final_state.get("safety_result") or {}),
         reference_sources=list(final_state.get("reference_sources") or []),
         reference_summary=final_state.get("reference_summary"),
