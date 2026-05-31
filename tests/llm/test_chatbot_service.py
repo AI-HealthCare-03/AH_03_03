@@ -9,6 +9,7 @@ from app.services.chatbot import ask_chatbot
 @pytest.mark.asyncio
 async def test_chatbot_uses_local_llm_rule_router_without_dummy_source(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", False)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     response = await ask_chatbot(
@@ -23,6 +24,7 @@ async def test_chatbot_uses_local_llm_rule_router_without_dummy_source(monkeypat
 @pytest.mark.asyncio
 async def test_chatbot_real_llm_flag_without_openai_key_falls_back_to_rule_engine(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     response = await ask_chatbot(
@@ -36,6 +38,7 @@ async def test_chatbot_real_llm_flag_without_openai_key_falls_back_to_rule_engin
 @pytest.mark.asyncio
 async def test_chatbot_real_llm_flag_uses_openai_rewrite_when_configured(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setattr(
         "ai_runtime.llm.llm_generator.call_llm_json",
