@@ -225,7 +225,8 @@ def build_result_chatbot_prompt(input_data: ResultChatbotInput) -> str:
 2. 입력된 건강정보 기준이라는 표현을 사용한다.
 3. 추천 챌린지는 생활습관 관리 관점으로만 설명한다.
 4. 약물/치료 질문은 의료진 상담을 권고한다.
-5. 반드시 다음 의미를 포함한다: {CAUTION_MESSAGE}
+5. 정신건강 관련 위기 키워드가 있으면 챌린지 추천보다 즉시 도움 안내와 보호자/전문기관 연결을 우선한다.
+6. 반드시 다음 의미를 포함한다: {CAUTION_MESSAGE}
 
 사용자 질문:
 {input_data.user_message}
@@ -277,7 +278,8 @@ def build_main_health_chatbot_prompt(input_data: MainHealthChatbotInput) -> str:
 1. 진단, 확진, 치료, 처방, 약물 복용/중단 판단을 하지 않는다.
 2. 고혈압, 당뇨, 이상지질혈증, 비만 관련 질문은 일반 생활습관 관리 관점에서 답한다.
 3. 약물/치료 질문은 의료진 상담을 권고한다.
-4. 반드시 다음 의미를 포함한다: {CAUTION_MESSAGE}
+4. 정신건강 관련 키워드는 진단하지 않고, 위기 키워드는 즉시 도움 안내와 보호자/전문기관 연결을 우선한다.
+5. 반드시 다음 의미를 포함한다: {CAUTION_MESSAGE}
 
 사용자 질문:
 {input_data.user_message}

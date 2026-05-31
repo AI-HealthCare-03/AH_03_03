@@ -1,6 +1,7 @@
 import os
 
 from ai_runtime.llm.response_router import route_main_health_chatbot_response
+from ai_runtime.llm.safety import detect_mental_health_safety
 from ai_runtime.llm.schemas import MainHealthChatbotInput
 from app.core import config
 from app.dtos.chatbot import ChatbotAskRequest, ChatbotAskResponse, ChatbotContextType
@@ -17,7 +18,7 @@ async def ask_chatbot(request: ChatbotAskRequest) -> ChatbotAskResponse:
         use_llm_rewrite=use_real_llm,
         use_real_llm=use_real_llm,
     )
-    actions = _recommended_actions(request)
+    actions = _recommended_actions(request, routed.intent)
     return ChatbotAskResponse(
         answer=routed.answer,
         source=routed.source,
@@ -27,7 +28,17 @@ async def ask_chatbot(request: ChatbotAskRequest) -> ChatbotAskResponse:
     )
 
 
-def _recommended_actions(request: ChatbotAskRequest) -> list[str]:
+def _recommended_actions(request: ChatbotAskRequest, intent: str | None = None) -> list[str]:
+    if intent == "mental_health_crisis_support":
+        return ["가까운 보호자에게 알리기", "119 또는 112에 도움 요청", "전문기관 상담 연결"]
+
+    mental_health_result = detect_mental_health_safety(request.message)
+    if mental_health_result is not None:
+        if mental_health_result.level == "professional_support":
+            return ["수면과 식사 기록하기", "가벼운 자기관리 목표 세우기", "전문 상담 일정 확인"]
+        if mental_health_result.level == "self_care":
+            return ["수면 시간 기록하기", "짧은 호흡 챌린지", "가벼운 산책 목표 세우기"]
+
     message = request.message.lower()
     if request.context_type == ChatbotContextType.DIET or any(
         keyword in message for keyword in ["식단", "음식", "칼로리"]
