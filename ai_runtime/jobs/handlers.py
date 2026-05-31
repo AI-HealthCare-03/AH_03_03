@@ -113,6 +113,64 @@ async def handle_diet_analyze_image(job_id: int, payload: dict[str, Any]) -> Non
     )
 
 
+@register_job_handler(async_job_service.ANALYSIS_RUN_JOB_TYPE)
+async def handle_analysis_run(job_id: int, payload: dict[str, Any]) -> None:
+    user_id = _payload_int(payload, "user_id")
+    health_record_id = _payload_int(payload, "health_record_id") or _payload_int(payload, "resource_id")
+    mode_value = payload.get("mode")
+    if user_id is None:
+        await async_job_service.mark_failed(job_id, "missing_user_id")
+        raise NonRetryableJobError("missing_user_id")
+    if health_record_id is None:
+        await async_job_service.mark_failed(job_id, "missing_health_record_id")
+        raise NonRetryableJobError("missing_health_record_id")
+    if mode_value in (None, ""):
+        await async_job_service.mark_failed(job_id, "missing_analysis_mode")
+        raise NonRetryableJobError("missing_analysis_mode")
+
+    from app.models.analysis import AnalysisMode
+    from app.models.users import User
+    from app.services import analysis as analysis_service
+    from app.services import health as health_service
+
+    try:
+        mode = AnalysisMode(str(mode_value))
+    except ValueError as exc:
+        await async_job_service.mark_failed(job_id, f"invalid_analysis_mode:{mode_value}")
+        raise NonRetryableJobError(f"invalid_analysis_mode:{mode_value}") from exc
+
+    health_record = await health_service.get_health_record(health_record_id)
+    if health_record is None:
+        await async_job_service.mark_failed(job_id, "health_record_not_found")
+        raise NonRetryableJobError("health_record_not_found")
+    if int(health_record.user_id) != user_id:
+        await async_job_service.mark_failed(job_id, "health_record_owner_mismatch")
+        raise NonRetryableJobError("health_record_owner_mismatch")
+
+    user = await User.get_or_none(id=user_id)
+    if user is None:
+        await async_job_service.mark_failed(job_id, "user_not_found")
+        raise NonRetryableJobError("user_not_found")
+
+    missing_fields = await analysis_service.get_missing_fields_for_mode(user, health_record, mode)
+    if missing_fields:
+        await async_job_service.mark_failed(job_id, "analysis_required_fields_missing")
+        raise NonRetryableJobError("analysis_required_fields_missing")
+
+    await async_job_service.mark_processing(job_id)
+    results = await analysis_service.run_analysis(user_id, health_record, mode)
+    await async_job_service.mark_success(
+        job_id,
+        {
+            "user_id": user_id,
+            "health_record_id": health_record_id,
+            "mode": mode.value,
+            "analysis_result_ids": [int(result["analysis_result_id"]) for result in results],
+            "result_count": len(results),
+        },
+    )
+
+
 def _register_service_job_handler(job_type: str, handler: Callable[[int], Awaitable[dict[str, Any]]]) -> None:
     @register_job_handler(job_type)
     async def _handle_service_job(job_id: int, payload: dict[str, Any]) -> None:

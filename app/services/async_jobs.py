@@ -14,6 +14,7 @@ DEMO_ECHO_JOB_TYPE = "DEMO_ECHO"
 EXAM_OCR_JOB_TYPE = "exam_ocr.run"
 MEDICATION_OCR_JOB_TYPE = "medication_ocr.run"
 DIET_ANALYZE_IMAGE_JOB_TYPE = "diet.analyze_image"
+ANALYSIS_RUN_JOB_TYPE = "analysis.run"
 
 
 async def create_async_job(
@@ -106,6 +107,23 @@ async def create_diet_analyze_image_job(user_id: int, request_payload: dict[str,
         stream_payload={
             "resource_type": "diet_analysis_request",
         },
+    )
+
+
+async def create_analysis_run_job(user_id: int, health_record_id: int, mode: str) -> AsyncJob:
+    request_payload = {
+        "user_id": user_id,
+        "health_record_id": health_record_id,
+        "mode": mode,
+        "resource_type": "health_record",
+    }
+    return await create_async_job(
+        job_type=ANALYSIS_RUN_JOB_TYPE,
+        request_payload=request_payload,
+        stream=AI_JOB_STREAM,
+        user_id=user_id,
+        resource_id=health_record_id,
+        stream_payload=request_payload,
     )
 
 
