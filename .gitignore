@@ -107,10 +107,47 @@ ai_runtime/ml/LGB18~24/outputs/
 *.pt
 *.pth
 *.onnx
+*.weights
 *.ckpt
 *.safetensors
 *.zip
+*.xlsx
+*.ttc
+*.ttf
 *.h5
+
+# Experiment datasets / model artifacts
+experiment/**/raw/**
+!experiment/**/raw/
+!experiment/**/raw/README.md
+experiment/**/nutrition/raw/
+experiment/**/nutrition/raw/**
+experiment/**/processed/**
+!experiment/**/processed/
+!experiment/**/processed/README.md
+experiment/**/models/**
+!experiment/**/models/
+!experiment/**/models/**/
+!experiment/**/models/**/README.md
+experiment/**/runs/**
+experiment/**/checkpoints/**
+experiment/**/reports/**
+!experiment/**/reports/
+!experiment/**/reports/**/
+!experiment/**/reports/**/*.md
+!experiment/**/reports/**/*.json
+experiment/**/__pycache__/
+experiment/**/images_rec/**
+experiment/**/images_rec/
+experiment/**/*.jpg
+experiment/**/*.jpeg
+experiment/**/*.JPG
+experiment/**/*.JPEG
+experiment/**/*.png
+experiment/**/*.PNG
+experiment/**/font/**
+experiment/**/font/
+experiment/**/*.log
 
 # ocr-compare 개인정보 파일
 ocr-compare/results/images/
