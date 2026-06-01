@@ -38,7 +38,7 @@ serviceAccountKey.json
 **/.DS_Store
 ai_runtime/outputs/
 ai_runtime/data/
-etc/ml/ai_worker/data/
+experiment/ml/ai_worker/data/
 # CV 평가 데이터 (로컬 전용)
 ai_runtime/cv/data/
 
@@ -79,8 +79,8 @@ ai_runtime/ml/artifacts/*
 !ai_runtime/ml/artifacts/*/catboost/
 ML/artifacts/*
 !ML/artifacts/.gitkeep
-etc/ml/ML/artifacts/*
-!etc/ml/ML/artifacts/.gitkeep
+experiment/ml/ML/artifacts/*
+!experiment/ml/ML/artifacts/.gitkeep
 ai_runtime/ml/LGB18~24/outputs/
 **/outputs/
 /data/
@@ -89,13 +89,15 @@ ai_runtime/ml/LGB18~24/outputs/
 /results/
 /logs/
 /models/
+/artifacts/
 /checkpoints/
+/runs/
 
 # Dataset / model artifacts
 *.csv
 !docs/data/challenges/*.csv
 !ML/models/report/*.csv
-!etc/ml/ML/models/report/*.csv
+!experiment/ml/ML/models/report/*.csv
 !ai_runtime/cv/food/nutrition/data/food_disease_scores.csv
 *.parquet
 *.pkl
@@ -105,6 +107,9 @@ ai_runtime/ml/LGB18~24/outputs/
 *.pt
 *.pth
 *.onnx
+*.ckpt
+*.safetensors
+*.zip
 *.h5
 
 # ocr-compare 개인정보 파일

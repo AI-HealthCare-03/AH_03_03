@@ -719,7 +719,7 @@ docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --bu
 
 - 기능 코드와 실험/문서/seed를 구분합니다.
 - 모델 artifact는 `ai_runtime/ml/artifacts/` 아래 runtime 경로에 둡니다.
-- 원본 학습 데이터, 실험 산출물, OCR raw/reference 자료는 `etc/` 또는 외부 저장소로 분리합니다.
+- 원본 학습 데이터, 실험 산출물, OCR raw/reference 자료는 `experiment/` 또는 외부 저장소로 분리합니다.
 - 실제 secret은 절대 commit하지 않습니다.
 - dependency 변경이 없으면 `uv.lock`을 건드리지 않습니다.
 - migration은 기존 파일을 수정하지 않고 새 migration으로 관리합니다.
