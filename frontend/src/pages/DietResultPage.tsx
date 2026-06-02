@@ -11,7 +11,7 @@ type Item = Record<string, unknown>;
 const diseaseScoreLabels: Record<string, string> = {
   DM: "당뇨",
   HTN: "고혈압",
-  DL: "이상지질혈증",
+  DL: "콜레스테롤·중성지방",
   OBE: "비만",
   ANEM: "빈혈",
 };
@@ -47,6 +47,17 @@ function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
 
 function foodDisplayName(food: Record<string, unknown>): string {
   return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
+}
+
+function scoringSourceLabel(value: unknown): string {
+  const source = String(value ?? "").toLowerCase();
+  if (!source) {
+    return "";
+  }
+  if (source.includes("vision") || source.includes("gpt")) {
+    return "이미지 인식 + 식단 기준표";
+  }
+  return "식단 기준표";
 }
 
 export default function DietResultPage() {
@@ -86,6 +97,7 @@ export default function DietResultPage() {
   const foodScoreDetails = Array.isArray(rawOutput.food_score_details)
     ? (rawOutput.food_score_details as Item[])
     : [];
+  const scoringSource = scoringSourceLabel(nutrition.scoring_source ?? rawOutput.scoring_source);
 
   useEffect(() => {
     const load = async () => {
@@ -256,11 +268,7 @@ export default function DietResultPage() {
                 </div>
               );
             })}
-            {Boolean(nutrition.scoring_source || rawOutput.scoring_source) && (
-              <span className="badge badge-reference">
-                점수 기준: {String(nutrition.scoring_source ?? rawOutput.scoring_source)}
-              </span>
-            )}
+            {scoringSource && <span className="badge badge-reference">점수 기준: {scoringSource}</span>}
           </div>
         </Card>
       )}

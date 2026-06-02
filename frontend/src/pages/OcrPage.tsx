@@ -21,11 +21,11 @@ export default function OcrPage() {
     <div className="page-stack">
       <div className="page-header">
         <div>
-          <h1>OCR로 건강정보 입력하기</h1>
+          <h1>검진·복약 등록</h1>
           <p>건강검진표 또는 복약/처방전 이미지를 인식해 건강정보를 빠르게 입력할 수 있습니다.</p>
         </div>
       </div>
-      <div className="state-box warning-card">OCR 결과는 자동 인식 결과이므로 저장 전 반드시 직접 확인해주세요.</div>
+      <div className="state-box warning-card">자동 인식 결과는 저장 전 반드시 직접 확인해주세요.</div>
       <div className="state-box">
         {isMobileDevice
           ? "모바일에서는 파일 선택과 카메라 촬영을 모두 사용할 수 있습니다."
@@ -33,18 +33,18 @@ export default function OcrPage() {
         촬영/업로드 후 자동 인식 결과를 확인하고 저장해주세요.
       </div>
       <div className="page-grid">
-        <Card title="건강검진표 OCR">
+        <Card title="검진표 등록">
           <div className="ocr-card-icon">📄</div>
           <p>혈압, 혈당, 콜레스테롤, 중성지방, HDL, LDL, HbA1c 등을 추출합니다.</p>
           <Link className="button" to="/ocr/exam">
-            검진표 인식하기
+            검진표 등록하기
           </Link>
         </Card>
-        <Card title="복약/처방전 OCR">
+        <Card title="복약 정보 등록">
           <div className="ocr-card-icon">💊</div>
           <p>약 이름, 복용 시간, 복용 횟수, 복용 기간을 추출합니다.</p>
           <Link className="button" to="/ocr/medication">
-            복약정보 인식하기
+            복약 정보 등록하기
           </Link>
         </Card>
       </div>

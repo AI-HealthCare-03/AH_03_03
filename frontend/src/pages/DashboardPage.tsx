@@ -3,14 +3,18 @@ import { Link } from "react-router-dom";
 
 import {
   DashboardAnalysisResult,
+  DashboardRiskTrend,
+  DashboardRiskTrendSeries,
   DashboardSummary,
   getDashboardChallenges,
   getDashboardDiets,
   getDashboardHealth,
   getDashboardMedications,
+  getDashboardRiskTrend,
   getDashboardSummary,
   getDashboardTrends,
 } from "../api/dashboard";
+import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -36,9 +40,9 @@ const challengeStatusLabels: Record<string, string> = {
   IN_PROGRESS: "진행 중",
   JOINED: "진행 중",
   COMPLETED: "완료",
-  GIVEN_UP: "포기",
-  CANCELED: "포기",
-  CANCELLED: "포기",
+  GIVEN_UP: "참여 전",
+  CANCELED: "참여 전",
+  CANCELLED: "참여 전",
   PENDING: "대기",
 };
 
@@ -52,7 +56,7 @@ const diseaseChartColors: Record<string, string> = {
 const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   HYPERTENSION: "고혈압",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   OBESITY: "비만",
 };
 
@@ -151,17 +155,43 @@ function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
   };
 }
 
+function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
+  return items
+    .map((item) => ({
+      key: item.disease_type,
+      label: analysisTypeLabels[item.disease_type] ?? item.disease_type,
+      color: diseaseChartColors[item.disease_type] ?? "var(--chart-overall)",
+      points: item.points
+        .reduce<ChartPoint[]>((points, point) => {
+          const value = Number(point.risk_score);
+          if (!Number.isFinite(value)) {
+            return points;
+          }
+          const normalizedValue = value <= 1 ? value * 100 : value;
+          points.push({
+            date: point.analyzed_at,
+            label: formatDate(point.analyzed_at),
+            value: normalizedValue,
+            displayValue: `${Math.round(normalizedValue * 10) / 10}/100 · ${formatRiskLevel(point.risk_level)}`,
+          });
+          return points;
+        }, [])
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    }))
+    .filter((item) => item.points.length > 0);
+}
+
 function EmptyChartState() {
   return (
     <div className="empty-state chart-empty-state">
       <strong>아직 추적할 데이터가 충분하지 않습니다.</strong>
-      <p>건강정보를 2회 이상 입력하거나 검진표 OCR을 추가하면 변화 추이를 확인할 수 있습니다.</p>
+      <p>건강정보를 2회 이상 입력하거나 검진표를 등록하면 변화 추이를 확인할 수 있습니다.</p>
       <div className="button-row">
         <Link className="button secondary" to="/health">
           건강정보 입력하기
         </Link>
         <Link className="button secondary" to="/ocr/exam">
-          검진표 OCR 추가하기
+          검진표 등록하기
         </Link>
       </div>
     </div>
@@ -279,21 +309,6 @@ function formatRiskLevel(value: unknown): string {
   return riskLevelLabels[key] ?? (key || "-");
 }
 
-function formatModelLabel(result: DashboardAnalysisResult): string | null {
-  const modelName = result.model_name ? String(result.model_name) : "";
-  const modelVersion = result.model_version ? String(result.model_version) : "";
-  if (!modelName && !modelVersion) {
-    return null;
-  }
-  if (modelName.toLowerCase() === "catboost") {
-    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
-  }
-  if (modelName.toLowerCase() === "rule_based") {
-    return modelVersion ? `rule_based · ${modelVersion}` : "rule_based";
-  }
-  return modelVersion ? `${modelName} · ${modelVersion}` : modelName || modelVersion;
-}
-
 function formatRiskScore(value: unknown): string {
   const score = Number(value);
   if (!Number.isFinite(score)) {
@@ -400,8 +415,8 @@ const analysisMetrics = [
   },
   {
     key: "exercise",
-    label: "운동 수행률",
-    description: "걷기와 근력운동 입력값을 기준으로 활동 상태를 확인합니다.",
+    label: "챌린지 수행률",
+    description: "참여 중인 챌린지 기록을 기준으로 수행률 변화를 확인합니다.",
     trendKeys: ["exercise"],
     ready: true,
   },
@@ -414,24 +429,10 @@ const analysisMetrics = [
   },
   {
     key: "medication",
-    label: "복약/영양제 수행률",
+    label: "복약 수행률",
     description: "등록된 복약/영양제 기록을 기준으로 수행 상태를 확인합니다.",
     trendKeys: ["medication"],
     ready: true,
-  },
-  {
-    key: "sleep",
-    label: "수면 변화",
-    description: "수면 기록을 2회 이상 입력하면 변화 추이를 확인할 수 있습니다.",
-    trendKeys: ["sleep"],
-    ready: false,
-  },
-  {
-    key: "water",
-    label: "수분 섭취 수행률",
-    description: "수분 섭취 기록이 쌓이면 수행률을 확인할 수 있습니다.",
-    trendKeys: ["water"],
-    ready: false,
   },
 ] as const;
 
@@ -466,8 +467,29 @@ function getChallengeDuration(challenge: AnyRecord): string {
 }
 
 function getChallengeProgress(challenge: AnyRecord): number {
+  if (Boolean(challenge.completed_at) || (Boolean(challenge.is_finalized) && Boolean(challenge.has_met_completion_condition))) {
+    return 100;
+  }
   const value = Number(challenge.progress ?? challenge.progress_rate ?? 0);
-  return Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 0;
+  if (Number.isFinite(value)) {
+    return Math.max(0, Math.min(value, 100));
+  }
+  const completionRate = Number(challenge.completion_rate);
+  return Number.isFinite(completionRate) ? Math.max(0, Math.min(completionRate, 100)) : 0;
+}
+
+function getChallengeDisplayStatus(challenge: AnyRecord): string {
+  const status = String(challenge.status ?? "").toUpperCase();
+  if (["GIVE_UP", "GIVEN_UP", "CANCELED", "CANCELLED"].includes(status)) {
+    return "참여 가능";
+  }
+  if (Boolean(challenge.is_finalized)) {
+    return Boolean(challenge.has_met_completion_condition) || Boolean(challenge.completed_at) ? "완료" : "미달성";
+  }
+  if (Boolean(challenge.has_met_completion_condition)) {
+    return "완료 조건 충족";
+  }
+  return challengeStatusLabels[status] ?? (status ? status : "참여 가능");
 }
 
 export default function DashboardPage() {
@@ -477,15 +499,27 @@ export default function DashboardPage() {
   const [dietSection, setDietSection] = useState<DashboardData>({});
   const [medicationSection, setMedicationSection] = useState<DashboardData>({});
   const [trends, setTrends] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [riskTrend, setRiskTrend] = useState<DashboardRiskTrend>({ period: "all", series: [] });
+  const [todayRecommendations, setTodayRecommendations] = useState<TodayRecommendations>({ date: "", items: [] });
   const [activeMetricKey, setActiveMetricKey] = useState<(typeof analysisMetrics)[number]["key"]>("blood");
   const [selectedPeriod, setSelectedPeriod] = useState("week");
 
   useEffect(() => {
     const load = async () => {
-      const [summaryResult, trendsResult, healthResult, challengeResult, dietResult, medicationResult] =
-        await Promise.allSettled([
+      const [
+        summaryResult,
+        trendsResult,
+        riskTrendResult,
+        recommendationResult,
+        healthResult,
+        challengeResult,
+        dietResult,
+        medicationResult,
+      ] = await Promise.allSettled([
           getDashboardSummary<DashboardSummary>(),
           getDashboardTrends<Record<string, Record<string, unknown>[]>>(selectedPeriod),
+          getDashboardRiskTrend<DashboardRiskTrend>(selectedPeriod),
+          getTodayRecommendations(),
           getDashboardHealth<DashboardData>(),
           getDashboardChallenges<DashboardData>(),
           getDashboardDiets<DashboardData>(),
@@ -493,6 +527,8 @@ export default function DashboardPage() {
         ]);
       if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
       if (trendsResult.status === "fulfilled") setTrends(trendsResult.value);
+      if (riskTrendResult.status === "fulfilled") setRiskTrend(riskTrendResult.value);
+      if (recommendationResult.status === "fulfilled") setTodayRecommendations(recommendationResult.value);
       if (healthResult.status === "fulfilled") setHealthSection(healthResult.value);
       if (challengeResult.status === "fulfilled") setChallengeSection(challengeResult.value);
       if (dietResult.status === "fulfilled") setDietSection(dietResult.value);
@@ -542,6 +578,8 @@ export default function DashboardPage() {
     makeMedicationAdherenceSeries(dashboardMedicationRecords),
   ];
   const medicationAdherenceSeries = makeMedicationAdherenceSeries(dashboardMedicationRecords);
+  const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
+  const hasRiskTrendEnoughData = riskTrendSeries.some((item) => item.points.length >= 2);
   const medicationAdherence = medicationAdherenceSeries.points.at(-1)?.value ?? null;
   const sleepValue = toNumber(latest.sleep_hours);
   const summaryCards = [
@@ -582,7 +620,7 @@ export default function DashboardPage() {
       gauge: toNumber(dietScore),
     },
     {
-      label: "복약/영양제 수행률",
+      label: "복약 수행률",
       value: medicationAdherence === null ? "아직 기록 없음" : `${Math.round(medicationAdherence)}%`,
       delta: getSeriesDelta([medicationAdherenceSeries]),
       gauge: medicationAdherence,
@@ -752,6 +790,14 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
+          <div className="analysis-tab-health-tip">
+            <h3>건강 팁</h3>
+            <ul className="dashboard-tip-list">
+              <li>식후 10분 걷기처럼 부담이 적은 습관을 먼저 반복해보세요.</li>
+              <li>아침 건강 지표를 같은 시간대에 기록하면 변화 흐름을 보기 좋습니다.</li>
+              <li>혈압이나 혈당 수치가 평소와 다르면 무리하지 말고 필요한 경우 의료진과 상담하세요.</li>
+            </ul>
+          </div>
         </aside>
         <div className="dashboard-analysis-main">
           <section className="analysis-chart-card">
@@ -762,7 +808,7 @@ export default function DashboardPage() {
               </div>
               <span>{formatDate(new Date())}</span>
             </div>
-            <div className="dashboard-chart-panels">
+            <div className={`dashboard-chart-panels${activeChartCards.length === 1 ? " single-panel" : ""}`}>
               {activeChartCards.map((item) => (
                 <article className="dashboard-chart-panel" key={item.title}>
                   <div className="dashboard-chart-panel-head">
@@ -782,164 +828,207 @@ export default function DashboardPage() {
               ))}
             </div>
           </section>
-          <div className="dashboard-helper-grid">
-            <section className="card ai-comment-card">
-              <div className="card-header">
-                <h2>AI 코멘트</h2>
-              </div>
-              <p>{aiComment}</p>
-              {latestAnalysisResults.length === 0 ? (
-                <Link className="button secondary compact-button" to="/analysis">
-                  간편 분석 실행하기
-                </Link>
-              ) : null}
-            </section>
-            <section className="card">
-              <div className="card-header">
-                <h2>최근 분석 결과</h2>
-              </div>
-              {diseaseAnalysisResults.length > 0 ? (
-                <div className="card-list">
-                  {diseaseAnalysisResults.map((result) => {
-                    const model = formatModelLabel(result);
-                    return (
-                      <div className="mini-card" key={result.id}>
-                        <div className="record-row">
-                          <div>
-                            <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
-                            <p className="muted">
-                              {result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}
-                              {model ? ` · ${model}` : ""}
-                            </p>
-                          </div>
-                          <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
-                            {formatRiskLevel(result.risk_level)}
-                          </span>
-                        </div>
-                        <span className="badge badge-reference">{formatRiskScore(result.risk_score)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <strong>최근 분석 결과가 없습니다.</strong>
-                  <p>건강정보를 입력하고 분석을 실행하면 질환별 결과가 표시됩니다.</p>
-                  <Link className="button secondary compact-button" to="/analysis">
-                    분석 실행하기
-                  </Link>
-                </div>
-              )}
-            </section>
-            <section className="card health-tip-card">
-              <div className="card-header">
-                <h2>건강 팁</h2>
-              </div>
-              <ul className="dashboard-tip-list">
-                <li>식후 10분 걷기처럼 부담이 적은 습관을 먼저 반복해보세요.</li>
-                <li>아침 건강 지표를 같은 시간대에 기록하면 변화 흐름을 보기 좋습니다.</li>
-                <li>혈압이나 혈당 수치가 평소와 다르면 무리하지 말고 필요한 경우 의료진과 상담하세요.</li>
-              </ul>
-            </section>
-          </div>
         </div>
       </section>
-      <section className="card diet-summary-section">
+
+      <section className="card today-recommendation-card">
         <div className="card-header">
           <div>
-            <h2>식단 추천 결과 요약</h2>
-            <p>최근 식단 기록을 기준으로 식단 점수와 추천 포인트를 확인합니다.</p>
+            <h2>오늘의 추천 행동</h2>
+            <p>최근 건강 기록과 생활습관 기록을 기준으로 오늘 실천할 행동을 제안합니다.</p>
           </div>
-          <div className="card-actions">
-            <Link className="button secondary compact-button" to="/diets">
-              식단 업로드하기
-            </Link>
-          </div>
+          <span className="badge badge-reference">{todayRecommendations.date || formatDate(new Date())}</span>
         </div>
-        {latestDiet ? (
-          <div className="dashboard-diet-summary">
-            <div className="dashboard-diet-score">
-              <MiniGauge value={toNumber(latestDiet.diet_score)} />
-              <strong>{latestDiet.diet_score ? `${String(latestDiet.diet_score)}점` : "점수 미산정"}</strong>
-            </div>
-            <div className="dashboard-diet-copy">
-              <span>추천 식단 요약</span>
-              <p>{dietSummary || "최근 식단 기록을 기준으로 식사 구성을 점검해보세요."}</p>
-            </div>
-            <div className="dashboard-diet-points">
-              <span>추천 포인트</span>
-              {dietPoints.length > 0 ? (
-                <ul>
-                  {dietPoints.map((point) => (
-                    <li key={point}>{point}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>식단을 더 기록하면 추천 포인트를 확인할 수 있습니다.</p>
-              )}
-            </div>
+        {todayRecommendations.items.length > 0 ? (
+          <div className="card-list today-recommendation-list">
+            {todayRecommendations.items.map((item) => (
+              <article className="mini-card today-recommendation-item" key={`${item.action_type}-${item.title}`}>
+                <div className="record-row">
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                  </div>
+                  <span className="badge">{analysisTypeLabels[item.related_disease] ?? "생활습관"}</span>
+                </div>
+                <p className="muted">{item.reason}</p>
+              </article>
+            ))}
           </div>
         ) : (
           <div className="empty-state">
-            <strong>아직 식단 분석 결과가 없습니다.</strong>
-            <p>식단 이미지를 업로드하면 식단 점수와 추천 포인트를 확인할 수 있습니다.</p>
-            <Link className="button secondary compact-button" to="/diets">
-              식단 업로드하기
+            <strong>오늘 표시할 추천 행동이 없습니다.</strong>
+            <p>건강정보, 식단, 챌린지 기록을 남기면 맞춤형 행동 제안이 표시됩니다.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="card dashboard-risk-trend-card">
+        <div className="card-header">
+          <div>
+            <h2>질환별 예측 위험도 변화</h2>
+            <p>분석 기록을 기준으로 질환별 예측 점수 변화 흐름을 확인합니다.</p>
+          </div>
+          <Link className="button secondary compact-button" to="/analysis/history">
+            분석 기록 보기
+          </Link>
+        </div>
+        {hasRiskTrendEnoughData ? (
+          <LineChart series={riskTrendSeries} />
+        ) : (
+          <div className="empty-state">
+            <strong>아직 추이를 계산할 분석 기록이 부족합니다.</strong>
+            <p>질환별 분석을 2회 이상 실행하면 위험도 변화 그래프가 표시됩니다.</p>
+            <Link className="button secondary compact-button" to="/analysis">
+              분석 실행하기
             </Link>
           </div>
         )}
       </section>
 
-      <section className="card">
-        <div className="card-header">
-          <div>
-            <h2>추천 챌린지</h2>
-            <p>최근 참여 현황을 바탕으로 이어가기 좋은 챌린지를 확인합니다.</p>
+      <section className="dashboard-primary-grid">
+        <section className="card dashboard-analysis-summary-card">
+          <div className="card-header">
+            <h2>최근 분석 결과</h2>
           </div>
-          <div className="card-actions">
-            <Link className="button secondary compact-button" to="/challenges">
-              전체 보기
+          {diseaseAnalysisResults.length > 0 ? (
+            <div className="card-list">
+              {diseaseAnalysisResults.map((result) => (
+                <div className="mini-card" key={result.id}>
+                  <div className="record-row">
+                    <div>
+                      <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
+                      <p className="muted">{result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}</p>
+                    </div>
+                    <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
+                      {formatRiskLevel(result.risk_level)}
+                    </span>
+                  </div>
+                  <span className="badge badge-reference">{formatRiskScore(result.risk_score)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <strong>최근 분석 결과가 없습니다.</strong>
+              <p>건강정보를 입력하고 분석을 실행하면 질환별 결과가 표시됩니다.</p>
+              <Link className="button secondary compact-button" to="/analysis">
+                분석 실행하기
+              </Link>
+            </div>
+          )}
+        </section>
+
+        <section className="card diet-summary-section">
+          <div className="card-header">
+            <div>
+              <h2>식단 추천 결과 요약</h2>
+              <p>최근 식단 기록을 기준으로 식단 점수와 추천 포인트를 확인합니다.</p>
+            </div>
+            <div className="card-actions">
+              <Link className="button secondary compact-button" to="/diets">
+                식단 업로드하기
+              </Link>
+            </div>
+          </div>
+          {latestDiet ? (
+            <div className="dashboard-diet-summary">
+              <div className="dashboard-diet-score">
+                <MiniGauge value={toNumber(latestDiet.diet_score)} />
+                <strong>{latestDiet.diet_score ? `${String(latestDiet.diet_score)}점` : "점수 미산정"}</strong>
+              </div>
+              <div className="dashboard-diet-copy">
+                <span>추천 식단 요약</span>
+                <p>{dietSummary || "최근 식단 기록을 기준으로 식사 구성을 점검해보세요."}</p>
+              </div>
+              <div className="dashboard-diet-points">
+                <span>추천 포인트</span>
+                {dietPoints.length > 0 ? (
+                  <ul>
+                    {dietPoints.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>식단을 더 기록하면 추천 포인트를 확인할 수 있습니다.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <strong>아직 식단 분석 결과가 없습니다.</strong>
+              <p>식단 이미지를 업로드하면 식단 점수와 추천 포인트를 확인할 수 있습니다.</p>
+              <Link className="button secondary compact-button" to="/diets">
+                식단 업로드하기
+              </Link>
+            </div>
+          )}
+        </section>
+
+        <section className="card dashboard-challenge-summary-card">
+          <div className="card-header">
+            <div>
+              <h2>추천 챌린지</h2>
+              <p>최근 참여 현황을 바탕으로 이어갈 챌린지를 확인합니다.</p>
+            </div>
+            <div className="card-actions">
+              <Link className="button secondary compact-button" to="/challenges">
+                전체 보기
+              </Link>
+            </div>
+          </div>
+          {recommendedChallenges.length > 0 ? (
+            <div className="challenge-compact-grid">
+              {recommendedChallenges.map((challenge) => {
+                const nested = challenge.challenge as AnyRecord | undefined;
+                const status = String(challenge.status ?? "").toUpperCase();
+                const progress = getChallengeProgress(challenge);
+                return (
+                  <article className="challenge-compact-card" key={String(challenge.id)}>
+                    <div className="challenge-compact-icon">{getChallengeIcon(nested?.category ?? challenge.category)}</div>
+                    <div>
+                      <strong>{getChallengeTitle(challenge)}</strong>
+                      <p>
+                        {getChallengeDuration(challenge)} ·{" "}
+                        {getChallengeDisplayStatus(challenge)}
+                      </p>
+                    </div>
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${progress}%` }} />
+                    </div>
+                    <div className="challenge-compact-footer">
+                      <span>{Math.round(progress)}%</span>
+                      <Link className="button secondary compact-button" to={`/challenges/${String(challenge.challenge_id ?? nested?.id ?? "")}`}>
+                        {status === "ACTIVE" || status === "IN_PROGRESS" || status === "JOINED" ? "진행중" : "참여하기"}
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <strong>추천할 챌린지 기록이 아직 없습니다.</strong>
+              <p>관심 있는 챌린지에 참여하면 진행률과 추천 흐름을 이곳에서 확인할 수 있습니다.</p>
+              <Link className="button secondary compact-button" to="/challenges">
+                챌린지 둘러보기
+              </Link>
+            </div>
+          )}
+        </section>
+      </section>
+
+      <section className="dashboard-support-grid">
+        <section className="card ai-comment-card">
+          <div className="card-header">
+            <h2>AI 코멘트</h2>
+          </div>
+          <p>{aiComment}</p>
+          {latestAnalysisResults.length === 0 ? (
+            <Link className="button secondary compact-button" to="/analysis">
+              간편 분석 실행하기
             </Link>
-          </div>
-        </div>
-        {recommendedChallenges.length > 0 ? (
-          <div className="challenge-compact-grid">
-            {recommendedChallenges.map((challenge) => {
-              const nested = challenge.challenge as AnyRecord | undefined;
-              const status = String(challenge.status ?? "").toUpperCase();
-              const progress = getChallengeProgress(challenge);
-              return (
-                <article className="challenge-compact-card" key={String(challenge.id)}>
-                  <div className="challenge-compact-icon">{getChallengeIcon(nested?.category ?? challenge.category)}</div>
-                  <div>
-                    <strong>{getChallengeTitle(challenge)}</strong>
-                    <p>
-                      {getChallengeDuration(challenge)} ·{" "}
-                      {challengeStatusLabels[status] ?? (status ? status : "참여 가능")}
-                    </p>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${progress}%` }} />
-                  </div>
-                  <div className="challenge-compact-footer">
-                    <span>{Math.round(progress)}%</span>
-                    <Link className="button secondary compact-button" to={`/challenges/${String(challenge.challenge_id ?? nested?.id ?? "")}`}>
-                      {status === "ACTIVE" || status === "IN_PROGRESS" || status === "JOINED" ? "진행중" : "참여하기"}
-                    </Link>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <strong>추천할 챌린지 기록이 아직 없습니다.</strong>
-            <p>관심 있는 챌린지에 참여하면 진행률과 추천 흐름을 이곳에서 확인할 수 있습니다.</p>
-            <Link className="button secondary compact-button" to="/challenges">
-              챌린지 둘러보기
-            </Link>
-          </div>
-        )}
+          ) : null}
+        </section>
       </section>
     </div>
   );

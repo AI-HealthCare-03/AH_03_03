@@ -92,7 +92,7 @@ async def check_phone(
     available = await auth_service.is_phone_number_available(phone_number)
     return AvailabilityResponse(
         available=available,
-        message="사용 가능한 휴대폰 번호입니다." if available else "이미 사용 중인 휴대폰 번호입니다.",
+        message="사용 가능한 휴대폰 번호입니다." if available else "이미 사용중인 휴대폰 번호입니다.",
     )
 
 
@@ -107,6 +107,7 @@ async def find_login_id(
 @auth_router.post(
     "/email-verifications/send",
     response_model=EmailVerificationSendResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
 )
 async def send_email_verification_code(

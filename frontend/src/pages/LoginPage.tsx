@@ -5,6 +5,19 @@ import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
+function formatLoginError(message: string): string {
+  const normalizedMessage = message.trim();
+  if (!normalizedMessage || normalizedMessage.startsWith("API 요청 실패")) {
+    return "아이디 또는 이메일과 비밀번호를 확인해주세요.";
+  }
+
+  if (normalizedMessage.includes("Authenticate Failed") || normalizedMessage.includes("인증")) {
+    return "아이디 또는 이메일과 비밀번호를 확인해주세요.";
+  }
+
+  return normalizedMessage;
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -20,11 +33,7 @@ export default function LoginPage() {
       navigate("/");
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      setError(
-        message.includes("Authenticate Failed") || message.includes("인증")
-          ? "이메일 또는 비밀번호를 확인해주세요."
-          : message || "로그인에 실패했습니다.",
-      );
+      setError(formatLoginError(message));
     }
   };
 

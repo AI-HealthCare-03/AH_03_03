@@ -124,6 +124,12 @@ class FamilyShareSetting(models.Model):
     share_medications = fields.BooleanField(default=False)
     share_challenges = fields.BooleanField(default=False)
     share_exam_reports = fields.BooleanField(default=False)
+    share_challenge_status = fields.BooleanField(default=False)
+    share_medication_status = fields.BooleanField(default=False)
+    share_diet_status = fields.BooleanField(default=False)
+    share_health_report_summary = fields.BooleanField(default=False)
+    share_raw_health_values = fields.BooleanField(default=False)
+    share_ocr_original = fields.BooleanField(default=False)
     receive_analysis_alerts = fields.BooleanField(default=False)
     receive_abnormal_value_alerts = fields.BooleanField(default=False)
     receive_medication_alerts = fields.BooleanField(default=False)
@@ -138,3 +144,37 @@ class FamilyShareSetting(models.Model):
             ("viewer_user_id",),
             ("family_id", "owner_user_id", "viewer_user_id"),
         )
+
+
+class FamilyNotificationSetting(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    owner_user = fields.ForeignKeyField(
+        "models.User",
+        related_name="family_notification_owner_settings",
+        on_delete=fields.CASCADE,
+    )
+    family_user = fields.ForeignKeyField(
+        "models.User",
+        related_name="family_notification_receiver_settings",
+        on_delete=fields.CASCADE,
+    )
+    notify_challenge_missed = fields.BooleanField(default=False)
+    notify_challenge_completed = fields.BooleanField(default=False)
+    notify_medication_missed = fields.BooleanField(default=False)
+    notify_diet_missed = fields.BooleanField(default=False)
+    notify_report_updated = fields.BooleanField(default=False)
+    channel_in_app = fields.BooleanField(default=True)
+    channel_push = fields.BooleanField(default=False)
+    quiet_hours_start = fields.TimeField(null=True)
+    quiet_hours_end = fields.TimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "family_notification_settings"
+        indexes = (
+            ("owner_user_id",),
+            ("family_user_id",),
+            ("owner_user_id", "family_user_id"),
+        )
+        unique_together = (("owner_user_id", "family_user_id"),)

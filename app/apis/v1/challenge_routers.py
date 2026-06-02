@@ -1,10 +1,12 @@
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user, require_operator_user
 from app.dtos.challenges import (
     ChallengeActionResponse,
+    ChallengeCalendarResponse,
     ChallengeCreateRequest,
     ChallengeLogCreateRequest,
     ChallengeLogResponse,
@@ -20,6 +22,14 @@ from app.services import analysis as analysis_service
 from app.services import challenges as challenge_service
 
 challenge_router = APIRouter(prefix="/challenges", tags=["challenges"])
+
+
+def _challenge_log_payload(log: object) -> dict:
+    return ChallengeLogResponse.model_validate(log).model_dump(mode="json")
+
+
+def _user_challenge_payload(user_challenge: object) -> dict:
+    return UserChallengeResponse.model_validate(user_challenge).model_dump(mode="json")
 
 
 @challenge_router.get("", response_model=list[ChallengeResponse])
@@ -47,6 +57,14 @@ async def create_challenge(request: ChallengeCreateRequest, user: Annotated[User
 @challenge_router.get("/my", response_model=list[UserChallengeResponse])
 async def list_user_challenges(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
     return await challenge_service.list_user_challenges(user.id, limit=limit, offset=offset)
+
+
+@challenge_router.get("/calendar", response_model=ChallengeCalendarResponse)
+async def get_challenge_calendar(
+    calendar_date: Annotated[date, Query(alias="date")],
+    user: Annotated[User, Depends(get_request_user)],
+):
+    return await challenge_service.get_challenge_calendar(user.id, calendar_date)
 
 
 @challenge_router.patch("/my/{user_challenge_id}", response_model=UserChallengeResponse | None)
@@ -98,7 +116,7 @@ async def complete_today_challenge(user_challenge_id: int, user: Annotated[User,
     )
     ensure_owner(user_challenge.user_id, user)
     result = await challenge_service.complete_today_challenge(user_challenge_id)
-    return {"message": "오늘 챌린지를 완료 처리했습니다.", "result": result}
+    return {"message": "오늘 챌린지를 완료 처리했습니다.", "result": _challenge_log_payload(result)}
 
 
 @challenge_router.patch("/my/{user_challenge_id}/give-up", response_model=ChallengeActionResponse)
@@ -112,7 +130,7 @@ async def give_up_challenge(user_challenge_id: int, user: Annotated[User, Depend
         await challenge_service.give_up_challenge(user_challenge_id),
         "사용자 챌린지를 찾을 수 없습니다.",
     )
-    return {"message": "챌린지를 포기 처리했습니다.", "result": result}
+    return {"message": "챌린지를 포기 처리했습니다.", "result": _user_challenge_payload(result)}
 
 
 @challenge_router.post(

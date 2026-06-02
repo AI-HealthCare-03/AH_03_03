@@ -150,7 +150,7 @@ export default function MedicationPage() {
       <Card title="복약/영양제 등록">
         <div className="button-row" style={{ marginBottom: 12 }}>
           <Link className="button secondary" to="/ocr/medication">
-            복약 OCR로 입력
+            복약 정보 등록
           </Link>
         </div>
         <form className="form" onSubmit={submit}>

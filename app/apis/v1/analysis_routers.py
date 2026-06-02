@@ -9,22 +9,44 @@ from app.dtos.analysis import (
     AnalysisResultFactorResponse,
     AnalysisResultResponse,
     AnalysisRunByHealthRecordRequest,
-    AnalysisRunResultResponse,
     AnalysisSnapshotCreateRequest,
     AnalysisSnapshotResponse,
 )
+from app.dtos.async_jobs import AsyncJobResponse
 from app.models.users import User
 from app.services import analysis as analysis_service
+from app.services import async_jobs as async_job_service
 from app.services import health as health_service
 from app.services.sensitive_access_logs import safe_record_sensitive_access
 
 analysis_router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 
-async def _run_analysis(
+@analysis_router.post(
+    "/run",
+    status_code=status.HTTP_410_GONE,
+    deprecated=True,
+)
+async def run_analysis(
+    request: AnalysisRunByHealthRecordRequest,  # noqa: ARG001
+    user: Annotated[User, Depends(get_request_user)],
+):
+    _ = user
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="분석 실행은 비동기 작업으로만 지원합니다. /api/v1/analysis/run-async를 사용해주세요.",
+    )
+
+
+@analysis_router.post(
+    "/run-async",
+    response_model=AsyncJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def run_analysis_async(
     request: AnalysisRunByHealthRecordRequest,
-    user: User,
-) -> list[AnalysisRunResultResponse]:
+    user: Annotated[User, Depends(get_request_user)],
+):
     health_record = ensure_found(
         await health_service.get_health_record(request.health_record_id),
         "건강 기록을 찾을 수 없습니다.",
@@ -37,33 +59,11 @@ async def _run_analysis(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"{mode_label}에 필요한 정보가 부족합니다: {', '.join(missing_fields)}",
         )
-    return await analysis_service.run_analysis(user.id, health_record, request.mode)
-
-
-@analysis_router.post(
-    "/run",
-    response_model=list[AnalysisRunResultResponse],
-    status_code=status.HTTP_201_CREATED,
-)
-async def run_analysis(
-    request: AnalysisRunByHealthRecordRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await _run_analysis(request, user)
-
-
-@analysis_router.post(
-    "/dummy-run",
-    response_model=list[AnalysisRunResultResponse],
-    status_code=status.HTTP_201_CREATED,
-    deprecated=True,
-    include_in_schema=False,
-)
-async def run_legacy_analysis(
-    request: AnalysisRunByHealthRecordRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await _run_analysis(request, user)
+    return await async_job_service.create_analysis_run_job(
+        user_id=int(user.id),
+        health_record_id=request.health_record_id,
+        mode=request.mode.value,
+    )
 
 
 @analysis_router.post("/results", response_model=AnalysisResultResponse, status_code=status.HTTP_201_CREATED)

@@ -73,6 +73,50 @@ const stepToSection: Record<number, string[]> = {
   3: [healthProfileSectionTitles[3]],
 };
 
+const healthFieldLabels: Record<string, string> = {
+  height_cm: "키",
+  weight_kg: "몸무게",
+  bmi: "BMI",
+  occupation_code: "직업군",
+  family_htn: "고혈압 가족력",
+  family_dm: "당뇨병 가족력",
+  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력",
+  smoking_status: "현재 흡연 여부",
+  drinking_frequency: "음주 빈도",
+  drinking_amount: "한 번 음주량",
+  walking_days_per_week: "걷기 일수",
+  strength_days_per_week: "근력운동 일수",
+  systolic_bp: "수축기 혈압",
+  diastolic_bp: "이완기 혈압",
+  fasting_glucose: "공복혈당",
+  hba1c: "당화혈색소",
+  total_cholesterol: "총콜레스테롤",
+  triglyceride: "중성지방",
+  hdl_cholesterol: "HDL 콜레스테롤",
+  ldl_cholesterol: "LDL 콜레스테롤",
+  waist_cm: "허리둘레",
+};
+
+const healthValueLabels: Record<string, Record<string, string>> = {
+  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
+  drinking_frequency: {
+    RARE: "월 1회 미만",
+    MONTHLY_2_4: "월 2-4회",
+    WEEKLY_2_3: "주 2-3회",
+    WEEKLY_4_PLUS: "주 4회 이상",
+  },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
+};
+
 function toStringValue(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
@@ -209,6 +253,15 @@ function getValue(record: HealthRecord, key: string, unit = ""): string {
   return `${String(value)}${unit}`;
 }
 
+function getDisplayValue(record: HealthRecord, key: string, unit = ""): string {
+  const value = record[key];
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  const stringValue = String(value);
+  return `${healthValueLabels[key]?.[stringValue] ?? stringValue}${unit}`;
+}
+
 export default function HealthRecordPage() {
   const navigate = useNavigate();
   const { backendUser } = useAuth();
@@ -327,7 +380,7 @@ export default function HealthRecordPage() {
           <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
           <div className="button-row" style={{ marginTop: 12 }}>
             <Link className="button secondary" to="/ocr/exam">
-              검진표 OCR로 입력
+              검진표로 입력
             </Link>
             <Link className="button secondary" to="/health/profile">
               필수 건강정보 관리로 이동
@@ -376,26 +429,29 @@ export default function HealthRecordPage() {
         </form>
       </Card>
       <Card title="분석 준비 상태">
-        <p className={readiness?.is_ready ? "success-text" : "warning-text"}>
-          {readiness?.is_ready ? "기본 분석 준비 완료" : "기본 분석에 필요한 정보가 부족합니다."}
-        </p>
-        <div className="chip-list">
-          {missingBasicFields.map((field) => (
-            <span className="badge badge-missing" key={field}>
-              {field}
-            </span>
-          ))}
-          {missingBasicFields.length === 0 && <span className="badge badge-saved">기본 분석 부족 항목 없음</span>}
-        </div>
-        <div className="state-box">
-          검진/혈액검사 수치를 입력하면 정밀 분석 정확도가 높아집니다.
-          <div className="chip-list" style={{ marginTop: 8 }}>
-            {missingPrecisionFields.map((field) => (
-              <span className="badge badge-reference" key={field}>
-                {field}
+        <div className="analysis-readiness-panel">
+          <div className={`readiness-status ${readiness?.is_ready ? "success-text" : "warning-text"}`}>
+            <span aria-hidden="true" />
+            <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "기본 분석에 필요한 정보가 부족합니다."}</strong>
+          </div>
+          <div className="chip-list readiness-chip-list">
+            {missingBasicFields.map((field) => (
+              <span className="badge badge-missing" key={field}>
+                {healthFieldLabels[field] ?? field}
               </span>
             ))}
-            {missingPrecisionFields.length === 0 && <span className="badge badge-saved">정밀 보강값 입력 완료</span>}
+            {missingBasicFields.length === 0 && <span className="badge badge-saved">기본 분석 부족 항목 없음</span>}
+          </div>
+          <div className="state-box readiness-note">
+            <p>검진/혈액검사 수치를 입력하면 정밀 분석 정확도가 높아집니다.</p>
+            <div className="chip-list readiness-chip-list">
+              {missingPrecisionFields.map((field) => (
+                <span className="badge badge-reference" key={field}>
+                  {healthFieldLabels[field] ?? field}
+                </span>
+              ))}
+              {missingPrecisionFields.length === 0 && <span className="badge badge-saved">정밀 보강값 입력 완료</span>}
+            </div>
           </div>
         </div>
       </Card>
@@ -422,7 +478,7 @@ export default function HealthRecordPage() {
                 <div>
                   <span>가족력/생활</span>
                   <strong>
-                    {getValue(record, "family_htn")} · {getValue(record, "smoking_status")} ·{" "}
+                    {getDisplayValue(record, "family_htn")} · {getDisplayValue(record, "smoking_status")} ·{" "}
                     {getValue(record, "walking_days_per_week", "일 걷기")}
                   </strong>
                 </div>
@@ -433,11 +489,25 @@ export default function HealthRecordPage() {
                   </strong>
                 </div>
                 <div>
-                  <span>지질 주요값</span>
-                  <strong>
-                    TC {getValue(record, "total_cholesterol")} · LDL {getValue(record, "ldl_cholesterol")} · HDL{" "}
-                    {getValue(record, "hdl_cholesterol")} · TG {getValue(record, "triglyceride")}
-                  </strong>
+                  <span>콜레스테롤/중성지방</span>
+                  <div className="health-record-lipid-list">
+                    <span>
+                      <em>총콜레스테롤</em>
+                      <strong>{getValue(record, "total_cholesterol")}</strong>
+                    </span>
+                    <span>
+                      <em>LDL</em>
+                      <strong>{getValue(record, "ldl_cholesterol")}</strong>
+                    </span>
+                    <span>
+                      <em>HDL</em>
+                      <strong>{getValue(record, "hdl_cholesterol")}</strong>
+                    </span>
+                    <span>
+                      <em>중성지방</em>
+                      <strong>{getValue(record, "triglyceride")}</strong>
+                    </span>
+                  </div>
                 </div>
               </div>
               {Boolean(record.id) && (

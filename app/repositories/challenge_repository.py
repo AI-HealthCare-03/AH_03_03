@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from app.models.challenges import (
@@ -58,6 +58,18 @@ async def list_user_challenges(user_id: int, limit: int = 20, offset: int = 0) -
     return await UserChallenge.filter(user_id=user_id).order_by("-created_at").offset(offset).limit(limit)
 
 
+async def list_user_challenges_started_between(
+    user_id: int,
+    started_at: datetime,
+    ended_before: datetime,
+) -> list[UserChallenge]:
+    return await UserChallenge.filter(
+        user_id=user_id,
+        started_at__gte=started_at,
+        started_at__lt=ended_before,
+    ).order_by("started_at")
+
+
 async def count_user_challenges_by_status(user_id: int, statuses: list[UserChallengeStatus]) -> int:
     return await UserChallenge.filter(user_id=user_id, status__in=statuses).count()
 
@@ -77,8 +89,29 @@ async def create_challenge_log(user_challenge_id: int, data: dict[str, Any]) -> 
     return await ChallengeLog.create(user_challenge_id=user_challenge_id, **data)
 
 
+async def count_challenge_logs_by_date(user_challenge_id: int, log_date: date) -> int:
+    return await ChallengeLog.filter(user_challenge_id=user_challenge_id, log_date=log_date).count()
+
+
 async def list_challenge_logs(user_challenge_id: int) -> list[ChallengeLog]:
     return await ChallengeLog.filter(user_challenge_id=user_challenge_id).order_by("-log_date")
+
+
+async def list_challenge_logs_completed_between(
+    user_id: int,
+    completed_at: datetime,
+    ended_before: datetime,
+) -> list[ChallengeLog]:
+    return (
+        await ChallengeLog.filter(
+            user_challenge__user_id=user_id,
+            is_completed=True,
+            completed_at__gte=completed_at,
+            completed_at__lt=ended_before,
+        )
+        .prefetch_related("user_challenge")
+        .order_by("completed_at")
+    )
 
 
 async def get_challenge_log_by_date(user_challenge_id: int, log_date: date) -> ChallengeLog | None:

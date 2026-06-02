@@ -15,6 +15,14 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from ai_runtime.common.image_normalizer import (
+    HEIC_CONVERSION_ERROR_MESSAGE,
+    SUPPORTED_UPLOAD_IMAGE_TYPES,
+    ImageNormalizationError,
+    NormalizedImage,
+    is_heic_upload,
+    normalize_upload_image,
+)
 from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
 
 from .schemas import (
@@ -53,12 +61,12 @@ def get_vision_client(
 
 # ── 이미지 유효성 검사 ────────────────────────────────────────────────────────
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_TYPES = SUPPORTED_UPLOAD_IMAGE_TYPES
 MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 
 
-async def validate_image(file: UploadFile) -> bytes:
-    if file.content_type not in ALLOWED_TYPES:
+async def validate_image(file: UploadFile) -> NormalizedImage:
+    if file.content_type not in ALLOWED_TYPES and not is_heic_upload(file.content_type, file.filename):
         err = ERROR_MAP["unsupported_type"]
         raise HTTPException(
             status_code=err["status_code"],
@@ -90,7 +98,16 @@ async def validate_image(file: UploadFile) -> bytes:
             ).model_dump(),
         )
 
-    return image_bytes
+    try:
+        return normalize_upload_image(image_bytes, file.content_type, file.filename)
+    except ImageNormalizationError as e:
+        raise HTTPException(
+            status_code=415,
+            detail=ErrorResponse(
+                error_code="unsupported_type",
+                message=HEIC_CONVERSION_ERROR_MESSAGE,
+            ).model_dump(),
+        ) from e
 
 
 # ── 공통 Vision 호출 ──────────────────────────────────────────────────────────
@@ -103,13 +120,13 @@ async def call_vision(
 ) -> dict[str, Any]:
     """이미지 검증 후 GPT Vision 호출. 에러 시 HTTPException 발생."""
 
-    image_bytes = await validate_image(file)
+    normalized_image = await validate_image(file)
 
     try:
         return await client.analyze(
             analysis_type=analysis_type,
-            image_bytes=image_bytes,
-            media_type=file.content_type or "image/jpeg",
+            image_bytes=normalized_image.data,
+            media_type=normalized_image.media_type,
         )
     except ValueError as e:
         err = ERROR_MAP["parse_error"]
@@ -162,7 +179,7 @@ def calculate_bmi(height_cm, weight_kg) -> float | None:
     },
 )
 async def analyze_diet(
-    file: Annotated[UploadFile, File(description="식단 이미지 (JPG/PNG/WEBP, 최대 10MB)")],
+    file: Annotated[UploadFile, File(description="식단 이미지 (JPG/PNG/WEBP/HEIC, 최대 10MB)")],
     client: Annotated[VisionClient, Depends(get_vision_client)],
 ) -> DietAnalysisResponse:
     raw = await call_vision(AnalysisType.DIET, file, client)
@@ -189,7 +206,7 @@ async def analyze_diet(
     },
 )
 async def analyze_prescription(
-    file: Annotated[UploadFile, File(description="처방전 또는 약봉투 이미지")],
+    file: Annotated[UploadFile, File(description="처방전 또는 약봉투 이미지 (JPG/PNG/WEBP/HEIC)")],
     client: Annotated[VisionClient, Depends(get_vision_client)],
 ) -> PrescriptionAnalysisResponse:
     raw = await call_vision(AnalysisType.PRESCRIPTION, file, client)
@@ -222,7 +239,7 @@ async def analyze_prescription(
     },
 )
 async def analyze_checkup(
-    file: Annotated[UploadFile, File(description="건강검진 결과지 이미지")],
+    file: Annotated[UploadFile, File(description="건강검진 결과지 이미지 (JPG/PNG/WEBP/HEIC)")],
     client: Annotated[VisionClient, Depends(get_vision_client)],
 ) -> CheckupAnalysisResponse:
     raw = await call_vision(AnalysisType.CHECKUP, file, client)

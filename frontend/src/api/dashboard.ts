@@ -35,6 +35,24 @@ export type DashboardSummary = {
   overall_risk_score?: number | null;
 };
 
+export type DashboardRiskTrendPoint = {
+  analyzed_at: string;
+  risk_score: number;
+  risk_level: string;
+};
+
+export type DashboardRiskTrendSeries = {
+  disease_type: string;
+  points: DashboardRiskTrendPoint[];
+};
+
+export type DashboardRiskTrend = {
+  period: string;
+  date_from?: string | null;
+  date_to?: string | null;
+  series: DashboardRiskTrendSeries[];
+};
+
 export async function getDashboardSummary<T>(): Promise<T> {
   return apiRequest<T>("/dashboard/summary");
 }
@@ -57,4 +75,8 @@ export async function getDashboardMedications<T>(): Promise<T> {
 
 export async function getDashboardTrends<T>(period = "week"): Promise<T> {
   return apiRequest<T>(`/dashboard/trends?period=${encodeURIComponent(period)}`);
+}
+
+export async function getDashboardRiskTrend<T>(period = "all"): Promise<T> {
+  return apiRequest<T>(`/dashboard/risk-trend?period=${encodeURIComponent(period)}`);
 }

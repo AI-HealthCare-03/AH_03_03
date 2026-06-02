@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysis } from "../api/analysis";
+import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysisAsync } from "../api/analysis";
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -44,7 +45,7 @@ type Readiness = {
 const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   OBESITY: "비만",
-  DYSLIPIDEMIA: "이상지질혈증",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
   HYPERTENSION: "고혈압",
 };
 
@@ -54,20 +55,13 @@ const riskFallbackScores: Record<string, number> = {
   LOW: 25,
 };
 
-function modelLabel(result: AnalysisResult): string | null {
-  const modelName = result.model_name ? String(result.model_name) : "";
-  const modelVersion = result.model_version ? String(result.model_version) : "";
-  if (!modelName && !modelVersion) {
-    return null;
-  }
-  if (modelName.toLowerCase() === "catboost") {
-    return modelVersion ? `CatBoost · ${modelVersion}` : "CatBoost";
-  }
-  if (modelName) {
-    return modelVersion ? `${modelName} · ${modelVersion}` : modelName;
-  }
-  return modelVersion;
-}
+const asyncJobStatusMessages: Record<string, string> = {
+  PENDING: "분석 작업 대기 중입니다.",
+  PROCESSING: "분석 중입니다.",
+  SUCCESS: "분석이 완료되었습니다.",
+  FAILED: "분석에 실패했습니다.",
+  CANCELED: "분석 작업이 취소되었습니다.",
+};
 
 const missingFieldLabels: Record<string, string> = {
   height_cm: "키",
@@ -79,18 +73,48 @@ const missingFieldLabels: Record<string, string> = {
   hba1c: "당화혈색소",
   total_cholesterol: "총콜레스테롤",
   triglyceride: "중성지방",
-  hdl_cholesterol: "HDL",
-  ldl_cholesterol: "LDL",
+  hdl_cholesterol: "HDL 콜레스테롤",
+  ldl_cholesterol: "LDL 콜레스테롤",
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
-  family_dyslipidemia: "이상지질혈증 가족력 여부",
+  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력 여부",
   smoking_status: "현재 흡연 여부",
   drinking_frequency: "1년간 음주 빈도",
   drinking_amount: "한 번 음주량",
   walking_days_per_week: "1주일간 걷기 일수",
   strength_days_per_week: "1주일간 근력운동 일수",
 };
+
+const factorValueLabels: Record<string, Record<string, string>> = {
+  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
+  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
+  drinking_frequency: {
+    RARE: "월 1회 미만",
+    MONTHLY_2_4: "월 2-4회",
+    WEEKLY_2_3: "주 2-3회",
+    WEEKLY_4_PLUS: "주 4회 이상",
+  },
+  drinking_amount: {
+    NONE: "마시지 않음",
+    ONE_TO_TWO: "1-2잔",
+    THREE_TO_FOUR: "3-4잔",
+    FIVE_TO_SIX: "5-6잔",
+    SEVEN_PLUS: "7잔 이상",
+  },
+};
+
+function displayFactorValue(factor: AnalysisFactor): string {
+  const key = String(factor.factor_key ?? "");
+  const rawValue = factor.factor_value;
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return "";
+  }
+  const value = String(rawValue);
+  return factorValueLabels[key]?.[value] ?? value;
+}
 
 function getRiskLevel(result: AnalysisResult): string {
   return String(result.risk_level ?? "").toUpperCase();
@@ -132,6 +156,34 @@ export default function AnalysisPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
+  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
+
+  const { latestJob, isPolling, pollingError } = useAsyncJobPolling({
+    jobId: analysisJobId,
+    enabled: analysisJobId !== null && runningMode !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      await load();
+      setNotice("분석이 완료되었습니다.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onFailure: (job) => {
+      setError(
+        job.status === "CANCELED"
+          ? "분석 작업이 취소되었습니다."
+          : "분석에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      );
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onTimeout: () => {
+      setNotice("분석 시간이 길어지고 있습니다. 잠시 후 결과를 다시 확인해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+  });
 
   const load = async () => {
     const latestResults = await getLatestAnalysisResults<AnalysisResult[]>();
@@ -183,6 +235,7 @@ export default function AnalysisPage() {
   const run = async (mode: AnalysisMode) => {
     setError("");
     setNotice("");
+    setAnalysisJobId(null);
     setRunningMode(mode);
     try {
       const readiness = await getAnalysisReadiness<Readiness>();
@@ -205,23 +258,28 @@ export default function AnalysisPage() {
         setNotice("건강검진 데이터를 입력해주세요.");
         return;
       }
-      await runAnalysis(readiness.latest_health_record_id, mode);
-      await load();
+      const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);
+      setAnalysisJobId(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
-    } finally {
       setRunningMode(null);
     }
   };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
+  const jobStatusMessage = latestJob
+    ? asyncJobStatusMessages[latestJob.status] ?? "분석 작업 상태를 확인하고 있습니다."
+    : analysisJobId
+      ? "분석 작업 대기 중입니다."
+      : "";
+  const showJobStatus = analysisJobId !== null && (isPolling || Boolean(jobStatusMessage));
 
   return (
     <div className="page-stack">
       <div className="page-header">
         <div>
           <h1>건강 분석 결과</h1>
-          <p>당뇨, 고혈압, 비만, 이상지질혈증 위험도를 한 화면에서 확인합니다.</p>
+          <p>당뇨, 고혈압, 비만, 콜레스테롤·중성지방 이상 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
           <button disabled={runningMode !== null} onClick={() => void run("BASIC")} type="button">
@@ -236,7 +294,16 @@ export default function AnalysisPage() {
         </div>
       </div>
       {error && <ErrorMessage message={error} />}
+      {pollingError && <ErrorMessage message={pollingError.message} />}
       {notice && <div className="state-box">{notice}</div>}
+      {showJobStatus && (
+        <div className="state-box">
+          {jobStatusMessage}
+          {latestJob?.status && latestJob.status !== "SUCCESS" && latestJob.status !== "FAILED" && (
+            <span className="muted"> 현재 상태: {latestJob.status}</span>
+          )}
+        </div>
+      )}
       {missingFields.length > 0 && (
         <Card title="분석에 필요한 정보가 부족합니다">
           <div className="readiness-card">
@@ -289,7 +356,6 @@ export default function AnalysisPage() {
               <strong>{score}/100</strong>
               <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {modelLabel(result) && <span className="badge badge-reference">{modelLabel(result)}</span>}
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (
@@ -348,12 +414,15 @@ export default function AnalysisPage() {
                 <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
                 {factors.length > 0 ? (
                   <div className="chip-list">
-                    {factors.slice(0, 4).map((factor) => (
-                      <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
-                        {String(factor.factor_name ?? factor.factor_key)}
-                        {factor.factor_value ? `: ${String(factor.factor_value)}` : ""}
-                      </span>
-                    ))}
+                    {factors.slice(0, 4).map((factor) => {
+                      const value = displayFactorValue(factor);
+                      return (
+                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
+                          {String(factor.factor_name ?? factor.factor_key)}
+                          {value ? `: ${value}` : ""}
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : (
                   <span>상세 요인은 분석 입력값과 질환별 기준에 따라 표시됩니다.</span>

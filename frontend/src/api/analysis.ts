@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import type { AsyncJob } from "./jobs";
 
 export type AnalysisMode = "BASIC" | "PRECISION";
 
@@ -47,11 +48,11 @@ export async function getAnalysisResultDetail<T>(analysisId: number): Promise<T>
   return apiRequest<T>(`/analysis/results/${analysisId}/detail`);
 }
 
-export async function runAnalysis<T = AnalysisRunResponse[]>(
+export async function runAnalysisAsync(
   healthRecordId: number,
   mode: AnalysisMode = "BASIC",
-): Promise<T> {
-  return apiRequest<T>("/analysis/run", {
+): Promise<AsyncJob> {
+  return apiRequest<AsyncJob>("/analysis/run-async", {
     method: "POST",
     body: { health_record_id: healthRecordId, mode },
   });

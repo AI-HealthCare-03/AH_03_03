@@ -1,5 +1,5 @@
 .PHONY: app-up app-up-full app-worker-up app-build app-worker-build app-rebuild app-clean-image app-down app-ps app-logs app-worker-logs
-.PHONY: dev-up dev-down dev-ps
+.PHONY: dev-up dev-up-real dev-up-mock dev-down dev-ps
 .PHONY: demo-up demo-down demo-ps demo-logs demo-health
 .PHONY: langfuse-up langfuse-down langfuse-ps langfuse-logs
 
@@ -38,6 +38,12 @@ app-worker-logs:
 
 dev-up:
 	./scripts/docker_stack.sh dev up
+
+dev-up-real:
+	docker compose --env-file .env.local.real -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+
+dev-up-mock:
+	docker compose --env-file .env.local.mock -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
 
 dev-down:
 	./scripts/docker_stack.sh dev down

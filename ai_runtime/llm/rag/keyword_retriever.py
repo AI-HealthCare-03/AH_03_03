@@ -8,6 +8,7 @@ from ai_runtime.llm.rag.source_loader import (
     RagSourceDocument,
     load_all_rag_source_documents,
 )
+from ai_runtime.llm.rag.source_trust import source_trust_level_for_type
 from ai_runtime.llm.schemas import RetrievedContext
 
 DISEASE_SOURCE_MAP = {
@@ -53,6 +54,8 @@ class KeywordRagMatch:
             "source_url": metadata.source_url,
             "year": metadata.year,
             "status": metadata.status,
+            "source_type": metadata.source_type,
+            "source_trust_level": source_trust_level_for_type(metadata.source_type),
             "disease_type": metadata.disease_type,
             "score": self.score,
             "matched_keywords": list(self.matched_keywords),

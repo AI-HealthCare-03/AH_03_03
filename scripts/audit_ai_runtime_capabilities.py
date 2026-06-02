@@ -601,23 +601,23 @@ def _audit_async_runtime_scope() -> list[AuditRow]:
         AuditRow(
             area="async_scope",
             item="AI Worker consumer",
-            status="DEMO_ECHO",
-            detail="ai_runtime/main.py runs a Redis Stream consumer for DEMO_ECHO only",
+            status="READY_RUNTIME",
+            detail="ai_runtime/main.py runs Redis Stream handlers for analysis, OCR, diet, medication, and service jobs",
             category="READY_RUNTIME",
         ),
         AuditRow(
             area="async_scope",
             item="async_jobs table/API",
-            status="DEMO_ECHO",
-            detail="async_jobs model and /api/v1/jobs demo/status API exist for DEMO_ECHO only",
+            status="READY_RUNTIME",
+            detail="async_jobs model, /api/v1/jobs status API, retry/DLQ, and AI/service stream job enqueue paths are implemented",
             category="READY_RUNTIME",
         ),
         AuditRow(
             area="async_scope",
             item="AnalysisResult.async_job_id",
-            status="RESERVED",
-            detail="reserved nullable field for future analysis job linkage; not wired to /analysis/run yet",
-            category="P2_BACKLOG",
+            status="OPTIONAL",
+            detail="analysis.run async job stores result ids in job result_payload; direct DB FK linkage remains optional",
+            category="READY_RUNTIME",
         ),
     ]
 
