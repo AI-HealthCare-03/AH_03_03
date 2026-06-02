@@ -1,14 +1,15 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 
+from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
+from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.medications import (
     MedicationCreateRequest,
     MedicationOCRConfirmRequest,
     MedicationOCRConfirmResponse,
     MedicationOCRRequest,
-    MedicationOCRResponse,
     MedicationRecordCreateRequest,
     MedicationRecordResponse,
     MedicationRecordUpdateRequest,
@@ -16,6 +17,7 @@ from app.dtos.medications import (
     MedicationUpdateRequest,
 )
 from app.models.users import User
+from app.services import async_jobs as async_job_service
 from app.services import medications as medication_service
 from app.services.sensitive_access_logs import safe_record_sensitive_access
 
@@ -52,35 +54,41 @@ async def list_medications(
     )
 
 
-async def _run_medication_ocr(
-    request: MedicationOCRRequest,
-    user: User,
-    image_bytes: bytes | None = None,
-    image_media_type: str | None = None,
-) -> MedicationOCRResponse:
-    _ = user
-    return await medication_service.run_medication_ocr(
-        request,
-        image_bytes=image_bytes,
-        image_media_type=image_media_type,
-    )
-
-
-@medication_router.post("/ocr", response_model=MedicationOCRResponse)
+@medication_router.post("/ocr", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def run_medication_ocr(
     request: Request,
     user: Annotated[User, Depends(get_request_user)],
 ):
     payload, image_bytes, image_media_type = await _parse_medication_ocr_request(request)
-    return await _run_medication_ocr(payload, user, image_bytes=image_bytes, image_media_type=image_media_type)
+    request_payload: dict[str, object] = {
+        "source_type": payload.source_type or "PRESCRIPTION",
+    }
+    if payload.image_filename:
+        request_payload["image_filename"] = payload.image_filename
 
+    if image_bytes:
+        request_payload.update(
+            medication_service.store_medication_ocr_upload(
+                user_id=int(user.id),
+                image_bytes=image_bytes,
+                image_media_type=image_media_type,
+                filename=payload.image_filename,
+            )
+        )
+    elif payload.raw_text and payload.raw_text.strip():
+        request_payload.update(
+            medication_service.store_medication_ocr_text(
+                user_id=int(user.id),
+                text=payload.raw_text,
+            )
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="복약 OCR을 실행하려면 이미지 파일 또는 인식할 텍스트가 필요합니다.",
+        )
 
-@medication_router.post("/dummy-ocr", response_model=MedicationOCRResponse, deprecated=True, include_in_schema=False)
-async def run_legacy_medication_ocr(
-    request: MedicationOCRRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await _run_medication_ocr(request, user)
+    return await async_job_service.create_medication_ocr_job(int(user.id), request_payload)
 
 
 async def _parse_medication_ocr_request(request: Request) -> tuple[MedicationOCRRequest, bytes | None, str | None]:
@@ -95,13 +103,28 @@ async def _parse_medication_ocr_request(request: Request) -> tuple[MedicationOCR
         if key not in {"image", "file"} and not _is_upload(value) and value not in {"", None}
     }
     upload = form.get("image") or form.get("file")
-    image_bytes = await upload.read() if _is_upload(upload) else None
-    image_media_type = upload.content_type if _is_upload(upload) else None
+    if not _is_upload(upload):
+        return MedicationOCRRequest.model_validate(data), None, None
+
+    normalized_image = _normalize_uploaded_image(
+        await upload.read(),
+        upload.content_type,
+        getattr(upload, "filename", None),
+    )
+    image_bytes = normalized_image.data
+    image_media_type = normalized_image.media_type
     return MedicationOCRRequest.model_validate(data), image_bytes, image_media_type
 
 
 def _is_upload(value: object) -> bool:
     return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
+
+
+def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
+    try:
+        return normalize_upload_image(image_bytes, media_type, filename)
+    except ImageNormalizationError as exc:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
 
 
 @medication_router.post(

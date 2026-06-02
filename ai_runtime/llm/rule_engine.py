@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from ai_runtime.llm.safety import detect_mental_health_safety
 from ai_runtime.llm.schemas import MainHealthChatbotInput, ResultChatbotInput
 
 
@@ -38,6 +39,14 @@ def try_result_chatbot_rule_engine(
     input_data: ResultChatbotInput,
 ) -> RuleEngineResult:
     user_message = input_data.user_message
+    mental_health_result = detect_mental_health_safety(user_message)
+    if mental_health_result is not None:
+        return RuleEngineResult(
+            is_matched=True,
+            intent=mental_health_result.intent,
+            response=mental_health_result.response,
+            source="safety_policy",
+        )
 
     if has_medical_consult_keyword(user_message):
         return RuleEngineResult(
@@ -92,6 +101,14 @@ def try_main_health_chatbot_rule_engine(
     input_data: MainHealthChatbotInput,
 ) -> RuleEngineResult:
     user_message = input_data.user_message
+    mental_health_result = detect_mental_health_safety(user_message)
+    if mental_health_result is not None:
+        return RuleEngineResult(
+            is_matched=True,
+            intent=mental_health_result.intent,
+            response=mental_health_result.response,
+            source="safety_policy",
+        )
 
     if has_medical_consult_keyword(user_message):
         return RuleEngineResult(

@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from ai_runtime.ocr.checkup.extractor import parse_blood_pressure, parse_from_text_lines, parse_height_weight
+import pytest
+
+from ai_runtime.ocr.checkup import extractor
+from ai_runtime.ocr.checkup.extractor import (
+    parse_blood_pressure,
+    parse_from_text_lines,
+    parse_height_weight,
+    select_measurement_page_lines,
+)
+from ai_runtime.ocr.checkup.pdf_handler import PdfType
 
 
 def test_parse_height_weight_does_not_reuse_150cm_as_weight() -> None:
@@ -36,3 +45,80 @@ def test_parse_from_text_lines_does_not_mark_high_confidence_hb() -> None:
 
     assert data.hb == 13.2
     assert "hb" not in low_conf
+
+
+def test_select_measurement_page_lines_prioritizes_checkup_table_page() -> None:
+    selected = select_measurement_page_lines(
+        [
+            [("종합소견 결과 안내 HDL", 1.0)],
+            [("검사항목 결과 참고치 공복혈당 총콜레스테롤 HDL LDL 중성지방 AST ALT 혈색소", 1.0)],
+            [("발급 안내문 결과", 1.0)],
+        ]
+    )
+
+    assert selected == [("검사항목 결과 참고치 공복혈당 총콜레스테롤 HDL LDL 중성지방 AST ALT 혈색소", 1.0)]
+
+
+def test_parse_from_text_lines_numeric_value_wins_over_not_applicable_marker() -> None:
+    data, _, _ = parse_from_text_lines(
+        [
+            ("이상지질혈증 비해당", 1.0),
+            ("총콜레스테롤 137", 1.0),
+            ("HDL 콜레스테롤 49", 1.0),
+            ("중성지방 105", 1.0),
+            ("LDL 콜레스테롤 67", 1.0),
+        ]
+    )
+
+    assert data.total_cholesterol == 137
+    assert data.hdl == 49
+    assert data.triglyceride == 105
+    assert data.ldl == 67
+
+
+def test_parse_from_text_lines_skips_not_applicable_lipid_values() -> None:
+    data, _, _ = parse_from_text_lines(
+        [
+            ("총콜레스테롤 비해당", 1.0),
+            ("HDL 콜레스테롤 해당없음", 1.0),
+            ("중성지방 검사안함", 1.0),
+            ("LDL 콜레스테롤 미실시", 1.0),
+        ]
+    )
+
+    assert data.total_cholesterol is None
+    assert data.hdl is None
+    assert data.triglyceride is None
+    assert data.ldl is None
+
+
+@pytest.mark.asyncio
+async def test_run_ocr_on_pdf_extracts_lipid_values_from_second_measurement_page(monkeypatch) -> None:
+    monkeypatch.setattr(extractor, "detect_pdf_type", lambda _: PdfType.TEXT)
+    monkeypatch.setattr(
+        extractor,
+        "extract_text_from_pdf",
+        lambda _: [
+            "종합소견 결과 안내 HDL",
+            "\n".join(
+                [
+                    "검사항목 결과 참고치",
+                    "공복혈당 91",
+                    "총콜레스테롤 137",
+                    "HDL 콜레스테롤 49",
+                    "중성지방 105",
+                    "LDL 콜레스테롤 67",
+                    "AST 20 ALT 18 혈색소 14.2",
+                ]
+            ),
+            "발급 안내문 결과",
+        ],
+    )
+
+    data, _low_confidence_fields, _raw_texts, status = await extractor.run_ocr_on_pdf(b"%PDF")
+
+    assert status != "failed"
+    assert data.total_cholesterol == 137
+    assert data.hdl == 49
+    assert data.triglyceride == 105
+    assert data.ldl == 67

@@ -91,7 +91,7 @@ class ExamConfirmRequest(BaseModel):
 class ExamOCRResponse(BaseModel):
     message: str
     measurements: list[ExamMeasurementResponse]
-    ocr_provider: str = "fallback"
-    fallback_used: bool = True
+    ocr_provider: str = "none"
+    fallback_used: bool = False
     provider_message: str | None = None
     raw_text_preview: str | None = None

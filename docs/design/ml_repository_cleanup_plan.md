@@ -25,7 +25,7 @@
 | `ai_runtime/ml/artifacts/.gitkeep` | 유지 | artifact 디렉터리 placeholder입니다. 실제 artifact는 gitignore 대상입니다. |
 | `etc/ml/ai_worker/ml/final_models/` | 보존 | 기존 Optuna 최종 학습 스크립트 reference입니다. 서비스 import 대상이 아니므로 archive 영역에 보존합니다. |
 | `etc/ml/ML/models/final/` | 보존 | 팀원이 정리한 최종 노트북 reference입니다. 서비스 import 영역 밖에서 보존합니다. |
-| `etc/ml/ML/models/report/` | 보존 | 모델별 최종 보고서 문서입니다. README/발표/검증 근거로 사용 가능합니다. |
+| `docs/pipeline/ml_reports/` | 보존 | 모델별 최종 보고서 문서입니다. README/발표/검증 근거로 사용 가능합니다. |
 | `etc/ml/ML/features/*.py` | 보존 | 노트북에서 분리된 feature engineering 실험 코드입니다. `ai_runtime/ml/common/features.py`와 통합 가능성을 확인한 뒤 정리합니다. |
 
 ## 삭제 또는 외부 보관 후보

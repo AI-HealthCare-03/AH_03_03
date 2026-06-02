@@ -10,19 +10,35 @@ import {
   type ExamMeasurement,
   type ExamReport,
 } from "../api/exams";
+import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
+import { isHeicFile } from "../utils/files";
 
 export default function ExamOcrPage() {
-  const [selectedFileName, setSelectedFileName] = useState("health-exam-upload.pdf");
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
+  const [previewMessage, setPreviewMessage] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [exam, setExam] = useState<ExamReport | null>(null);
   const [measurements, setMeasurements] = useState<ExamMeasurement[]>([]);
+  const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunningOcr, setIsRunningOcr] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [canRetryOcr, setCanRetryOcr] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (selectedPreviewUrl) {
+        URL.revokeObjectURL(selectedPreviewUrl);
+      }
+    };
+  }, [selectedPreviewUrl]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -35,17 +51,94 @@ export default function ExamOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const handleFileSelection = (file: File | null) => {
+  const { latestJob: latestOcrJob } = useAsyncJobPolling({
+    jobId: ocrJobId,
+    enabled: isRunningOcr && ocrJobId !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      if (!exam) {
+        setError("검진표 정보를 찾지 못했습니다. 파일을 다시 선택해주세요.");
+        setIsRunningOcr(false);
+        setOcrJobId(null);
+        return;
+      }
+      try {
+        const latestMeasurements = await listMeasurements(exam.id);
+        setMeasurements(latestMeasurements);
+        setCanRetryOcr(false);
+        setMessage(
+          latestMeasurements.length > 0
+            ? `${getAsyncJobStatusMessage("SUCCESS")} 저장 전 검진 수치를 확인해주세요.`
+            : `${getAsyncJobStatusMessage("SUCCESS")} 인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.`,
+        );
+      } catch {
+        setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
+        setCanRetryOcr(true);
+      } finally {
+        setIsRunningOcr(false);
+        setOcrJobId(null);
+      }
+    },
+    onFailure: (job) => {
+      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setCanRetryOcr(true);
+      setIsRunningOcr(false);
+      setOcrJobId(null);
+    },
+    onTimeout: () => {
+      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setCanRetryOcr(true);
+      setIsRunningOcr(false);
+      setOcrJobId(null);
+    },
+  });
+
+  const ocrStatusMessage =
+    isRunningOcr && ocrJobId !== null ? getAsyncJobStatusMessage(latestOcrJob?.status ?? "PENDING") : "";
+
+  const handleFileSelection = async (file: File | null) => {
+    if (selectedPreviewUrl) {
+      URL.revokeObjectURL(selectedPreviewUrl);
+    }
+    setSelectedPreviewUrl("");
+    setPreviewMessage("");
     if (!file) {
       return;
     }
     setSelectedFile(file);
     setSelectedFileName(file.name);
+    if (isPdfFile(file)) {
+      return;
+    }
+    if (!isHeicFile(file)) {
+      setSelectedPreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setPreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
+    try {
+      const previewBlob = await normalizeImageForPreview(file);
+      setSelectedPreviewUrl(URL.createObjectURL(previewBlob));
+      setPreviewMessage("");
+    } catch (err) {
+      setPreviewMessage(
+        err instanceof Error
+          ? err.message
+          : "HEIC 미리보기를 생성하지 못했습니다. 분석은 업로드 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const startExamOcr = async () => {
     setError("");
     setMessage("");
+    setMeasurements([]);
+    setCanRetryOcr(false);
+    if (!selectedFile) {
+      setError("검진표 이미지 또는 PDF 파일을 먼저 선택해주세요.");
+      return;
+    }
     setIsRunningOcr(true);
     try {
       const report =
@@ -54,18 +147,14 @@ export default function ExamOcrPage() {
           original_filename: selectedFileName,
           file_path: `exam-upload/${selectedFileName}`,
           uploaded_at: new Date().toISOString(),
-        }));
+      }));
       setExam(report);
-      const result = await runExamOcr(report.id, selectedFile);
-      setMeasurements(result.measurements);
-      setMessage(
-        result.fallback_used
-          ? "측정값 후보가 생성되었습니다. 자동 인식 결과가 부정확할 수 있으니 저장 전 검진 수치를 확인해주세요."
-          : "측정값 후보가 생성되었습니다. 저장 전 검진 수치를 확인해주세요.",
-      );
+      const job = await runExamOcr(report.id, selectedFile);
+      setMessage("");
+      setOcrJobId(job.id);
     } catch (err) {
-      setError(err instanceof Error ? toUserMessage(err.message) : "측정값 후보 생성에 실패했습니다.");
-    } finally {
+      setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
+      setCanRetryOcr(true);
       setIsRunningOcr(false);
     }
   };
@@ -115,17 +204,30 @@ export default function ExamOcrPage() {
         </Link>
       </div>
       {error && <ErrorMessage message={error} />}
+      {canRetryOcr ? (
+        <div className="button-row">
+          <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
+      {ocrStatusMessage && <div className="state-box">{ocrStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
       <div className="page-grid">
         <Card title="파일 업로드">
           <div className="upload-box">
             <strong>검진표 이미지/PDF 업로드</strong>
             <span>촬영/업로드 후 생성된 후보 값을 확인하고 저장해주세요.</span>
+            <p className="warning-text">
+              업로드한 이미지는 건강정보 추출 및 분석을 위해 사용됩니다. 자동 인식 결과는 오류가 있을 수 있으므로
+              저장 또는 분석 전에 내용을 확인해주세요. 건강검진 결과는 민감한 건강정보일 수 있으므로 본인 자료만
+              업로드해주세요.
+            </p>
             <div className="upload-action-grid">
               <label className="upload-action-button">
                 파일에서 선택
                 <input
-                  accept="image/*,.pdf"
+                  accept="image/*,.heic,.heif,.pdf"
                   onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
                   type="file"
                 />
@@ -134,7 +236,7 @@ export default function ExamOcrPage() {
                 <label className="upload-action-button">
                   카메라로 촬영
                   <input
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     capture="environment"
                     onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
                     type="file"
@@ -145,13 +247,18 @@ export default function ExamOcrPage() {
               )}
             </div>
             <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
+            {previewMessage ? (
+              <div className="state-box heic-preview-notice">
+                {previewMessage}
+              </div>
+            ) : null}
+            {selectedPreviewUrl ? (
+              <img alt="선택한 검진표 이미지 미리보기" className="upload-preview" src={selectedPreviewUrl} />
+            ) : null}
           </div>
           <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
             {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
           </button>
-          {isRunningOcr ? (
-            <div className="state-box">건강검진표를 분석 중입니다. PDF 페이지 수에 따라 시간이 걸릴 수 있습니다.</div>
-          ) : null}
         </Card>
         <Card title="저장 전 확인">
           <p className="warning-text">자동 인식으로 생성된 후보값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
@@ -203,9 +310,6 @@ export default function ExamOcrPage() {
   );
 }
 
-function toUserMessage(message: string): string {
-  if (message.includes("provider") || message.includes("fallback")) {
-    return "자동 인식 후보값을 생성했습니다. 저장 전 내용을 확인해주세요.";
-  }
-  return message.replaceAll("OCR", "자동 인식");
+function isPdfFile(file: File): boolean {
+  return file.type.toLowerCase() === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }

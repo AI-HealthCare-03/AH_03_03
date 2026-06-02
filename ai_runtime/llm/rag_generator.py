@@ -2,7 +2,11 @@ import json
 from typing import Any
 
 from ai_runtime.llm.llm_client import call_llm
-from ai_runtime.llm.prompt_templates import MAIN_HEALTH_RAG_PROMPT, MAIN_HEALTH_RAG_PROMPT_VERSION
+from ai_runtime.llm.prompt_templates import (
+    FALLBACK_SAFE_RESPONSE_PROMPT_VERSION,
+    MAIN_HEALTH_RAG_PROMPT_VERSION,
+    render_prompt,
+)
 from ai_runtime.llm.rag_sources import is_allowed_rag_source
 from ai_runtime.llm.safety import check_medical_safety
 from ai_runtime.llm.schemas import MainHealthChatbotOutput, RagContextSource
@@ -73,19 +77,15 @@ def build_main_health_rag_prompt(
     context_sources: list[RagContextSource],
 ) -> str:
     sources_text = "\n".join(format_context_source(source) for source in context_sources)
-
-    return f"""
-{MAIN_HEALTH_RAG_PROMPT}
-
-사용자 질문:
-{user_message}
-
-RAG context:
-{retrieved_context}
-
-context sources:
-{sources_text or "- 제공된 출처 메타데이터 없음"}
-""".strip()
+    source_titles = [source.title for source in context_sources if source.title]
+    reference_summary = f"참고 정보: {', '.join(source_titles)} 후보 문서를 함께 확인했습니다." if source_titles else ""
+    return render_prompt(
+        "rag_grounded_answer_prompt",
+        user_message=user_message,
+        retrieved_context=retrieved_context,
+        context_sources=sources_text or "- 제공된 출처 메타데이터 없음",
+        reference_summary=reference_summary or "- 별도 요약 없음",
+    )
 
 
 def parse_context_sources(context_sources: list[dict] | None) -> list[RagContextSource]:
@@ -94,7 +94,13 @@ def parse_context_sources(context_sources: list[dict] | None) -> list[RagContext
         if isinstance(source, RagContextSource):
             parsed_sources.append(source)
         elif isinstance(source, dict):
-            parsed_sources.append(RagContextSource(**source))
+            parsed_sources.append(
+                RagContextSource(
+                    source_name=source.get("source_name") or source.get("source_org"),
+                    url=source.get("url") or source.get("source_url"),
+                    title=source.get("title"),
+                )
+            )
     return parsed_sources
 
 
@@ -149,15 +155,12 @@ def ensure_caution_message(answer: str) -> str:
 
 
 def build_fallback_response(reason: str, context_source_count: int) -> MainHealthChatbotOutput:
-    answer = (
-        "현재 질문에 답변할 수 있는 신뢰 가능한 근거 자료가 충분하지 않습니다. "
-        "일반적인 건강정보는 참고용으로만 확인하고, 증상이나 검사 결과 해석이 필요하면 의료진과 상담해 주세요. "
-        f"{CAUTION_MESSAGE}"
-    )
+    answer = render_prompt("fallback_safe_response_prompt")
     safety_result = add_rag_metadata(
         check_medical_safety(answer),
         context_source_count=context_source_count,
         fallback_reason=reason,
+        prompt_version=FALLBACK_SAFE_RESPONSE_PROMPT_VERSION,
     )
 
     return MainHealthChatbotOutput(
@@ -175,10 +178,11 @@ def add_rag_metadata(
     safety_result: dict,
     context_source_count: int,
     fallback_reason: str | None = None,
+    prompt_version: str = MAIN_HEALTH_RAG_PROMPT_VERSION,
 ) -> dict:
     metadata = {
         **safety_result.get("metadata", {}),
-        "prompt_version": MAIN_HEALTH_RAG_PROMPT_VERSION,
+        "prompt_version": prompt_version,
         "source": RAG_SOURCE,
         "context_source_count": context_source_count,
     }

@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 
+from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
+from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.diets import (
     DietAnalyzeRequest,
-    DietAnalyzeResponse,
     DietPhotoResultCreateRequest,
     DietPhotoResultResponse,
     DietRecordCreateRequest,
@@ -13,6 +14,7 @@ from app.dtos.diets import (
     DietRecordUpdateRequest,
 )
 from app.models.users import User
+from app.services import async_jobs as async_job_service
 from app.services import diets as diet_service
 
 diet_router = APIRouter(prefix="/diets", tags=["diets"])
@@ -38,41 +40,23 @@ async def list_diet_records(
     )
 
 
-async def _run_diet_analysis(
-    request: DietAnalyzeRequest,
-    user: User,
-    image_bytes: bytes | None = None,
-    image_media_type: str | None = None,
-) -> DietAnalyzeResponse:
-    return await diet_service.run_diet_analysis(
-        user.id,
-        request,
-        image_bytes=image_bytes,
-        image_media_type=image_media_type,
-    )
-
-
-@diet_router.post("/analyze", response_model=DietAnalyzeResponse, status_code=status.HTTP_201_CREATED)
+@diet_router.post("/analyze", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def run_diet_analysis(
     request: Request,
     user: Annotated[User, Depends(get_request_user)],
 ):
     payload, image_bytes, image_media_type = await _parse_diet_analyze_request(request)
-    return await _run_diet_analysis(payload, user, image_bytes=image_bytes, image_media_type=image_media_type)
-
-
-@diet_router.post(
-    "/dummy-analyze",
-    response_model=DietAnalyzeResponse,
-    status_code=status.HTTP_201_CREATED,
-    deprecated=True,
-    include_in_schema=False,
-)
-async def run_legacy_diet_analysis(
-    request: DietAnalyzeRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await _run_diet_analysis(request, user)
+    request_payload = payload.model_dump(mode="json", exclude_none=True)
+    if image_bytes:
+        request_payload.update(
+            diet_service.store_diet_analysis_upload(
+                user_id=int(user.id),
+                image_bytes=image_bytes,
+                image_media_type=image_media_type,
+                filename=str(request_payload.get("image_path") or "") or None,
+            )
+        )
+    return await async_job_service.create_diet_analyze_image_job(int(user.id), request_payload)
 
 
 async def _parse_diet_analyze_request(request: Request) -> tuple[DietAnalyzeRequest, bytes | None, str | None]:
@@ -88,13 +72,29 @@ async def _parse_diet_analyze_request(request: Request) -> tuple[DietAnalyzeRequ
         if key != "image" and not _is_upload(value) and value not in {"", None}
     }
     image = form.get("image")
-    image_bytes = await image.read() if _is_upload(image) else None
-    image_media_type = image.content_type if _is_upload(image) else None
+    if not _is_upload(image):
+        return DietAnalyzeRequest.model_validate(data), None, None
+
+    image_bytes = await image.read()
+    normalized_image = _normalize_uploaded_image(
+        image_bytes,
+        image.content_type,
+        getattr(image, "filename", None),
+    )
+    image_bytes = normalized_image.data
+    image_media_type = normalized_image.media_type
     return DietAnalyzeRequest.model_validate(data), image_bytes, image_media_type
 
 
 def _is_upload(value: object) -> bool:
     return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
+
+
+def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
+    try:
+        return normalize_upload_image(image_bytes, media_type, filename)
+    except ImageNormalizationError as exc:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
 
 
 @diet_router.get("/{diet_record_id}", response_model=DietRecordResponse)

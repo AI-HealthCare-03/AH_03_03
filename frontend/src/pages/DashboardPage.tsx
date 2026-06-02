@@ -3,14 +3,18 @@ import { Link } from "react-router-dom";
 
 import {
   DashboardAnalysisResult,
+  DashboardRiskTrend,
+  DashboardRiskTrendSeries,
   DashboardSummary,
   getDashboardChallenges,
   getDashboardDiets,
   getDashboardHealth,
   getDashboardMedications,
+  getDashboardRiskTrend,
   getDashboardSummary,
   getDashboardTrends,
 } from "../api/dashboard";
+import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -36,9 +40,9 @@ const challengeStatusLabels: Record<string, string> = {
   IN_PROGRESS: "진행 중",
   JOINED: "진행 중",
   COMPLETED: "완료",
-  GIVEN_UP: "포기",
-  CANCELED: "포기",
-  CANCELLED: "포기",
+  GIVEN_UP: "참여 전",
+  CANCELED: "참여 전",
+  CANCELLED: "참여 전",
   PENDING: "대기",
 };
 
@@ -149,6 +153,32 @@ function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
       }))
       .sort((a, b) => a.date.localeCompare(b.date)),
   };
+}
+
+function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
+  return items
+    .map((item) => ({
+      key: item.disease_type,
+      label: analysisTypeLabels[item.disease_type] ?? item.disease_type,
+      color: diseaseChartColors[item.disease_type] ?? "var(--chart-overall)",
+      points: item.points
+        .reduce<ChartPoint[]>((points, point) => {
+          const value = Number(point.risk_score);
+          if (!Number.isFinite(value)) {
+            return points;
+          }
+          const normalizedValue = value <= 1 ? value * 100 : value;
+          points.push({
+            date: point.analyzed_at,
+            label: formatDate(point.analyzed_at),
+            value: normalizedValue,
+            displayValue: `${Math.round(normalizedValue * 10) / 10}/100 · ${formatRiskLevel(point.risk_level)}`,
+          });
+          return points;
+        }, [])
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    }))
+    .filter((item) => item.points.length > 0);
 }
 
 function EmptyChartState() {
@@ -437,8 +467,29 @@ function getChallengeDuration(challenge: AnyRecord): string {
 }
 
 function getChallengeProgress(challenge: AnyRecord): number {
+  if (Boolean(challenge.completed_at) || (Boolean(challenge.is_finalized) && Boolean(challenge.has_met_completion_condition))) {
+    return 100;
+  }
   const value = Number(challenge.progress ?? challenge.progress_rate ?? 0);
-  return Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 0;
+  if (Number.isFinite(value)) {
+    return Math.max(0, Math.min(value, 100));
+  }
+  const completionRate = Number(challenge.completion_rate);
+  return Number.isFinite(completionRate) ? Math.max(0, Math.min(completionRate, 100)) : 0;
+}
+
+function getChallengeDisplayStatus(challenge: AnyRecord): string {
+  const status = String(challenge.status ?? "").toUpperCase();
+  if (["GIVE_UP", "GIVEN_UP", "CANCELED", "CANCELLED"].includes(status)) {
+    return "참여 가능";
+  }
+  if (Boolean(challenge.is_finalized)) {
+    return Boolean(challenge.has_met_completion_condition) || Boolean(challenge.completed_at) ? "완료" : "미달성";
+  }
+  if (Boolean(challenge.has_met_completion_condition)) {
+    return "완료 조건 충족";
+  }
+  return challengeStatusLabels[status] ?? (status ? status : "참여 가능");
 }
 
 export default function DashboardPage() {
@@ -448,15 +499,27 @@ export default function DashboardPage() {
   const [dietSection, setDietSection] = useState<DashboardData>({});
   const [medicationSection, setMedicationSection] = useState<DashboardData>({});
   const [trends, setTrends] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [riskTrend, setRiskTrend] = useState<DashboardRiskTrend>({ period: "all", series: [] });
+  const [todayRecommendations, setTodayRecommendations] = useState<TodayRecommendations>({ date: "", items: [] });
   const [activeMetricKey, setActiveMetricKey] = useState<(typeof analysisMetrics)[number]["key"]>("blood");
   const [selectedPeriod, setSelectedPeriod] = useState("week");
 
   useEffect(() => {
     const load = async () => {
-      const [summaryResult, trendsResult, healthResult, challengeResult, dietResult, medicationResult] =
-        await Promise.allSettled([
+      const [
+        summaryResult,
+        trendsResult,
+        riskTrendResult,
+        recommendationResult,
+        healthResult,
+        challengeResult,
+        dietResult,
+        medicationResult,
+      ] = await Promise.allSettled([
           getDashboardSummary<DashboardSummary>(),
           getDashboardTrends<Record<string, Record<string, unknown>[]>>(selectedPeriod),
+          getDashboardRiskTrend<DashboardRiskTrend>(selectedPeriod),
+          getTodayRecommendations(),
           getDashboardHealth<DashboardData>(),
           getDashboardChallenges<DashboardData>(),
           getDashboardDiets<DashboardData>(),
@@ -464,6 +527,8 @@ export default function DashboardPage() {
         ]);
       if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
       if (trendsResult.status === "fulfilled") setTrends(trendsResult.value);
+      if (riskTrendResult.status === "fulfilled") setRiskTrend(riskTrendResult.value);
+      if (recommendationResult.status === "fulfilled") setTodayRecommendations(recommendationResult.value);
       if (healthResult.status === "fulfilled") setHealthSection(healthResult.value);
       if (challengeResult.status === "fulfilled") setChallengeSection(challengeResult.value);
       if (dietResult.status === "fulfilled") setDietSection(dietResult.value);
@@ -513,6 +578,8 @@ export default function DashboardPage() {
     makeMedicationAdherenceSeries(dashboardMedicationRecords),
   ];
   const medicationAdherenceSeries = makeMedicationAdherenceSeries(dashboardMedicationRecords);
+  const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
+  const hasRiskTrendEnoughData = riskTrendSeries.some((item) => item.points.length >= 2);
   const medicationAdherence = medicationAdherenceSeries.points.at(-1)?.value ?? null;
   const sleepValue = toNumber(latest.sleep_hours);
   const summaryCards = [
@@ -764,6 +831,60 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <section className="card today-recommendation-card">
+        <div className="card-header">
+          <div>
+            <h2>오늘의 추천 행동</h2>
+            <p>최근 건강 기록과 생활습관 기록을 기준으로 오늘 실천할 행동을 제안합니다.</p>
+          </div>
+          <span className="badge badge-reference">{todayRecommendations.date || formatDate(new Date())}</span>
+        </div>
+        {todayRecommendations.items.length > 0 ? (
+          <div className="card-list today-recommendation-list">
+            {todayRecommendations.items.map((item) => (
+              <article className="mini-card today-recommendation-item" key={`${item.action_type}-${item.title}`}>
+                <div className="record-row">
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                  </div>
+                  <span className="badge">{analysisTypeLabels[item.related_disease] ?? "생활습관"}</span>
+                </div>
+                <p className="muted">{item.reason}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <strong>오늘 표시할 추천 행동이 없습니다.</strong>
+            <p>건강정보, 식단, 챌린지 기록을 남기면 맞춤형 행동 제안이 표시됩니다.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="card dashboard-risk-trend-card">
+        <div className="card-header">
+          <div>
+            <h2>질환별 예측 위험도 변화</h2>
+            <p>분석 기록을 기준으로 질환별 예측 점수 변화 흐름을 확인합니다.</p>
+          </div>
+          <Link className="button secondary compact-button" to="/analysis/history">
+            분석 기록 보기
+          </Link>
+        </div>
+        {hasRiskTrendEnoughData ? (
+          <LineChart series={riskTrendSeries} />
+        ) : (
+          <div className="empty-state">
+            <strong>아직 추이를 계산할 분석 기록이 부족합니다.</strong>
+            <p>질환별 분석을 2회 이상 실행하면 위험도 변화 그래프가 표시됩니다.</p>
+            <Link className="button secondary compact-button" to="/analysis">
+              분석 실행하기
+            </Link>
+          </div>
+        )}
+      </section>
+
       <section className="dashboard-primary-grid">
         <section className="card dashboard-analysis-summary-card">
           <div className="card-header">
@@ -868,7 +989,7 @@ export default function DashboardPage() {
                       <strong>{getChallengeTitle(challenge)}</strong>
                       <p>
                         {getChallengeDuration(challenge)} ·{" "}
-                        {challengeStatusLabels[status] ?? (status ? status : "참여 가능")}
+                        {getChallengeDisplayStatus(challenge)}
                       </p>
                     </div>
                     <div className="progress-bar">

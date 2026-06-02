@@ -28,6 +28,11 @@ dependencies = [
     "firebase-admin>=7.4.0",
     "catboost>=1.2.10",
     "openpyxl>=3.1.5",
+    "pillow-heif>=1.3.0",
+    "boto3>=1.43.18",
+    "pymupdf>=1.27.2.3",
+    "langgraph>=1.2.2",
+    "langchain-core>=1.4.0",
 ]
 
 [dependency-groups]
@@ -81,7 +86,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 pythonpath = ["."]
 testpaths = ["tests"]
-norecursedirs = ["app/tests", ".git", ".venv", "node_modules", "frontend/node_modules"]
+norecursedirs = [".git", ".venv", "node_modules", "frontend/node_modules"]
 
 [tool.ruff]
 # 기본 라인 길이 설정

@@ -6,11 +6,16 @@ import {
   createDietRecord,
   listDietRecords,
   type DietFoodItem,
+  type DietAnalyzeResponse,
   type DietNutritionSummary,
   type DietRecordPayload,
 } from "../api/diets";
+import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
+import { isHeicFile } from "../utils/files";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
@@ -115,8 +120,12 @@ export default function DietPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
+  const [imagePreviewMessage, setImagePreviewMessage] = useState("");
+  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [canRetryAnalysis, setCanRetryAnalysis] = useState(false);
 
   const load = async () => {
     setError("");
@@ -139,18 +148,76 @@ export default function DietPage() {
     };
   }, [selectedImagePreviewUrl]);
 
-  const handleDietImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const { latestJob: latestAnalysisJob } = useAsyncJobPolling({
+    jobId: analysisJobId,
+    enabled: isAnalyzing && analysisJobId !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async (job) => {
+      try {
+        const result = dietAnalysisResultFromPayload(job.result_payload);
+        if (!result) {
+          throw new Error("식단 분석 결과를 불러오지 못했습니다.");
+        }
+        setAnalysisResult(result as unknown as Record<string, unknown>);
+        setCanRetryAnalysis(false);
+        setMessage(`${getAsyncJobStatusMessage("SUCCESS")} 저장된 결과를 확인해주세요.`);
+        await load();
+      } catch {
+        setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
+        setCanRetryAnalysis(true);
+      } finally {
+        setIsAnalyzing(false);
+        setAnalysisJobId(null);
+      }
+    },
+    onFailure: (job) => {
+      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setCanRetryAnalysis(true);
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
+    },
+    onTimeout: () => {
+      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setCanRetryAnalysis(true);
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
+    },
+  });
+
+  const analysisStatusMessage =
+    isAnalyzing && analysisJobId !== null ? getAsyncJobStatusMessage(latestAnalysisJob?.status ?? "PENDING") : "";
+
+  const handleDietImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (selectedImagePreviewUrl) {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
+    setImagePreviewMessage("");
     if (!file) {
       setSelectedImageFile(null);
       setSelectedImagePreviewUrl("");
       return;
     }
     setSelectedImageFile(file);
-    setSelectedImagePreviewUrl(URL.createObjectURL(file));
+    if (!isHeicFile(file)) {
+      setSelectedImagePreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setSelectedImagePreviewUrl("");
+    setImagePreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
+    try {
+      const previewBlob = await normalizeImageForPreview(file);
+      setSelectedImagePreviewUrl(URL.createObjectURL(previewBlob));
+      setImagePreviewMessage("");
+    } catch (err) {
+      setImagePreviewMessage(
+        err instanceof Error
+          ? err.message
+          : "HEIC 미리보기를 생성하지 못했습니다. 분석은 업로드 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const clearSelectedImage = () => {
@@ -159,6 +226,7 @@ export default function DietPage() {
     }
     setSelectedImageFile(null);
     setSelectedImagePreviewUrl("");
+    setImagePreviewMessage("");
   };
 
   const submitManualDiet = async (event: FormEvent) => {
@@ -204,6 +272,9 @@ export default function DietPage() {
 
   const runDietAnalysis = async () => {
     setError("");
+    setMessage("");
+    setAnalysisResult(null);
+    setCanRetryAnalysis(false);
     setIsAnalyzing(true);
     try {
       const payload = selectedImageFile
@@ -213,12 +284,12 @@ export default function DietPage() {
             meal_time: new Date().toISOString(),
             image_path: null,
           };
-      const result = await analyzeDiet<Record<string, unknown>>(payload);
-      setAnalysisResult(result);
-      await load();
+      const job = await analyzeDiet(payload);
+      setMessage("");
+      setAnalysisJobId(job.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "식단 분석에 실패했습니다.");
-    } finally {
+      setError("분석 요청을 시작하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해주세요.");
+      setCanRetryAnalysis(true);
       setIsAnalyzing(false);
     }
   };
@@ -243,6 +314,15 @@ export default function DietPage() {
   return (
     <div className="page-grid">
       {error && <ErrorMessage message={error} />}
+      {canRetryAnalysis ? (
+        <div className="button-row">
+          <button disabled={isAnalyzing} onClick={runDietAnalysis} type="button">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
+      {analysisStatusMessage && <div className="state-box">{analysisStatusMessage}</div>}
+      {message && <div className="state-box">{message}</div>}
       <Card
         title="식단 이미지 분석"
         actions={
@@ -267,9 +347,15 @@ export default function DietPage() {
                 카메라로 촬영
               </label>
             </div>
-            <input accept="image/*" disabled={isAnalyzing} id="diet-file-input" onChange={handleDietImageChange} type="file" />
             <input
-              accept="image/*"
+              accept="image/*,.heic,.heif"
+              disabled={isAnalyzing}
+              id="diet-file-input"
+              onChange={handleDietImageChange}
+              type="file"
+            />
+            <input
+              accept="image/*,.heic,.heif"
               capture="environment"
               disabled={isAnalyzing}
               id="diet-camera-input"
@@ -277,9 +363,8 @@ export default function DietPage() {
               type="file"
             />
             {selectedImageFile && (
-              <div className="state-box">
-                <strong>선택한 이미지</strong>
-                <span>{selectedImageFile.name}</span>
+              <div className="state-box upload-selected-file">
+                <strong>선택한 이미지: {selectedImageFile.name}</strong>
                 <span className="muted">이미지를 다시 선택하려면 파일 선택 또는 카메라 촬영을 눌러주세요.</span>
                 <span className="muted">이미지에서 음식명 후보를 찾고 식단 기준표로 점수화합니다. 결과는 저장 전 확인해주세요.</span>
                 <button className="button secondary" disabled={isAnalyzing} onClick={clearSelectedImage} type="button">
@@ -287,16 +372,20 @@ export default function DietPage() {
                 </button>
               </div>
             )}
-            {selectedImagePreviewUrl && <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />}
+            {imagePreviewMessage ? (
+              <div className="state-box heic-preview-notice">
+                {imagePreviewMessage}
+              </div>
+            ) : null}
+            {selectedImagePreviewUrl ? (
+              <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />
+            ) : null}
           </div>
           <div className="button-row">
             <button disabled={isAnalyzing} type="button" onClick={runDietAnalysis}>
               {isAnalyzing ? "식단 분석 중..." : "간편 식단 분석"}
             </button>
           </div>
-          {isAnalyzing ? (
-            <div className="state-box">식단을 분석 중입니다. 이미지 분석과 질환별 점수 계산에 잠시 시간이 걸릴 수 있습니다.</div>
-          ) : null}
         </form>
       </Card>
       <Card title="식단 직접 입력">
@@ -574,4 +663,11 @@ function buildDietAnalysisFormData(file: File, description: string): FormData {
   formData.append("meal_time", new Date().toISOString());
   formData.append("image_path", file.name);
   return formData;
+}
+
+function dietAnalysisResultFromPayload(payload: Record<string, unknown> | null | undefined): DietAnalyzeResponse | null {
+  if (!payload || !payload.diet_record || !payload.photo_result) {
+    return null;
+  }
+  return payload as unknown as DietAnalyzeResponse;
 }
