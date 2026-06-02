@@ -50,7 +50,8 @@ class ChallengeResponse(BaseSerializerModel):
 class UserChallengeCreateRequest(BaseModel):
     challenge_id: int
     status: UserChallengeStatus = UserChallengeStatus.JOINED
-    started_at: datetime
+    started_at: datetime | None = None
+    expected_done_at: datetime | None = None
 
 
 class UserChallengeUpdateRequest(BaseModel):
@@ -58,6 +59,7 @@ class UserChallengeUpdateRequest(BaseModel):
 
     status: UserChallengeStatus | None = None
     started_at: datetime | None = None
+    expected_done_at: datetime | None = None
     completed_at: datetime | None = None
     canceled_at: datetime | None = None
 
@@ -68,9 +70,20 @@ class UserChallengeResponse(BaseSerializerModel):
     challenge_id: int
     status: UserChallengeStatus
     started_at: datetime
+    expected_done_at: datetime | None = None
     completed_at: datetime | None
     canceled_at: datetime | None
+    started_date: date | None = None
+    expected_done_date: date | None = None
+    end_date: date | None = None
+    completed_date: date | None = None
+    is_completed: bool = False
     completed_days: int = 0
+    total_days: int = 7
+    required_days: int = 6
+    completion_rate: float = 0.0
+    has_met_completion_condition: bool = False
+    is_finalized: bool = False
     progress: int = 0
     today_completed: bool = False
     today_completed_count: int = 0
@@ -83,6 +96,7 @@ class UserChallengeResponse(BaseSerializerModel):
 class ChallengeLogCreateRequest(BaseModel):
     log_date: date
     is_completed: bool = False
+    completed_at: datetime | None = None
     memo: str | None = None
 
 
@@ -91,9 +105,38 @@ class ChallengeLogResponse(BaseSerializerModel):
     user_challenge_id: int
     log_date: date
     is_completed: bool
+    completed_at: datetime | None = None
+    completed_date: date | None = None
     memo: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ChallengeCalendarItemResponse(BaseModel):
+    challenge_id: int
+    user_challenge_id: int
+    challenge_log_id: int | None = None
+    title: str | None = None
+    status: str
+    total_count: int = 1
+    completed_count: int = 0
+    is_completed: bool = False
+    started_at: datetime | None = None
+    expected_done_at: datetime | None = None
+    due_at: datetime | None = None
+    completed_at: datetime | None = None
+    started_date: date | None = None
+    expected_done_date: date | None = None
+    due_date: date | None = None
+    completed_date: date | None = None
+
+
+class ChallengeCalendarResponse(BaseModel):
+    date: date
+    total_count: int = 0
+    completed_count: int = 0
+    is_completed: bool = False
+    items: list[ChallengeCalendarItemResponse]
 
 
 class ChallengeRecommendationCreateRequest(BaseModel):
@@ -117,4 +160,4 @@ class ChallengeRecommendationResponse(BaseSerializerModel):
 
 class ChallengeActionResponse(BaseModel):
     message: str
-    result: Any
+    result: dict[str, Any]

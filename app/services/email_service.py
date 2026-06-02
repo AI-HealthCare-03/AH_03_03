@@ -42,6 +42,25 @@ class EmailService:
         )
         return await self._send_email(email, subject, body)
 
+    async def send_family_invite_email(
+        self,
+        email: str,
+        *,
+        inviter_display_name: str,
+        invite_url: str,
+        expires_at_text: str,
+    ) -> bool:
+        subject = "AI HealthCare 가족연동 초대가 도착했습니다."
+        body = (
+            "AI HealthCare 가족연동 초대 안내입니다.\n\n"
+            f"{inviter_display_name}님이 가족연동을 요청했습니다.\n"
+            "아래 링크를 눌러 초대를 수락해주세요.\n"
+            f"{invite_url}\n\n"
+            f"이 초대는 {expires_at_text}까지 유효합니다.\n\n"
+            "본인이 요청받은 초대가 아니라면 이 이메일을 무시해주세요."
+        )
+        return await self._send_email(email, subject, body)
+
     async def _send_email(self, recipient: str, subject: str, body: str) -> bool:
         if not config.EMAIL_ENABLED:
             if config.is_production:

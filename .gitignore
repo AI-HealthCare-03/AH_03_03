@@ -133,3 +133,4 @@ ai_runtime/ml/artifacts/**/threshold_tuning.csv
 .DS_Store
 "@
 $content | Set-Content .gitignore -Encoding UTF8
+var/

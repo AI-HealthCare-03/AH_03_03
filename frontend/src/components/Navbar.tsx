@@ -6,7 +6,13 @@ import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 
-export default function Navbar() {
+type NavbarProps = {
+  isMobileMenuOpen?: boolean;
+  onMobileMenuOpen?: () => void;
+  showMobileMenuButton?: boolean;
+};
+
+export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, showMobileMenuButton = false }: NavbarProps) {
   const { backendUser, isAuthenticated, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const showAdminLink = isAdminConsoleRole(backendUser?.role);
@@ -44,32 +50,50 @@ export default function Navbar() {
         <ThemeToggle />
         {isAuthenticated ? (
           <>
-            <Link className="icon-button" to="/notifications" aria-label="알림">
+            <Link className="icon-button navbar-notification-link" to="/notifications" aria-label="알림">
               알림
               {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
             </Link>
-            <Link className="icon-button" to="/chatbot" aria-label="AI 건강 상담">
+            <Link className="icon-button desktop-nav-action" to="/chatbot" aria-label="AI 건강 상담">
               상담
             </Link>
             {showAdminLink && (
-              <Link className="icon-button" to="/admin" aria-label="관리자 콘솔">
+              <Link className="icon-button desktop-nav-action" to="/admin" aria-label="관리자 콘솔">
                 관리자
               </Link>
             )}
-            <Link className="user-chip" to="/mypage">
+            <Link className="user-chip desktop-nav-action" to="/mypage">
               <span className="avatar">{(backendUser?.nickname ?? backendUser?.name ?? "U").slice(0, 1)}</span>
               <span>{backendUser?.nickname ?? backendUser?.name ?? backendUser?.email}</span>
             </Link>
-            <button type="button" onClick={logout}>
+            <button className="desktop-nav-action" type="button" onClick={logout}>
               로그아웃
             </button>
+            {showMobileMenuButton && (
+              <button
+                aria-controls="mobile-navigation-drawer"
+                aria-expanded={isMobileMenuOpen}
+                aria-label="모바일 메뉴 열기"
+                className="icon-button mobile-menu-button"
+                onClick={onMobileMenuOpen}
+                type="button"
+              >
+                <span aria-hidden="true">☰</span>
+              </button>
+            )}
           </>
         ) : (
           <>
-            <NavLink to="/">서비스 소개</NavLink>
-            <NavLink to="/faqs">FAQ</NavLink>
-            <NavLink to="/login">로그인</NavLink>
-            <NavLink className="button" to="/signup">
+            <NavLink className="desktop-nav-action" to="/">
+              서비스 소개
+            </NavLink>
+            <NavLink className="desktop-nav-action" to="/faqs">
+              FAQ
+            </NavLink>
+            <NavLink className="mobile-core-action" to="/login">
+              로그인
+            </NavLink>
+            <NavLink className="button mobile-core-action" to="/signup">
               회원가입
             </NavLink>
           </>

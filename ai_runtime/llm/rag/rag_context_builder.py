@@ -43,6 +43,8 @@ def build_reference_sources(contexts: list[RetrievedContext]) -> list[dict[str, 
             "source_url": context.url,
             "year": context.metadata.get("year"),
             "status": context.metadata.get("status"),
+            "source_type": context.metadata.get("source_type"),
+            "source_trust_level": context.metadata.get("source_trust_level"),
         }
         for context in contexts
     ]

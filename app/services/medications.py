@@ -1,3 +1,6 @@
+from pathlib import Path
+from uuid import uuid4
+
 from fastapi import HTTPException
 from starlette import status
 
@@ -17,10 +20,20 @@ from app.dtos.medications import (
 )
 from app.models.medications import Medication, MedicationRecord
 from app.repositories import medication_repository
+from app.services.storage import get_storage_service, normalize_storage_key
 
 MEDICATION_NOT_FOUND_MESSAGE = "복약/영양제 정보를 찾을 수 없습니다."
 MEDICATION_RECORD_NOT_FOUND_MESSAGE = "복약 기록을 찾을 수 없습니다."
 MEDICATION_RECORD_ACCESS_DENIED_MESSAGE = "복약 기록에 접근할 수 없습니다."
+MEDICATION_OCR_UPLOAD_DIR = "medication_ocr"
+MEDICATION_OCR_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+}
 
 _FALLBACK_OCR_ITEMS = [
     MedicationOCRItem(
@@ -127,6 +140,59 @@ async def run_medication_ocr(
         extracted_text_preview=_preview_text(raw_text),
         raw_text=parsed.raw_text or provider_result["raw_text"] or None,
         parser_warnings=parsed.warnings,
+    )
+
+
+def store_medication_ocr_upload(
+    *,
+    user_id: int,
+    image_bytes: bytes,
+    image_media_type: str | None,
+    filename: str | None,
+) -> dict[str, str]:
+    suffix = _safe_file_suffix(filename, image_media_type)
+    storage_key = _build_medication_ocr_key(user_id=user_id, suffix=suffix)
+    stored_key = get_storage_service().save_bytes(image_bytes, storage_key, content_type=image_media_type)
+    return {
+        "upload_path": stored_key,
+        "image_media_type": image_media_type or _media_type_from_upload_path(stored_key),
+        "image_filename": filename or Path(stored_key).name,
+    }
+
+
+def store_medication_ocr_text(*, user_id: int, text: str) -> dict[str, str]:
+    storage_key = _build_medication_ocr_key(user_id=user_id, suffix=".txt")
+    text_path = get_storage_service().save_bytes(text.encode("utf-8"), storage_key, content_type="text/plain")
+    return {
+        "text_path": text_path,
+    }
+
+
+async def run_medication_ocr_from_job(job_id: int) -> MedicationOCRResponse:
+    from app.services import async_jobs as async_job_service
+
+    job = await async_job_service.get_job(job_id)
+    if job is None:
+        raise ValueError("medication_ocr_job_not_found")
+
+    payload = job.request_payload or {}
+    request = MedicationOCRRequest(
+        source_type=str(payload.get("source_type") or "PRESCRIPTION"),
+        image_filename=str(payload.get("image_filename") or "") or None,
+        memo=None,
+        raw_text=_read_medication_ocr_text(payload.get("text_path")),
+    )
+    image_bytes = _read_medication_ocr_bytes(payload.get("upload_path"))
+    if image_bytes is None and request.raw_text is None:
+        raise ValueError("medication_ocr_source_missing")
+
+    image_media_type = str(payload.get("image_media_type") or "") or _media_type_from_upload_path(
+        str(payload.get("upload_path") or "")
+    )
+    return await run_medication_ocr(
+        request,
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
     )
 
 
@@ -388,6 +454,78 @@ def _is_number(value: object) -> bool:
     except (TypeError, ValueError):
         return False
     return True
+
+
+def _upload_storage_root() -> Path:
+    root = Path(config.UPLOAD_STORAGE_DIR)
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    path = root / MEDICATION_OCR_UPLOAD_DIR
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _build_medication_ocr_path(*, user_id: int, suffix: str) -> Path:
+    user_dir = _upload_storage_root() / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir / f"{uuid4().hex}{suffix}"
+
+
+def _build_medication_ocr_key(*, user_id: int, suffix: str) -> str:
+    return normalize_storage_key(f"medication-ocr/{user_id}/{uuid4().hex}/source{suffix}")
+
+
+def _safe_file_suffix(filename: str | None, media_type: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in MEDICATION_OCR_MEDIA_TYPES:
+        return suffix
+    if media_type == "image/png":
+        return ".png"
+    if media_type == "image/webp":
+        return ".webp"
+    if media_type == "application/pdf":
+        return ".pdf"
+    return ".jpg"
+
+
+def _read_medication_ocr_bytes(path_value: object) -> bytes | None:
+    if not path_value:
+        return None
+    try:
+        storage = get_storage_service()
+        if storage.exists(str(path_value)):
+            return storage.read_bytes(str(path_value))
+    except Exception:
+        pass
+
+    path = Path(str(path_value))
+    if not path.exists() or not path.is_file():
+        raise ValueError("medication_ocr_upload_missing")
+    return path.read_bytes()
+
+
+def _read_medication_ocr_text(path_value: object) -> str | None:
+    if not path_value:
+        return None
+    try:
+        storage = get_storage_service()
+        if storage.exists(str(path_value)):
+            text = storage.read_bytes(str(path_value)).decode("utf-8").strip()
+            return text or None
+    except Exception:
+        pass
+
+    path = Path(str(path_value))
+    if not path.exists() or not path.is_file():
+        raise ValueError("medication_ocr_text_missing")
+    text = path.read_text(encoding="utf-8").strip()
+    return text or None
+
+
+def _media_type_from_upload_path(path_value: str) -> str | None:
+    if not path_value:
+        return None
+    return MEDICATION_OCR_MEDIA_TYPES.get(Path(path_value).suffix.lower())
 
 
 async def _get_owned_medication_or_raise(medication_id: int, user_id: int) -> Medication:

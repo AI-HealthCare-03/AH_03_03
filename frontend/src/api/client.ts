@@ -14,7 +14,7 @@ type ApiOptions = Omit<RequestInit, "body"> & {
   hasRetriedAfterRefresh?: boolean;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 export const ACCESS_TOKEN_STORAGE_KEY = "ai_health_access_token";
 
 export function getStoredAccessToken(): string | null {
@@ -87,14 +87,26 @@ function shouldSkipRefresh(path: string, options: ApiOptions): boolean {
 }
 
 async function parseErrorMessage(response: Response): Promise<string> {
-  let message = `API 요청 실패 (${response.status})`;
+  const fallbackMessage =
+    response.status === 502 || response.status === 503 || response.status === 504
+      ? "서버 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요."
+      : `API 요청 실패 (${response.status})`;
   try {
-    const errorBody = (await response.json()) as { detail?: unknown; message?: unknown; msg?: unknown };
-    message = formatApiErrorDetail(errorBody.detail ?? errorBody.message ?? errorBody.msg) ?? message;
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const errorBody = (await response.json()) as { detail?: unknown; message?: unknown; msg?: unknown };
+      return formatApiErrorDetail(errorBody.detail ?? errorBody.message ?? errorBody.msg) ?? fallbackMessage;
+    }
+
+    const text = (await response.text()).trim();
+    if (contentType.includes("text/html") || /^<!doctype html|^<html/i.test(text)) {
+      return fallbackMessage;
+    }
+    return text || fallbackMessage;
   } catch {
-    // Keep the status based fallback message.
+    // 응답 본문이 깨져도 화면에는 상태 코드 기반 안내를 유지한다.
   }
-  return message;
+  return fallbackMessage;
 }
 
 export async function refreshAccessToken(): Promise<string> {
@@ -162,4 +174,46 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   }
 
   return (await response.json()) as T;
+}
+
+export async function apiBlobRequest(path: string, options: ApiOptions = {}): Promise<Blob> {
+  const headers = new Headers(options.headers);
+  const isFormData = options.body instanceof FormData;
+
+  if (!isFormData && options.body !== undefined && options.body !== null) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (!options.skipAuth) {
+    const token = getStoredAccessToken();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: options.credentials ?? "include",
+    body:
+      options.body === undefined || options.body === null || isFormData
+        ? (options.body as BodyInit | null | undefined)
+        : JSON.stringify(options.body),
+  });
+
+  if (response.status === 401 && !shouldSkipRefresh(path, options)) {
+    try {
+      await refreshAccessToken();
+      return apiBlobRequest(path, { ...options, hasRetriedAfterRefresh: true });
+    } catch {
+      clearStoredAccessToken();
+      throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
+  }
+
+  return response.blob();
 }

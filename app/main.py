@@ -1,16 +1,33 @@
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from tortoise import Tortoise
 
 from app.apis.v1 import v1_routers
 from app.core import config
 from app.core.db.databases import initialize_tortoise
 from app.services.system_logs import create_system_error_log
 
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    _ = app_instance
+    try:
+        yield
+    finally:
+        if Tortoise._inited:
+            await Tortoise.close_connections()
+
+
 app = FastAPI(
-    default_response_class=ORJSONResponse, docs_url="/api/docs", redoc_url="/api/redoc", openapi_url="/api/openapi.json"
+    default_response_class=ORJSONResponse,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 

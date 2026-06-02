@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-ai_health}
       POSTGRES_USER: ${DB_USER:-ozcoding}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pw1234}
       TZ: Asia/Seoul
     ports:
       - "${DB_EXPOSE_PORT:-5432}:5432"
@@ -51,13 +51,33 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-ozcoding}
-      DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      DB_PASSWORD: ${DB_PASSWORD:-pw1234}
       DB_NAME: ${DB_NAME:-ai_health}
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-5}
+      DB_COMMAND_TIMEOUT: ${DB_COMMAND_TIMEOUT:-60}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      EMAIL_ENABLED: "false"
-      EMAIL_VERIFICATION_DEBUG: "true"
-      PASSWORD_RESET_DEBUG: "false"
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-60}
+      UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_ROOT: ${LOCAL_STORAGE_ROOT:-var/storage}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-ap-northeast-2}
+      S3_PREFIX: ${S3_PREFIX:-ai-health/dev}
+      S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      EMAIL_VERIFICATION_DEBUG: ${EMAIL_VERIFICATION_DEBUG:-true}
+      PASSWORD_RESET_DEBUG: ${PASSWORD_RESET_DEBUG:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-AI HealthCare}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8080}
       CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
@@ -65,7 +85,7 @@ services:
       DIET_GPT_VISION_ENABLED: ${DIET_GPT_VISION_ENABLED:-false}
       DIET_GPT_VISION_MODEL: ${DIET_GPT_VISION_MODEL:-gpt-4o-mini}
       DIET_VISION_PROVIDER: ${DIET_VISION_PROVIDER:-rule_based}
-      EXAM_OCR_PROVIDER: ${EXAM_OCR_PROVIDER:-fallback}
+      EXAM_OCR_PROVIDER: ${EXAM_OCR_PROVIDER:-auto}
       EXAM_GPT_VISION_ENABLED: ${EXAM_GPT_VISION_ENABLED:-false}
       EXAM_GPT_VISION_MODEL: ${EXAM_GPT_VISION_MODEL:-gpt-4o-mini}
       PADDLE_OCR_ENABLED: ${PADDLE_OCR_ENABLED:-false}
@@ -79,6 +99,8 @@ services:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     volumes:
       - ../../app:/app/app
+      - ai_health_dev_uploads:/app/var/uploads
+      - ai_health_dev_storage:/app/var/storage
     ports:
       - "8000:8000"
     networks:
@@ -113,10 +135,22 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-ozcoding}
-      DB_PASSWORD: ${DB_PASSWORD:-PLEASE_CHANGE_ME}
+      DB_PASSWORD: ${DB_PASSWORD:-pw1234}
       DB_NAME: ${DB_NAME:-ai_health}
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-5}
+      DB_COMMAND_TIMEOUT: ${DB_COMMAND_TIMEOUT:-60}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-60}
+      UPLOAD_STORAGE_DIR: ${UPLOAD_STORAGE_DIR:-var/uploads}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_ROOT: ${LOCAL_STORAGE_ROOT:-var/storage}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-ap-northeast-2}
+      S3_PREFIX: ${S3_PREFIX:-ai-health/dev}
+      S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
       CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
@@ -124,7 +158,7 @@ services:
       DIET_GPT_VISION_ENABLED: ${DIET_GPT_VISION_ENABLED:-false}
       DIET_GPT_VISION_MODEL: ${DIET_GPT_VISION_MODEL:-gpt-4o-mini}
       DIET_VISION_PROVIDER: ${DIET_VISION_PROVIDER:-rule_based}
-      EXAM_OCR_PROVIDER: ${EXAM_OCR_PROVIDER:-fallback}
+      EXAM_OCR_PROVIDER: ${EXAM_OCR_PROVIDER:-auto}
       EXAM_GPT_VISION_ENABLED: ${EXAM_GPT_VISION_ENABLED:-false}
       EXAM_GPT_VISION_MODEL: ${EXAM_GPT_VISION_MODEL:-gpt-4o-mini}
       PADDLE_OCR_ENABLED: ${PADDLE_OCR_ENABLED:-false}
@@ -137,6 +171,9 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     restart: unless-stopped
+    volumes:
+      - ai_health_dev_uploads:/app/var/uploads
+      - ai_health_dev_storage:/app/var/storage
     networks:
       - app
       - ai-health-shared
@@ -153,6 +190,14 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: /api/v1
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_MEASUREMENT_ID: ${VITE_FIREBASE_MEASUREMENT_ID:-}
+        VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY:-}
     restart: unless-stopped
     expose:
       - "80"
@@ -180,6 +225,8 @@ services:
 
 volumes:
   ai_health_dev_postgres_data:
+  ai_health_dev_uploads:
+  ai_health_dev_storage:
 
 networks:
   app:

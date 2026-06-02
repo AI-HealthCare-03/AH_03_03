@@ -60,6 +60,27 @@ HB_RANGE = (5.0, 25.0)
 CONFIDENCE_THRESHOLD = 0.7
 CHECKBOX_PATTERN = re.compile(r"[■□▣▪●○◆◇]")
 NOT_APPLICABLE_KEYWORDS = ["비해당", "해당없음"]
+MEASUREMENT_PAGE_KEYWORDS = {
+    "검사항목": 3,
+    "참고치": 3,
+    "결과": 1,
+    "공복혈당": 4,
+    "총콜레스테롤": 4,
+    "중성지방": 4,
+    "HDL": 3,
+    "LDL": 3,
+    "AST": 2,
+    "ALT": 2,
+    "혈색소": 3,
+    "수축기": 2,
+    "이완기": 2,
+    "혈압": 2,
+    "신장": 2,
+    "체중": 2,
+    "허리둘레": 2,
+    "BMI": 2,
+}
+MEASUREMENT_PAGE_MIN_SCORE = 6
 
 
 def clean_text(text):
@@ -244,8 +265,6 @@ def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
                 # 현재 줄 + 다음 2줄 안에 비해당 있으면 비해당으로 처리
                 check_lines = [text] + [text_lines[j][0] for j in range(i + 1, min(i + 3, len(text_lines)))]
                 if any(is_not_applicable(line) for line in check_lines):
-                    extracted[field] = "비해당"
-                    logger.info("필드 추출 | %s = 비해당", field)
                     continue
 
             value, confidence = _extract_value_from_context(text_lines, i, text)
@@ -352,13 +371,12 @@ async def run_ocr(image_bytes):
 
 async def run_ocr_on_pdf(pdf_bytes):
     pdf_type = detect_pdf_type(pdf_bytes)
-    all_text_lines = []
+    page_text_lines: list[list[tuple[str, float]]] = []
 
     if pdf_type == PdfType.TEXT:
         logger.info("텍스트 PDF 처리 중...")
         texts = extract_text_from_pdf(pdf_bytes)
-        lines = parse_text_lines(texts)
-        all_text_lines = [(line, 1.0) for line in lines]
+        page_text_lines = [[(line, 1.0) for line in parse_text_lines([text])] for text in texts]
     else:
         logger.info("스캔 PDF 처리 중...")
         image_bytes_list = pdf_to_images(pdf_bytes)
@@ -368,8 +386,35 @@ async def run_ocr_on_pdf(pdf_bytes):
         for i, img_bytes in enumerate(image_bytes_list):
             logger.info("페이지 %d OCR 실행 중...", i + 1)
             page_lines = run_ocr_on_image(img_bytes)
-            all_text_lines.extend(page_lines)
+            page_text_lines.append(page_lines)
 
-    data, low_conf, raw = parse_from_text_lines(all_text_lines)
+    measurement_lines = select_measurement_page_lines(page_text_lines)
+    data, low_conf, raw = parse_from_text_lines(measurement_lines)
     status = determine_status(data, low_conf)
+    if status == OcrStatus.FAILED and measurement_lines != flatten_page_lines(page_text_lines):
+        logger.info("측정값 페이지 우선 추출 실패, 전체 PDF 텍스트 fallback")
+        data, low_conf, raw = parse_from_text_lines(flatten_page_lines(page_text_lines))
+        status = determine_status(data, low_conf)
     return data, low_conf, raw, status
+
+
+def flatten_page_lines(page_text_lines: list[list[tuple[str, float]]]) -> list[tuple[str, float]]:
+    return [line for page_lines in page_text_lines for line in page_lines]
+
+
+def score_measurement_page(text_lines: list[tuple[str, float]]) -> int:
+    text = "\n".join(line for line, _ in text_lines).upper()
+    return sum(weight * text.count(keyword.upper()) for keyword, weight in MEASUREMENT_PAGE_KEYWORDS.items())
+
+
+def select_measurement_page_lines(page_text_lines: list[list[tuple[str, float]]]) -> list[tuple[str, float]]:
+    if not page_text_lines:
+        return []
+    scores = [score_measurement_page(page_lines) for page_lines in page_text_lines]
+    max_score = max(scores, default=0)
+    if max_score < MEASUREMENT_PAGE_MIN_SCORE:
+        return flatten_page_lines(page_text_lines)
+    selected_pages = [
+        page_lines for page_lines, score in zip(page_text_lines, scores, strict=True) if score == max_score
+    ]
+    return flatten_page_lines(selected_pages)

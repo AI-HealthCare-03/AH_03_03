@@ -8,6 +8,7 @@ from app.dtos.dashboard import (
     DashboardDietsResponse,
     DashboardHealthResponse,
     DashboardMedicationsResponse,
+    DashboardRiskTrendResponse,
     DashboardSummaryResponse,
     DashboardTrendsResponse,
 )
@@ -72,5 +73,24 @@ async def get_dashboard_trends(
     )
     try:
         return await dashboard_service.get_dashboard_trends(user.id, period)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@dashboard_router.get("/risk-trend", response_model=DashboardRiskTrendResponse)
+async def get_dashboard_risk_trend(
+    request: Request,
+    user: Annotated[User, Depends(get_request_user)],
+    period: str = "all",
+):
+    await safe_record_sensitive_access(
+        request=request,
+        actor=user,
+        target_user_id=user.id,
+        resource_type="DASHBOARD",
+        access_reason="dashboard.risk_trend",
+    )
+    try:
+        return await dashboard_service.get_dashboard_risk_trend(user.id, period)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

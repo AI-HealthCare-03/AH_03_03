@@ -175,7 +175,7 @@ make demo-ps
 - API Docs: `http://localhost:8080/api/docs`
 - FastAPI 직접 접근: `http://localhost:8000`
 
-루트 `docker-compose.yml`은 백엔드/AI 검증용이다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
+루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이다. frontend, Firebase Web Push build args, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
 
 로그/종료:
 
@@ -184,7 +184,7 @@ make demo-logs
 make demo-down
 ```
 
-백엔드/AI만 빠르게 확인할 때는 루트 compose 래퍼를 사용할 수 있다.
+백엔드/AI만 빠르게 확인할 때는 legacy/minimal 루트 compose 래퍼를 사용할 수 있다.
 
 ```bash
 docker compose up -d postgres redis fastapi
@@ -234,6 +234,7 @@ Docker 개발 스택은 `frontend`, `nginx`, `fastapi`, `ai-worker`, `postgres`,
 `frontend`는 Docker build 단계에서 정적 파일을 만들고 내부 Nginx로 서빙하며, 바깥 `nginx`가 `/`를 frontend로, `/api/`를 FastAPI로 proxy한다.
 
 Langfuse는 `infra/langfuse/docker-compose.yml`로 별도 실행한다. 우리 서비스와 Langfuse를 같은 Docker 서버에서 연결해야 하면 `ai-health-shared` external network를 공유한다. 이 네트워크는 HTTP 접근용이며, 우리 서비스 Postgres/Redis와 Langfuse Postgres/Redis는 공유하지 않는다.
+`infra/langfuse/.env.example`은 Langfuse self-host 전용 템플릿이며, 앱의 루트 `.env`와 별개로 유지한다.
 
 ```bash
 cd infra/langfuse

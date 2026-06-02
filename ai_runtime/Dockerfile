@@ -16,5 +16,5 @@ COPY ./ai_runtime ./ai_runtime
 COPY ./app ./app
 COPY ./docs/rag_sources ./docs/rag_sources
 
-# 5. 실제 AI Worker 진입점입니다. 현재는 DEMO_ECHO Redis Stream job만 처리합니다.
+# 5. 실제 AI Worker 진입점입니다. Redis Stream 기반 job consumer를 실행합니다.
 CMD ["uv", "run", "--no-sync", "python", "-m", "ai_runtime.main"]

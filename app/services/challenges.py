@@ -1,6 +1,7 @@
 import re
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
+from math import ceil
 
 from fastapi import HTTPException
 from starlette import status
@@ -16,14 +17,17 @@ from app.dtos.challenges import (
 from app.models.challenges import Challenge, ChallengeLog, ChallengeRecommendation, UserChallenge, UserChallengeStatus
 from app.repositories import challenge_repository
 
+DEFAULT_CHALLENGE_DURATION_DAYS = 7
+CHALLENGE_COMPLETION_THRESHOLD = 0.8
+
 
 def _get_daily_goal_count(challenge: Challenge | None) -> int:
     if challenge is None:
         return 1
-    metric = str(challenge.target_metric or "").lower()
+    metric = str(getattr(challenge, "target_metric", None) or "").lower()
     if not any(token in metric for token in ("count", "times", "횟수", "회")):
         return 1
-    matched = re.search(r"\d+", str(challenge.target_value or ""))
+    matched = re.search(r"\d+", str(getattr(challenge, "target_value", None) or ""))
     if not matched:
         return 1
     return max(1, min(int(matched.group()), 10))
@@ -34,28 +38,102 @@ def _count_completed_days(log_dates: list[date], daily_goal_count: int) -> int:
     return sum(1 for count in counts.values() if count >= daily_goal_count)
 
 
+def _is_completed_day(completed_count: int, total_count: int) -> bool:
+    return total_count > 0 and completed_count >= total_count
+
+
+def _get_duration_days(challenge: Challenge | None) -> int:
+    duration_days = getattr(challenge, "duration_days", None) if challenge is not None else None
+    if isinstance(duration_days, int) and duration_days > 0:
+        return duration_days
+    return DEFAULT_CHALLENGE_DURATION_DAYS
+
+
+def _get_required_days(total_days: int) -> int:
+    return max(1, ceil(total_days * CHALLENGE_COMPLETION_THRESHOLD))
+
+
+def _is_rejoinable_user_challenge(user_challenge: UserChallenge) -> bool:
+    return user_challenge.status == UserChallengeStatus.CANCELED or user_challenge.canceled_at is not None
+
+
+def _now() -> datetime:
+    return datetime.now(config.TIMEZONE)
+
+
+def _to_kst_date(value: datetime | None) -> date | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.date()
+    return value.astimezone(config.TIMEZONE).date()
+
+
+def _kst_day_range(target_date: date) -> tuple[datetime, datetime]:
+    started_at = datetime.combine(target_date, time.min, tzinfo=config.TIMEZONE)
+    return started_at, started_at + timedelta(days=1)
+
+
+def _default_expected_done_at(started_at: datetime, duration_days: int = DEFAULT_CHALLENGE_DURATION_DAYS) -> datetime:
+    return started_at + timedelta(days=duration_days)
+
+
+def _attach_user_challenge_dates(user_challenge: UserChallenge) -> None:
+    user_challenge.started_date = _to_kst_date(user_challenge.started_at)
+    user_challenge.expected_done_date = _to_kst_date(user_challenge.expected_done_at)
+    user_challenge.completed_date = _to_kst_date(user_challenge.completed_at)
+    user_challenge.is_completed = user_challenge.completed_at is not None
+
+
+def _attach_challenge_log_dates(log: ChallengeLog) -> None:
+    log.completed_date = _to_kst_date(log.completed_at)
+
+
 async def _with_user_challenge_progress(user_challenge: UserChallenge | None) -> UserChallenge | None:
     if user_challenge is None:
         return None
 
-    today = datetime.now(config.TIMEZONE).date()
+    today = _now().date()
     challenge = await Challenge.get_or_none(id=user_challenge.challenge_id)
     daily_goal_count = _get_daily_goal_count(challenge)
     completed_log_dates = [
-        log.log_date
-        for log in await ChallengeLog.filter(user_challenge_id=user_challenge.id, is_completed=True).only("log_date")
+        completed_date
+        for completed_date in [
+            _to_kst_date(log.completed_at)
+            for log in await ChallengeLog.filter(user_challenge_id=user_challenge.id, is_completed=True).only(
+                "completed_at"
+            )
+        ]
+        if completed_date is not None
     ]
     completed_days = _count_completed_days(completed_log_dates, daily_goal_count)
-    today_completed_count = sum(1 for log_date in completed_log_dates if log_date == today)
+    today_completed_count = sum(1 for completed_date in completed_log_dates if completed_date == today)
     today_completed = today_completed_count >= daily_goal_count
-    duration_days = challenge.duration_days if challenge is not None else None
-    progress = 0
-    if duration_days and duration_days > 0:
-        progress = max(0, min(round((completed_days / duration_days) * 100), 100))
-    if user_challenge.status == UserChallengeStatus.COMPLETED:
+    duration_days = _get_duration_days(challenge)
+    required_days = _get_required_days(duration_days)
+    expected_done_at = user_challenge.expected_done_at or _default_expected_done_at(
+        user_challenge.started_at,
+        duration_days,
+    )
+    completion_rate = round((completed_days / duration_days) * 100, 1) if duration_days > 0 else 0.0
+    has_met_completion_condition = completed_days >= required_days
+    is_finalized = bool(user_challenge.completed_at) or expected_done_at <= _now()
+    is_final_completed = bool(user_challenge.completed_at) or (is_finalized and has_met_completion_condition)
+    progress = max(0, min(round(completion_rate), 100))
+    if is_final_completed:
         progress = 100
 
+    _attach_user_challenge_dates(user_challenge)
+    user_challenge.expected_done_at = expected_done_at
+    user_challenge.expected_done_date = _to_kst_date(expected_done_at)
+    user_challenge.end_date = _to_kst_date(expected_done_at)
+    user_challenge.is_completed = is_final_completed
     user_challenge.completed_days = completed_days
+    user_challenge.total_days = duration_days
+    user_challenge.required_days = required_days
+    user_challenge.completion_rate = completion_rate
+    user_challenge.has_met_completion_condition = has_met_completion_condition
+    user_challenge.is_finalized = is_finalized
     user_challenge.progress = progress
     user_challenge.today_completed = today_completed
     user_challenge.today_completed_count = today_completed_count
@@ -101,12 +179,25 @@ async def join_challenge(
     user_id: int, challenge_id: int, request: UserChallengeCreateRequest | None = None
 ) -> UserChallenge:
     existing = await challenge_repository.get_user_challenge_by_user_and_challenge(user_id, challenge_id)
+    data = request.model_dump(exclude={"challenge_id"}, exclude_none=True) if request is not None else {}
+    data.setdefault("started_at", _now())
+    data.setdefault("expected_done_at", _default_expected_done_at(data["started_at"]))
     if existing is not None:
-        # Rejoining a canceled challenge needs a product policy and DB constraint pass.
+        if _is_rejoinable_user_challenge(existing):
+            return await _with_user_challenge_progress(
+                await challenge_repository.update_user_challenge(
+                    existing.id,
+                    {
+                        "status": UserChallengeStatus.JOINED,
+                        "started_at": data["started_at"],
+                        "expected_done_at": data["expected_done_at"],
+                        "completed_at": None,
+                        "canceled_at": None,
+                    },
+                )
+            )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 참여한 챌린지입니다.")
 
-    data = request.model_dump(exclude={"challenge_id"}) if request is not None else {}
-    data.setdefault("started_at", datetime.now(config.TIMEZONE))
     return await _with_user_challenge_progress(
         await challenge_repository.create_user_challenge(user_id, challenge_id, data)
     )
@@ -134,36 +225,206 @@ async def update_user_challenge(user_challenge_id: int, request: UserChallengeUp
 
 
 async def create_challenge_log(user_challenge_id: int, request: ChallengeLogCreateRequest) -> ChallengeLog:
-    return await challenge_repository.create_challenge_log(user_challenge_id, request.model_dump())
+    user_challenge = await challenge_repository.get_user_challenge_by_id(user_challenge_id)
+    if user_challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자 챌린지를 찾을 수 없습니다.")
+
+    challenge = await Challenge.get_or_none(id=user_challenge.challenge_id)
+    daily_goal_count = _get_daily_goal_count(challenge)
+    existing_count = await challenge_repository.count_challenge_logs_by_date(user_challenge_id, request.log_date)
+    if existing_count >= daily_goal_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="해당 날짜의 챌린지 로그가 하루 목표 횟수에 도달했습니다.",
+        )
+
+    data = request.model_dump(exclude_none=True)
+    if request.is_completed and data.get("completed_at") is None:
+        data["completed_at"] = _now()
+    if not request.is_completed:
+        data.pop("completed_at", None)
+    log = await challenge_repository.create_challenge_log(user_challenge_id, data)
+    _attach_challenge_log_dates(log)
+    return log
 
 
 async def list_challenge_logs(user_challenge_id: int) -> list[ChallengeLog]:
-    return await challenge_repository.list_challenge_logs(user_challenge_id)
+    logs = await challenge_repository.list_challenge_logs(user_challenge_id)
+    for log in logs:
+        _attach_challenge_log_dates(log)
+    return logs
 
 
 async def complete_today_challenge(user_challenge_id: int) -> ChallengeLog:
-    today = datetime.now(config.TIMEZONE).date()
+    now = _now()
+    today = now.date()
+    today_started_at, tomorrow_started_at = _kst_day_range(today)
     user_challenge = await challenge_repository.get_user_challenge_by_id(user_challenge_id)
     challenge = await Challenge.get_or_none(id=user_challenge.challenge_id) if user_challenge else None
     daily_goal_count = _get_daily_goal_count(challenge)
     completed_today = await ChallengeLog.filter(
         user_challenge_id=user_challenge_id,
-        log_date=today,
         is_completed=True,
+        completed_at__gte=today_started_at,
+        completed_at__lt=tomorrow_started_at,
     ).count()
     if completed_today >= daily_goal_count:
-        existing_log = await challenge_repository.get_challenge_log_by_date(user_challenge_id, today)
+        existing_log = (
+            await ChallengeLog.filter(
+                user_challenge_id=user_challenge_id,
+                is_completed=True,
+                completed_at__gte=today_started_at,
+                completed_at__lt=tomorrow_started_at,
+            )
+            .order_by("-completed_at")
+            .first()
+        )
         if existing_log is not None:
+            _attach_challenge_log_dates(existing_log)
             return existing_log
 
-    return await challenge_repository.create_challenge_log(
+    log = await challenge_repository.create_challenge_log(
         user_challenge_id,
         {
             "log_date": today,
             "is_completed": True,
+            "completed_at": now,
             "memo": f"오늘 챌린지 수행 {completed_today + 1}/{daily_goal_count}",
         },
     )
+    _attach_challenge_log_dates(log)
+    try:
+        from app.services import service_jobs
+
+        await service_jobs.enqueue_family_notification_create(
+            alert_type="challenge_completed",
+            user_challenge_id=user_challenge_id,
+        )
+    except Exception:  # noqa: BLE001
+        # 가족 알림은 부가 기능이므로 챌린지 완료 기록 자체를 실패시키지 않는다.
+        pass
+    return log
+
+
+async def get_challenge_calendar(user_id: int, target_date: date) -> dict:
+    started_at, ended_before = _kst_day_range(target_date)
+    started_challenges = await challenge_repository.list_user_challenges_started_between(
+        user_id=user_id,
+        started_at=started_at,
+        ended_before=ended_before,
+    )
+    completed_logs = await challenge_repository.list_challenge_logs_completed_between(
+        user_id=user_id,
+        completed_at=started_at,
+        ended_before=ended_before,
+    )
+    challenge_ids = {item.challenge_id for item in started_challenges}
+    for log in completed_logs:
+        challenge_ids.add(log.user_challenge.challenge_id)
+    challenges = {item.id: item for item in await Challenge.filter(id__in=challenge_ids)} if challenge_ids else {}
+    completed_logs_by_user_challenge_id: dict[int, list[ChallengeLog]] = {}
+    for log in completed_logs:
+        if _is_rejoinable_user_challenge(log.user_challenge):
+            continue
+        completed_logs_by_user_challenge_id.setdefault(log.user_challenge_id, []).append(log)
+
+    items: list[dict] = []
+    seen_user_challenge_ids: set[int] = set()
+    total_count = 0
+    completed_count = 0
+    for user_challenge in started_challenges:
+        if _is_rejoinable_user_challenge(user_challenge):
+            continue
+        _attach_user_challenge_dates(user_challenge)
+        item_completed_logs = completed_logs_by_user_challenge_id.get(user_challenge.id, [])
+        for completed_log in item_completed_logs:
+            _attach_challenge_log_dates(completed_log)
+        challenge = challenges.get(user_challenge.challenge_id)
+        item_total_count = _get_daily_goal_count(challenge)
+        item_completed_count = min(len(item_completed_logs), item_total_count)
+        item_is_completed = _is_completed_day(item_completed_count, item_total_count)
+        total_count += item_total_count
+        completed_count += item_completed_count
+        latest_completed_log = item_completed_logs[-1] if item_completed_logs else None
+        if item_is_completed or user_challenge.completed_at is not None:
+            status_label = "COMPLETED"
+        elif user_challenge.canceled_at is not None:
+            status_label = "CANCELED"
+        elif user_challenge.expected_done_at is not None and user_challenge.expected_done_at < _now():
+            status_label = "EXPIRED"
+        else:
+            status_label = "IN_PROGRESS"
+        items.append(
+            {
+                "challenge_id": user_challenge.challenge_id,
+                "user_challenge_id": user_challenge.id,
+                "challenge_log_id": latest_completed_log.id if latest_completed_log else None,
+                "title": challenge.title if challenge else None,
+                "status": status_label,
+                "total_count": item_total_count,
+                "completed_count": item_completed_count,
+                "is_completed": item_is_completed,
+                "started_at": user_challenge.started_at,
+                "expected_done_at": user_challenge.expected_done_at,
+                "due_at": user_challenge.expected_done_at,
+                "completed_at": latest_completed_log.completed_at
+                if latest_completed_log
+                else user_challenge.completed_at,
+                "started_date": user_challenge.started_date,
+                "expected_done_date": user_challenge.expected_done_date,
+                "due_date": user_challenge.expected_done_date,
+                "completed_date": latest_completed_log.completed_date
+                if latest_completed_log
+                else user_challenge.completed_date,
+            }
+        )
+        seen_user_challenge_ids.add(user_challenge.id)
+
+    for user_challenge_id, item_completed_logs in completed_logs_by_user_challenge_id.items():
+        for log in item_completed_logs:
+            _attach_challenge_log_dates(log)
+        latest_completed_log = item_completed_logs[-1]
+        user_challenge = latest_completed_log.user_challenge
+        if _is_rejoinable_user_challenge(user_challenge):
+            continue
+        _attach_user_challenge_dates(user_challenge)
+        challenge = challenges.get(user_challenge.challenge_id)
+        if user_challenge.id in seen_user_challenge_ids:
+            continue
+        item_total_count = _get_daily_goal_count(challenge)
+        item_completed_count = min(len(item_completed_logs), item_total_count)
+        item_is_completed = _is_completed_day(item_completed_count, item_total_count)
+        total_count += item_total_count
+        completed_count += item_completed_count
+        items.append(
+            {
+                "challenge_id": user_challenge.challenge_id,
+                "user_challenge_id": user_challenge.id,
+                "challenge_log_id": latest_completed_log.id,
+                "title": challenge.title if challenge else None,
+                "status": "COMPLETED" if item_is_completed else "IN_PROGRESS",
+                "total_count": item_total_count,
+                "completed_count": item_completed_count,
+                "is_completed": item_is_completed,
+                "started_at": user_challenge.started_at,
+                "expected_done_at": user_challenge.expected_done_at,
+                "due_at": user_challenge.expected_done_at,
+                "completed_at": latest_completed_log.completed_at,
+                "started_date": user_challenge.started_date,
+                "expected_done_date": user_challenge.expected_done_date,
+                "due_date": user_challenge.expected_done_date,
+                "completed_date": latest_completed_log.completed_date,
+            }
+        )
+
+    items.sort(key=lambda item: (item["completed_at"] or item["started_at"] or started_at, item["user_challenge_id"]))
+    return {
+        "date": target_date,
+        "total_count": total_count,
+        "completed_count": completed_count,
+        "is_completed": _is_completed_day(completed_count, total_count),
+        "items": items,
+    }
 
 
 async def give_up_challenge(user_challenge_id: int) -> UserChallenge | None:
@@ -172,7 +433,7 @@ async def give_up_challenge(user_challenge_id: int) -> UserChallenge | None:
             user_challenge_id,
             {
                 "status": UserChallengeStatus.CANCELED,
-                "canceled_at": datetime.now(config.TIMEZONE),
+                "canceled_at": _now(),
             },
         )
     )

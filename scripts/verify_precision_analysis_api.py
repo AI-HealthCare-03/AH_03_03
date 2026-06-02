@@ -9,6 +9,7 @@ Environment variables:
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from argparse import ArgumentParser
@@ -17,6 +18,8 @@ from typing import Any
 API_BASE_URL = os.getenv("VERIFY_API_BASE_URL", "http://localhost:8000/api/v1").rstrip("/")
 EMAIL = os.getenv("VERIFY_EMAIL", "demo@example.com")
 PASSWORD = os.getenv("VERIFY_PASSWORD", "Demo1234!")
+JOB_POLL_INTERVAL_SECONDS = float(os.getenv("VERIFY_JOB_POLL_INTERVAL_SECONDS", "1"))
+JOB_TIMEOUT_SECONDS = float(os.getenv("VERIFY_JOB_TIMEOUT_SECONDS", "60"))
 
 EXPECTED_CATBOOST = {
     "DIABETES": "dm_catboost_final",
@@ -39,18 +42,23 @@ def main() -> int:
     if not health_record_id:
         _fail("latest_health_record_id가 없습니다.")
 
-    run_results = _request_json(
+    job = _request_json(
         "POST",
-        "/analysis/run",
+        "/analysis/run-async",
         token=token,
         payload={"health_record_id": health_record_id, "mode": "PRECISION"},
     )
-    if not isinstance(run_results, list) or not run_results:
-        _fail("/analysis/run 응답에 분석 결과가 없습니다.")
+    job_id = job.get("id") if isinstance(job, dict) else None
+    if not job_id:
+        _fail("/analysis/run-async 응답에 job id가 없습니다.")
 
-    details = [
-        _request_json("GET", f"/analysis/results/{result['analysis_result_id']}", token=token) for result in run_results
-    ]
+    completed_job = _wait_for_job_success(int(job_id), token)
+    result_payload = completed_job.get("result_payload") or {}
+    result_ids = result_payload.get("analysis_result_ids") if isinstance(result_payload, dict) else None
+    if not isinstance(result_ids, list) or not result_ids:
+        _fail("analysis.run job result_payload에 analysis_result_ids가 없습니다.")
+
+    details = [_request_json("GET", f"/analysis/results/{result_id}", token=token) for result_id in result_ids]
     _assert_precision_results(details)
 
     print("PRECISION analysis smoke OK")
@@ -61,6 +69,23 @@ def main() -> int:
             )
         )
     return 0
+
+
+def _wait_for_job_success(job_id: int, token: str) -> dict[str, Any]:
+    deadline = time.monotonic() + JOB_TIMEOUT_SECONDS
+    last_job: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        job = _request_json("GET", f"/jobs/{job_id}", token=token)
+        if not isinstance(job, dict):
+            _fail(f"/jobs/{job_id} 응답이 올바르지 않습니다.")
+        last_job = job
+        status = job.get("status")
+        if status == "SUCCESS":
+            return job
+        if status in {"FAILED", "CANCELED"}:
+            _fail(f"analysis.run job failed: status={status}, error={job.get('error_message')}")
+        time.sleep(JOB_POLL_INTERVAL_SECONDS)
+    _fail(f"analysis.run job timeout: last={last_job}")
 
 
 def _parse_args():

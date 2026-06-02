@@ -1,7 +1,13 @@
-from datetime import datetime
+import logging
+import zoneinfo
+from datetime import datetime, time, timedelta
+from enum import Enum
+from typing import Any
 
 from app.core import config
 from app.dtos.notifications import (
+    FCMTokenDeleteRequest,
+    FCMTokenRegisterRequest,
     NotificationCreateRequest,
     NotificationUpdateRequest,
     ReminderScheduleCreateRequest,
@@ -13,8 +19,11 @@ from app.models.notifications import (
     NotificationLog,
     NotificationLogStatus,
     ReminderSchedule,
+    UserFCMToken,
 )
 from app.repositories import notification_repository
+
+logger = logging.getLogger(__name__)
 
 
 async def create_notification(user_id: int, request: NotificationCreateRequest) -> Notification:
@@ -110,6 +119,150 @@ async def list_my_notification_logs(user_id: int, limit: int = 50, offset: int =
     return await notification_repository.list_notification_logs_by_user(user_id=user_id, limit=limit, offset=offset)
 
 
+async def process_due_reminder_schedules(now: datetime | None = None, limit: int = 100) -> int:
+    now = _aware_datetime(now or datetime.now(config.TIMEZONE))
+    schedules = await notification_repository.list_due_reminder_schedules(now, limit=limit)
+    created_count = 0
+    for schedule in schedules:
+        try:
+            if await _process_due_reminder_schedule(schedule, now):
+                created_count += 1
+        except Exception:
+            logger.exception("Failed to process reminder schedule", extra={"reminder_schedule_id": schedule.id})
+    return created_count
+
+
+async def _process_due_reminder_schedule(schedule: ReminderSchedule, now: datetime) -> bool:
+    trigger_at = _aware_datetime(schedule.next_trigger_at or now)
+    if await notification_repository.has_notification_log_for_reminder_since(int(schedule.id), trigger_at):
+        await _advance_reminder_schedule(schedule, now)
+        return False
+
+    notification = await notification_repository.create_notification(
+        int(schedule.user_id),
+        {
+            "notification_type": _enum_value(schedule.reminder_type),
+            "title": schedule.title,
+            "message": schedule.message,
+            "related_type": schedule.related_type,
+            "related_id": schedule.related_id,
+        },
+    )
+
+    channel = _notification_channel(schedule.channel)
+    await record_notification_log(
+        user_id=int(schedule.user_id),
+        notification_id=int(notification.id),
+        reminder_schedule_id=int(schedule.id),
+        notification_type=_enum_value(schedule.reminder_type),
+        channel=channel,
+        title=schedule.title,
+        message_summary=_summary(schedule.message),
+        related_type=schedule.related_type,
+        related_id=schedule.related_id,
+        status=NotificationLogStatus.PENDING if channel == NotificationChannel.PUSH else NotificationLogStatus.SENT,
+        sent_at=now if channel != NotificationChannel.PUSH else None,
+    )
+
+    if channel == NotificationChannel.PUSH:
+        await _enqueue_push_for_reminder(schedule)
+
+    await _advance_reminder_schedule(schedule, now)
+    return True
+
+
+async def _enqueue_push_for_reminder(schedule: ReminderSchedule) -> None:
+    try:
+        from app.services import service_jobs
+
+        await service_jobs.enqueue_fcm_push_send(
+            user_id=int(schedule.user_id),
+            title=schedule.title,
+            body=schedule.message,
+            data={
+                "type": _enum_value(schedule.reminder_type),
+                "reminder_schedule_id": str(schedule.id),
+            },
+            notification_type=_enum_value(schedule.reminder_type),
+            related_type=schedule.related_type,
+            related_id=schedule.related_id,
+        )
+    except Exception:
+        logger.exception("Failed to enqueue reminder push job", extra={"reminder_schedule_id": schedule.id})
+
+
+async def _advance_reminder_schedule(schedule: ReminderSchedule, now: datetime) -> None:
+    next_trigger_at = _calculate_next_trigger(schedule, now)
+    data: dict[str, Any] = {
+        "last_triggered_at": now,
+        "next_trigger_at": next_trigger_at,
+    }
+    if next_trigger_at is None:
+        data["is_active"] = False
+    await notification_repository.update_reminder_schedule(int(schedule.id), data)
+
+
+def _calculate_next_trigger(schedule: ReminderSchedule, now: datetime) -> datetime | None:
+    if not schedule.schedule_time:
+        return None
+
+    parsed_time = _parse_schedule_time(schedule.schedule_time)
+    if parsed_time is None:
+        return None
+
+    tz = _schedule_timezone(schedule.timezone)
+    local_now = _aware_datetime(now).astimezone(tz)
+    candidate = datetime.combine(local_now.date(), parsed_time, tzinfo=tz)
+    if candidate <= local_now:
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def _parse_schedule_time(value: str | None) -> time | None:
+    if not value:
+        return None
+    parts = value.split(":")
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+        second = int(parts[2]) if len(parts) > 2 else 0
+        return time(hour=hour, minute=minute, second=second)
+    except (IndexError, ValueError):
+        return None
+
+
+def _schedule_timezone(value: str | None) -> zoneinfo.ZoneInfo:
+    try:
+        return zoneinfo.ZoneInfo(value or "Asia/Seoul")
+    except zoneinfo.ZoneInfoNotFoundError:
+        return config.TIMEZONE
+
+
+def _aware_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=config.TIMEZONE)
+    return value
+
+
+def _notification_channel(value: NotificationChannel | str) -> NotificationChannel:
+    if isinstance(value, NotificationChannel):
+        return value
+    try:
+        return NotificationChannel(str(value))
+    except ValueError:
+        return NotificationChannel.IN_APP
+
+
+def _enum_value(value: Enum | str) -> str:
+    return value.value if isinstance(value, Enum) else str(value)
+
+
+def _summary(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value[:255]
+
+
 async def record_notification_log(
     *,
     user_id: int,
@@ -153,3 +306,27 @@ async def record_notification_log(
         "failed_at": failed_at,
     }
     return await notification_repository.create_notification_log(user_id, data)
+
+
+async def register_fcm_token(
+    user_id: int,
+    request: FCMTokenRegisterRequest,
+    *,
+    request_user_agent: str | None = None,
+) -> UserFCMToken:
+    now = datetime.now(config.TIMEZONE)
+    data = request.model_dump()
+    data["user_agent"] = data.get("user_agent") or request_user_agent
+    data["is_active"] = True
+    data["last_seen_at"] = now
+    data["revoked_at"] = None
+    return await notification_repository.upsert_fcm_token(user_id, data)
+
+
+async def deactivate_fcm_token(user_id: int, request: FCMTokenDeleteRequest) -> int:
+    revoked_at = datetime.now(config.TIMEZONE)
+    return await notification_repository.deactivate_fcm_token(user_id, request.token, revoked_at)
+
+
+async def deactivate_fcm_tokens_by_user(user_id: int, revoked_at: datetime) -> int:
+    return await notification_repository.deactivate_fcm_tokens_by_user(user_id, revoked_at)

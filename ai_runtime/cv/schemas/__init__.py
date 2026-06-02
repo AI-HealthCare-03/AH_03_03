@@ -48,7 +48,7 @@ ERROR_MAP: dict[str, dict] = {
     },
     "unsupported_type": {
         "status_code": 415,
-        "message": "지원하지 않는 이미지 형식입니다. JPG, PNG, WEBP로 다시 업로드해주세요.",
+        "message": "지원하지 않는 이미지 형식입니다. JPG, PNG, WEBP, HEIC로 다시 업로드해주세요.",
     },
     "image_blurry": {
         "status_code": 422,

@@ -67,7 +67,7 @@ const targetDiseaseLabel: Record<string, string> = {
   GENERAL: "일반 건강관리",
   DIABETES: "당뇨 관리",
   HYPERTENSION: "고혈압 관리",
-  DYSLIPIDEMIA: "이상지질혈증 관리",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방 관리",
   OBESITY: "비만 관리",
 };
 
@@ -83,10 +83,10 @@ const statusLabel: Record<string, string> = {
   IN_PROGRESS: "진행 중",
   JOINED: "진행 중",
   COMPLETED: "완료",
-  GIVEN_UP: "포기",
-  GIVE_UP: "포기",
-  CANCELED: "포기",
-  CANCELLED: "포기",
+  GIVEN_UP: "참여 전",
+  GIVE_UP: "참여 전",
+  CANCELED: "참여 전",
+  CANCELLED: "참여 전",
   PENDING: "대기",
 };
 
@@ -101,6 +101,10 @@ function normalizeStatus(value: unknown): string {
 function getDisplayStatus(value: unknown): string {
   const status = normalizeStatus(value);
   return statusLabel[status] ?? "진행 중";
+}
+
+function isRejoinableChallengeStatus(value: unknown): boolean {
+  return ["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(normalizeStatus(value));
 }
 
 function getDisplayCategory(value: unknown): string {
@@ -177,8 +181,16 @@ function getChallengeDescription(item: Challenge, challengeList: Challenge[]): s
 
 function getDurationDays(item: Challenge, challengeList: Challenge[]): number {
   const nested = item.challenge as Challenge | undefined;
-  const parsed = Number(item.duration_days ?? nested?.duration_days ?? findMasterChallenge(item, challengeList)?.duration_days);
+  const parsed = Number(item.total_days ?? item.duration_days ?? nested?.duration_days ?? findMasterChallenge(item, challengeList)?.duration_days);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+}
+
+function getRequiredDays(item: Challenge, challengeList: Challenge[] = []): number {
+  const parsed = Number(item.required_days ?? item.required_count);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.round(parsed);
+  }
+  return Math.ceil(getDurationDays(item, challengeList) * 0.8);
 }
 
 function getCompletedDays(item: Challenge, challengeList: Challenge[] = []): number | null {
@@ -193,20 +205,71 @@ function getCompletedDays(item: Challenge, challengeList: Challenge[] = []): num
   return null;
 }
 
+function hasMetCompletionCondition(item: Challenge, challengeList: Challenge[] = []): boolean {
+  if (item.has_met_completion_condition !== undefined) {
+    return Boolean(item.has_met_completion_condition);
+  }
+  return (getCompletedDays(item, challengeList) ?? 0) >= getRequiredDays(item, challengeList);
+}
+
+function isFinalizedChallenge(item: Challenge | undefined): boolean {
+  if (!item) {
+    return false;
+  }
+  if (Boolean(item.is_finalized) || Boolean(item.completed_at)) {
+    return true;
+  }
+  return ["COMPLETED", "EXPIRED", "FAILED"].includes(normalizeStatus(item.status));
+}
+
+function isFinalCompletedChallenge(item: Challenge | undefined, challengeList: Challenge[] = []): boolean {
+  if (!item) {
+    return false;
+  }
+  if (Boolean(item.completed_at)) {
+    return true;
+  }
+  return isFinalizedChallenge(item) && hasMetCompletionCondition(item, challengeList);
+}
+
+function isMissedChallenge(item: Challenge | undefined, challengeList: Challenge[] = []): boolean {
+  return Boolean(item) && isFinalizedChallenge(item) && !isFinalCompletedChallenge(item, challengeList) && !isRejoinableChallengeStatus(item?.status);
+}
+
+function getChallengeStatusLabel(item: Challenge | undefined, challengeList: Challenge[] = []): string {
+  if (!item || isRejoinableChallengeStatus(item.status)) {
+    return "참여 전";
+  }
+  if (isFinalCompletedChallenge(item, challengeList)) {
+    return "완료";
+  }
+  if (isMissedChallenge(item, challengeList)) {
+    return "미달성";
+  }
+  if (hasMetCompletionCondition(item, challengeList)) {
+    return "완료 조건 충족";
+  }
+  return getDisplayStatus(item.status);
+}
+
 function getProgressLabel(item: Challenge, challengeList: Challenge[] = []): string {
   const status = normalizeStatus(item.status);
   const durationDays = getDurationDays(item, challengeList);
-  const completedDays = getCompletedDays(item, challengeList);
-  if (status === "COMPLETED") {
+  const completedDays = Math.min(getCompletedDays(item, challengeList) ?? 0, durationDays);
+  const requiredDays = getRequiredDays(item, challengeList);
+  if (isFinalCompletedChallenge(item, challengeList)) {
     return `${durationDays}/${durationDays}일 완료`;
   }
-  if (["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(status)) {
-    return "포기";
+  if (isRejoinableChallengeStatus(status)) {
+    return "참여 전";
   }
-  if (completedDays !== null) {
-    return `${Math.min(completedDays, durationDays)}/${durationDays}일 완료`;
+  if (isMissedChallenge(item, challengeList)) {
+    return `${completedDays}/${durationDays}일 미달성`;
   }
-  return getDisplayStatus(status);
+  if (hasMetCompletionCondition(item, challengeList)) {
+    return `${completedDays}/${durationDays}일 완료 조건 충족 · 진행 중`;
+  }
+  return `${completedDays}/${durationDays}일 진행 중 · 목표 ${requiredDays}일`;
 }
 
 function isTodayCompleted(item: Challenge): boolean {
@@ -259,7 +322,61 @@ function getLocalDateKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function getDateKey(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw.slice(0, 10);
+  }
+  return getLocalDateKey(parsed);
+}
+
+function formatDateLabel(value: unknown): string {
+  const key = getDateKey(value);
+  if (!key) {
+    return "-";
+  }
+  const [year, month, day] = key.split("-");
+  return `${year}. ${Number(month)}. ${Number(day)}.`;
+}
+
+function getStartedDate(item: Challenge | undefined): string {
+  return getDateKey(item?.started_date ?? item?.started_at);
+}
+
+function getExpectedDoneDate(item: Challenge | undefined): string {
+  return getDateKey(item?.end_date ?? item?.expected_done_date ?? item?.due_date ?? item?.expected_done_at ?? item?.due_at);
+}
+
+function getCompletedDate(log: ChallengeLog): string {
+  return getDateKey(log.completed_date ?? log.completed_at ?? log.log_date);
+}
+
+function isChallengeScheduledForDate(item: Challenge, dateKey: string): boolean {
+  const startedDate = getStartedDate(item);
+  if (!startedDate) {
+    return false;
+  }
+  const expectedDoneDate = getExpectedDoneDate(item);
+  if (!expectedDoneDate) {
+    return startedDate === dateKey;
+  }
+  return startedDate <= dateKey && dateKey < expectedDoneDate;
+}
+
 function getProgress(item: Challenge, challengeList: Challenge[] = []): number {
+  if (isRejoinableChallengeStatus(item.status)) {
+    return 0;
+  }
+  if (isFinalCompletedChallenge(item, challengeList)) {
+    return 100;
+  }
   const explicit = Number(item.progress ?? item.progress_rate);
   if (Number.isFinite(explicit)) {
     return Math.max(0, Math.min(explicit > 1 ? explicit : explicit * 100, 100));
@@ -269,28 +386,29 @@ function getProgress(item: Challenge, challengeList: Challenge[] = []): number {
   if (Number.isFinite(completedDays) && completedDays >= 0 && durationDays > 0) {
     return Math.max(0, Math.min(Math.round((completedDays / durationDays) * 100), 100));
   }
-  const status = normalizeStatus(item.status);
-  if (status === "COMPLETED") {
-    return 100;
+  const rate = Number(item.completion_rate);
+  if (Number.isFinite(rate)) {
+    return Math.max(0, Math.min(rate, 100));
   }
-  if (["ACTIVE", "IN_PROGRESS", "JOINED"].includes(status)) {
-    return 40;
-  }
-  if (["GIVE_UP", "GIVEN_UP", "FAILED", "CANCELED", "CANCELLED"].includes(status)) {
-    return 0;
-  }
-  return 0;
+  return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status)) ? 40 : 0;
 }
 
 function isJoinedStatus(item: Challenge | undefined): boolean {
   if (!item) {
     return false;
   }
-  return !["", "PENDING"].includes(normalizeStatus(item.status));
+  const status = normalizeStatus(item.status);
+  return !["", "PENDING"].includes(status) && !isRejoinableChallengeStatus(status);
 }
 
 function isActiveChallengeStatus(item: Challenge | undefined): boolean {
   if (!item) {
+    return false;
+  }
+  if (item.completed_at || item.canceled_at) {
+    return false;
+  }
+  if (isFinalizedChallenge(item)) {
     return false;
   }
   return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status));
@@ -304,6 +422,7 @@ export default function ChallengePage() {
   const [page, setPage] = useState(1);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -355,9 +474,22 @@ export default function ChallengePage() {
   const myChallengeByMasterId = useMemo(() => {
     const mapped = new Map<number, Challenge>();
     myChallenges.forEach((item) => {
+      if (isRejoinableChallengeStatus(item.status)) {
+        return;
+      }
       const challengeId = getChallengeId(item);
       if (challengeId !== null) {
         mapped.set(challengeId, item);
+      }
+    });
+    return mapped;
+  }, [myChallenges]);
+  const myChallengeById = useMemo(() => {
+    const mapped = new Map<number, Challenge>();
+    myChallenges.forEach((item) => {
+      const id = Number(item.id);
+      if (Number.isFinite(id)) {
+        mapped.set(id, item);
       }
     });
     return mapped;
@@ -370,7 +502,7 @@ export default function ChallengePage() {
     setPage(1);
   }, [activeTab]);
 
-  const activeMyChallenges = myChallenges.filter((item) => ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status)));
+  const activeMyChallenges = myChallenges.filter(isActiveChallengeStatus);
   const todayDoneCount = activeMyChallenges.filter((item) => getTodayCompletedCount(item) >= getDailyGoalCount(item, challenges)).length;
   const averageProgress =
     activeMyChallenges.length > 0
@@ -398,18 +530,43 @@ export default function ChallengePage() {
 
   const getCalendarDayState = (day: number) => {
     const key = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const done = Object.values(logsByUserChallengeId)
-      .flat()
-      .filter((log) => String(log.log_date ?? "").slice(0, 10) === key && Boolean(log.is_completed)).length;
-    const goal = activeMyChallenges.reduce((sum, item) => sum + getDailyGoalCount(item, challenges), 0);
-    return { done, goal, isToday: key === todayKey };
+    const scheduledIds = new Set<number>();
+    activeMyChallenges.forEach((item) => {
+      const id = Number(item.id);
+      if (Number.isFinite(id) && isChallengeScheduledForDate(item, key)) {
+        scheduledIds.add(id);
+      }
+    });
+
+    const completedCountByChallengeId = new Map<number, number>();
+    Object.entries(logsByUserChallengeId).forEach(([rawId, logs]) => {
+      const id = Number(rawId);
+      const count = logs.filter((log) => Boolean(log.is_completed) && getCompletedDate(log) === key).length;
+      if (Number.isFinite(id) && count > 0) {
+        completedCountByChallengeId.set(id, count);
+        scheduledIds.add(id);
+      }
+    });
+
+    let total = 0;
+    let done = 0;
+    scheduledIds.forEach((id) => {
+      const challenge = myChallengeById.get(id);
+      const dailyGoal = getDailyGoalCount(challenge, challenges);
+      total += dailyGoal;
+      done += Math.min(completedCountByChallengeId.get(id) ?? 0, dailyGoal);
+    });
+    return { done, total, isToday: key === todayKey, label: total > 0 ? `${done}/${total}` : "" };
   };
 
   const handleJoin = async (challengeId: number) => {
     setActionId(`join-${challengeId}`);
+    setError("");
+    setMessage("");
     try {
       await joinChallenge(challengeId);
       await load();
+      setMessage("챌린지에 참여했습니다. 오늘 수행 기록을 남길 수 있습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "챌린지 참여 처리에 실패했습니다.");
     } finally {
@@ -423,9 +580,12 @@ export default function ChallengePage() {
       return;
     }
     setActionId(`complete-${id}`);
+    setError("");
+    setMessage("");
     try {
       await completeToday(id);
       await load();
+      setMessage("오늘 수행을 완료했습니다. 달력과 진행률에 반영되었습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "오늘 수행 완료 처리에 실패했습니다.");
     } finally {
@@ -438,15 +598,18 @@ export default function ChallengePage() {
     if (!Number.isFinite(id)) {
       return;
     }
-    if (!window.confirm("챌린지를 포기하면 현재 진행 상태가 중단됩니다. 계속하시겠습니까?")) {
+    if (!window.confirm("챌린지 참여를 취소하면 현재 진행 상태가 중단됩니다. 계속하시겠습니까?")) {
       return;
     }
     setActionId(`give-up-${id}`);
+    setError("");
+    setMessage("");
     try {
       await giveUpChallenge(id);
       await load();
+      setMessage("챌린지 참여를 취소했습니다. 다시 시작할 수 있습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "챌린지 포기 처리에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "챌린지 참여 취소 처리에 실패했습니다.");
     } finally {
       setActionId(null);
     }
@@ -475,6 +638,7 @@ export default function ChallengePage() {
         ))}
       </div>
       {error && <div className="state-box">{error}</div>}
+      {message && <div className="state-box">{message}</div>}
       <div className="challenge-page-layout">
         <main className="challenge-main-list">
           <Card title="챌린지 목록">
@@ -508,19 +672,27 @@ export default function ChallengePage() {
                       <span className="badge badge-reference">{getDisplayChallengeType(challenge)}</span>
                       <span className="badge badge-reference">{getDisplayCategory(category)}</span>
                       <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
-                      <span className="badge badge-reference">참여 상태: {joinedChallenge ? getDisplayStatus(joinedChallenge.status) : "참여 전"}</span>
+                      <span className="badge badge-reference">
+                        참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
+                      </span>
                     </div>
                     {Boolean(challenge.caution_message) && <div className="state-box warning-card">{String(challenge.caution_message)}</div>}
                     {Boolean(challenge.contraindication_message) && (
                       <div className="state-box warning-card">{String(challenge.contraindication_message)}</div>
                     )}
                     {joinedChallenge ? (
-                      <div className="challenge-progress">
-                        <span className="muted">{getProgressLabel(joinedChallenge, challenges)}</span>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${progress}%` }} />
+                      <>
+                        <div className="challenge-date-meta">
+                          <span>실행일: {formatDateLabel(joinedChallenge.started_date ?? joinedChallenge.started_at)}</span>
+                          <span>완료 예정일: {formatDateLabel(joinedChallenge.end_date ?? joinedChallenge.expected_done_date ?? joinedChallenge.expected_done_at)}</span>
                         </div>
-                      </div>
+                        <div className="challenge-progress">
+                          <span className="muted">{getProgressLabel(joinedChallenge, challenges)}</span>
+                          <div className="progress-bar">
+                            <div className="progress-fill" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <p className="muted">아직 참여 전입니다.</p>
                     )}
@@ -538,11 +710,11 @@ export default function ChallengePage() {
                         </button>
                       ) : joined ? (
                         <button disabled type="button">
-                          {getDisplayStatus(joinedChallenge?.status)}
+                          {getChallengeStatusLabel(joinedChallenge, challenges)}
                         </button>
                       ) : (
                         <button disabled={actionId === `join-${String(challenge.id)}`} onClick={() => void handleJoin(Number(challenge.id))} type="button">
-                          {actionId === `join-${String(challenge.id)}` ? "참여 중..." : "참여하기"}
+                          {actionId === `join-${String(challenge.id)}` ? "시작 중..." : "지금 수행하기"}
                         </button>
                       )}
                     </div>
@@ -584,10 +756,10 @@ export default function ChallengePage() {
               </div>
             </div>
             <div className="my-challenge-summary-list">
-              {!loading && myChallenges.length === 0 && (
+              {!loading && activeMyChallenges.length === 0 && (
                 <div className="compact-empty-state">아직 참여 중인 챌린지가 없습니다. 관심 있는 챌린지를 시작해보세요.</div>
               )}
-              {myChallenges.slice(0, 4).map((challenge) => {
+              {activeMyChallenges.slice(0, 4).map((challenge) => {
                 const master = findMasterChallenge(challenge, challenges);
                 const category = getCategory(master ?? challenge);
                 const progress = getProgress(challenge, challenges);
@@ -597,7 +769,7 @@ export default function ChallengePage() {
                       <span className="challenge-icon">{categoryIcon[category] ?? "🌿"}</span>
                       <div>
                         <strong>{getChallengeTitle(challenge, challenges)}</strong>
-                        <p>{getDisplayStatus(challenge.status)}</p>
+                        <p>{getChallengeStatusLabel(challenge, challenges)}</p>
                       </div>
                     </div>
                     <div className="challenge-progress">
@@ -605,6 +777,10 @@ export default function ChallengePage() {
                       <div className="progress-bar">
                         <div className="progress-fill" style={{ width: `${progress}%` }} />
                       </div>
+                    </div>
+                    <div className="challenge-date-meta compact">
+                      <span>실행일: {formatDateLabel(challenge.started_date ?? challenge.started_at)}</span>
+                      <span>완료 예정일: {formatDateLabel(challenge.end_date ?? challenge.expected_done_date ?? challenge.expected_done_at)}</span>
                     </div>
                     <div className="button-row">
                       <span className={isTodayCompleted(challenge) ? "badge risk-low" : "badge badge-missing"}>
@@ -623,7 +799,7 @@ export default function ChallengePage() {
                             onClick={() => void handleComplete(challenge)}
                             type="button"
                           >
-                            {getTodayActionLabel(challenge, challenges)}
+                            {actionId === `complete-${String(challenge.id)}` ? "저장 중..." : getTodayActionLabel(challenge, challenges)}
                           </button>
                           <button
                             className="secondary compact-button"
@@ -631,11 +807,11 @@ export default function ChallengePage() {
                             onClick={() => void handleGiveUp(challenge)}
                             type="button"
                           >
-                            포기
+                            참여 취소
                           </button>
                         </>
                       ) : (
-                        <span className="badge badge-reference">{getDisplayStatus(challenge.status)}</span>
+                        <span className="badge badge-reference">{getChallengeStatusLabel(challenge, challenges)}</span>
                       )}
                     </div>
                   </div>
@@ -674,8 +850,8 @@ export default function ChallengePage() {
                   return <span className="challenge-calendar-cell empty" key={cell.key} />;
                 }
                 const state = getCalendarDayState(cell.day);
-                const complete = state.goal > 0 && state.done >= state.goal;
-                const partial = state.done > 0 && !complete;
+                const complete = state.total > 0 && state.done >= state.total;
+                const partial = state.total > 0 && !complete;
                 return (
                   <span
                     className={`challenge-calendar-cell ${state.isToday ? "today" : ""} ${complete ? "complete" : ""} ${partial ? "partial" : ""}`}
@@ -683,7 +859,7 @@ export default function ChallengePage() {
                   >
                     <strong>{cell.day}</strong>
                     {complete ? <em>✅</em> : null}
-                    {partial ? <small>{state.done}/{state.goal}</small> : null}
+                    {partial ? <small>{state.label}</small> : null}
                   </span>
                 );
               })}

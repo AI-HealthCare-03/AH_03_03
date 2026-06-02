@@ -1,31 +1,34 @@
 # P2 Operational Backlog
 
-이 문서는 `feature/kdu` 기준으로 시연 전에는 구현하지 않는 작업을 명확히 분리하기 위한 운영 백로그다. 아래 항목은 "미구현"이라기보다, 시연 안정성과 범위 통제를 위해 의도적으로 보류한 작업이다.
+이 문서는 `feature/kdu` 기준으로 이미 구현된 운영 기반과 아직 남은 P1/P2 운영 과제를 분리하기 위한 백로그다.
 
-시연 전 P0의 초점은 동기 API 기반 핵심 흐름이다.
+현재 P0/P1 일부는 이미 구현되었다.
 
 - 로그인/회원가입
 - 건강정보 입력
 - 건강검진 OCR confirm
-- BASIC/PRECISION 분석
+- BASIC/PRECISION 분석과 `analysis.run` async job
 - CatBoost DM/HTN/DL 추론
 - OBESITY rule-based 분석
-- 식단 nutrition score
+- 식단 nutrition score와 `diet.analyze_image` async job
+- 건강검진 OCR `exam_ocr.run` async job
+- 복약 OCR `medication_ocr.run` async job
+- 이메일/비밀번호/가족초대/FCM/가족알림 service job
 - 관리자 콘솔/FAQ/문의
-- Docker compose 기반 FastAPI 구동
+- Docker compose 기반 FastAPI, ai-worker, Redis, PostgreSQL 구동
 
-현재 FastAPI 라우터와 Tortoise/asyncpg 기반 DB I/O는 `async`로 동작한다. 다만 OCR/CV/ML/LLM workflow 자체는 요청 안에서 동기적으로 처리한다. Redis는 현재 health check와 인프라 준비 용도이며, Redis Stream 기반 작업 큐로는 사용하지 않는다.
+현재 FastAPI 라우터와 Tortoise/asyncpg 기반 DB I/O는 `async`로 동작한다. 긴 OCR/식단/분석/외부 발송 작업은 Redis Stream 기반 async job으로 넘기며, `/api/v1/jobs/{job_id}`로 상태를 조회한다. 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 막아 요청 중 직접 분석을 수행하지 않는다.
 
-운영 진입 단계에서는 아래 P1/P2 항목을 순차적으로 구현한다.
+운영 진입 단계에서는 아래 남은 P1/P2 항목을 순차적으로 구현한다.
 
 ## 1. 전체 항목 요약
 
 | 번호 | 항목 | 우선순위 | 현재 상태 | 시연 전 P0 제외 사유 | 운영 진입 전 필요한 이유 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Redis Stream / async_jobs / AI Worker consumer | P2 | DEMO_ECHO skeleton만 존재 | 시연 핵심 흐름은 동기 API로 충분하며 실제 OCR/CV/ML/LLM queue 전환은 장애 지점이 늘어남 | OCR/CV/LLM 장시간 작업의 retry, status tracking, DLQ 필요 |
+| 1 | Redis Stream / async_jobs / AI Worker consumer | 완료/부분 완료 | AI/service stream, 주요 job handler, retry/DLQ/pending recovery 구현 | P0에서 1차 구현 완료 | queue metrics, DLQ 재처리, worker heartbeat/운영 대시보드 고도화 필요 |
 | 2 | vector RAG / pgvector embedding search | P2 | RAG-ready interface 수준 | 신뢰 문서 수집/임베딩/검증 없이 붙이면 의료 답변 위험 증가 | 근거 기반 건강정보 답변, 출처 추적, 검색 품질 개선 필요 |
 | 3 | wearable 연동 | P2 | 요구사항 보류 | 외부 계정/OAuth/device API 범위가 크고 시연 핵심 흐름이 아님 | 연속 건강 데이터 기반 추세 분석과 리마인더 자동화에 필요 |
-| 4 | 외부 알림 worker | P2 | reminder/log UI와 스키마 중심 | SMS/Push/Kakao/Email 발송은 비용/인증/실패처리 이슈가 큼 | 실제 리마인더 발송, 재시도, 발송 이력 관리 필요 |
+| 4 | 외부 알림 worker | 부분 완료 | 이메일/FCM/family service job 구현. SMS/Kakao 미구현 | 문자/카카오 provider는 비용/인증/정책 확인 필요 | 실제 채널별 발송 품질, 실패 재시도, 수신 동의 정책 고도화 필요 |
 | 5 | Langfuse 운영 추적 | P1 | 실험/연동 구조 존재 | 실제 LLM 호출 기본값이 꺼져 있어 시연 핵심 장애 요인이 아님 | LLM 비용, prompt version, safety/fallback 관측 필요 |
 | 6 | Sentry/Datadog 등 모니터링 | P1 | DB 로그 중심 | 외부 SaaS 연동보다 현재 Docker/API 안정화가 우선 | 운영 장애 알림, trace, error aggregation 필요 |
 | 7 | rate limiting | P1 | 로그인 제한 등 일부 정책만 존재 | 시연 로컬 환경에서는 abuse 방어보다 UX 검증이 우선 | 로그인/LLM/OCR/분석 API 남용 방지 필요 |
@@ -40,33 +43,22 @@
 ### 1. Redis Stream / async_jobs / AI Worker consumer
 
 - 현재 상태:
-  - Redis 컨테이너와 compose healthcheck는 존재한다.
-  - FastAPI는 `REDIS_HOST`, `REDIS_PORT` 설정으로 compose 내부 Redis에 연결할 수 있다.
+  - Redis 컨테이너와 compose healthcheck가 존재한다.
   - `/api/v1/system/health`는 Redis 연결 상태를 확인한다.
-  - `async_jobs` 모델과 `/api/v1/jobs/demo`, `/api/v1/jobs/{job_id}` 상태 조회 API가 추가되어 있다.
-  - `ai_runtime/main.py`는 Redis Stream consumer로 실행되며 현재 `DEMO_ECHO` job만 처리한다.
-  - 현재 Redis Stream 사용 범위는 demo skeleton 검증용이다.
-  - FastAPI 라우터와 DB I/O는 async 기반이지만, OCR/CV/ML/LLM workflow는 현재 동기 API 요청 안에서 처리한다.
-  - `/analysis/run`, `/diets/analyze`, 건강검진 OCR confirm은 아직 Redis Stream으로 넘기지 않는다.
-  - `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs`를 연결하기 위한 reserved nullable field다. 현재 공식 분석 결과와는 연결하지 않는다.
-  - retry, dead-letter queue, worker heartbeat, idempotency key는 아직 구현하지 않는다.
-- 왜 시연 전 P0가 아닌지:
-  - 현재 핵심 시연 흐름은 FastAPI 동기 API로 검증 가능하다.
-  - `/analysis/run`, `/diets/analyze`, 건강검진 OCR confirm 흐름은 시연 전까지 동기 처리로 유지하는 것이 안전하다.
-  - queue/worker를 넣으면 상태 전이, retry, timeout, idempotency까지 함께 설계해야 해 시연 리스크가 커진다.
-  - MVP 시연 설명은 "현재는 동기 처리이며, Redis Stream은 DEMO_ECHO skeleton만 존재한다. 운영 확장 시 실제 OCR/CV/ML/LLM 작업을 비동기 worker로 전환한다"로 통일한다.
-- 운영 진입 전 필요한 이유:
-  - OCR, CV, GPT Vision, LLM, 대용량 ML 추론은 요청 시간이 길어질 수 있다.
-  - 작업 상태 조회, 실패 재시도, dead-letter queue, worker heartbeat가 필요하다.
-  - 운영 전에는 `async_jobs` DB 모델, Redis Stream producer/consumer, consumer group, retry/DLQ, heartbeat, idempotency key를 한 묶음으로 설계해야 한다.
-- 예상 변경 파일/모듈:
-  - `app/models/async_jobs.py` 고도화
-  - `app/apis/v1/job_routers.py` 실제 job type 확장
-  - `ai_runtime/jobs/` retry/DLQ/heartbeat 확장
-  - `ai_runtime/pipelines/`
-  - Redis Stream producer/consumer 모듈
-  - retry/dead-letter queue 모듈
-- 우선순위: P2
+  - `async_jobs` 모델과 `/api/v1/jobs/demo`, `/api/v1/jobs/{job_id}` 상태 조회 API가 있다.
+  - `ai_runtime/main.py`는 Redis Stream consumer와 scheduler loop로 실행된다.
+  - AI stream job: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`
+  - Service stream job: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `fcm.push.send`, `family.notification.create`
+  - stream MAXLEN, retry/backoff, DLQ, pending recovery가 구현되어 있다.
+  - `/analysis/run-async`, `/diets/analyze`, `/exams/{exam_id}/ocr`, `/medications/ocr`는 job 생성 후 polling하는 흐름이다.
+  - 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 응답한다.
+- 남은 운영 과제:
+  - worker heartbeat/metrics 노출
+  - 관리자 queue/DLQ 모니터링 화면
+  - DLQ 재처리 CLI/API
+  - job type별 timeout/priority 정책
+  - worker 수평 확장과 consumer group 운영 절차
+- 우선순위: 완료/부분 완료
 
 ### 2. vector RAG / pgvector embedding search
 
@@ -108,20 +100,23 @@
 ### 4. 외부 알림 worker
 
 - 현재 상태:
-  - 알림 inbox, reminder schedule, notification log 중심의 구조와 UI를 우선한다.
-  - 실제 Push/SMS/Kakao/Email 발송 worker는 구현하지 않는다.
-- 왜 시연 전 P0가 아닌지:
-  - 외부 발송은 API key, 비용, 발송 실패, 재시도, 수신 동의 정책이 필요하다.
-  - 시연에서는 예약/이력 관리와 in-app 알림 흐름 확인이 더 중요하다.
-- 운영 진입 전 필요한 이유:
-  - 복약, 챌린지, 건강기록 리마인더가 실제 사용자에게 전달되어야 한다.
-  - channel별 실패 원인과 retry 정책이 필요하다.
+  - 알림 inbox, reminder schedule, notification log 구조가 있다.
+  - email verification, password reset, family invite email은 service stream job으로 enqueue된다.
+  - FCM push는 `fcm.push.send` service job과 `user_fcm_tokens`를 사용한다.
+  - 가족 챌린지 알림 생성은 `family.notification.create` service job으로 분리되어 있다.
+  - SMS/Kakao provider는 아직 구현하지 않는다.
+- 남은 운영 과제:
+  - channel별 발송 지표와 실패율 관측
+  - DLQ 재처리와 provider별 rate limit
+  - SMS/Kakao 도입 여부 결정
+  - 수신 동의/quiet hour 정책 고도화
 - 예상 변경 파일/모듈:
   - `app/services/notifications.py`
   - `app/models/notifications.py`
-  - `ai_runtime/jobs/notification_worker.py`
-  - SMS/Email/Push/Kakao provider
-- 우선순위: P2
+  - `app/services/service_jobs.py`
+  - `ai_runtime/jobs/handlers.py`
+  - SMS/Kakao provider
+- 우선순위: 부분 완료/P2
 
 ### 5. Langfuse 운영 추적
 

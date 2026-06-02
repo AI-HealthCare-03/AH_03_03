@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.dtos.challenges import ChallengeResponse, UserChallengeResponse
 from app.dtos.diets import DietRecordResponse
 from app.dtos.health import HealthRecordResponse
 from app.models.analysis import AnalysisMode, AnalysisType, RiskLevel
@@ -48,8 +49,8 @@ class DashboardHealthResponse(BaseModel):
 
 
 class DashboardChallengesResponse(BaseModel):
-    active_challenges: list[Any]
-    user_challenges: list[Any]
+    active_challenges: list[ChallengeResponse]
+    user_challenges: list[UserChallengeResponse]
 
 
 class DashboardDietsResponse(BaseModel):
@@ -70,3 +71,21 @@ class DashboardTrendsResponse(BaseModel):
     weight: list[dict[str, Any]]
     challenge_completion_rate: list[dict[str, Any]]
     diet_score: list[dict[str, Any]]
+
+
+class DashboardRiskTrendPointResponse(BaseModel):
+    analyzed_at: str
+    risk_score: float
+    risk_level: RiskLevel
+
+
+class DashboardRiskTrendSeriesResponse(BaseModel):
+    disease_type: AnalysisType
+    points: list[DashboardRiskTrendPointResponse]
+
+
+class DashboardRiskTrendResponse(BaseModel):
+    period: str
+    date_from: str | None = None
+    date_to: str | None = None
+    series: list[DashboardRiskTrendSeriesResponse]
