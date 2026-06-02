@@ -71,3 +71,21 @@ class DashboardTrendsResponse(BaseModel):
     weight: list[dict[str, Any]]
     challenge_completion_rate: list[dict[str, Any]]
     diet_score: list[dict[str, Any]]
+
+
+class DashboardRiskTrendPointResponse(BaseModel):
+    analyzed_at: str
+    risk_score: float
+    risk_level: RiskLevel
+
+
+class DashboardRiskTrendSeriesResponse(BaseModel):
+    disease_type: AnalysisType
+    points: list[DashboardRiskTrendPointResponse]
+
+
+class DashboardRiskTrendResponse(BaseModel):
+    period: str
+    date_from: str | None = None
+    date_to: str | None = None
+    series: list[DashboardRiskTrendSeriesResponse]

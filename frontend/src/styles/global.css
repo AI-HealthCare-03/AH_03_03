@@ -1791,6 +1791,24 @@ pre {
   text-align: center;
 }
 
+.today-recommendation-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.today-recommendation-item {
+  gap: 12px;
+  min-height: 150px;
+}
+
+.today-recommendation-item p {
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+
 .dashboard-support-grid {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -2546,6 +2564,92 @@ pre {
   font-weight: 900;
 }
 
+.signup-privacy-consent {
+  background: color-mix(in srgb, var(--color-blue-soft) 72%, white);
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: 14px;
+}
+
+.signup-privacy-consent p {
+  margin: 0;
+}
+
+.privacy-consent-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.privacy-detail-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 900;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.privacy-consent-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.privacy-consent-details {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.privacy-consent-details section {
+  display: grid;
+  gap: 8px;
+}
+
+.privacy-consent-details h3 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.privacy-consent-details ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.privacy-consent-details li {
+  line-height: 1.55;
+}
+
+.privacy-consent-check {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 12px;
+}
+
+.checkbox-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  line-height: 1.5;
+}
+
+.checkbox-row input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
 .progress-bar,
 .bar-track {
   background: var(--color-muted-surface);
@@ -2741,6 +2845,39 @@ pre {
 
 .toggle-row input {
   width: auto;
+}
+
+.browser-push-box {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-section-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.settings-section-header p {
+  margin: 4px 0 0;
+}
+
+.status-pill {
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  color: var(--color-primary-dark);
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.browser-push-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .family-section-grid {
@@ -2953,6 +3090,23 @@ pre {
   max-width: min(100%, 360px);
   object-fit: cover;
   width: 100%;
+}
+
+.upload-selected-file {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.upload-selected-file strong {
+  overflow-wrap: anywhere;
+}
+
+.heic-preview-notice {
+  background: var(--color-yellow-soft);
+  color: var(--color-text);
+  font-weight: 800;
+  justify-self: stretch;
 }
 
 .ocr-card-icon {
@@ -3548,6 +3702,7 @@ pre {
 
 .challenge-list-card .challenge-card-header,
 .challenge-list-card .challenge-card-meta,
+.challenge-list-card .challenge-date-meta,
 .challenge-list-card .challenge-progress,
 .challenge-list-card > .muted {
   grid-column: 1;
@@ -3562,6 +3717,27 @@ pre {
 .challenge-card-meta .badge {
   font-size: 11px;
   padding: 5px 8px;
+}
+
+.challenge-date-meta {
+  color: var(--color-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px 12px;
+}
+
+.challenge-date-meta span {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 5px 9px;
+}
+
+.challenge-date-meta.compact {
+  font-size: 11px;
+  gap: 5px;
 }
 
 .challenge-card-actions {

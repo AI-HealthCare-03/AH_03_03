@@ -64,7 +64,7 @@
 검증 목적:
 
 - 컨테이너 내부에서 `catboost`, `argon2`, `ai_runtime.ml.inference.disease_risk_service` import가 가능해야 한다.
-- `/analysis/run` PRECISION 경로에서 CatBoost artifact를 사용할 수 있어야 한다.
+- `/analysis/run-async` PRECISION job 경로에서 CatBoost artifact를 사용할 수 있어야 한다.
 
 ### 4.2 Redis health
 
@@ -86,7 +86,7 @@
 주요 변경:
 
 - `scripts/verify_precision_analysis_api.py`를 추가했다.
-- 로그인 -> readiness -> `/analysis/run` PRECISION -> 결과 상세 조회 흐름을 검증한다.
+- 로그인 -> readiness -> `/analysis/run-async` PRECISION job SUCCESS -> 결과 상세 조회 흐름을 검증한다.
 - DM/HTN/DL은 `model_name=catboost`, `model_version=*_catboost_final`, `risk_score` 존재 여부를 확인한다.
 - OBESITY는 현재 ML artifact가 없으므로 `rule_based`를 정상 경로로 검증한다.
 
@@ -202,8 +202,8 @@
 - `docs/policy/privacy.md`
 - `docs/policy/terms.md`
 - `docs/policy/sensitive_health_data_notice.md`
-- `docs/qa/frontend_demo_checklist.md`
-- `docs/qa/demo_ready_checklist.md`
+- `docs/demo/frontend_checklist.md`
+- `docs/demo/ready_checklist.md`
 
 보안 정리:
 

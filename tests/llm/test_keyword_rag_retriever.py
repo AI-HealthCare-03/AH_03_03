@@ -1,5 +1,7 @@
 from ai_runtime.llm.llm_client import record_langfuse_event
 from ai_runtime.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts, retrieve_keyword_rag_matches
+from ai_runtime.llm.rag.retriever import KeywordRagRetriever, disabled_rag_retrieval_result
+from ai_runtime.llm.rag.source_trust import source_trust_level_for_type
 from ai_runtime.llm.rag.tracing import build_keyword_rag_trace_metadata, trace_keyword_rag_retrieval
 
 
@@ -18,6 +20,8 @@ def test_retrieve_by_hypertension_keywords() -> None:
     assert contexts[0].metadata["id"] == "hypertension"
     assert contexts[0].metadata["source_org"] == "대한고혈압학회"
     assert contexts[0].metadata["status"] == "candidate_unreviewed"
+    assert contexts[0].metadata["source_type"] == "official_society"
+    assert contexts[0].metadata["source_trust_level"] == "public_health_agency"
 
 
 def test_retrieve_food_nutrition_api_keywords() -> None:
@@ -36,6 +40,66 @@ def test_include_safety_disclaimer() -> None:
 
     assert "diabetes" in source_ids
     assert "safety_disclaimer" in source_ids
+
+
+def test_keyword_retriever_adapter_returns_interface_result() -> None:
+    result = KeywordRagRetriever().retrieve(
+        query="공복혈당이 높게 나왔어요",
+        top_k=2,
+        include_safety_disclaimer=True,
+    )
+
+    assert result.strategy == "local_markdown_keyword_match"
+    assert result.documents
+    assert result.contexts
+    assert result.reference_sources
+    assert result.reference_summary
+    assert "diabetes" in result.trace_metadata["document_ids"]
+    assert result.trace_metadata["vector_rag"] is False
+    assert result.trace_metadata["embedding_search"] is False
+    assert "official_guideline" in result.trace_metadata["source_trust_levels"]
+    assert all("content" not in document for document in result.trace_metadata["documents"])
+    assert all("source_trust_level" in document for document in result.trace_metadata["documents"])
+
+
+def test_keyword_retriever_adapter_no_result_contract_without_safety() -> None:
+    result = KeywordRagRetriever().retrieve(
+        query="전혀 관련 없는 문장입니다",
+        top_k=2,
+        include_safety_disclaimer=False,
+    )
+
+    assert result.documents == []
+    assert result.contexts == []
+    assert result.reference_sources == []
+    assert result.reference_summary is None
+    assert result.fallback_reason == "no_result"
+    assert result.trace_metadata["document_count"] == 0
+    assert result.trace_metadata["source_trust_levels"] == []
+    assert result.trace_metadata["fallback"] is True
+    assert result.trace_metadata["fallback_reason"] == "no_result"
+
+
+def test_source_trust_level_mapping_for_rag_sources() -> None:
+    assert source_trust_level_for_type("clinical_guideline") == "official_guideline"
+    assert source_trust_level_for_type("nutrition_guideline") == "official_guideline"
+    assert source_trust_level_for_type("official_society") == "public_health_agency"
+    assert source_trust_level_for_type("public_data_api") == "public_health_agency"
+    assert source_trust_level_for_type("safety_policy") == "internal_policy"
+    assert source_trust_level_for_type("unexpected_source") == "unknown"
+
+
+def test_disabled_rag_retrieval_result_is_empty_and_safe() -> None:
+    result = disabled_rag_retrieval_result()
+
+    assert result.documents == []
+    assert result.contexts == []
+    assert result.reference_sources == []
+    assert result.reference_summary is None
+    assert result.strategy == "disabled"
+    assert result.fallback_reason == "rag_disabled"
+    assert result.trace_metadata["enabled"] is False
+    assert result.trace_metadata["document_count"] == 0
 
 
 def test_unknown_keyword_returns_empty_without_safety() -> None:

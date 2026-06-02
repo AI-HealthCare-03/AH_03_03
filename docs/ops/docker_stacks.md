@@ -6,41 +6,40 @@
 
 | 스택 | Compose 파일 | 용도 | 주요 서비스 |
 | --- | --- | --- | --- |
-| `app` | `docker-compose.yml` | 로컬 FastAPI/ML 시연용 최소 스택 | `postgres`, `redis`, `fastapi` |
-| `dev` | `infra/docker/docker-compose.dev.yml` | frontend 포함 개발 전체 스택 | `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx` |
-| `prod` | `infra/docker/docker-compose.prod.yml` | 운영 이미지 기반 스택 | `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`, `certbot` |
-| `langfuse` | `infra/langfuse/docker-compose.yml` | Langfuse 관측 실험 전용 스택 | `langfuse-web`, `langfuse-worker`, `postgres`, `redis`, `clickhouse`, `minio` |
+| `app` | `docker-compose.yml` | legacy/minimal backend/AI 검증용 스택 | `postgres`, `redis`, `fastapi` |
+| `dev` | `infra/docker/docker-compose.dev.yml` | 표준 로컬 개발/시연 전체 스택 | `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx` |
+| `prod` | `infra/docker/docker-compose.prod.yml` | 표준 EC2/운영 이미지 기반 스택 | `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`, `certbot` |
+| `langfuse` | `infra/langfuse/docker-compose.yml` | Langfuse self-host optional 관측 스택 | `langfuse-web`, `langfuse-worker`, `postgres`, `redis`, `clickhouse`, `minio` |
 
 `scripts/docker_stack.sh`와 `Makefile`은 자주 쓰는 `app`, `dev`, `langfuse` 스택 실행을 감싼다. `prod`는 이미지 태그와 운영 환경변수 확인이 필요하므로 명시적으로 compose 파일을 지정해서 실행한다.
 
-## 현재 Redis 범위
+현재 표준 로컬 실행은 `infra/docker/docker-compose.dev.yml`이다. 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용으로만 유지하며, frontend, Firebase Web Push build args, storage, scheduler, 최신 dev full stack 검증에는 사용하지 않는다.
 
-현재 앱 스택의 Redis는 아래 용도로만 사용한다.
+## 현재 Redis / async job 범위
+
+현재 앱 스택의 Redis는 health check뿐 아니라 Redis Stream 기반 job 처리에도 사용한다.
 
 - Docker Compose Redis 컨테이너 실행
 - FastAPI의 `REDIS_HOST`, `REDIS_PORT` 기반 연결
 - `/api/v1/system/health` Redis 연결 확인
 - Compose `redis` service healthcheck
+- AI stream: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`
+- Service stream: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `fcm.push.send`, `family.notification.create`
+- retry/backoff, DLQ, pending recovery 기반 `ai-worker` consumer
 
-아래 항목은 아직 구현하지 않으며 P2 운영 확장 범위로 둔다.
-
-- Redis Stream `XADD` / `XREADGROUP`
-- `async_jobs` 테이블
-- AI Worker consumer
-- retry / dead-letter queue
-- 비동기 OCR/CV/ML/LLM 처리
+P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영 관측, queue 지표 노출, alerting, worker 수평 확장 정책이다.
 
 시연 설명 문구:
 
-> 현재 MVP는 FastAPI 동기 처리로 OCR/ML/CV/LLM 준비 흐름을 검증합니다. 운영 확장 단계에서는 Redis Stream 기반 비동기 worker로 전환해 장시간 작업, 재시도, dead-letter queue, 작업 상태 추적을 붙입니다.
+> 현재 MVP는 긴 OCR/식단/분석/외부 발송 작업을 Redis Stream async job으로 넘기고, `/api/v1/jobs/{job_id}` polling으로 상태를 확인합니다. 긴 작업의 기존 동기 분석 API는 410 Gone으로 막고 async 전용 경로를 사용합니다.
 
 ## 2. 빠른 실행
 
 ### app 스택
 
-로컬 시연에서 FastAPI, PostgreSQL, Redis만 띄운다. `ai-worker`, `frontend`, `nginx`는 기본으로 올리지 않는다.
+루트 `docker-compose.yml`을 사용하는 legacy/minimal backend/AI 검증용 스택이다. FastAPI, PostgreSQL, Redis만 빠르게 띄우며 `ai-worker`, `frontend`, `nginx`는 기본으로 올리지 않는다.
 
-이 스택의 Redis는 FastAPI health check와 `DEMO_ECHO` Redis Stream skeleton 용도다. `async_jobs` 모델/API와 AI Worker consumer는 존재하지만, 현재 처리 job은 `DEMO_ECHO`뿐이다. retry/dead-letter queue, heartbeat, OCR/CV/ML/LLM 비동기 처리는 아직 구현하지 않는다. FastAPI 라우터와 DB I/O는 async 기반이지만 `/analysis/run`, `/diets/analyze`, OCR confirm 같은 MVP 공식 workflow는 시연 전까지 동기 API 흐름으로 유지한다.
+이 스택은 FastAPI 중심 검증용이지만 frontend, Firebase Web Push build args, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 실제 프론트 포함 비동기 UX 확인은 `dev` 스택에서 `ai-worker`, `frontend`, `nginx`까지 함께 올려 검증한다.
 
 ```bash
 ./scripts/docker_stack.sh app up
@@ -95,9 +94,18 @@ make app-clean-image # 알려진 로컬 app/test 이미지를 삭제
 
 ### dev 스택
 
-frontend, Nginx, FastAPI, AI Worker 자리, PostgreSQL, Redis를 모두 올린다.
+frontend, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 올린다.
 
-`ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer를 실행한다. 현재 처리 범위는 `DEMO_ECHO` job뿐이다. `AnalysisResult.async_job_id`는 향후 실제 분석 job과 `async_jobs` 테이블을 연결하기 위한 reserved field이며, 현재 `/analysis/run` 결과와 연결되어 있지 않다.
+`ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer와 scheduler loop를 실행한다. 처리 job은 `DEMO_ECHO`뿐 아니라 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`, 이메일/비밀번호/가족초대/FCM/가족알림 service job을 포함한다.
+
+로컬 개발에서는 `.env`를 직접 계속 바꾸지 않도록 provider 성격에 따라 아래 프로필을 사용한다.
+
+```bash
+make dev-up-mock
+make dev-up-real
+```
+
+직접 compose 명령을 사용할 때는 Docker Compose variable interpolation이 `env_file`이 아니라 `--env-file` 또는 루트 `.env`를 기준으로 동작한다는 점에 주의한다.
 
 ```bash
 ./scripts/docker_stack.sh dev up
@@ -109,6 +117,8 @@ Makefile:
 
 ```bash
 make dev-up
+make dev-up-mock
+make dev-up-real
 make dev-ps
 make dev-down
 ```
@@ -116,12 +126,22 @@ make dev-down
 직접 compose 명령:
 
 ```bash
-docker compose -f infra/docker/docker-compose.dev.yml up -d
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+docker compose --env-file .env.local.mock -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+docker compose --env-file .env.local.real -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
 ```
 
 ### langfuse 스택
 
-Langfuse self-host 실험용 스택만 올린다. 앱 DB/Redis와 Langfuse DB/Redis는 공유하지 않는다.
+Langfuse self-host 실험용 optional 스택만 올린다. 앱 DB/Redis와 Langfuse DB/Redis는 공유하지 않는다. `infra/langfuse/.env.example`은 앱 env가 아니라 Langfuse self-host 전용 템플릿이다.
+
+```bash
+cd infra/langfuse
+cp .env.example .env
+docker compose up -d
+```
+
+wrapper 명령:
 
 ```bash
 ./scripts/docker_stack.sh langfuse up
@@ -143,10 +163,10 @@ make langfuse-down
 
 ## 3. prod 스택
 
-운영 스택은 image 기반이다. 로컬 시연용 기본 명령에 포함하지 않는다.
+운영/EC2 표준 스택은 `infra/docker/docker-compose.prod.yml` 기준이다. 로컬 시연용 기본 명령에 포함하지 않는다.
 
 ```bash
-docker compose -f infra/docker/docker-compose.prod.yml up -d
+docker compose --env-file .env -f infra/docker/docker-compose.prod.yml up -d --build --force-recreate
 ```
 
 운영 실행 전 확인할 것:

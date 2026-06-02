@@ -1,4 +1,5 @@
 import { apiRequest, type ApiValue } from "./client";
+import type { AsyncJob } from "./jobs";
 
 export type MedicationOcrItem = {
   temp_id?: string | null;
@@ -83,8 +84,8 @@ export async function deleteMedication<T>(medicationId: number): Promise<T> {
   return apiRequest<T>(`/medications/${medicationId}`, { method: "DELETE" });
 }
 
-export async function runMedicationOcr(payload: MedicationOcrRequest | FormData): Promise<MedicationOcrResponse> {
-  return apiRequest<MedicationOcrResponse>("/medications/ocr", { method: "POST", body: payload });
+export async function runMedicationOcr(payload: MedicationOcrRequest | FormData): Promise<AsyncJob> {
+  return apiRequest<AsyncJob>("/medications/ocr", { method: "POST", body: payload });
 }
 
 export async function confirmMedicationOcr(

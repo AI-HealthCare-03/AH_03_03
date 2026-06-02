@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   checkEmail,
   checkLoginId,
+  checkPhone,
   sendEmailVerification,
   verifyEmailCode,
 } from "../api/auth";
@@ -25,12 +26,15 @@ export default function SignupPage() {
   const [step, setStep] = useState(0);
   const [loginId, setLoginId] = useState("");
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [phoneParts, setPhoneParts] = useState({ first: "010", second: "", third: "" });
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState<"MALE" | "FEMALE">("MALE");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [privacyConsentAgreed, setPrivacyConsentAgreed] = useState(false);
+  const [privacyDetailsOpen, setPrivacyDetailsOpen] = useState(false);
   const [lifestyle, setLifestyle] = useState({
     smoking_status: "NON_SMOKER",
     drinking_frequency: "RARE",
@@ -54,11 +58,12 @@ export default function SignupPage() {
   const [isOccupationHelpOpen, setIsOccupationHelpOpen] = useState(false);
   const [loginIdCheck, setLoginIdCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCheck, setEmailCheck] = useState<AvailabilityCheck | null>(null);
+  const [phoneCheck, setPhoneCheck] = useState<AvailabilityCheck | null>(null);
   const [emailCode, setEmailCode] = useState("");
   const [emailDebugCode, setEmailDebugCode] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState<AvailabilityCheck | null>(null);
   const [checkingField, setCheckingField] = useState<
-    "login_id" | "email" | "email_send" | "email_verify" | null
+    "login_id" | "email" | "phone" | "email_send" | "email_verify" | null
   >(null);
 
   const steps = ["계정 정보", "기본 정보", "생활 습관", "간편 분석 정보"];
@@ -97,6 +102,11 @@ export default function SignupPage() {
 
   const setOnlyDigitsPhonePart = (key: keyof typeof phoneParts, value: string, maxLength: number) => {
     setPhoneParts((prev) => ({ ...prev, [key]: value.replace(/\D/g, "").slice(0, maxLength) }));
+    setPhoneCheck(null);
+    setFieldErrors((prev) => {
+      const { phone_number, phone_number_check, ...rest } = prev;
+      return rest;
+    });
   };
 
   const validateCurrentStep = (targetStep = step): boolean => {
@@ -126,17 +136,33 @@ export default function SignupPage() {
       if (hasPhoneInput && (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4)) {
         nextErrors.phone_number = "휴대폰 번호를 올바르게 입력해주세요.";
       }
+      if (
+        hasPhoneInput &&
+        phoneParts.first.length >= 2 &&
+        phoneParts.second.length >= 3 &&
+        phoneParts.third.length === 4 &&
+        (!phoneCheck || phoneCheck.checkedValue !== normalizedPhoneNumber || !phoneCheck.available)
+      ) {
+        nextErrors.phone_number_check = "휴대폰 번호 중복확인을 해주세요.";
+      }
       if (!isPasswordValid(password)) {
         nextErrors.password = passwordPolicyMessage;
       }
       if (password !== passwordConfirm) {
         nextErrors.password_confirm = "비밀번호 확인이 일치하지 않습니다.";
       }
+      if (!privacyConsentAgreed) {
+        nextErrors.privacy_consent = "개인정보 수집·이용 안내를 확인하고 동의해주세요.";
+      }
     }
 
     if (targetStep === 1) {
       if (!name.trim()) {
         nextErrors.name = "이름을 입력해주세요.";
+      }
+      const normalizedNickname = nickname.trim();
+      if (normalizedNickname.length < 2 || normalizedNickname.length > 20) {
+        nextErrors.nickname = "닉네임은 2자 이상 20자 이하로 입력해주세요.";
       }
       if (!birthDate) {
         nextErrors.birth_date = "생년월일을 입력해주세요.";
@@ -239,6 +265,46 @@ export default function SignupPage() {
     }
   };
 
+  const handleCheckPhone = async () => {
+    setError("");
+    if (!hasPhoneInput) {
+      setPhoneCheck({
+        checkedValue: "",
+        available: true,
+        message: "휴대폰 번호는 선택 입력입니다.",
+      });
+      setFieldErrors((prev) => {
+        const { phone_number, phone_number_check, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+    if (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4) {
+      setFieldErrors((prev) => ({ ...prev, phone_number: "휴대폰 번호를 올바르게 입력해주세요." }));
+      return;
+    }
+
+    try {
+      setCheckingField("phone");
+      const result = await checkPhone(normalizedPhoneNumber);
+      setPhoneCheck({
+        checkedValue: normalizedPhoneNumber,
+        available: result.available,
+        message:
+          result.message ?? (result.available ? "사용 가능한 휴대폰 번호입니다." : "이미 사용중인 휴대폰 번호입니다."),
+      });
+      setFieldErrors((prev) => {
+        const { phone_number, phone_number_check, ...rest } = prev;
+        return rest;
+      });
+    } catch (err) {
+      setPhoneCheck(null);
+      setError(err instanceof Error ? err.message : "휴대폰 번호 중복확인에 실패했습니다.");
+    } finally {
+      setCheckingField(null);
+    }
+  };
+
   const handleSendEmailVerification = async () => {
     setError("");
     const normalizedEmail = email.trim().toLowerCase();
@@ -322,7 +388,8 @@ export default function SignupPage() {
         gender,
         birth_date: birthDate,
         ...(hasPhoneInput ? { phone_number: normalizedPhoneNumber } : {}),
-        nickname: name.trim(),
+        nickname: nickname.trim(),
+        privacy_consent_agreed: privacyConsentAgreed,
         sensitive_data_agreed: true,
       });
       try {
@@ -528,9 +595,18 @@ export default function SignupPage() {
                     onChange={(event) => setOnlyDigitsPhonePart("third", event.target.value, 4)}
                   />
                 </div>
-                <span className="muted">MVP 시연에서는 이메일 인증만 사용합니다. 휴대폰 번호는 선택 입력입니다.</span>
                 {fieldErrors.phone_number && <span className="field-error">{fieldErrors.phone_number}</span>}
               </label>
+              <button
+                className="secondary"
+                disabled={checkingField === "phone"}
+                type="button"
+                onClick={() => void handleCheckPhone()}
+              >
+                {checkingField === "phone" ? "확인 중..." : "휴대폰 번호 중복확인"}
+              </button>
+              {phoneCheck && <div className={phoneCheck.available ? "success-text" : "warning-text"}>{phoneCheck.message}</div>}
+              {fieldErrors.phone_number_check && <span className="field-error">{fieldErrors.phone_number_check}</span>}
               <label>
                 비밀번호
                 <input
@@ -554,6 +630,97 @@ export default function SignupPage() {
                 />
                 {fieldErrors.password_confirm && <span className="field-error">{fieldErrors.password_confirm}</span>}
               </label>
+              <div className="state-box signup-privacy-consent">
+                <div className="privacy-consent-header">
+                  <strong>개인정보 수집·이용 안내</strong>
+                  <button
+                    aria-expanded={privacyDetailsOpen}
+                    className="privacy-detail-toggle"
+                    onClick={() => setPrivacyDetailsOpen((prev) => !prev)}
+                    type="button"
+                  >
+                    {privacyDetailsOpen ? "접기" : "자세히 보기"} <span aria-hidden="true">{privacyDetailsOpen ? "▲" : "▼"}</span>
+                  </button>
+                </div>
+                <div className="privacy-consent-summary">
+                  <p>
+                    AI HealthCare는 회원가입 및 건강관리 기능 제공을 위해 필요한 개인정보를 수집·이용합니다.
+                  </p>
+                  <p>
+                    건강검진 결과, 복약 정보, 식단 기록, 챌린지 수행 기록 등 건강 관련 정보는 민감할 수 있으므로
+                    서비스 제공 목적 범위 내에서만 사용됩니다.
+                  </p>
+                </div>
+                {privacyDetailsOpen && (
+                  <div className="privacy-consent-details">
+                    <section>
+                      <h3>수집·이용 목적</h3>
+                      <ul>
+                        <li>회원가입 및 계정 관리</li>
+                        <li>이메일 인증 및 본인 계정 확인</li>
+                        <li>건강검진 OCR, 복약 OCR, 식단 기록, 챌린지 수행 기록 기반 건강관리 참고 정보 제공</li>
+                        <li>가족 연동 기능 사용 시 사용자가 허용한 범위 내 정보 공유 및 알림 제공</li>
+                        <li>서비스 오류 확인, 부정 이용 방지, 고객 문의 대응</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>수집 항목</h3>
+                      <ul>
+                        <li>필수 계정 정보: 이름, 닉네임, 이메일, 비밀번호</li>
+                        <li>선택 계정 정보: 휴대폰 번호</li>
+                        <li>건강관리 정보: 건강검진 결과, OCR 업로드 이미지/PDF에서 추출된 항목, 복약 정보, 식단 기록, 챌린지 수행 기록</li>
+                        <li>서비스 이용 정보: 로그인 기록, 알림 수신 설정, 가족 연동 설정, 기기/브라우저 정보, FCM 토큰</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>건강정보 및 OCR 안내</h3>
+                      <ul>
+                        <li>업로드한 검진표, 약봉투, 식단 이미지는 자동 인식 및 분석에 사용될 수 있습니다.</li>
+                        <li>OCR/AI 분석 결과는 오류가 있을 수 있으며 사용자가 확인·수정해야 합니다.</li>
+                        <li>분석 결과는 의료기관의 진단을 대체하지 않는 건강관리 참고 정보입니다.</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>보유 및 이용 기간</h3>
+                      <ul>
+                        <li>회원 탈퇴 시 관련 법령 또는 서비스 운영상 필요한 보존 항목을 제외하고 삭제 또는 비식별/익명화 처리합니다.</li>
+                        <li>사용자가 직접 삭제 가능한 기록은 서비스 정책에 따라 삭제할 수 있습니다.</li>
+                        <li>부정 이용 방지, 분쟁 대응, 법령 준수를 위해 일부 로그는 일정 기간 보관될 수 있습니다.</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>제3자 제공 및 가족 연동</h3>
+                      <ul>
+                        <li>기본적으로 건강정보는 다른 사용자에게 자동 공개되지 않습니다.</li>
+                        <li>가족 연동 기능에서는 사용자가 허용한 항목만 공유됩니다.</li>
+                        <li>가족에게도 원본 건강 수치, OCR 원본, 민감한 건강 상세정보는 기본적으로 공개하지 않는 방향을 유지합니다.</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>동의 거부 권리 및 불이익</h3>
+                      <ul>
+                        <li>사용자는 개인정보 수집·이용 동의를 거부할 수 있습니다.</li>
+                        <li>다만 필수 항목에 동의하지 않으면 회원가입 및 주요 건강관리 기능 이용이 제한될 수 있습니다.</li>
+                      </ul>
+                    </section>
+                  </div>
+                )}
+                <label className="checkbox-row privacy-consent-check">
+                  <input
+                    checked={privacyConsentAgreed}
+                    onChange={(event) => {
+                      setPrivacyConsentAgreed(event.target.checked);
+                      setFieldErrors((prev) => {
+                        const { privacy_consent, ...rest } = prev;
+                        return rest;
+                      });
+                    }}
+                    type="checkbox"
+                  />
+                  위 내용을 확인하고 개인정보 수집·이용에 동의합니다.
+                </label>
+                {fieldErrors.privacy_consent && <span className="field-error">{fieldErrors.privacy_consent}</span>}
+              </div>
             </>
           )}
 
@@ -563,6 +730,18 @@ export default function SignupPage() {
                 이름
                 <input value={name} onChange={(event) => setName(event.target.value)} maxLength={20} required />
                 {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
+              </label>
+              <label>
+                닉네임
+                <input
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  minLength={2}
+                  maxLength={20}
+                  required
+                />
+                <span className="muted">서비스 화면에 표시되는 이름입니다.</span>
+                {fieldErrors.nickname && <span className="field-error">{fieldErrors.nickname}</span>}
               </label>
               <label>
                 생년월일

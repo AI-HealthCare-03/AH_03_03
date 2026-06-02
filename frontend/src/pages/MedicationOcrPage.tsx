@@ -5,21 +5,38 @@ import {
   confirmMedicationOcr,
   type MedicationOcrItem,
   type MedicationOcrRequest,
+  type MedicationOcrResponse,
   runMedicationOcr,
 } from "../api/medications";
+import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
+import { isHeicFile } from "../utils/files";
 
 export default function MedicationOcrPage() {
   const [items, setItems] = useState<MedicationOcrItem[]>([]);
   const [sourceType, setSourceType] = useState("PRESCRIPTION");
   const [imageFilename, setImageFilename] = useState("");
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
+  const [previewMessage, setPreviewMessage] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [canRetryOcr, setCanRetryOcr] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (selectedPreviewUrl) {
+        URL.revokeObjectURL(selectedPreviewUrl);
+      }
+    };
+  }, [selectedPreviewUrl]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -32,17 +49,58 @@ export default function MedicationOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  const { latestJob: latestOcrJob } = useAsyncJobPolling({
+    jobId: ocrJobId,
+    enabled: isRunning && ocrJobId !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: (job) => {
+      const result = medicationResultFromPayload(job.result_payload);
+      const nextItems = result?.items ?? [];
+      setItems(nextItems);
+      setCanRetryOcr(false);
+      setMessage(
+        nextItems.length > 0
+          ? `${getAsyncJobStatusMessage("SUCCESS")} 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.`
+          : `${getAsyncJobStatusMessage("SUCCESS")} 인식된 복약 정보 후보가 없습니다. 파일을 다시 확인해주세요.`,
+      );
+      setIsRunning(false);
+      setOcrJobId(null);
+    },
+    onFailure: (job) => {
+      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setCanRetryOcr(true);
+      setIsRunning(false);
+      setOcrJobId(null);
+    },
+    onTimeout: () => {
+      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setCanRetryOcr(true);
+      setIsRunning(false);
+      setOcrJobId(null);
+    },
+  });
+
+  const ocrStatusMessage =
+    isRunning && ocrJobId !== null ? getAsyncJobStatusMessage(latestOcrJob?.status ?? "PENDING") : "";
+
   const runMedicationRecognition = async () => {
     setError("");
     setMessage("");
+    setItems([]);
+    setCanRetryOcr(false);
+    if (!selectedImageFile) {
+      setError("처방전 또는 약봉투 이미지 파일을 먼저 선택해주세요.");
+      return;
+    }
     setIsRunning(true);
     try {
-      const response = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
-      setItems(response.items);
-      setMessage("복약 정보 후보를 생성했습니다. 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.");
-    } catch (err) {
-      setError(err instanceof Error ? toUserMessage(err.message) : "복약정보 후보 생성에 실패했습니다.");
-    } finally {
+      const job = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
+      setMessage("");
+      setOcrJobId(job.id);
+    } catch {
+      setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
+      setCanRetryOcr(true);
       setIsRunning(false);
     }
   };
@@ -51,12 +109,34 @@ export default function MedicationOcrPage() {
     setItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
   };
 
-  const handleImageSelection = (file: File | null) => {
+  const handleImageSelection = async (file: File | null) => {
+    if (selectedPreviewUrl) {
+      URL.revokeObjectURL(selectedPreviewUrl);
+    }
+    setSelectedPreviewUrl("");
+    setPreviewMessage("");
     if (!file) {
       return;
     }
     setSelectedImageFile(file);
     setImageFilename(file.name);
+    if (!isHeicFile(file)) {
+      setSelectedPreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setPreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
+    try {
+      const previewBlob = await normalizeImageForPreview(file);
+      setSelectedPreviewUrl(URL.createObjectURL(previewBlob));
+      setPreviewMessage("");
+    } catch (err) {
+      setPreviewMessage(
+        err instanceof Error
+          ? err.message
+          : "HEIC 미리보기를 생성하지 못했습니다. 분석은 업로드 후 다시 시도해주세요.",
+      );
+    }
   };
 
   const save = async () => {
@@ -94,17 +174,30 @@ export default function MedicationOcrPage() {
         </Link>
       </div>
       {error && <ErrorMessage message={error} />}
+      {canRetryOcr ? (
+        <div className="button-row">
+          <button disabled={isRunning} onClick={runMedicationRecognition} type="button">
+            다시 시도
+          </button>
+        </div>
+      ) : null}
+      {ocrStatusMessage && <div className="state-box">{ocrStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
       <div className="page-grid">
         <Card title="처방전/약봉투 업로드">
           <div className="upload-box">
             <strong>이미지 업로드 영역</strong>
             <span>촬영/업로드 후 생성된 후보 정보를 확인하고 저장해주세요.</span>
+            <p className="warning-text">
+              업로드한 이미지는 건강정보 추출 및 분석을 위해 사용됩니다. 자동 인식 결과는 오류가 있을 수 있으므로
+              저장 또는 분석 전에 내용을 확인해주세요. 복약 정보는 민감한 건강정보일 수 있으므로 본인 자료만
+              업로드해주세요.
+            </p>
             <div className="upload-action-grid">
               <label className="upload-action-button">
                 파일에서 선택
                 <input
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   type="file"
                   onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
                 />
@@ -113,7 +206,7 @@ export default function MedicationOcrPage() {
                 <label className="upload-action-button">
                   카메라로 촬영
                   <input
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     capture="environment"
                     type="file"
                     onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
@@ -124,6 +217,14 @@ export default function MedicationOcrPage() {
               )}
             </div>
             <span className="muted">선택된 파일: {imageFilename || "없음"}</span>
+            {previewMessage ? (
+              <div className="state-box heic-preview-notice">
+                {previewMessage}
+              </div>
+            ) : null}
+            {selectedPreviewUrl ? (
+              <img alt="선택한 처방전 또는 약봉투 이미지 미리보기" className="upload-preview" src={selectedPreviewUrl} />
+            ) : null}
           </div>
           <label>
             인식 유형
@@ -222,9 +323,9 @@ function buildMedicationOcrPayload(sourceType: string, file: File | null, imageF
   return formData;
 }
 
-function toUserMessage(message: string): string {
-  if (message.includes("provider") || message.includes("fallback")) {
-    return "복약 정보 후보를 생성했습니다.";
+function medicationResultFromPayload(payload: Record<string, unknown> | null | undefined): MedicationOcrResponse | null {
+  if (!payload || !Array.isArray(payload.items)) {
+    return null;
   }
-  return message.replaceAll("OCR", "자동 인식");
+  return payload as MedicationOcrResponse;
 }

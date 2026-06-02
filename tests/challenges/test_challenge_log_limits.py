@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.dtos.challenges import ChallengeLogCreateRequest
+from app.models.challenges import UserChallengeStatus
 from app.services import challenges as challenge_service
 
 
@@ -102,3 +103,45 @@ async def test_create_challenge_log_allows_until_daily_goal_count(monkeypatch) -
         await challenge_service.create_challenge_log(8, request)
     assert exc.value.status_code == 409
     assert len(created_payloads) == 2
+
+
+@pytest.mark.asyncio
+async def test_join_challenge_reactivates_canceled_challenge(monkeypatch) -> None:
+    existing = SimpleNamespace(
+        id=5,
+        user_id=42,
+        challenge_id=3,
+        status=UserChallengeStatus.CANCELED,
+        canceled_at=datetime(2026, 5, 28, 9, 0, 0),
+    )
+    updated_payload: dict[str, object] = {}
+
+    async def fake_get_user_challenge_by_user_and_challenge(user_id: int, challenge_id: int):
+        assert user_id == 42
+        assert challenge_id == 3
+        return existing
+
+    async def fake_update_user_challenge(user_challenge_id: int, data: dict):
+        assert user_challenge_id == existing.id
+        updated_payload.update(data)
+        payload = {**existing.__dict__, **data}
+        return SimpleNamespace(**payload)
+
+    async def fake_with_progress(user_challenge):
+        return user_challenge
+
+    monkeypatch.setattr(
+        challenge_service.challenge_repository,
+        "get_user_challenge_by_user_and_challenge",
+        fake_get_user_challenge_by_user_and_challenge,
+    )
+    monkeypatch.setattr(challenge_service.challenge_repository, "update_user_challenge", fake_update_user_challenge)
+    monkeypatch.setattr(challenge_service, "_with_user_challenge_progress", fake_with_progress)
+
+    rejoined = await challenge_service.join_challenge(user_id=42, challenge_id=3)
+
+    assert rejoined.status == UserChallengeStatus.JOINED
+    assert rejoined.canceled_at is None
+    assert rejoined.completed_at is None
+    assert updated_payload["started_at"] is not None
+    assert updated_payload["expected_done_at"] is not None

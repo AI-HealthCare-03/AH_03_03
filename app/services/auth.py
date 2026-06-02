@@ -26,16 +26,20 @@ from app.dtos.settings import UserSettingCreateRequest
 from app.models.users import User
 from app.repositories import setting_repository
 from app.repositories.user_repository import UserRepository
-from app.services.email_service import EmailConfigurationError, EmailDeliveryError, EmailService
+from app.services import service_jobs
+from app.services.email_service import EmailService
 from app.services.jwt import JwtService
 
 VERIFICATION_CODE_TTL_MINUTES = 10
 PASSWORD_RESET_TOKEN_TTL_MINUTES = 30
-INVALID_LOGIN_MESSAGE = "아이디 또는 비밀번호가 올바르지 않습니다."
+ACCOUNT_NOT_FOUND_MESSAGE = "가입되지 않은 아이디 또는 이메일입니다."
+INVALID_LOGIN_MESSAGE = "비밀번호가 올바르지 않습니다."
 ACCOUNT_LOCKED_MESSAGE = "로그인 시도가 여러 번 실패했습니다. 잠시 후 다시 시도하거나 추가 확인을 진행해주세요."
 EMAIL_VERIFICATION_PURPOSE = "EMAIL_VERIFICATION"
 EMAIL_VERIFICATION_SIGNUP_TTL_MINUTES = 30
 PHONE_AUTH_DEFERRED_MESSAGE = "휴대폰 인증은 현재 MVP 범위에서 제공하지 않습니다. 이메일 인증을 사용해주세요."
+PRIVACY_CONSENT_VERSION = "2026-05-30"
+PRIVACY_CONSENT_REQUIRED_MESSAGE = "개인정보 수집·이용 동의가 필요합니다."
 
 
 class AuthService:
@@ -45,17 +49,21 @@ class AuthService:
         self.email_service = EmailService()
 
     async def signup(self, data: SignUpRequest) -> User:
+        if not data.privacy_consent_agreed:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PRIVACY_CONSENT_REQUIRED_MESSAGE)
+
         login_id = data.login_id or self._default_login_id(str(data.email))
         await self.check_login_id_exists(login_id)
 
         # 이메일 중복 체크
         await self.check_email_exists(data.email)
 
-        email_verified_at = datetime.now(config.TIMEZONE)
+        now = datetime.now(config.TIMEZONE)
+        email_verified_at = now
         await self.ensure_email_verified(data.email)
 
         # 휴대폰 번호는 MVP 시연 범위에서 인증 필수값이 아니며, 기존 DB 호환용으로만 보존한다.
-        normalized_phone_number = ""
+        normalized_phone_number = None
         if data.phone_number:
             normalized_phone_number = self._normalize_phone_for_db(data.phone_number)
             await self.check_phone_number_exists(normalized_phone_number)
@@ -66,7 +74,7 @@ class AuthService:
                 login_id=login_id,
                 email=data.email,
                 hashed_password=hash_password(data.password),  # 해시화된 비밀번호를 사용
-                name=data.name,
+                name=data.name.strip(),
                 nickname=data.nickname,
                 phone_number=normalized_phone_number,
                 gender=data.gender,
@@ -74,9 +82,12 @@ class AuthService:
                 address=data.address,
                 profile_image_url=data.profile_image_url,
                 email_verified_at=email_verified_at,
+                privacy_consent_agreed_at=now,
+                privacy_consent_version=PRIVACY_CONSENT_VERSION,
             )
             await self.user_repo.create_user_consent(
                 user_id=user.id,
+                privacy_agreed=data.privacy_consent_agreed,
                 sensitive_data_agreed=data.sensitive_data_agreed,
                 marketing_agreed=data.marketing_agreed,
             )
@@ -91,7 +102,7 @@ class AuthService:
         else:
             user = await self.user_repo.get_user_by_email(str(data.email))
         if not user:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_LOGIN_MESSAGE)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ACCOUNT_NOT_FOUND_MESSAGE)
 
         now = datetime.now(config.TIMEZONE)
         if user.locked_until is not None and user.locked_until > now:
@@ -177,18 +188,7 @@ class AuthService:
             code_hash=self._digest(code),
             expires_at=expires_at,
         )
-        try:
-            await self.email_service.send_email_verification_code(str(email), code)
-        except EmailConfigurationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="이메일 발송 설정이 필요합니다.",
-            ) from exc
-        except EmailDeliveryError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="이메일 발송을 처리할 수 없습니다.",
-            ) from exc
+        await service_jobs.enqueue_email_verification_send(email=str(email), code=code)
         return code
 
     async def send_phone_verification_code(self, phone_number: str) -> str | None:
@@ -236,18 +236,7 @@ class AuthService:
                 expires_at=expires_at,
             )
             reset_url = self._password_reset_url(token)
-            try:
-                await self.email_service.send_password_reset_email(str(email), reset_url)
-            except EmailConfigurationError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="이메일 발송 설정이 필요합니다.",
-                ) from exc
-            except EmailDeliveryError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="이메일 발송을 처리할 수 없습니다.",
-                ) from exc
+            await service_jobs.enqueue_password_reset_email_send(email=str(email), reset_url=reset_url)
         return token
 
     async def confirm_password_reset(self, data: PasswordResetConfirmRequest) -> None:

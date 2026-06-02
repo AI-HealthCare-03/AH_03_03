@@ -28,10 +28,22 @@ class Config(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = "pw1234"
     DB_NAME: str = "ai_health"
-    DB_CONNECTION_POOL_MAXSIZE: int = 10
+    DB_POOL_MIN_SIZE: int = 1
+    DB_POOL_MAX_SIZE: int = 5
+    DB_COMMAND_TIMEOUT: int = 60
+    DB_CONNECTION_POOL_MAXSIZE: int | None = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str | None = None
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_INTERVAL_SECONDS: int = 60
+    UPLOAD_STORAGE_DIR: str = "var/uploads"
+    STORAGE_BACKEND: str = "local"
+    LOCAL_STORAGE_ROOT: str = "var/storage"
+    S3_BUCKET_NAME: str | None = None
+    S3_REGION: str = "ap-northeast-2"
+    S3_PREFIX: str = ""
+    S3_PRESIGNED_URL_EXPIRES_SECONDS: int = 3600
     LOGIN_FAILURE_LIMIT: int = 5
     LOGIN_SOFT_LOCK_MINUTES: int = 1
     ACCOUNT_LOCK_MINUTES: int = 15
@@ -57,7 +69,7 @@ class Config(BaseSettings):
     DIET_GPT_VISION_ENABLED: bool = False
     DIET_GPT_VISION_MODEL: str = "gpt-4o-mini"
     DIET_VISION_PROVIDER: str = "rule_based"
-    EXAM_OCR_PROVIDER: str = "fallback"
+    EXAM_OCR_PROVIDER: str = "auto"
     EXAM_GPT_VISION_ENABLED: bool = False
     EXAM_GPT_VISION_MODEL: str = "gpt-4o-mini"
     PADDLE_OCR_ENABLED: bool = False
@@ -87,6 +99,10 @@ class Config(BaseSettings):
     @property
     def cors_allow_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def db_pool_max_size(self) -> int:
+        return self.DB_CONNECTION_POOL_MAXSIZE or self.DB_POOL_MAX_SIZE
 
     @property
     def is_production(self) -> bool:

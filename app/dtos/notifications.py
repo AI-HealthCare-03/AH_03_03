@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.notifications import NotificationChannel, NotificationLogStatus, ReminderType
+from app.models.notifications import FCMTokenPlatform, NotificationChannel, NotificationLogStatus, ReminderType
 
 
 class NotificationCreateRequest(BaseModel):
@@ -42,6 +42,50 @@ class NotificationResponse(BaseModel):
 class NotificationListResponse(BaseModel):
     items: list[NotificationResponse]
     total: int
+
+
+class FCMTokenRegisterRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+    platform: FCMTokenPlatform
+    device_id: str | None = Field(default=None, max_length=128)
+    user_agent: str | None = Field(default=None, max_length=500)
+
+    @field_validator("token", "device_id", "user_agent", mode="before")
+    @classmethod
+    def strip_blank_strings(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+class FCMTokenDeleteRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+
+    @field_validator("token", mode="before")
+    @classmethod
+    def strip_token(cls, value: str) -> str:
+        return value.strip()
+
+
+class FCMTokenResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    token: str
+    platform: FCMTokenPlatform
+    device_id: str | None
+    user_agent: str | None
+    is_active: bool
+    last_seen_at: datetime
+    revoked_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FCMTokenDeleteResponse(BaseModel):
+    deactivated_count: int
 
 
 class ReminderScheduleCreateRequest(BaseModel):

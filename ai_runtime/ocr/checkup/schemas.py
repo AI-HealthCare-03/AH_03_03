@@ -114,7 +114,7 @@ ERROR_MAP: dict[str, dict] = {
     },
     "unsupported_type": {
         "status_code": 415,
-        "message": "지원하지 않는 형식입니다. JPG, PNG, WEBP로 업로드해주세요.",
+        "message": "지원하지 않는 형식입니다. JPG, PNG, WEBP, HEIC로 업로드해주세요.",
     },
     "quality_failed": {
         "status_code": 422,

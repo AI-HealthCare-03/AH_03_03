@@ -43,6 +43,11 @@ export async function listChallengeLogs<T>(userChallengeId: number): Promise<T> 
   return apiRequest<T>(`/challenges/my/${userChallengeId}/logs`);
 }
 
+export async function getChallengeCalendar<T>(targetDate: string): Promise<T> {
+  const query = new URLSearchParams({ date: targetDate });
+  return apiRequest<T>(`/challenges/calendar?${query.toString()}`);
+}
+
 export async function joinChallenge<T>(challengeId: number): Promise<T> {
   return apiRequest<T>(`/challenges/${challengeId}/join`, { method: "POST" });
 }

@@ -35,9 +35,9 @@ Usage:
   ./scripts/docker_stack.sh langfuse logs
 
 Stacks:
-  app       Root docker-compose.yml. Starts postgres, redis, fastapi by default.
-  dev       infra/docker/docker-compose.dev.yml. Starts the full dev stack.
-  langfuse  infra/langfuse/docker-compose.yml. Starts the Langfuse-only stack.
+  app       Legacy/minimal root docker-compose.yml for backend/AI checks.
+  dev       infra/docker/docker-compose.dev.yml. Standard full dev stack.
+  langfuse  infra/langfuse/docker-compose.yml. Optional Langfuse self-host stack.
 USAGE
 }
 

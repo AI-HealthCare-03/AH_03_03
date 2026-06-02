@@ -25,7 +25,7 @@ class User(models.Model):
     nickname = fields.CharField(max_length=30, null=True)
     gender = fields.CharEnumField(enum_type=Gender)
     birthday = fields.DateField()
-    phone_number = fields.CharField(max_length=11)
+    phone_number = fields.CharField(max_length=11, null=True)
     address = fields.CharField(max_length=255, null=True)
     profile_image_url = fields.CharField(max_length=500, null=True)
     role = fields.CharField(max_length=20, default="USER")
@@ -36,6 +36,8 @@ class User(models.Model):
     locked_until = fields.DatetimeField(null=True)
     deactivated_at = fields.DatetimeField(null=True)
     email_verified_at = fields.DatetimeField(null=True)
+    privacy_consent_agreed_at = fields.DatetimeField(null=True)
+    privacy_consent_version = fields.CharField(max_length=30, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

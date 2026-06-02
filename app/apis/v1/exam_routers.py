@@ -1,19 +1,23 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 
+from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
+from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.exams import (
     ExamConfirmRequest,
     ExamMeasurementCreateRequest,
     ExamMeasurementResponse,
     ExamMeasurementUpdateRequest,
-    ExamOCRResponse,
     ExamReportCreateRequest,
     ExamReportResponse,
     ExamReportUpdateRequest,
 )
+from app.models.async_jobs import AsyncJobStatus
+from app.models.exams import OCRStatus
 from app.models.users import User
+from app.services import async_jobs as async_job_service
 from app.services import exams as exam_service
 from app.services.sensitive_access_logs import safe_record_sensitive_access
 
@@ -57,38 +61,30 @@ async def get_exam_report(exam_id: int, request: Request, user: Annotated[User, 
     return report
 
 
-async def _run_exam_ocr(
-    exam_id: int,
-    user: User,
-    image_bytes: bytes | None = None,
-    image_media_type: str | None = None,
-    image_filename: str | None = None,
-) -> ExamOCRResponse:
-    report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
-    ensure_owner(report.user_id, user)
-    return await exam_service.run_exam_ocr(
-        exam_id,
-        image_bytes=image_bytes,
-        image_media_type=image_media_type,
-        image_filename=image_filename,
-    )
-
-
-@exam_router.post("/{exam_id}/ocr", response_model=ExamOCRResponse)
+@exam_router.post("/{exam_id}/ocr", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def run_exam_ocr(exam_id: int, request: Request, user: Annotated[User, Depends(get_request_user)]):
     image_bytes, image_media_type, image_filename = await _read_optional_upload(request)
-    return await _run_exam_ocr(
-        exam_id,
-        user,
+    if image_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="검진표 이미지 또는 PDF 파일을 업로드해주세요.",
+        )
+    report = ensure_found(await exam_service.get_exam_report(exam_id), "검진표를 찾을 수 없습니다.")
+    ensure_owner(report.user_id, user)
+    await exam_service.store_exam_ocr_upload(
+        report=report,
         image_bytes=image_bytes,
         image_media_type=image_media_type,
         image_filename=image_filename,
     )
-
-
-@exam_router.post("/{exam_id}/dummy-ocr", response_model=ExamOCRResponse, deprecated=True, include_in_schema=False)
-async def run_legacy_exam_ocr(exam_id: int, user: Annotated[User, Depends(get_request_user)]):
-    return await _run_exam_ocr(exam_id, user)
+    job = await async_job_service.create_exam_ocr_job(user_id=int(user.id), exam_report_id=exam_id)
+    await exam_service.update_exam_report(
+        exam_id,
+        ExamReportUpdateRequest(
+            ocr_status=OCRStatus.FAILED if job.status == AsyncJobStatus.FAILED else OCRStatus.PROCESSING
+        ),
+    )
+    return job
 
 
 async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | None, str | None]:
@@ -97,12 +93,21 @@ async def _read_optional_upload(request: Request) -> tuple[bytes | None, str | N
     form = await request.form()
     upload = form.get("image") or form.get("file")
     if _is_upload(upload):
-        return await upload.read(), upload.content_type, getattr(upload, "filename", None)
+        filename = getattr(upload, "filename", None)
+        normalized_image = _normalize_uploaded_image(await upload.read(), upload.content_type, filename)
+        return normalized_image.data, normalized_image.media_type, filename
     return None, None, None
 
 
 def _is_upload(value: object) -> bool:
     return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
+
+
+def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
+    try:
+        return normalize_upload_image(image_bytes, media_type, filename)
+    except ImageNormalizationError as exc:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
 
 
 @exam_router.patch("/{exam_id}", response_model=ExamReportResponse)
