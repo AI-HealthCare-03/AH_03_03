@@ -29,6 +29,17 @@ from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
 
 warnings.filterwarnings("ignore")
+import joblib
+
+# imbalanced-learn — 불균형 앙상블
+try:
+    from imblearn.ensemble import EasyEnsembleClassifier, BalancedRandomForestClassifier
+    IMBALANCED_AVAILABLE = True
+except ImportError:
+    import subprocess, sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "imbalanced-learn", "-q"])
+    from imblearn.ensemble import EasyEnsembleClassifier, BalancedRandomForestClassifier
+    IMBALANCED_AVAILABLE = True
 
 import optuna
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -52,8 +63,8 @@ RECALL_TARGET = 0.8
 #    2024 전체 + 아래 타겟의 2023/2022 양성 행 추가
 #    모든 타겟이 동일한 df_all 기반 → 공정한 비교
 # ────────────────────────────────────────────
-ADD_23_POS = ["고혈압", "대사증후군", "간기능이상", "신장단백뇨"]
-ADD_22_POS = ["고혈압", "대사증후군", "간기능이상", "신장단백뇨"]
+ADD_23_POS = ["고혈압","간기능이상"]
+ADD_22_POS = ["고혈압","간기능이상"]
 
 # ────────────────────────────────────────────
 # 2. 실험 목록
@@ -71,20 +82,89 @@ EXPERIMENTS = [
     # },
 
     # ── B: Optuna 튜닝 (LightGBM + CatBoost) ─────────────────
-    {
-        "tag":         "B",
-        "desc":        "Optuna 튜닝 — LightGBM + CatBoost / 전체 6개 타겟 / 50 trials",
-        "optuna":      True,
-        "trials":      50,
-        "tune_models": ["LightGBM", "CatBoost"],
-    },
+    # {
+    #     "tag":         "B",
+    #     "desc":        "Optuna 튜닝 — LightGBM + CatBoost / 전체 6개 타겟 / 50 trials",
+    #     "optuna":      True,
+    #     "trials":      50,
+    #     "tune_models": ["LightGBM", "CatBoost"],
+    # },
 
-    # ── C: 다음 실험 ──────────────────────────────────────────
+    # ── C: B 베스트 파라미터 고정 + CLINICAL_BOUNDS 이상치 처리 ──
     # {
     #     "tag":    "C",
-    #     "desc":   "",
+    #     "desc":   "B 베스트 파라미터 고정 + CLINICAL_BOUNDS 의학적 이상치 처리",
     #     "optuna": False,
     # },
+
+    # ── D: C + df_all 중복 행 제거 ───────────────────────────
+    # {
+    #     "tag":    "D",
+    #     "desc":   "B 베스트 파라미터 고정 + CLINICAL_BOUNDS + df_all 중복 제거",
+    #     "optuna": False,
+    #     "dedup":  True,
+    # },
+
+    # ── E: C + 타겟별 class_weight balanced ──────────────────
+    # {
+    #     "tag":          "E",
+    #     "desc":         "C + 타겟별 class_weight balanced 불균형 처리",
+    #     "optuna":       False,
+    #     "class_weight": "balanced",
+    # },
+
+    # ── F: E + bmi_category 제거 ─────────────────────────────
+    # {
+    #     "tag":          "F",
+    #     "desc":         "E + bmi_category 전체 제거 (중요도 전 타겟 최하위)",
+    #     "optuna":       False,
+    #     "class_weight": "balanced",
+    #     "save_models":  True,
+    # },
+
+    # ── G: F + 신장/체중 5단위 jitter (해상도 개선) ───────────
+    # {
+    #     "tag":          "G",
+    #     "desc":         "F + 신장/체중 5단위 균등분포 jitter → BMI/WHtR 해상도 개선",
+    #     "optuna":       False,
+    #     "class_weight": "balanced",
+    #     "jitter":       True,
+    # },
+
+    # ── H: 불균형 앙상블 (고혈압/당뇨 타겟 집중) ────────────────
+    # {
+    #     "tag":            "H",
+    #     "desc":           "불균형 앙상블 — EasyEnsemble + BalancedRF",
+    #     "optuna":         False,
+    #     "class_weight":   "balanced",
+    #     "imb_ensemble":   True,
+    #     "skip_targets":   ["대사증후군", "신장단백뇨"],
+    # },
+
+    # ── I: OOF 확률 평균 앙상블 ──────────────────────────────
+    # {
+    #     "tag":          "I",
+    #     "desc":         "OOF 확률 평균 앙상블 — LightGBM + CatBoost + XGBoost",
+    #     "optuna":       False,
+    #     "class_weight": "balanced",
+    #     "oof_ensemble": True,
+    #     "oof_models":   ["LightGBM", "CatBoost", "XGBoost"],
+    #     "skip_targets": ["대사증후군", "신장단백뇨"],
+    # },
+
+    # ── J: OOF 스태킹 앙상블 ─────────────────────────────────
+    # LightGBM + CatBoost + XGBoost → 5-fold OOF 확률 → LR 메타 모델
+    # 대사증후군/신장단백뇨 제외
+    {
+        "tag":          "J",
+        "desc":         "OOF 스태킹 — LightGBM+CatBoost+XGBoost → LR 메타모델",
+        "optuna":       False,
+        "class_weight": "balanced",
+        "stacking":     True,
+        "stack_models": ["LightGBM", "CatBoost", "XGBoost"],
+        "stack_folds":  5,
+        "save_models":  True,   # KNHANES 외부 검증용 스태킹 모델 저장
+    },
 ]
 
 # ────────────────────────────────────────────
@@ -94,26 +174,42 @@ TARGETS = {
     "당뇨위험":    "target_diabetes",
     "고혈압":      "target_hypertension",
     "이상지질혈증": "target_dyslipidemia",
-    "대사증후군":   "target_metabolic",
     "간기능이상":   "target_liver",
-    "신장단백뇨":   "target_proteinuria",
 }
 
 FEATURE_COLS = [
     "성별코드", "신장(5cm단위)", "체중(5kg단위)", "허리둘레", "음주여부",
-    "bmi", "bmi_category", "waist_height_ratio",
+    "bmi", "waist_height_ratio",
     "age_mid", "gender_age_enc", "obesity_combined",
     "smoking_current", "smoking_ever",
-]
+]  # bmi_category 제거 (F 실험: 전 타겟 중요도 최하위, bmi 연속값과 중복)
 
 # ────────────────────────────────────────────
 # 4. 전처리 함수
 # ────────────────────────────────────────────
+CLINICAL_BOUNDS = {
+    "신장(5cm단위)":      (100, 250),   # 기네스 최장신 251cm / 100 미만 성인 측정오류
+    "체중(5kg단위)":      (20,  350),   # 20 미만 성인 측정오류 / 350 초과 국내 현실적 불가
+    "허리둘레":           (40,  200),   # 999 코드값 → 범위 초과 자동 NaN
+    "수축기혈압":         (60,  280),   # 60 미만 심인성 쇼크 / 280 초과 고혈압 응급 상한
+    "이완기혈압":         (40,  150),   # 임상적 측정 가능 범위
+    "식전혈당(공복혈당)": (40,  600),   # 40 미만 중증저혈당 / 600 초과 HHS / 991 코드값 포함
+    "총콜레스테롤":       (50,  700),   # 가족성고콜레스테롤혈증 극단값 기준
+    "LDL콜레스테롤":      (10,  500),
+    "HDL콜레스테롤":      (10,  150),   # 150 초과 측정오류 수준
+    "트리글리세라이드":   (20,  5000),  # 급성췌장염 유발 / 드물게 5000대 보고
+    "혈청지오티(AST)":    (5,   5000),  # 급성간염/허혈성간염 수천 단위 보고
+    "혈청지피티(ALT)":    (5,   5000),
+    "감마지티피":         (5,   3000),  # 알코올성 간질환 극단값 / 9999 코드값 포함
+}
+
 def preprocess(df):
+    """의학적 CLINICAL_BOUNDS 기반 이상치 → NaN 처리 (v2)"""
     df = df.copy()
-    df["허리둘레"]         = df["허리둘레"].replace(999, np.nan)
-    df["감마지티피"]        = df["감마지티피"].replace(9999, np.nan)
-    df["식전혈당(공복혈당)"] = df["식전혈당(공복혈당)"].replace(991, np.nan)
+    for col, (lo, hi) in CLINICAL_BOUNDS.items():
+        if col not in df.columns:
+            continue
+        df[col] = df[col].where((df[col] >= lo) & (df[col] <= hi), other=np.nan)
     return df
 
 def make_targets(df):
@@ -198,9 +294,92 @@ def make_features(df):
 # ────────────────────────────────────────────
 # 5. 모델 정의
 # ────────────────────────────────────────────
-def get_models(scale_pos_weight=1.0, class_weight=None):
+# ── B 실험 베스트 파라미터 (타겟별 고정) ──────────────────────
+# Optuna 50 trials 결과 / C 실험에서 고정 파라미터로 사용
+BEST_PARAMS_B = {
+    "당뇨위험": {
+        "LightGBM": dict(n_estimators=522, learning_rate=0.05034719040252834, num_leaves=101,
+                         max_depth=8, min_child_samples=81, subsample=0.5420498720757686,
+                         colsample_bytree=0.9656316260251595, reg_alpha=0.7639368798428724,
+                         reg_lambda=0.00618006575315154),
+        "CatBoost": dict(iterations=806, learning_rate=0.04623826630220252, depth=10,
+                         l2_leaf_reg=1e-3,  # degenerate 방지: 원본 1.86e-5 → 1e-3 상향
+                         bagging_temperature=0.09197660588086623, random_strength=0.0005944485244359853),
+    },
+    "고혈압": {
+        "LightGBM": dict(n_estimators=507, learning_rate=0.22331242412867336, num_leaves=149,
+                         max_depth=12, min_child_samples=10, subsample=0.7954172753805078,
+                         colsample_bytree=0.7247644266894295, reg_alpha=3.831e-05,
+                         reg_lambda=0.0006679438865010269),
+        "CatBoost": dict(iterations=742, learning_rate=0.2849015462477188, depth=10,
+                         l2_leaf_reg=1e-3,  # degenerate 방지: 원본 1.56e-6 → 1e-3 상향
+                         bagging_temperature=0.776653017329181, random_strength=1.580e-05),
+    },
+    "이상지질혈증": {
+        "LightGBM": dict(n_estimators=376, learning_rate=0.09997948419313435, num_leaves=35,
+                         max_depth=12, min_child_samples=22, subsample=0.8873235866452984,
+                         colsample_bytree=0.7962071632765588, reg_alpha=3.361e-08,
+                         reg_lambda=1.159e-06),
+        "CatBoost": dict(iterations=814, learning_rate=0.06492060953012901, depth=10,
+                         l2_leaf_reg=1e-3,  # degenerate 방지: 원본 3.75e-5 → 1e-3 상향
+                         bagging_temperature=0.29206227335309387, random_strength=5.620e-06),
+    },
+    "대사증후군": {
+        "LightGBM": dict(n_estimators=902, learning_rate=0.09685139354186116, num_leaves=139,
+                         max_depth=12, min_child_samples=53, subsample=0.649352863649425,
+                         colsample_bytree=0.7727081638649321, reg_alpha=1.417e-06,
+                         reg_lambda=0.0009399152029515449),
+        "CatBoost": dict(iterations=922, learning_rate=0.13844752134393362, depth=10,
+                         l2_leaf_reg=0.00723482443317559,
+                         bagging_temperature=0.708032370100854, random_strength=2.185e-08),
+    },
+    "간기능이상": {
+        "LightGBM": dict(n_estimators=985, learning_rate=0.09792171704582421, num_leaves=137,
+                         max_depth=12, min_child_samples=20, subsample=0.8011011032029123,
+                         colsample_bytree=0.9633869918248013, reg_alpha=5.296e-05,
+                         reg_lambda=0.6975799435019739),
+        "CatBoost": dict(iterations=934, learning_rate=0.09330545961114106, depth=10,
+                         l2_leaf_reg=0.018218240559437857,
+                         bagging_temperature=0.5525877889462425, random_strength=0.7494583751599895),
+    },
+    "신장단백뇨": {
+        "LightGBM": dict(n_estimators=957, learning_rate=0.23146375268766253, num_leaves=109,
+                         max_depth=10, min_child_samples=52, subsample=0.857210459075525,
+                         colsample_bytree=0.8043497429670368, reg_alpha=3.892069681051425,
+                         reg_lambda=0.05620347256425568),
+        "CatBoost": dict(iterations=878, learning_rate=0.01596021282510282, depth=8,
+                         l2_leaf_reg=1e-3,  # degenerate 방지: 원본 3.14e-7 → 1e-3 상향
+                         bagging_temperature=0.8232527440752893, random_strength=3.514e-05),
+    },
+}
+
+def get_models(scale_pos_weight=1.0, class_weight=None, target_name=None, imb_ensemble=False):
     cw = class_weight
-    return {
+
+    # B 베스트 파라미터 고정 적용 (타겟명 있을 때)
+    if target_name and target_name in BEST_PARAMS_B:
+        bp = BEST_PARAMS_B[target_name]
+        lgbm_params = {**bp["LightGBM"], "random_state": RANDOM_STATE, "n_jobs": -1, "verbose": -1}
+        catb_params = {**bp["CatBoost"], "random_state": RANDOM_STATE, "verbose": 0}
+    else:
+        lgbm_params = dict(n_estimators=500, learning_rate=0.05, num_leaves=63,
+                           random_state=RANDOM_STATE, n_jobs=-1, verbose=-1)
+        catb_params = dict(iterations=500, learning_rate=0.05, depth=6,
+                           random_state=RANDOM_STATE, verbose=0)
+
+    # class_weight balanced 적용
+    # LightGBM: class_weight 파라미터로 전달
+    # XGBoost: scale_pos_weight로 변환 (balanced 지원 안 함)
+    # CatBoost: auto_class_weights="Balanced"로 변환
+    if cw == "balanced":
+        lgbm_params = {**lgbm_params, "class_weight": "balanced"}
+        xgb_spw     = scale_pos_weight  # 기본값 유지 (타겟별 계산은 루프에서)
+        catb_auto   = "Balanced"
+    else:
+        xgb_spw   = scale_pos_weight
+        catb_auto = None
+
+    models = {
         "LR": Pipeline([
             ("imputer", KNNImputer(n_neighbors=5)),
             ("scaler",  StandardScaler()),
@@ -217,23 +396,34 @@ def get_models(scale_pos_weight=1.0, class_weight=None):
                 class_weight=cw
             )),
         ]),
-        "LightGBM": LGBMClassifier(
-            n_estimators=500, learning_rate=0.05,
-            num_leaves=63, random_state=RANDOM_STATE,
-            n_jobs=-1, verbose=-1, class_weight=cw
-        ),
+        "LightGBM": LGBMClassifier(**lgbm_params),
         "XGBoost": XGBClassifier(
             n_estimators=500, learning_rate=0.05,
             max_depth=6, random_state=RANDOM_STATE,
             n_jobs=-1, eval_metric="logloss",
-            verbosity=0, scale_pos_weight=scale_pos_weight
+            verbosity=0, scale_pos_weight=xgb_spw
         ),
-        "CatBoost": CatBoostClassifier(
-            iterations=500, learning_rate=0.05,
-            depth=6, random_state=RANDOM_STATE, verbose=0,
-            auto_class_weights="Balanced" if cw == "balanced" else None
-        ),
+        "CatBoost": CatBoostClassifier(**catb_params,
+                                        auto_class_weights=catb_auto),
     }
+
+    # 불균형 앙상블 추가 (imb_ensemble 플래그 있을 때만)
+    if imb_ensemble:
+        models["EasyEnsemble"] = Pipeline([
+            ("imputer", KNNImputer(n_neighbors=5)),
+            ("model",   EasyEnsembleClassifier(
+                n_estimators=10, random_state=RANDOM_STATE, n_jobs=-1
+            )),
+        ])
+        models["BalancedRF"] = Pipeline([
+            ("imputer", KNNImputer(n_neighbors=5)),
+            ("model",   BalancedRandomForestClassifier(
+                n_estimators=300, max_depth=10,
+                random_state=RANDOM_STATE, n_jobs=-1
+            )),
+        ])
+
+    return models
 
 # ────────────────────────────────────────────
 # 6. Threshold 자동 조정
@@ -328,16 +518,23 @@ print(f"  완료: {df22.shape[0]:,}행")
 print("\ndf_all 구성 중...")
 target_cols = list(TARGETS.values())
 all_cols    = FEATURE_COLS + target_cols
-df_all      = df24[all_cols].copy()
+
+# 연도 컬럼 추가 (중복 제거 시 동일 연도 내 중복만 제거하기 위함)
+df24["연도"] = 2024
+df23["연도"] = 2023
+df22["연도"] = 2022
+all_cols_with_year = ["연도"] + all_cols
+
+df_all = df24[all_cols_with_year].copy()
 
 for target_name, target_col in TARGETS.items():
     if target_name in ADD_23_POS:
-        pos23  = df23[all_cols].dropna(subset=[target_col])
+        pos23  = df23[all_cols_with_year].dropna(subset=[target_col])
         pos23  = pos23[pos23[target_col] == 1]
         df_all = pd.concat([df_all, pos23], ignore_index=True)
         print(f"  +2023 {target_name} 양성: {len(pos23):,}행")
     if target_name in ADD_22_POS:
-        pos22  = df22[all_cols].dropna(subset=[target_col])
+        pos22  = df22[all_cols_with_year].dropna(subset=[target_col])
         pos22  = pos22[pos22[target_col] == 1]
         df_all = pd.concat([df_all, pos22], ignore_index=True)
         print(f"  +2022 {target_name} 양성: {len(pos22):,}행")
@@ -359,10 +556,39 @@ all_params      = []   # Optuna 베스트 파라미터
 all_importances = []   # 피처 중요도
 
 for exp in EXPERIMENTS:
-    tag         = exp["tag"]
-    use_optuna  = exp.get("optuna", False)
-    n_trials    = exp.get("trials", 50)
-    tune_models = exp.get("tune_models", [])
+    tag          = exp["tag"]
+    use_optuna   = exp.get("optuna", False)
+    n_trials     = exp.get("trials", 50)
+    tune_models  = exp.get("tune_models", [])
+    use_dedup    = exp.get("dedup", False)
+    class_weight = exp.get("class_weight", None)
+    save_models  = exp.get("save_models", False)
+    use_jitter     = exp.get("jitter", False)
+    imb_ensemble   = exp.get("imb_ensemble", False)
+    oof_ensemble   = exp.get("oof_ensemble", False)
+    oof_models     = exp.get("oof_models", ["LightGBM", "CatBoost", "XGBoost"])
+    stacking       = exp.get("stacking", False)
+    stack_models   = exp.get("stack_models", ["LightGBM", "CatBoost", "XGBoost"])
+    stack_folds    = exp.get("stack_folds", 5)
+    skip_targets   = exp.get("skip_targets", [])
+
+    # 모델 저장 디렉토리
+    if save_models:
+        model_save_dir = os.path.join(OUT_DIR, "saved_models")
+        os.makedirs(model_save_dir, exist_ok=True)
+
+    # jitter 적용 — train 데이터에만 적용 (test는 원본값 유지)
+    # 실제 서비스에서 사용자는 5단위 원본값 입력 → test는 그 조건 유지
+    # train에만 다양성 부여 → 모델 일반화 개선 목적
+
+    # 중복 제거 (dedup 플래그 있을 때만)
+    # 연도 포함 기준: 동일 연도 내 피처+타겟 완전 동일 행만 제거
+    # 연도가 다른 동일 피처값은 중복으로 보지 않음
+    if use_dedup:
+        before = len(df_all)
+        df_all = df_all.drop_duplicates().reset_index(drop=True)
+        after  = len(df_all)
+        print(f"\n[중복 제거] {before:,}행 → {after:,}행 (제거: {before - after:,}행)")
 
     print(f"\n{'='*60}")
     print(f"실험: {tag}")
@@ -370,6 +596,9 @@ for exp in EXPERIMENTS:
     print(f"{'='*60}")
 
     for target_name, target_col in TARGETS.items():
+        if target_name in skip_targets:
+            print(f"\n  [타겟: {target_name}] 스킵")
+            continue
         print(f"\n  [타겟: {target_name}]")
 
         df_use = df_all[FEATURE_COLS + [target_col]].dropna(subset=[target_col])
@@ -385,10 +614,23 @@ for exp in EXPERIMENTS:
         )
         print(f"  Train: {len(X_train):,} | Test: {len(X_test):,}")
 
+        # jitter: train에만 적용 — test는 원본값 유지 (실서비스 조건)
+        if use_jitter:
+            X_train = X_train.copy()
+            rng = np.random.default_rng(RANDOM_STATE)
+            X_train["신장(5cm단위)"] = X_train["신장(5cm단위)"] + rng.uniform(-2.5, 2.5, len(X_train))
+            X_train["체중(5kg단위)"] = X_train["체중(5kg단위)"] + rng.uniform(-2.5, 2.5, len(X_train))
+            X_train["bmi"] = (X_train["체중(5kg단위)"] / ((X_train["신장(5cm단위)"] / 100) ** 2)).round(2)
+            X_train["waist_height_ratio"] = (X_train["허리둘레"] / X_train["신장(5cm단위)"]).round(3)
+            X_train["obesity_combined"] = (
+                (X_train["bmi"] >= 25) & (X_train["waist_height_ratio"] >= 0.5)
+            ).astype(float)
+            print(f"  [jitter] train에만 ±2.5 균등분포 노이즈 적용")
+
         target_results = []
 
         # ── 일반 모델 ──────────────────────────────────────────
-        for model_name, model in get_models().items():
+        for model_name, model in get_models(target_name=target_name, class_weight=class_weight, imb_ensemble=imb_ensemble).items():
             if use_optuna and model_name in tune_models:
                 continue
 
@@ -505,9 +747,153 @@ for exp in EXPERIMENTS:
                             "피처": fname, "중요도": round(float(fval), 6),
                         })
 
+        # ── OOF 확률 평균 앙상블 ─────────────────────────────
+        if oof_ensemble:
+            oof_probs = []
+            for oof_model_name in oof_models:
+                oof_m = get_models(target_name=target_name, class_weight=class_weight).get(oof_model_name)
+                if oof_m is None:
+                    continue
+                oof_m.fit(X_train, y_train)
+                if hasattr(oof_m, "predict_proba"):
+                    oof_probs.append(oof_m.predict_proba(X_test)[:, 1])
+
+            if len(oof_probs) >= 2:
+                y_prob_ens = np.mean(oof_probs, axis=0)
+                auc_ens    = roc_auc_score(y_test, y_prob_ens)
+                thr_ens    = find_best_threshold(y_test, y_prob_ens)
+                y_pred_ens = (y_prob_ens >= thr_ens).astype(int)
+                recall_ens = recall_score(y_test, y_pred_ens, zero_division=0)
+                f1_ens     = f1_score(y_test, y_pred_ens, zero_division=0)
+                prec_ens   = precision_score(y_test, y_pred_ens, zero_division=0)
+                tn, fp, fn, tp = confusion_matrix(y_test, y_pred_ens).ravel()
+
+                model_label = "+".join(oof_models)
+                recall_ok = "✅" if recall_ens >= RECALL_TARGET else "❌"
+                f1_ok     = "✅" if f1_ens >= 0.6 else "❌"
+                print(f"  {'OOF_Ensemble':<18} AUC: {auc_ens:.4f} | Recall: {recall_ens:.4f} {recall_ok} | "
+                      f"F1: {f1_ens:.4f} {f1_ok} | Precision: {prec_ens:.4f} | Threshold: {thr_ens:.2f}")
+                print(f"    └ ({model_label} 평균)")
+
+                ens_result = {
+                    "실험": tag, "타겟": target_name, "모델": "OOF_Ensemble",
+                    "AUC": round(auc_ens,4), "Recall": round(recall_ens,4),
+                    "F1": round(f1_ens,4), "Precision": round(prec_ens,4),
+                    "Threshold": thr_ens,
+                    "TP": int(tp), "FP": int(fp), "TN": int(tn), "FN": int(fn),
+                    "Recall_달성": recall_ens >= RECALL_TARGET, "F1_달성": f1_ens >= 0.6,
+                }
+                target_results.append(ens_result)
+                all_results.append(ens_result)
+
+        # ── OOF 스태킹 앙상블 ───────────────────────────────────
+        if stacking:
+            from sklearn.model_selection import StratifiedKFold
+            from sklearn.linear_model import LogisticRegression as MetaLR
+
+            skf = StratifiedKFold(n_splits=stack_folds, shuffle=True, random_state=RANDOM_STATE)
+            oof_train_probs = np.zeros((len(X_train), len(stack_models)))
+            oof_test_probs  = np.zeros((len(X_test),  len(stack_models)))
+
+            print(f"  [스태킹] {stack_folds}-fold OOF 학습 중...")
+            for mi, smodel_name in enumerate(stack_models):
+                fold_test_probs = np.zeros((len(X_test), stack_folds))
+                for fi, (tr_idx, va_idx) in enumerate(skf.split(X_train, y_train)):
+                    X_tr, X_va = X_train.iloc[tr_idx], X_train.iloc[va_idx]
+                    y_tr, y_va = y_train.iloc[tr_idx], y_train.iloc[va_idx]
+
+                    smodel = get_models(target_name=target_name, class_weight=class_weight).get(smodel_name)
+                    if smodel is None:
+                        continue
+
+                    # KNN impute per fold
+                    imp = KNNImputer(n_neighbors=5)
+                    X_tr_imp = imp.fit_transform(X_tr)
+                    X_va_imp = imp.transform(X_va)
+                    X_te_imp = imp.transform(X_test)
+
+                    smodel.fit(X_tr_imp, y_tr)
+                    oof_train_probs[va_idx, mi] = smodel.predict_proba(X_va_imp)[:, 1]
+                    fold_test_probs[:, fi]       = smodel.predict_proba(X_te_imp)[:, 1]
+
+                oof_test_probs[:, mi] = fold_test_probs.mean(axis=1)
+
+            # 메타 모델 학습 (LR)
+            meta_model = MetaLR(max_iter=1000, random_state=RANDOM_STATE)
+
+            # train OOF에도 KNN impute 필요 없음 (이미 처리됨)
+            meta_model.fit(oof_train_probs, y_train)
+            y_prob_stack = meta_model.predict_proba(oof_test_probs)[:, 1]
+
+            auc_st    = roc_auc_score(y_test, y_prob_stack)
+            thr_st    = find_best_threshold(y_test, y_prob_stack)
+            y_pred_st = (y_prob_stack >= thr_st).astype(int)
+            recall_st = recall_score(y_test, y_pred_st, zero_division=0)
+            f1_st     = f1_score(y_test, y_pred_st, zero_division=0)
+            prec_st   = precision_score(y_test, y_pred_st, zero_division=0)
+            tn, fp, fn, tp = confusion_matrix(y_test, y_pred_st).ravel()
+
+            recall_ok = "✅" if recall_st >= RECALL_TARGET else "❌"
+            f1_ok     = "✅" if f1_st >= 0.6 else "❌"
+            model_label = "+".join(stack_models)
+            print(f"  {'Stacking':<18} AUC: {auc_st:.4f} | Recall: {recall_st:.4f} {recall_ok} | "
+                  f"F1: {f1_st:.4f} {f1_ok} | Precision: {prec_st:.4f} | Threshold: {thr_st:.2f}")
+            print(f"    └ ({model_label} → LR 메타모델)")
+
+            stack_result = {
+                "실험": tag, "타겟": target_name, "모델": "Stacking",
+                "AUC": round(auc_st,4), "Recall": round(recall_st,4),
+                "F1": round(f1_st,4), "Precision": round(prec_st,4),
+                "Threshold": thr_st,
+                "TP": int(tp), "FP": int(fp), "TN": int(tn), "FN": int(fn),
+                "Recall_달성": recall_st >= RECALL_TARGET, "F1_달성": f1_st >= 0.6,
+            }
+            target_results.append(stack_result)
+            all_results.append(stack_result)
+
         best = max(target_results, key=lambda x: (x["Recall_달성"], x["F1"]))
         print(f"\n  → [{target_name}] 최고: {best['모델']} "
               f"AUC {best['AUC']:.4f} / Recall {best['Recall']:.4f} / F1 {best['F1']:.4f}")
+
+        # 최고 모델 저장 (save_models 플래그 있을 때만)
+        if save_models:
+            best_model_name = best["모델"]
+
+            # 스태킹인 경우 — base 모델들 + 메타 모델 저장
+            if best_model_name == "Stacking" and stacking:
+                stack_save = {
+                    "base_models": {},
+                    "meta_model":  meta_model,
+                    "stack_models": stack_models,
+                    "stack_folds":  stack_folds,
+                    "feature_cols": FEATURE_COLS,
+                }
+                # base 모델 전체 재학습 후 저장
+                imp_full = KNNImputer(n_neighbors=5)
+                X_train_imp = imp_full.fit_transform(X_train)
+                X_test_imp  = imp_full.transform(X_test)
+                stack_save["imputer"] = imp_full
+                for sn in stack_models:
+                    sm = get_models(target_name=target_name, class_weight=class_weight).get(sn)
+                    if sm:
+                        sm.fit(X_train_imp, y_train)
+                        stack_save["base_models"][sn] = sm
+                save_path = os.path.join(model_save_dir, f"{tag}_{target_name}_stacking.pkl")
+                joblib.dump(stack_save, save_path)
+                print(f"    스태킹 모델 저장: {save_path}")
+
+            # 단일 모델인 경우
+            else:
+                save_model_obj = None
+                for model_name, model in get_models(target_name=target_name, class_weight=class_weight).items():
+                    if model_name == best_model_name:
+                        model.fit(X_train, y_train)
+                        save_model_obj = model
+                        break
+                if save_model_obj is not None:
+                    save_path = os.path.join(model_save_dir, f"{tag}_{target_name}_best.pkl")
+                    joblib.dump(save_model_obj, save_path)
+                    print(f"    모델 저장: {save_path}")
 
 # ────────────────────────────────────────────
 # 10. 전체 결과 요약
