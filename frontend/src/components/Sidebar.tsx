@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { NavLink } from "react-router-dom";
 
 import { isAdminConsoleRole } from "../auth/AdminRoute";
@@ -28,20 +29,28 @@ export const sidebarLinks: SidebarLink[] = [
 export default function Sidebar() {
   const { backendUser } = useAuth();
   const showAdminLink = isAdminConsoleRole(backendUser?.role);
+  const sidebarRef = useRef<HTMLElement>(null);
   const getLinkClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-link${isActive ? " sidebar-link-active" : ""}`;
 
+  const handleLinkClick = () => {
+    if (sidebarRef.current && document.activeElement instanceof HTMLElement &&
+        sidebarRef.current.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+  };
+
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" ref={sidebarRef}>
       {sidebarLinks.map((link) => (
-        <NavLink aria-label={link.label} className={getLinkClass} key={link.to} title={link.label} to={link.to}>
+        <NavLink aria-label={link.label} className={getLinkClass} key={link.to} onClick={handleLinkClick} title={link.label} to={link.to}>
           <span aria-hidden="true" className="sidebar-active-indicator" />
           <span className="sidebar-link-icon">{link.icon}</span>
           <span className="sidebar-link-label">{link.label}</span>
         </NavLink>
       ))}
       {showAdminLink && (
-        <NavLink aria-label="관리자 콘솔" className={getLinkClass} title="관리자 콘솔" to="/admin">
+        <NavLink aria-label="관리자 콘솔" className={getLinkClass} onClick={handleLinkClick} title="관리자 콘솔" to="/admin">
           <span aria-hidden="true" className="sidebar-active-indicator" />
           <span className="sidebar-link-icon">🛡️</span>
           <span className="sidebar-link-label">관리자 콘솔</span>
