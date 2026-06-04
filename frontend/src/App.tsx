@@ -1,5 +1,13 @@
-import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { Route, Routes, useLocation } from "react-router-dom";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 import AdminRoute from "./auth/AdminRoute";
 import ProtectedRoute from "./auth/ProtectedRoute";
@@ -52,6 +60,7 @@ const AdminMonitoringPage = lazy(() => import("./pages/admin/AdminMonitoringPage
 export default function App() {
   return (
     <ErrorBoundary>
+      <ScrollToTop />
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route element={<Layout />}>
