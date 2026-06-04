@@ -34,7 +34,18 @@ SOURCE_VARIABLE_MAP = {
     "HE_GFR": "egfr",
 }
 
-SUPPORTED_DISEASES = ("HTN", "DM", "DL", "OBE", "ANEM", "FL", "ABO", "LF", "KF", "CKD")
+SUPPORTED_DISEASES = (
+    "HTN",
+    "DM",
+    "DL",
+    "OBE",
+    "ANEM",
+    "FL",
+    "ABO",
+    "LF",
+    "KF",
+    "CKD",
+)
 
 
 @dataclass(frozen=True)
@@ -74,7 +85,9 @@ def _missing_result(disease: str, missing: list[str]) -> StageResult:
     )
 
 
-def classify_htn(systolic_bp: Any = None, diastolic_bp: Any = None) -> StageResult:
+def classify_htn(
+    systolic_bp: Any = None, diastolic_bp: Any = None
+) -> StageResult:
     sbp = _to_decimal(systolic_bp)
     dbp = _to_decimal(diastolic_bp)
     missing = []
@@ -100,7 +113,10 @@ def classify_htn(systolic_bp: Any = None, diastolic_bp: Any = None) -> StageResu
         disease="HTN",
         stage=stage,
         label=label,
-        detail=f"수축기 {sbp:g}mmHg, 이완기 {dbp:g}mmHg 기준의 참고용 단계입니다. 의료기관 상담을 권장할 수 있습니다.",
+        detail=(
+            f"수축기 {sbp:g}mmHg, 이완기 {dbp:g}mmHg 기준의 참고용 단계입니다."
+            " 의료기관 상담을 권장할 수 있습니다."
+        ),
         missing=[],
     )
 
@@ -111,9 +127,13 @@ def classify_dm(fasting_glucose: Any = None, hba1c: Any = None) -> StageResult:
     if glucose is None and a1c is None:
         return _missing_result("DM", ["fasting_glucose", "hba1c"])
 
-    if (glucose is not None and glucose >= 126) or (a1c is not None and a1c >= Decimal("6.5")):
+    if (glucose is not None and glucose >= 126) or (
+        a1c is not None and a1c >= Decimal("6.5")
+    ):
         stage, label = "DIABETES_RANGE", "당뇨병 범위"
-    elif (glucose is not None and glucose >= 100) or (a1c is not None and a1c >= Decimal("5.7")):
+    elif (glucose is not None and glucose >= 100) or (
+        a1c is not None and a1c >= Decimal("5.7")
+    ):
         stage, label = "PRE_DIABETES_RANGE", "공복혈당장애/전단계 범위"
     elif glucose is None:
         return _missing_result("DM", ["fasting_glucose"])
@@ -128,7 +148,10 @@ def classify_dm(fasting_glucose: Any = None, hba1c: Any = None) -> StageResult:
         disease="DM",
         stage=stage,
         label=label,
-        detail=f"공복혈당 {glucose_text}, 당화혈색소 {a1c_text} 기준의 참고용 단계입니다. 의료 진단이 아닙니다.",
+        detail=(
+            f"공복혈당 {glucose_text}, 당화혈색소 {a1c_text} 기준의 참고용 단계입니다."
+            " 의료 진단이 아닙니다."
+        ),
         missing=[],
     )
 
@@ -219,7 +242,8 @@ def classify_dl(
         disease="DL",
         stage=stage,
         label=label,
-        detail=", ".join(reasons) + "입니다. 참고용 판정이며 의료기관 상담을 권장할 수 있습니다.",
+        detail=", ".join(reasons)
+        + "입니다. 참고용 판정이며 의료기관 상담을 권장할 수 있습니다.",
         missing=[],
     )
 
@@ -233,7 +257,9 @@ def _calculate_bmi(height_cm: Any, weight_kg: Any) -> Decimal | None:
     return weight / (height_m * height_m)
 
 
-def classify_obe(bmi: Any = None, height_cm: Any = None, weight_kg: Any = None) -> StageResult:
+def classify_obe(
+    bmi: Any = None, height_cm: Any = None, weight_kg: Any = None
+) -> StageResult:
     bmi_value = _to_decimal(bmi)
     if bmi_value is None:
         bmi_value = _calculate_bmi(height_cm, weight_kg)
@@ -262,7 +288,10 @@ def classify_obe(bmi: Any = None, height_cm: Any = None, weight_kg: Any = None) 
         disease="OBE",
         stage=stage,
         label=label,
-        detail=f"BMI {bmi_value.quantize(Decimal('0.1'))} 기준의 참고용 단계입니다. 의료 진단이 아닙니다.",
+        detail=(
+            f"BMI {bmi_value.quantize(Decimal('0.1'))} 기준의 참고용 단계입니다."
+            " 의료 진단이 아닙니다."
+        ),
         missing=[],
     )
 
@@ -289,7 +318,9 @@ def classify_anem(hemoglobin: Any = None, gender: Any = None) -> StageResult:
     if missing:
         return _missing_result("ANEM", missing)
 
-    normal_cutoff = Decimal("13.0") if normalized_gender == "MALE" else Decimal("12.0")
+    normal_cutoff = (
+        Decimal("13.0") if normalized_gender == "MALE" else Decimal("12.0")
+    )
     if hb >= normal_cutoff:
         stage, label = "NORMAL", "정상 범위"
     elif hb >= Decimal("11.0"):
@@ -304,7 +335,10 @@ def classify_anem(hemoglobin: Any = None, gender: Any = None) -> StageResult:
         disease="ANEM",
         stage=stage,
         label=label,
-        detail=f"{gender_label} 혈색소 {hb:g}g/dL 기준의 참고용 단계입니다. 의료기관 상담을 권장할 수 있습니다.",
+        detail=(
+            f"{gender_label} 혈색소 {hb:g}g/dL 기준의 참고용 단계입니다."
+            " 의료기관 상담을 권장할 수 있습니다."
+        ),
         missing=[],
     )
 
@@ -319,7 +353,7 @@ def classify_fl(
 ) -> StageResult:
     """지방간 위험도 분류 (HSI, Hepatic Steatosis Index).
 
-    HSI = 8 × (ALT / AST) + BMI + 2 × (여성이면 1, 아니면 0)
+    HSI = 8 × (AST / ALT) + BMI + 2 × (여성이면 1, 아니면 0)
     - HSI < 30  : 저위험군
     - 30 ≤ HSI ≤ 36 : 위험군
     - HSI > 36  : 고위험군
@@ -336,8 +370,8 @@ def classify_fl(
         missing.append("ast")
     if alt_val is None:
         missing.append("alt")
-    if ast_val is not None and ast_val == 0:
-        missing.append("ast (0은 허용되지 않습니다)")
+    if alt_val is not None and alt_val == 0:
+        missing.append("alt (0은 허용되지 않습니다)")
     if bmi_val is None:
         missing.append("bmi (또는 height_cm, weight_kg)")
     if normalized_gender is None:
@@ -345,8 +379,14 @@ def classify_fl(
     if missing:
         return _missing_result("FL", missing)
 
-    female_flag = Decimal("1") if normalized_gender == "FEMALE" else Decimal("0")
-    hsi = Decimal("8") * (alt_val / ast_val) + bmi_val + Decimal("2") * female_flag
+    female_flag = (
+        Decimal("1") if normalized_gender == "FEMALE" else Decimal("0")
+    )
+    hsi = (
+        Decimal("8") * (ast_val / alt_val)
+        + bmi_val
+        + Decimal("2") * female_flag
+    )
 
     if hsi < 30:
         stage, label = "LOW_RISK", "저위험군"
@@ -365,7 +405,8 @@ def classify_fl(
         stage=stage,
         label=label,
         detail=(
-            f"HSI {hsi_rounded} ({gender_label}, AST {ast_val:g}U/L, ALT {alt_val:g}U/L, "
+            f"HSI {hsi_rounded} ({gender_label}, "
+            f"AST {ast_val:g}U/L, ALT {alt_val:g}U/L, "
             f"BMI {bmi_val.quantize(Decimal('0.1'))}) 기준 {detail_risk}입니다. "
             "참고용 판정이며 의료 진단이 아닙니다."
         ),
@@ -377,14 +418,14 @@ def classify_abo(waist_cm: Any = None, gender: Any = None) -> StageResult:
     """복부비만 위험도 분류 (대한비만학회 기준).
 
     남성 허리둘레:
-      < 85cm       → 저위험군
-      85cm ~ 89.9cm  → 위험군
-      ≥ 90cm       → 고위험군
+      < 90cm       → 저위험군
+      90cm ~ 94cm  → 위험군
+      ≥ 95cm       → 고위험군
 
     여성 허리둘레:
-      < 80cm       → 저위험군
-      80cm ~ 84.9cm  → 위험군
-      ≥ 85cm       → 고위험군
+      < 85cm       → 저위험군
+      85cm ~ 89cm  → 위험군
+      ≥ 90cm       → 고위험군
     """
     waist = _to_decimal(waist_cm)
     normalized_gender = _normalize_gender(gender)
@@ -398,28 +439,29 @@ def classify_abo(waist_cm: Any = None, gender: Any = None) -> StageResult:
         return _missing_result("ABO", missing)
 
     if normalized_gender == "MALE":
-        if waist < 85:
+        if waist < 90:
             stage, label = "LOW_RISK", "저위험군"
-        elif waist <= 89.9:
+        elif waist <= 94:
             stage, label = "RISK", "위험군"
         else:
             stage, label = "HIGH_RISK", "고위험군"
     else:  # FEMALE
-        if waist < 80:
+        if waist < 85:
             stage, label = "LOW_RISK", "저위험군"
-        elif waist <= 84.9:
+        elif waist <= 89:
             stage, label = "RISK", "위험군"
         else:
             stage, label = "HIGH_RISK", "고위험군"
 
     gender_label = "남성" if normalized_gender == "MALE" else "여성"
-    cutoff_text = "85/90cm" if normalized_gender == "MALE" else "80/85cm"
+    cutoff_text = "90/95cm" if normalized_gender == "MALE" else "85/90cm"
     return StageResult(
-        disease="ABO", # Abdominal Obesity
+        disease="ABO",
         stage=stage,
         label=label,
         detail=(
-            f"{gender_label} 허리둘레 {waist:g}cm 기준 복부비만 {label}입니다 "
+            f"{gender_label} 허리둘레 {waist:g}cm 기준 {label}입니다 "
+            f"(대한비만학회 기준: {gender_label} 위험군 {cutoff_text}). "
             "참고용 판정이며 의료 진단이 아닙니다."
         ),
         missing=[],
@@ -458,21 +500,27 @@ def classify_lf(
     abnormal_reasons: list[str] = []
 
     if ast_val is not None and ast_val > 40:
-        abnormal_reasons.append(f"AST {ast_val:g} IU/L (기준 초과)")
+        abnormal_reasons.append(f"AST {ast_val:g}IU/L (기준 초과)")
     if alt_val is not None and alt_val > 40:
-        abnormal_reasons.append(f"ALT {alt_val:g} IU/L (기준 초과)")
+        abnormal_reasons.append(f"ALT {alt_val:g}IU/L (기준 초과)")
     if gtp_val is not None and normalized_gender is not None:
-        gtp_cutoff = Decimal("63") if normalized_gender == "MALE" else Decimal("35")
+        gtp_cutoff = (
+            Decimal("63") if normalized_gender == "MALE" else Decimal("35")
+        )
         if gtp_val > gtp_cutoff:
             gender_label = "남성" if normalized_gender == "MALE" else "여성"
             abnormal_reasons.append(
-                f"γ-GTP {gtp_val:g}IU/L (기준 초과, {gender_label} 기준 {gtp_cutoff:g} IU/L)"
+                f"γ-GTP {gtp_val:g}IU/L "
+                f"(기준 초과, {gender_label} 기준 {gtp_cutoff:g}IU/L)"
             )
 
     # 수치가 있으나 모두 정상 범위인 경우
     if abnormal_reasons:
         stage, label = "ABNORMAL_SUSPECTED", "간기능 이상 의심"
-        detail = ", ".join(abnormal_reasons) + "으로 간기능 이상이 의심됩니다. 참고용 판정이며 의료기관 상담을 권장합니다."
+        detail = (
+            ", ".join(abnormal_reasons)
+            + "으로 간기능 이상이 의심됩니다. 참고용 판정이며 의료기관 상담을 권장합니다."
+        )
     else:
         stage, label = "NORMAL", "정상 범위"
         values_text = []
@@ -482,7 +530,10 @@ def classify_lf(
             values_text.append(f"ALT {alt_val:g}IU/L")
         if gtp_val is not None:
             values_text.append(f"γ-GTP {gtp_val:g}IU/L")
-        detail = ", ".join(values_text) + " 기준 정상 범위입니다. 참고용 판정이며 의료 진단이 아닙니다."
+        detail = (
+            ", ".join(values_text)
+            + " 기준 정상 범위입니다. 참고용 판정이며 의료 진단이 아닙니다."
+        )
 
     return StageResult(
         disease="LF",
@@ -495,17 +546,40 @@ def classify_lf(
 
 _URINE_PROTEIN_POSITIVE = {
     # 숫자 코드 (국가건강검진 DB 코드값)
-    "1", "2", "3", "4",
+    "1",
+    "2",
+    "3",
+    "4",
     # 텍스트 표기
-    "+1", "+2", "+3", "+4",
-    "1+", "2+", "3+", "4+",
-    "양성", "양성(+1)", "양성(+2)", "양성(+3)", "양성(+4)",
-    "POSITIVE", "POS", "+",
+    "+1",
+    "+2",
+    "+3",
+    "+4",
+    "1+",
+    "2+",
+    "3+",
+    "4+",
+    "양성",
+    "양성(+1)",
+    "양성(+2)",
+    "양성(+3)",
+    "양성(+4)",
+    "POSITIVE",
+    "POS",
+    "+",
 }
 _URINE_PROTEIN_NEGATIVE = {
-    "0", "-1", "음성", "음성(-)", "NEGATIVE", "NEG", "-",
+    "0",
+    "-1",
+    "음성",
+    "음성(-)",
+    "NEGATIVE",
+    "NEG",
+    "-",
     # 미량(±)은 양성 기준 미달이므로 정상 처리
-    "미량", "±", "TRACE",
+    "미량",
+    "±",
+    "TRACE",
 }
 
 
@@ -546,20 +620,27 @@ def classify_kf(
 
     # 요단백 입력했으나 인식 불가
     if urine_protein is not None and protein_positive is None:
-        return _missing_result("KF", [f"urine_protein (인식 불가 값: {urine_protein!r})"])
+        return _missing_result(
+            "KF", [f"urine_protein (인식 불가 값: {urine_protein!r})"]
+        )
 
     abnormal_reasons: list[str] = []
 
     if protein_positive is True:
         abnormal_reasons.append(f"요단백 양성 ({urine_protein})")
     if crea_val is not None and crea_val > Decimal("1.5"):
-        abnormal_reasons.append(f"혈청 크레아티닌 {crea_val:g} mg/dL (기준 초과)")
+        abnormal_reasons.append(
+            f"혈청 크레아티닌 {crea_val:g}mg/dL (기준 초과)"
+        )
     if egfr_val is not None and egfr_val <= 60:
-        abnormal_reasons.append(f"eGFR {egfr_val:g} mL/min/1.73m² (기준 이하)")
+        abnormal_reasons.append(f"eGFR {egfr_val:g}mL/min/1.73m² (기준 이하)")
 
     if abnormal_reasons:
         stage, label = "DAMAGE_SUSPECTED", "신기능 손상 의심"
-        detail = ", ".join(abnormal_reasons) + "으로 신기능 손상이 의심됩니다. 참고용 판정이며 의료기관 상담을 권장합니다."
+        detail = (
+            ", ".join(abnormal_reasons)
+            + "으로 신기능 손상이 의심됩니다. 참고용 판정이며 의료기관 상담을 권장합니다."
+        )
     else:
         stage, label = "NORMAL", "정상 범위"
         values_text = []
@@ -569,7 +650,10 @@ def classify_kf(
             values_text.append(f"크레아티닌 {crea_val:g}mg/dL")
         if egfr_val is not None:
             values_text.append(f"eGFR {egfr_val:g}mL/min/1.73m²")
-        detail = ", ".join(values_text) + " 기준 정상 범위입니다. 참고용 판정이며 의료 진단이 아닙니다."
+        detail = (
+            ", ".join(values_text)
+            + " 기준 정상 범위입니다. 참고용 판정이며 의료 진단이 아닙니다."
+        )
 
     return StageResult(
         disease="KF",
@@ -586,8 +670,8 @@ def classify_ckd(egfr: Any = None) -> StageResult:
     중증도가 높은 단계가 우선 적용됩니다 (겹치는 구간은 고위험 우선):
       eGFR < 30               → 즉시 병원 방문 권유
       30 ≤ eGFR < 45          → 초고위험군
-      45 ≤ eGFR < 60          → 고위험군
-      60 ≤ eGFR < 90          → 위험군
+      45 ≤ eGFR < 65          → 고위험군   (※ 60-64 구간은 위험군 범위와 겹치나 고위험 우선)
+      65 ≤ eGFR < 90          → 위험군
       eGFR ≥ 90               → 저위험군
     """
     egfr_val = _to_decimal(egfr)
@@ -598,35 +682,35 @@ def classify_ckd(egfr: Any = None) -> StageResult:
         stage = "URGENT"
         label = "즉시 병원 방문 권유"
         detail = (
-            f"eGFR {egfr_val:g} mL/min/1.73m² — 신기능이 심각하게 저하된 상태입니다. "
+            f"eGFR {egfr_val:g}mL/min/1.73m² — 신기능이 심각하게 저하된 상태입니다. "
             "즉시 신장내과 전문의 진료를 받으시기 바랍니다. 참고용 판정이며 의료 진단이 아닙니다."
         )
     elif egfr_val < 45:
         stage = "VERY_HIGH_RISK"
         label = "초고위험군"
         detail = (
-            f"eGFR {egfr_val:g} mL/min/1.73m² — 신기능이 현저히 저하된 초고위험군입니다. "
+            f"eGFR {egfr_val:g}mL/min/1.73m² — 신기능이 현저히 저하된 초고위험군입니다. "
             "신장내과 전문의 상담을 강력히 권고합니다. 참고용 판정이며 의료 진단이 아닙니다."
         )
-    elif egfr_val < 60:
+    elif egfr_val < 65:
         stage = "HIGH_RISK"
         label = "고위험군"
         detail = (
-            f"eGFR {egfr_val:g} mL/min/1.73m² — 신기능이 중등도로 저하된 고위험군입니다. "
+            f"eGFR {egfr_val:g}mL/min/1.73m² — 신기능이 중등도로 저하된 고위험군입니다. "
             "의료기관 상담을 권장합니다. 참고용 판정이며 의료 진단이 아닙니다."
         )
     elif egfr_val < 90:
         stage = "RISK"
         label = "위험군"
         detail = (
-            f"eGFR {egfr_val:g} mL/min/1.73m² — 신기능이 경미하게 저하된 위험군입니다. "
+            f"eGFR {egfr_val:g}mL/min/1.73m² — 신기능이 경미하게 저하된 위험군입니다. "
             "정기적인 추적 관찰을 권장합니다. 참고용 판정이며 의료 진단이 아닙니다."
         )
     else:
         stage = "LOW_RISK"
         label = "저위험군"
         detail = (
-            f"eGFR {egfr_val:g} mL/min/1.73m² — 신기능이 정상 범위의 저위험군입니다. "
+            f"eGFR {egfr_val:g}mL/min/1.73m² — 신기능이 정상 범위의 저위험군입니다. "
             "참고용 판정이며 의료 진단이 아닙니다."
         )
 
@@ -663,7 +747,9 @@ def classify_all(
     egfr: Any = None,
 ) -> dict[str, StageResult]:
     return {
-        "HTN": classify_htn(systolic_bp=systolic_bp, diastolic_bp=diastolic_bp),
+        "HTN": classify_htn(
+            systolic_bp=systolic_bp, diastolic_bp=diastolic_bp
+        ),
         "DM": classify_dm(fasting_glucose=fasting_glucose, hba1c=hba1c),
         "DL": classify_dl(
             total_cholesterol=total_cholesterol,
@@ -673,10 +759,21 @@ def classify_all(
         ),
         "OBE": classify_obe(bmi=bmi, height_cm=height_cm, weight_kg=weight_kg),
         "ANEM": classify_anem(hemoglobin=hemoglobin, gender=gender),
-        "FL": classify_fl(ast=ast, alt=alt, bmi=bmi, height_cm=height_cm, weight_kg=weight_kg, gender=gender),
+        "FL": classify_fl(
+            ast=ast,
+            alt=alt,
+            bmi=bmi,
+            height_cm=height_cm,
+            weight_kg=weight_kg,
+            gender=gender,
+        ),
         "ABO": classify_abo(waist_cm=waist_cm, gender=gender),
-        "LF": classify_lf(ast=ast, alt=alt, gamma_gtp=gamma_gtp, gender=gender),
-        "KF": classify_kf(urine_protein=urine_protein, creatinine=creatinine, egfr=egfr),
+        "LF": classify_lf(
+            ast=ast, alt=alt, gamma_gtp=gamma_gtp, gender=gender
+        ),
+        "KF": classify_kf(
+            urine_protein=urine_protein, creatinine=creatinine, egfr=egfr
+        ),
         "CKD": classify_ckd(egfr=egfr),
     }
 
