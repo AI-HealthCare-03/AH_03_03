@@ -6,17 +6,31 @@ GPT Vision API 호출 클라이언트.
 """
 
 import base64
+import io
 import json
 import logging
 from typing import Any
 
 from openai import AsyncOpenAI
+from PIL import Image
+
+
+def _upscale_image(image_bytes: bytes, scale: float = 2.0) -> bytes:
+    """이미지 해상도를 업스케일합니다."""
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    w, h = img.size
+    img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95)
+    return buf.getvalue()
+
 
 logger = logging.getLogger(__name__)
 
 
 class AnalysisType:
     DIET = "diet"
+    MEDICATION = "medication"
     PRESCRIPTION = "prescription"
     CHECKUP = "checkup"
 
@@ -98,14 +112,17 @@ PROMPTS: dict[str, str] = {
 
 - 의료 진단 및 영양 처방 금지
 """,
-    AnalysisType.PRESCRIPTION: """
-이 약 봉투 또는 처방전 이미지에서 약물 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
+    AnalysisType.MEDICATION: """
+이 약봉투 이미지에서 약물 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
 {
   "medications": [
     {
       "drug_name": "약품명",
-      "dosage": "용량 (예: 5mg)",
-      "quantity": "수량",
+      "role": "복약안내 (약품 역할 및 기능)",
+      "dosage": "투약량 (예: 1정, 5ml)",
+      "frequency": "횟수 (예: 하루 3회)",
+      "days": "일수 (예: 3일치)",
+      "timing": null,
       "confidence": 0.0~1.0,
       "raw_text": "이미지 원문 텍스트"
     }
@@ -116,7 +133,41 @@ PROMPTS: dict[str, str] = {
 }
 
 규칙:
-- 복용법(횟수, 식전/후/간)은 추출하지 말 것
+- timing은 반드시 null로 반환 (사용자 수기 입력)
+- 모든 항목은 사용자가 수정 가능한 참고값으로 제공
+- 이미지에 있는 모든 약품을 추출할 것 (1개만 추출하는 것은 오류)
+- 약품 목록 추출 우선순위: 1) 하단/왼쪽 표(약품명 투약량 횟수 일수) 2) 복약안내 목록
+- 표가 있으면 각 행을 하나의 약품으로 추출하고 해당 행의 수치만 사용할 것
+- 약품명은 이미지에 보이는 제품명을 글자 그대로 읽을 것. 절대 추측하거나 수정하지 말 것
+- 인식 불확실 항목은 null로 반환하고 requires_manual_input에 추가할 것
+- role은 이미지에서 읽히는 약품 설명 텍스트로 작성할 것
+- 약봉투가 아닌 이미지면 failed로 반환하고 fail_reason 작성
+- 의료 진단 및 처방 변경 권고 금지
+""",
+    AnalysisType.PRESCRIPTION: """
+이 처방전 이미지에서 처방 의약품 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
+{
+  "medications": [
+    {
+      "drug_name": "처방 의약품 명칭",
+      "single_dose": "1회 투약량 (예: 1정, 0.5정)",
+      "daily_frequency": "1일 투여 횟수 (예: 1일 3회)",
+      "total_days": "총 투약일수 (예: 3일)",
+      "usage": "용법 (예: 식후 30분, 취침 전)",
+      "confidence": 0.0~1.0,
+      "raw_text": "이미지 원문 텍스트"
+    }
+  ],
+  "analysis_status": "success|partial|failed",
+  "requires_manual_input": ["인식 불확실 항목"],
+  "fail_reason": null
+}
+
+규칙:
+- 모든 항목은 사용자가 수정 가능한 참고값으로 제공
+- 약품명은 이미지에 보이는 글자를 철자 하나하나 그대로 옮겨 적을 것. 절대 추측하지 말 것
+- 1회 투약량, 1일 횟수, 총 투약일수는 표에서 해당 약품 행의 수치만 추출할 것
+- 인식 불확실 항목은 null로 반환하고 requires_manual_input에 추가할 것
 - 글자가 흐리거나 잘 안 보이면 partial로 반환
 - 처방전이 아닌 이미지면 failed로 반환하고 fail_reason 작성
 - 의료 진단 및 처방 변경 권고 금지
@@ -197,9 +248,14 @@ class VisionClient:
 
         logger.info("GPT Vision 분석 시작 | type=%s model=%s", analysis_type, self.model)
 
+        # 처방전/약봉투는 이미지 업스케일 적용
+        if analysis_type in (AnalysisType.PRESCRIPTION, AnalysisType.MEDICATION):
+            image_bytes = _upscale_image(image_bytes)
+
         response = await self.client.chat.completions.create(
             model=self.model,
             max_tokens=2048,
+            temperature=0,
             messages=[
                 {
                     "role": "user",

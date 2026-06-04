@@ -25,6 +25,7 @@ from ai_runtime.common.image_normalizer import (
 )
 from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
 
+from .drug_lookup import correct_drug_names
 from .schemas import (
     ERROR_MAP,
     STATUS_MESSAGE,
@@ -34,8 +35,10 @@ from .schemas import (
     DietAnalysisResponse,
     ErrorResponse,
     FoodItem,
+    MedicationAnalysisResponse,
     MedicationItem,
     PrescriptionAnalysisResponse,
+    PrescriptionItem,
 )
 from .settings import VisionSettings
 
@@ -195,9 +198,37 @@ async def analyze_diet(
 
 
 @router.post(
+    "/medication",
+    response_model=MedicationAnalysisResponse,
+    summary="약봉투 분석",
+    responses={
+        413: {"model": ErrorResponse},
+        415: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def analyze_medication(
+    file: Annotated[UploadFile, File(description="약봉투 이미지 (JPG/PNG/WEBP/HEIC, 최대 10MB)")],
+    client: Annotated[VisionClient, Depends(get_vision_client)],
+    settings: Annotated[VisionSettings, Depends(get_settings)],
+) -> MedicationAnalysisResponse:
+    raw = await call_vision(AnalysisType.MEDICATION, file, client)
+    status = raw.get("analysis_status", "failed")
+    medications = await correct_drug_names(raw.get("medications", []), settings.openai_api_key)
+    return MedicationAnalysisResponse(
+        analysis_status=status,
+        message=STATUS_MESSAGE.get(status, STATUS_MESSAGE["failed"]),
+        medications=[MedicationItem(**m) for m in medications],
+        requires_manual_input=raw.get("requires_manual_input", []),
+        raw_result=raw,
+    )
+
+
+@router.post(
     "/prescription",
     response_model=PrescriptionAnalysisResponse,
-    summary="처방전 / 약봉투 분석",
+    summary="처방전 분석",
     responses={
         413: {"model": ErrorResponse},
         415: {"model": ErrorResponse},
@@ -206,16 +237,17 @@ async def analyze_diet(
     },
 )
 async def analyze_prescription(
-    file: Annotated[UploadFile, File(description="처방전 또는 약봉투 이미지 (JPG/PNG/WEBP/HEIC)")],
+    file: Annotated[UploadFile, File(description="처방전 이미지 (JPG/PNG/WEBP/HEIC, 최대 10MB)")],
     client: Annotated[VisionClient, Depends(get_vision_client)],
+    settings: Annotated[VisionSettings, Depends(get_settings)],
 ) -> PrescriptionAnalysisResponse:
     raw = await call_vision(AnalysisType.PRESCRIPTION, file, client)
     status = raw.get("analysis_status", "failed")
-
+    medications = await correct_drug_names(raw.get("medications", []), settings.openai_api_key)
     return PrescriptionAnalysisResponse(
         analysis_status=status,
         message=STATUS_MESSAGE.get(status, STATUS_MESSAGE["failed"]),
-        medications=[MedicationItem(**m) for m in raw.get("medications", [])],
+        medications=[PrescriptionItem(**m) for m in medications],
         requires_manual_input=raw.get("requires_manual_input", []),
         raw_result=raw,
     )

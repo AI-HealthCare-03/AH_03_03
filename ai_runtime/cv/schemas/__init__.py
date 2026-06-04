@@ -139,17 +139,42 @@ class DietAnalysisResponse(BaseAnalysisResponse):
 # ── 처방전 ────────────────────────────────────────────────────────────────────
 
 
+# ── 약봉투 ────────────────────────────────────────────────────────────────────
+
+
 class MedicationItem(BaseModel):
-    drug_name: str
-    dosage: str | None = None
-    quantity: str | None = None
+    drug_name: str = Field(description="약품명")
+    role: str | None = Field(None, description="복약안내 (약품 역할 및 기능)")
+    dosage: str | None = Field(None, description="투약량")
+    frequency: str | None = Field(None, description="횟수 (예: 하루 3회)")
+    days: str | None = Field(None, description="일수 (예: 3일치)")
+    timing: str | None = Field(None, description="복용 타이밍 - 수기 입력")
+    confidence: float = Field(ge=0.0, le=1.0)
+    raw_text: str | None = None
+
+
+class MedicationAnalysisResponse(BaseAnalysisResponse):
+    analysis_type: str = "medication"
+    medications: list[MedicationItem] = Field(default_factory=list)
+    requires_manual_input: list[str] = Field(default_factory=list)
+
+
+# ── 처방전 ────────────────────────────────────────────────────────────────────
+
+
+class PrescriptionItem(BaseModel):
+    drug_name: str = Field(description="처방 의약품 명칭")
+    single_dose: str | None = Field(None, description="1회 투약량")
+    daily_frequency: str | None = Field(None, description="1일 투여 횟수")
+    total_days: str | None = Field(None, description="총 투약일수")
+    usage: str | None = Field(None, description="용법")
     confidence: float = Field(ge=0.0, le=1.0)
     raw_text: str | None = None
 
 
 class PrescriptionAnalysisResponse(BaseAnalysisResponse):
     analysis_type: str = "prescription"
-    medications: list[MedicationItem] = Field(default_factory=list)
+    medications: list[PrescriptionItem] = Field(default_factory=list)
     requires_manual_input: list[str] = Field(default_factory=list)
 
 

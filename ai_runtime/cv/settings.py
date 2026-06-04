@@ -5,6 +5,8 @@ envs/.local.env 에 아래 항목을 추가하세요:
 
     OPENAI_API_KEY=<your-openai-api-key>
     OPENAI_MODEL=gpt-4o-mini
+    DRUG_API_KEY=발급받은_인증키
+    DRUG_API_URL=엔드포인트_주소
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,3 +23,5 @@ class VisionSettings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     cv_max_image_size_mb: int = 10
     cv_min_confidence: float = 0.6
+    drug_api_key: str = ""
+    drug_api_url: str = ""
