@@ -32,7 +32,7 @@ from sklearn.metrics import (
 BASE_DIR    = "/Users/admin/PycharmProjects/AH_03_03/etc/ml/ai_worker"
 DATA_PATH   = os.path.join(BASE_DIR, "data", "국민건강보험공단_건강검진정보_2024.CSV")
 MODEL_DIR   = "/Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/CAT15~24/outputs/optuna_HTN_FE"
-OUT_DIR     = os.path.join(BASE_DIR, "ml", "NHIS", "outputs", "external_validation")
+OUT_DIR     = os.path.join(BASE_DIR, "ml", "HN", "outputs", "external_validation")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 N_FOLDS     = 5       # 모델 fold 수
@@ -201,16 +201,24 @@ print(f"  사용 threshold: {THRESHOLD}")
 # 6. 모델 로드
 # ────────────────────────────────────────────
 print(f"\n[HN CatBoost 모델 로드 — {N_FOLDS} folds]")
+print(f"  탐색 경로: {MODEL_DIR}")
 models = []
 for fold in range(1, N_FOLDS + 1):
     model_path = os.path.join(MODEL_DIR, f"model_fold{fold}.cbm")
     if not os.path.exists(model_path):
-        print(f"  ⚠️  model_fold{fold}.cbm 없음 — 건너뜀")
+        print(f"  ⚠️  model_fold{fold}.cbm 없음: {model_path}")
         continue
     m = CatBoostClassifier()
     m.load_model(model_path)
     models.append(m)
     print(f"  fold{fold} 로드 완료")
+
+if len(models) == 0:
+    print("\n❌ 로드된 모델이 없습니다. MODEL_DIR 경로를 확인하세요.")
+    print(f"   현재 설정: {MODEL_DIR}")
+    print("   cbm 파일 위치 확인 명령어:")
+    print("   find /Users/admin/PycharmProjects/AH_03_03 -name \'model_fold1.cbm\'")
+    raise SystemExit(1)
 
 def predict_ensemble(models, X):
     """fold 앙상블 평균 확률"""
@@ -260,7 +268,51 @@ prob_b = predict_ensemble(models, X_b)
 res_b  = evaluate(y_true, prob_b, THRESHOLD, "실험 1-B: jitter (seed=42)")
 
 # ────────────────────────────────────────────
-# 9. 비교 요약
+# 9. 공단 기준 최적 Threshold 재탐색 (1-A 기준)
+# ────────────────────────────────────────────
+print(f"\n[Threshold 재탐색 — 공단 데이터 기준 / 1-A 확률 사용]")
+print(f"  Recall ≥ 0.80 조건에서 F1 최대 threshold 탐색 중...")
+
+best_thr_new = 0.5
+best_f1_new  = 0.0
+best_rec_new = 0.0
+thr_candidates = []
+
+for thr in np.arange(0.05, 0.90, 0.01):
+    thr = round(thr, 2)
+    y_pred_tmp = (prob_a >= thr).astype(int)
+    rec_tmp = recall_score(y_true, y_pred_tmp, zero_division=0)
+    f1_tmp  = f1_score(y_true, y_pred_tmp, zero_division=0)
+    prec_tmp = precision_score(y_true, y_pred_tmp, zero_division=0)
+    thr_candidates.append((thr, rec_tmp, f1_tmp, prec_tmp))
+    if rec_tmp >= 0.8 and f1_tmp > best_f1_new:
+        best_f1_new  = f1_tmp
+        best_thr_new = thr
+        best_rec_new = rec_tmp
+
+print(f"\n  {'Threshold':>10} {'Recall':>8} {'F1':>8} {'Precision':>10}")
+print(f"  {'-'*42}")
+# Recall 0.75~0.90 구간만 출력 (전체 출력 방지)
+for thr, rec, f1, prec in thr_candidates:
+    if 0.75 <= rec <= 0.92:
+        marker = " ◀ 최적" if thr == best_thr_new else ""
+        print(f"  {thr:>10.2f} {rec:>8.4f} {f1:>8.4f} {prec:>10.4f}{marker}")
+
+if best_f1_new > 0:
+    y_pred_new = (prob_a >= best_thr_new).astype(int)
+    tn2, fp2, fn2, tp2 = confusion_matrix(y_true, y_pred_new).ravel()
+    print(f"\n  ✅ 최적 Threshold: {best_thr_new}")
+    print(f"     Recall={best_rec_new:.4f} | F1={best_f1_new:.4f}")
+    print(f"     TP: {tp2:>8,}  FP: {fp2:>8,}")
+    print(f"     FN: {fn2:>8,}  TN: {tn2:>8,}")
+else:
+    print(f"\n  ❌ Recall ≥ 0.80 달성 가능한 threshold 없음")
+    # Recall 최대 지점 출력
+    max_rec_row = max(thr_candidates, key=lambda x: x[1])
+    print(f"     Recall 최대: thr={max_rec_row[0]:.2f} → Recall={max_rec_row[1]:.4f}, F1={max_rec_row[2]:.4f}")
+
+# ────────────────────────────────────────────
+# 10. 비교 요약
 # ────────────────────────────────────────────
 print(f"\n{'='*60}")
 print(f"[최종 비교 요약]")
