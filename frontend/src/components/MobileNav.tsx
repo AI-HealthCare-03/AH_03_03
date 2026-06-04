@@ -113,7 +113,7 @@ export default function MobileNav({ isOpen, onClose }: MobileNavProps) {
               <h2>{section.title}</h2>
               <div className="mobile-nav-section-links">
                 {section.links.map((link) => (
-                  <NavLink className="mobile-drawer-link" key={link.to} to={link.to}>
+                  <NavLink className="mobile-drawer-link" key={link.to} onClick={onClose} to={link.to}>
                     <span aria-hidden="true">{link.icon}</span>
                     <span>{link.label}</span>
                   </NavLink>
@@ -122,7 +122,7 @@ export default function MobileNav({ isOpen, onClose }: MobileNavProps) {
             </section>
           ))}
           {showAdminLink && (
-            <NavLink className="mobile-drawer-link" to="/admin">
+            <NavLink className="mobile-drawer-link" onClick={onClose} to="/admin">
               <span aria-hidden="true">🛡️</span>
               <span>관리자 콘솔</span>
             </NavLink>
