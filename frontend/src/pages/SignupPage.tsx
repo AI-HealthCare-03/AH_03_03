@@ -784,7 +784,9 @@ export default function SignupPage() {
                   value={lifestyle.drinking_frequency}
                   onChange={(event) => setLifestyle((prev) => ({ ...prev, drinking_frequency: event.target.value }))}
                 >
+                  <option value="NONE">마시지 않음</option>
                   <option value="RARE">월 1회 미만</option>
+                  <option value="MONTHLY_1">월 1회</option>
                   <option value="MONTHLY_2_4">월 2-4회</option>
                   <option value="WEEKLY_2_3">주 2-3회</option>
                   <option value="WEEKLY_4_PLUS">주 4회 이상</option>
@@ -800,7 +802,8 @@ export default function SignupPage() {
                   <option value="ONE_TO_TWO">1-2잔</option>
                   <option value="THREE_TO_FOUR">3-4잔</option>
                   <option value="FIVE_TO_SIX">5-6잔</option>
-                  <option value="SEVEN_PLUS">7잔 이상</option>
+                  <option value="SEVEN_TO_NINE">7-9잔</option>
+                  <option value="TEN_PLUS">10잔 이상</option>
                 </select>
               </label>
               <label>
