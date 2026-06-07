@@ -147,7 +147,11 @@ def classify_dm(fasting_glucose: Any = None, hba1c: Any = None) -> StageResult:
 
 
 def _collect_lipid_reasons(
-    total: Decimal, ldl_value: Decimal, tg: Decimal, hdl_value: Decimal, gender: str,
+    total: Decimal,
+    ldl_value: Decimal,
+    tg: Decimal,
+    hdl_value: Decimal,
+    gender: str,
 ) -> tuple[int, list[str]]:
     severity = 0
     reasons: list[str] = []
@@ -182,9 +186,7 @@ def _collect_lipid_reasons(
 
     if hdl_value < hdl_cutoff:
         severity = max(severity, 2)
-        reasons.append(
-            f"HDL 낮은 범위 ({'남성' if gender == 'MALE' else '여성'} 기준 {hdl_cutoff:g}mg/dL 미만)"
-    )
+        reasons.append(f"HDL 낮은 범위 ({'남성' if gender == 'MALE' else '여성'} 기준 {hdl_cutoff:g}mg/dL 미만)")
 
     return severity, reasons
 
@@ -232,7 +234,13 @@ def classify_dl(
     if missing:
         return _missing_result("DL", missing)
 
-    severity, reasons = _collect_lipid_reasons(total, ldl_dec, tg, hdl_dec, normalized_gender,)
+    severity, reasons = _collect_lipid_reasons(
+        total,
+        ldl_dec,
+        tg,
+        hdl_dec,
+        normalized_gender,
+    )
     stage, label = _lipid_stage(severity)
     if stage == "NORMAL":
         reasons.append("주요 지질 수치가 정상 범위")
