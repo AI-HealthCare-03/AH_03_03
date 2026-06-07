@@ -79,8 +79,8 @@ def _missing_result(disease: str, missing: list[str]) -> StageResult:
     return StageResult(
         disease=disease,
         stage="UNCLASSIFIABLE",
-        label="판정 불가",
-        detail="필수 수치가 부족해 참고용 판정을 만들 수 없습니다.",
+        label="예측 불가",
+        detail="입력 정보가 부족해 예측이 불가능 합니다.",
         missing=missing,
     )
 
@@ -147,7 +147,7 @@ def classify_dm(fasting_glucose: Any = None, hba1c: Any = None) -> StageResult:
 
 
 def _collect_lipid_reasons(
-    total: Decimal, ldl_value: Decimal, tg: Decimal, hdl_value: Decimal
+    total: Decimal, ldl_value: Decimal, tg: Decimal, hdl_value: Decimal, gender: str,
 ) -> tuple[int, list[str]]:
     severity = 0
     reasons: list[str] = []
@@ -178,9 +178,13 @@ def _collect_lipid_reasons(
         severity = max(severity, 1)
         reasons.append("중성지방 경계 범위")
 
-    if hdl_value < 40:
+    hdl_cutoff = Decimal("40") if gender == "MALE" else Decimal("50")
+
+    if hdl_value < hdl_cutoff:
         severity = max(severity, 2)
-        reasons.append("HDL 낮은 범위")
+        reasons.append(
+            f"HDL 낮은 범위 ({'남성' if gender == 'MALE' else '여성'} 기준 {hdl_cutoff:g}mg/dL 미만)"
+    )
 
     return severity, reasons
 
@@ -200,6 +204,7 @@ def classify_dl(
     ldl_cholesterol: Any = None,
     triglyceride: Any = None,
     hdl_cholesterol: Any = None,
+    gender: Any = None,
     *,
     ldl: Any = None,
     hdl: Any = None,
@@ -211,6 +216,8 @@ def classify_dl(
     tg = _to_decimal(triglyceride)
     hdl_dec = _to_decimal(hdl_value)
 
+    normalized_gender = _normalize_gender(gender)
+
     missing = []
     if total is None:
         missing.append("total_cholesterol")
@@ -220,10 +227,12 @@ def classify_dl(
         missing.append("triglyceride")
     if hdl_dec is None:
         missing.append("hdl_cholesterol")
+    if normalized_gender is None:
+        missing.append("gender")
     if missing:
         return _missing_result("DL", missing)
 
-    severity, reasons = _collect_lipid_reasons(total, ldl_dec, tg, hdl_dec)
+    severity, reasons = _collect_lipid_reasons(total, ldl_dec, tg, hdl_dec, normalized_gender,)
     stage, label = _lipid_stage(severity)
     if stage == "NORMAL":
         reasons.append("주요 지질 수치가 정상 범위")
@@ -332,7 +341,7 @@ def classify_fl(
 ) -> StageResult:
     """지방간 위험도 분류 (HSI, Hepatic Steatosis Index).
 
-    HSI = 8 × (AST / ALT) + BMI + 2 × (여성이면 1, 아니면 0)
+    HSI = 8 × (ALT / AST) + BMI + 2 × (여성이면 1, 아니면 0)
     - HSI < 30  : 저위험군
     - 30 ≤ HSI ≤ 36 : 위험군
     - HSI > 36  : 고위험군
@@ -349,8 +358,8 @@ def classify_fl(
         missing.append("ast")
     if alt_val is None:
         missing.append("alt")
-    if alt_val is not None and alt_val == 0:
-        missing.append("alt (0은 허용되지 않습니다)")
+    if ast_val is not None and ast_val == 0:
+        missing.append("ast (0은 허용되지 않습니다)")
     if bmi_val is None:
         missing.append("bmi (또는 height_cm, weight_kg)")
     if normalized_gender is None:
@@ -359,7 +368,7 @@ def classify_fl(
         return _missing_result("FL", missing)
 
     female_flag = Decimal("1") if normalized_gender == "FEMALE" else Decimal("0")
-    hsi = Decimal("8") * (ast_val / alt_val) + bmi_val + Decimal("2") * female_flag
+    hsi = Decimal("8") * (alt_val / ast_val) + bmi_val + Decimal("2") * female_flag
 
     if hsi < 30:
         stage, label = "LOW_RISK", "저위험군"
@@ -379,7 +388,7 @@ def classify_fl(
         label=label,
         detail=(
             f"HSI {hsi_rounded} ({gender_label}, "
-            f"AST {ast_val:g}U/L, ALT {alt_val:g}U/L, "
+            f"AST {ast_val:g} U/L, ALT {alt_val:g} U/L, "
             f"BMI {bmi_val.quantize(Decimal('0.1'))}) 기준 {detail_risk}입니다. "
             "참고용 판정이며 의료 진단이 아닙니다."
         ),
@@ -392,12 +401,12 @@ def classify_abo(waist_cm: Any = None, gender: Any = None) -> StageResult:
 
     남성 허리둘레:
       < 90cm       → 저위험군
-      90cm ~ 94cm  → 위험군
+      90cm ~ 94.9cm  → 위험군
       ≥ 95cm       → 고위험군
 
     여성 허리둘레:
       < 85cm       → 저위험군
-      85cm ~ 89cm  → 위험군
+      85cm ~ 89.9cm  → 위험군
       ≥ 90cm       → 고위험군
     """
     waist = _to_decimal(waist_cm)
@@ -414,20 +423,20 @@ def classify_abo(waist_cm: Any = None, gender: Any = None) -> StageResult:
     if normalized_gender == "MALE":
         if waist < 90:
             stage, label = "LOW_RISK", "저위험군"
-        elif waist <= 94:
+        elif waist <= 94.9:
             stage, label = "RISK", "위험군"
         else:
             stage, label = "HIGH_RISK", "고위험군"
     else:  # FEMALE
         if waist < 85:
             stage, label = "LOW_RISK", "저위험군"
-        elif waist <= 89:
+        elif waist <= 89.9:
             stage, label = "RISK", "위험군"
         else:
             stage, label = "HIGH_RISK", "고위험군"
 
     gender_label = "남성" if normalized_gender == "MALE" else "여성"
-    cutoff_text = "90/95cm" if normalized_gender == "MALE" else "85/90cm"
+    cutoff_text = "90cm" if normalized_gender == "MALE" else "85cm"
     return StageResult(
         disease="ABO",
         stage=stage,
@@ -626,8 +635,8 @@ def classify_ckd(egfr: Any = None) -> StageResult:
     중증도가 높은 단계가 우선 적용됩니다 (겹치는 구간은 고위험 우선):
       eGFR < 30               → 즉시 병원 방문 권유
       30 ≤ eGFR < 45          → 초고위험군
-      45 ≤ eGFR < 65          → 고위험군   (※ 60-64 구간은 위험군 범위와 겹치나 고위험 우선)
-      65 ≤ eGFR < 90          → 위험군
+      45 ≤ eGFR < 60         → 고위험군
+      60 ≤ eGFR < 90          → 위험군
       eGFR ≥ 90               → 저위험군
     """
     egfr_val = _to_decimal(egfr)
@@ -648,7 +657,7 @@ def classify_ckd(egfr: Any = None) -> StageResult:
             f"eGFR {egfr_val:g}mL/min/1.73m² — 신기능이 현저히 저하된 초고위험군입니다. "
             "신장내과 전문의 상담을 강력히 권고합니다. 참고용 판정이며 의료 진단이 아닙니다."
         )
-    elif egfr_val < 65:
+    elif egfr_val < 60:
         stage = "HIGH_RISK"
         label = "고위험군"
         detail = (
@@ -710,6 +719,7 @@ def classify_all(
             ldl_cholesterol=ldl_cholesterol,
             triglyceride=triglyceride,
             hdl_cholesterol=hdl_cholesterol,
+            gender=gender,
         ),
         "OBE": classify_obe(bmi=bmi, height_cm=height_cm, weight_kg=weight_kg),
         "ANEM": classify_anem(hemoglobin=hemoglobin, gender=gender),
