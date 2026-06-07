@@ -68,12 +68,19 @@ PROMPTS: dict[str, str] = {
 
 규칙:
 
-[음식명]
+[음식명 - 가장 중요]
+- 반드시 구체적인 한국 음식명을 사용할 것. 상위 개념 금지
+  틀린 예) "조개구이" → 맞는 예) "가리비구이" 또는 "홍합구이" (종류를 특정)
+  틀린 예) "떡" → 맞는 예) "가래떡" 또는 "찹쌀떡" 또는 "시루떡" (종류를 특정)
+  틀린 예) "과일" → 맞는 예) "감" 또는 "사과" 또는 "귤" (종류를 특정)
+  틀린 예) "국" → 맞는 예) "갈비탕" 또는 "된장찌개" (요리명을 특정)
 - 조리법, 시즈닝, 소스, 브랜드가 보이면 반드시 음식명에 포함할 것
   예) 뿌링클 순살치킨, 간장 계란밥, 토마토 소스 파스타, 된장찌개
 - 같은 재료라도 조리법이 다르면 반드시 구분
   예) 닭고기 → 치킨(튀김) / 닭가슴살(구이/찜) 구분
-- 정확히 모르면 가장 유사한 음식명으로 추정할 것. 절대 "튀김", "음식" 같은 단순 단어로 반환 금지
+- 시각적 특징(색, 모양, 질감, 용기)으로 최대한 구체적으로 특정할 것
+  예) 주황빛 국물+뼈 → 갈비탕, 흰 국물+두부 → 순두부찌개
+- 정확히 모르면 가장 유사한 음식명으로 추정할 것. 절대 "튀김", "음식", "요리" 같은 단순 단어로 반환 금지
 
 [1인분 기준 용량 추정]
 - estimated_amount는 항상 1인분 기준으로 추정할 것
@@ -276,6 +283,14 @@ class VisionClient:
         raw_text = response.choices[0].message.content.strip()
         logger.info("GPT Vision 응답 수신 | %s...", raw_text[:80])
 
+        # 토큰 사용량 추출 (Langfuse 비용 추적용)
+        usage = response.usage
+        token_usage = {
+            "input_tokens":  usage.prompt_tokens     if usage else None,
+            "output_tokens": usage.completion_tokens if usage else None,
+            "total_tokens":  usage.total_tokens      if usage else None,
+        }
+
         cleaned = raw_text.replace("```json", "").replace("```", "").strip()
 
         try:
@@ -286,6 +301,7 @@ class VisionClient:
                 media_type=media_type,
                 output=parsed,
                 success=True,
+                token_usage=token_usage,
             )
             return parsed
         except json.JSONDecodeError as e:
@@ -309,18 +325,23 @@ def _record_vision_trace(
     output: dict[str, Any],
     success: bool,
     error_type: str | None = None,
+    token_usage: dict[str, Any] | None = None,
 ) -> None:
-    """Langfuse 설정이 있을 때만 Vision 호출 metadata를 남긴다."""
+    """Langfuse 설정이 있을 때만 Vision 호출을 generation 타입으로 기록한다.
+    generation 타입으로 기록해야 모델 단가 설정에 따라 비용이 자동 계산된다.
+    """
     try:
-        from ai_runtime.llm.llm_client import record_langfuse_event
+        from ai_runtime.llm.llm_client import record_langfuse_generation
 
-        record_langfuse_event(
+        record_langfuse_generation(
             name=f"{analysis_type}.gpt_vision",
+            model=model,
             output_payload=output,
+            input_tokens=token_usage.get("input_tokens") if token_usage else None,
+            output_tokens=token_usage.get("output_tokens") if token_usage else None,
             metadata={
                 "provider": "gpt_vision",
                 "analysis_type": analysis_type,
-                "model": model,
                 "media_type": media_type,
                 "success": success,
                 "error_type": error_type,

@@ -167,6 +167,60 @@ def record_langfuse_event(
             pass
 
 
+def record_langfuse_generation(
+    *,
+    name: str,
+    model: str,
+    input_payload: dict[str, Any] | str | None = None,
+    output_payload: dict[str, Any] | str | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> bool:
+    """GPT Vision 등 실제 모델 호출을 generation 타입으로 기록합니다.
+
+    generation 타입으로 기록해야 Langfuse가 토큰 수를 인식하고
+    모델 단가 설정에 따라 비용을 자동 계산합니다.
+    """
+    langfuse = build_langfuse_client()
+    if langfuse is None:
+        return False
+
+    # Langfuse SDK v3: usage_details (Dict[str, int]) 로 토큰 수 전달
+    usage_details: dict[str, int] = {}
+    if input_tokens is not None:
+        usage_details["input"] = input_tokens
+    if output_tokens is not None:
+        usage_details["output"] = output_tokens
+    if input_tokens and output_tokens:
+        usage_details["total"] = input_tokens + output_tokens
+
+    try:
+        observation_context = langfuse.start_as_current_observation(
+            name=name,
+            as_type="generation",
+            model=model,
+            input=input_payload,
+            metadata=metadata,
+            usage_details=usage_details if usage_details else None,
+        )
+        observation = observation_context.__enter__()
+    except Exception:
+        return False
+
+    try:
+        try:
+            observation.update(output=output_payload)
+        except Exception:
+            pass
+        return True
+    finally:
+        try:
+            observation_context.__exit__(None, None, None)
+        except Exception:
+            pass
+
+
 def build_openai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -194,6 +248,8 @@ def build_langfuse_client():
             public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
             secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
             host=os.getenv("LANGFUSE_BASE_URL"),
+            timeout=10,        # 기본값보다 짧게: 10초 안에 안 되면 포기
+            flush_interval=2,  # 2초마다 전송 시도
         )
     except Exception:
         return None

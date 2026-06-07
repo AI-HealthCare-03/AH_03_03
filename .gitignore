@@ -1,10 +1,10 @@
-$content = @"
 __pycache__/
 *.py[oc]
 *.py[cod]
 .pytest_cache/
 build/
 dist/
+var/
 .vite/
 node_modules/
 *.tsbuildinfo
@@ -41,6 +41,14 @@ ai_runtime/data/
 etc/ml/ai_worker/data/
 # CV 평가 데이터 (로컬 전용)
 ai_runtime/cv/data/
+
+# 식단 Vision eval 데이터 (로컬 전용 - git 제외)
+ai_runtime/cv/eval/images/*
+!ai_runtime/cv/eval/images/.gitkeep
+ai_runtime/cv/eval/labels/*
+!ai_runtime/cv/eval/labels/.gitkeep
+ai_runtime/cv/eval/results/*
+!ai_runtime/cv/eval/results/.gitkeep
 
 # CLOVA OCR PoC local inputs/outputs
 ai_runtime/ocr/providers/clova_ocr/data/images/*
@@ -97,6 +105,9 @@ ai_runtime/ml/LGB18~24/outputs/
 !ML/models/report/*.csv
 !etc/ml/ML/models/report/*.csv
 !ai_runtime/cv/food/nutrition/data/food_disease_scores.csv
+
+# 식약처 원본 영양 DB (79MB, 변환 전 원본 - 로컬 전용)
+etc/ai/cv/food/nutrition/raw/food_nutrition.xlsx
 *.parquet
 *.pkl
 *.joblib
@@ -131,6 +142,3 @@ ai_runtime/ml/artifacts/**/threshold_tuning.csv
 
 # OS files
 .DS_Store
-"@
-$content | Set-Content .gitignore -Encoding UTF8
-var/

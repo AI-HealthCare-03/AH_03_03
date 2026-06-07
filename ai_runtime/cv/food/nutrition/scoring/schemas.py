@@ -23,6 +23,8 @@ class FoodNutritionRow:
     zinc_mg: float | None = None
     cholesterol_mg: float | None = None
     trans_fat_g: float | None = None
+    fiber_g: float | None = None          # 식이섬유 (당뇨·고혈압·이상지질혈증)
+    saturated_fat_g: float | None = None  # 포화지방 (고혈압·이상지질혈증)
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ class DiseaseFoodScoreRecord:
     zinc_mg: float | None
     cholesterol_mg: float | None
     trans_fat_g: float | None
+    fiber_g: float | None
+    saturated_fat_g: float | None
     dm_score: float
     htn_score: float
     dl_score: float

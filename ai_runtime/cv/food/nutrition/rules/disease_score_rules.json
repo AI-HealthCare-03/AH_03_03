@@ -1,62 +1,68 @@
 {
-  "version": "food_disease_score_rules_v1",
+  "version": "food_disease_score_rules_v2",
   "description": "Reference-only food suitability scores by disease group. Higher scores mean the food is generally easier to fit into that disease-management context. This is not medical nutrition therapy.",
   "diseases": {
     "DM": {
       "label": "diabetes",
       "base_score": 100,
       "penalties": {
-        "sugar_g": { "start": 5, "limit": 40, "points": 35 },
-        "carbohydrate_g": { "start": 45, "limit": 110, "points": 30 },
-        "energy_kcal": { "start": 450, "limit": 900, "points": 15 },
-        "fat_g": { "start": 20, "limit": 50, "points": 10 },
-        "sodium_mg": { "start": 800, "limit": 1800, "points": 5 }
+        "sugar_g":        { "start": 5,   "limit": 40,   "points": 35 },
+        "carbohydrate_g": { "start": 45,  "limit": 110,  "points": 30 },
+        "energy_kcal":    { "start": 450, "limit": 900,  "points": 15 },
+        "fat_g":          { "start": 20,  "limit": 50,   "points": 10 },
+        "sodium_mg":      { "start": 800, "limit": 1800, "points": 5  }
       },
       "bonuses": {
-        "protein_g": { "target": 30, "points": 8 },
-        "magnesium_mg": { "target": 100, "points": 4 }
+        "protein_g":    { "target": 30,  "points": 8 },
+        "magnesium_mg": { "target": 100, "points": 4 },
+        "fiber_g":      { "target": 10,  "points": 8 }
       }
     },
     "HTN": {
       "label": "hypertension",
       "base_score": 100,
       "penalties": {
-        "sodium_mg": { "start": 400, "limit": 2000, "points": 55 },
-        "energy_kcal": { "start": 600, "limit": 1000, "points": 10 },
-        "cholesterol_mg": { "start": 100, "limit": 300, "points": 5 },
-        "trans_fat_g": { "start": 0.1, "limit": 1, "points": 10 }
+        "sodium_mg":        { "start": 400,  "limit": 2000, "points": 50 },
+        "energy_kcal":      { "start": 600,  "limit": 1000, "points": 10 },
+        "cholesterol_mg":   { "start": 100,  "limit": 300,  "points": 5  },
+        "trans_fat_g":      { "start": 0.1,  "limit": 1,    "points": 8  },
+        "saturated_fat_g":  { "start": 7,    "limit": 20,   "points": 7  }
       },
       "bonuses": {
         "potassium_mg": { "target": 700, "points": 15 },
-        "calcium_mg": { "target": 200, "points": 5 },
-        "magnesium_mg": { "target": 80, "points": 5 }
+        "calcium_mg":   { "target": 200, "points": 5  },
+        "magnesium_mg": { "target": 80,  "points": 5  },
+        "fiber_g":      { "target": 8,   "points": 5  }
       }
     },
     "DL": {
       "label": "dyslipidemia",
       "base_score": 100,
       "penalties": {
-        "fat_g": { "start": 15, "limit": 55, "points": 25 },
-        "cholesterol_mg": { "start": 100, "limit": 350, "points": 30 },
-        "trans_fat_g": { "start": 0.1, "limit": 1, "points": 25 },
-        "sugar_g": { "start": 15, "limit": 50, "points": 5 },
-        "energy_kcal": { "start": 650, "limit": 1100, "points": 10 }
+        "fat_g":           { "start": 15,  "limit": 55,   "points": 20 },
+        "cholesterol_mg":  { "start": 100, "limit": 350,  "points": 25 },
+        "trans_fat_g":     { "start": 0.1, "limit": 1,    "points": 20 },
+        "saturated_fat_g": { "start": 5,   "limit": 20,   "points": 20 },
+        "sugar_g":         { "start": 15,  "limit": 50,   "points": 5  },
+        "energy_kcal":     { "start": 650, "limit": 1100, "points": 5  }
       },
       "bonuses": {
-        "protein_g": { "target": 30, "points": 5 }
+        "protein_g": { "target": 30, "points": 5 },
+        "fiber_g":   { "target": 10, "points": 10 }
       }
     },
     "OBE": {
       "label": "obesity",
       "base_score": 100,
       "penalties": {
-        "energy_kcal": { "start": 450, "limit": 1000, "points": 40 },
-        "sugar_g": { "start": 10, "limit": 45, "points": 20 },
-        "fat_g": { "start": 18, "limit": 55, "points": 25 },
-        "carbohydrate_g": { "start": 65, "limit": 130, "points": 10 }
+        "energy_kcal":    { "start": 450, "limit": 1000, "points": 40 },
+        "sugar_g":        { "start": 10,  "limit": 45,   "points": 20 },
+        "fat_g":          { "start": 18,  "limit": 55,   "points": 25 },
+        "carbohydrate_g": { "start": 65,  "limit": 130,  "points": 10 }
       },
       "bonuses": {
-        "protein_g": { "target": 30, "points": 10 }
+        "protein_g": { "target": 30, "points": 10 },
+        "fiber_g":   { "target": 8,  "points": 5  }
       }
     },
     "ANEM": {
@@ -64,15 +70,14 @@
       "base_score": 50,
       "penalties": {
         "sodium_mg": { "start": 1200, "limit": 2400, "points": 5 },
-        "sugar_g": { "start": 25, "limit": 60, "points": 3 }
+        "sugar_g":   { "start": 25,   "limit": 60,   "points": 3 }
       },
       "bonuses": {
-        "iron_mg": { "target": 4, "points": 35 },
-        "protein_g": { "target": 30, "points": 15 },
-        "zinc_mg": { "target": 3, "points": 8 },
-        "magnesium_mg": { "target": 100, "points": 5 }
+        "iron_mg":      { "target": 4,   "points": 35 },
+        "protein_g":    { "target": 30,  "points": 15 },
+        "zinc_mg":      { "target": 3,   "points": 8  },
+        "magnesium_mg": { "target": 100, "points": 5  }
       }
     }
   }
 }
-

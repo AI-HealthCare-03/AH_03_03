@@ -239,11 +239,16 @@ def build_score_records_from_excel(
 def write_food_disease_score_csv(
     records: Iterable[DiseaseFoodScoreRecord],
     output_path: Path = DEFAULT_SCORE_CSV_PATH,
+    columns: list[str] | None = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df = pd.DataFrame([record.to_dict() for record in records], columns=RUNTIME_COLUMNS)
-    numeric_columns = [column for column in RUNTIME_COLUMNS if column != "food_name"]
-    df[numeric_columns] = df[numeric_columns].round(4)
+    cols = columns or RUNTIME_COLUMNS
+    all_dicts = [record.to_dict() for record in records]
+    # columns에 없는 키는 무시, 있는 키만 추출
+    df = pd.DataFrame(all_dicts)
+    df = df.reindex(columns=[c for c in cols if c in df.columns])
+    numeric_columns = [c for c in df.columns if c != "food_name"]
+    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors="coerce").round(4)
     df.to_csv(output_path, index=False, encoding="utf-8")
 
 

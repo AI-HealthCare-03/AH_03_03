@@ -1,4 +1,5 @@
 from datetime import datetime, time
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,7 +46,7 @@ class MedicationListResponse(BaseModel):
 
 
 class MedicationOCRRequest(BaseModel):
-    source_type: str | None = "PRESCRIPTION"
+    source_type: Literal["PRESCRIPTION", "MEDICATION_BAG"] | None = "PRESCRIPTION"
     image_filename: str | None = None
     memo: str | None = None
     raw_text: str | None = None
