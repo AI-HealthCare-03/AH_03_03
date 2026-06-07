@@ -59,7 +59,7 @@ HB_RANGE = (5.0, 25.0)
 
 CONFIDENCE_THRESHOLD = 0.7
 CHECKBOX_PATTERN = re.compile(r"[■□▣▪●○◆◇]")
-NOT_APPLICABLE_KEYWORDS = ["비해당", "해당없음"]
+NOT_APPLICABLE_KEYWORDS = ["비해당", "해당없음", "검사안함", "미실시"]
 MEASUREMENT_PAGE_KEYWORDS = {
     "검사항목": 3,
     "참고치": 3,
@@ -265,6 +265,7 @@ def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
                 # 현재 줄 + 다음 2줄 안에 비해당 있으면 비해당으로 처리
                 check_lines = [text] + [text_lines[j][0] for j in range(i + 1, min(i + 3, len(text_lines)))]
                 if any(is_not_applicable(line) for line in check_lines):
+                    extracted[field] = "비해당"  # <--- 무시하지 않고 "비해당" 값을 저장!
                     continue
 
             value, confidence = _extract_value_from_context(text_lines, i, text)

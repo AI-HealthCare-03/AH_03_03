@@ -86,10 +86,11 @@ def test_parse_from_text_lines_skips_not_applicable_lipid_values() -> None:
         ]
     )
 
-    assert data.total_cholesterol is None
-    assert data.hdl is None
-    assert data.triglyceride is None
-    assert data.ldl is None
+    # None이 아니라 정확히 "비해당" 문자열로 추출되는지 검증하도록 수정
+    assert data.total_cholesterol == "비해당"
+    assert data.hdl == "비해당"
+    assert data.triglyceride == "비해당"
+    assert data.ldl == "비해당"
 
 
 @pytest.mark.asyncio
