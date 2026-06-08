@@ -119,9 +119,9 @@ const landingPreview = {
 };
 
 const riskLabelMap: Record<string, string> = {
-  LOW: "낮음",
-  MEDIUM: "관리 필요",
-  HIGH: "높음",
+  LOW: "🟢 낮음",
+  MEDIUM: "🟡 관리 필요",
+  HIGH: "🔴 높음",
 };
 
 const analysisTypeLabels: Record<string, string> = {
