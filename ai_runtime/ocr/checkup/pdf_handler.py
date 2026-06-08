@@ -117,7 +117,7 @@ def _group_words_by_top(words, tolerance=3.0):
     return lines
 
 
-def _group_values_prefer_synthetic(words, top_tolerance=3.0, x_tolerance=8.0):
+def _group_values_prefer_synthetic(words, top_tolerance=3.0, x_tolerance=3.0):
     """
     같은 top 좌표에 여러 단어가 있을 때,
     x0가 비슷한 위치(x_tolerance 이내)의 중복값은 x0가 작은 것(합성 레이어)만 남김.

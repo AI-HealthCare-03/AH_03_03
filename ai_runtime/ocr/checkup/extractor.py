@@ -200,6 +200,9 @@ def parse_height_weight(text_lines):
             context = text_lines[i : i + 15]
             all_nums = []
             for ctx_text, _ in context:
+                # BMI 줄의 수치는 몸무게 후보로 잘못 집힐 수 있으므로 제외
+                if is_keyword_match(ctx_text, FIELD_KEYWORDS["bmi"]):
+                    continue
                 all_nums.extend(extract_numbers(ctx_text))
             # 키 범위: 100~250, 단 혈압 범위(60~180)와 겹치므로 140 이상만 허용
             candidates_h = [n for n in all_nums if 140 <= n <= 220]
