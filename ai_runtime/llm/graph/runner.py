@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
+from inspect import iscoroutine
 from typing import Any
 from uuid import uuid4
 
@@ -38,7 +40,7 @@ class AnalysisExplanationGraphResult:
     trace_metadata: dict[str, Any] = field(default_factory=dict)
 
 
-def run_chatbot_graph(
+async def run_chatbot_graph_async(
     *,
     user_message: str | None,
     user_context: dict[str, Any] | None = None,
@@ -72,7 +74,7 @@ def run_chatbot_graph(
         "use_real_llm": use_real_llm,
         "use_rag": use_rag,
     }
-    final_state = graph.invoke(initial_state)
+    final_state = await graph.ainvoke(initial_state)
     return ChatbotGraphResult(
         answer=str(final_state.get("final_answer") or final_state.get("llm_answer") or ""),
         source=str(final_state.get("source") or "langgraph_chatbot"),
@@ -90,7 +92,26 @@ def run_chatbot_graph(
     )
 
 
-def run_analysis_explanation_graph(
+def run_chatbot_graph(
+    *,
+    user_message: str | None,
+    user_context: dict[str, Any] | None = None,
+    context_type: str | None = None,
+    use_real_llm: bool = False,
+    use_rag: bool = True,
+) -> ChatbotGraphResult:
+    return _run_coroutine_sync(
+        run_chatbot_graph_async(
+            user_message=user_message,
+            user_context=user_context,
+            context_type=context_type,
+            use_real_llm=use_real_llm,
+            use_rag=use_rag,
+        )
+    )
+
+
+async def run_analysis_explanation_graph_async(
     *,
     input_data: AnalysisExplanationInput | None,
     contexts: list[RetrievedContext] | None = None,
@@ -130,7 +151,7 @@ def run_analysis_explanation_graph(
         "management_priorities": [],
         "analysis_contexts": [context.model_dump() for context in (contexts or [])],
     }
-    final_state = graph.invoke(initial_state)
+    final_state = await graph.ainvoke(initial_state)
     explanation_payload = final_state.get("analysis_explanation") or {}
     explanation = ExplanationOutput.model_validate(explanation_payload)
     return AnalysisExplanationGraphResult(
@@ -142,3 +163,31 @@ def run_analysis_explanation_graph(
         metadata=dict(final_state.get("metadata") or {}),
         trace_metadata=dict(final_state.get("trace_metadata") or {}),
     )
+
+
+def run_analysis_explanation_graph(
+    *,
+    input_data: AnalysisExplanationInput | None,
+    contexts: list[RetrievedContext] | None = None,
+    analysis_type: str | None = None,
+    use_real_llm: bool = False,
+) -> AnalysisExplanationGraphResult:
+    return _run_coroutine_sync(
+        run_analysis_explanation_graph_async(
+            input_data=input_data,
+            contexts=contexts,
+            analysis_type=analysis_type,
+            use_real_llm=use_real_llm,
+        )
+    )
+
+
+def _run_coroutine_sync(coroutine) -> Any:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+
+    if iscoroutine(coroutine):
+        coroutine.close()
+    raise RuntimeError("LangGraph runner is already in an event loop; use the async graph runner instead.")

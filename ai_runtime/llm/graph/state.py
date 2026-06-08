@@ -32,3 +32,6 @@ class HealthChatbotGraphState(TypedDict):
     risk_factors: NotRequired[list[dict[str, Any]]]
     management_priorities: NotRequired[list[str]]
     analysis_contexts: NotRequired[list[Any]]
+    fallback_required: NotRequired[bool]
+    graph_error: NotRequired[dict[str, Any] | None]
+    graph_errors: NotRequired[list[dict[str, Any]]]
