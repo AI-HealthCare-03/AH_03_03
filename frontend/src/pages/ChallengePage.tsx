@@ -14,7 +14,7 @@ import Card from "../components/Card";
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
 const tabToCategory: Record<string, string | null> = {
   전체: null,
@@ -676,10 +676,6 @@ export default function ChallengePage() {
                         참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
                       </span>
                     </div>
-                    {Boolean(challenge.caution_message) && <div className="state-box warning-card">{String(challenge.caution_message)}</div>}
-                    {Boolean(challenge.contraindication_message) && (
-                      <div className="state-box warning-card">{String(challenge.contraindication_message)}</div>
-                    )}
                     {joinedChallenge ? (
                       <>
                         <div className="challenge-date-meta">
