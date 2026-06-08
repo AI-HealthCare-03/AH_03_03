@@ -128,10 +128,6 @@ def classify_dm(fasting_glucose: Any = None, hba1c: Any = None) -> StageResult:
         stage, label = "DIABETES_RANGE", "당뇨병 범위"
     elif (glucose is not None and glucose >= 100) or (a1c is not None and a1c >= Decimal("5.7")):
         stage, label = "PRE_DIABETES_RANGE", "공복혈당장애/전단계 범위"
-    elif glucose is None:
-        return _missing_result("DM", ["fasting_glucose"])
-    elif a1c is None:
-        return _missing_result("DM", ["hba1c"])
     else:
         stage, label = "NORMAL", "정상 범위"
 
