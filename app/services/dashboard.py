@@ -3,6 +3,7 @@ from typing import Any
 
 from app.core import config
 from app.dtos.challenges import ChallengeResponse, UserChallengeResponse
+from app.models.challenges import Challenge
 from app.dtos.diets import DietRecordResponse
 from app.models.analysis import AnalysisResult, AnalysisType, RiskLevel
 from app.services import analysis as analysis_service
@@ -118,14 +119,24 @@ async def get_dashboard_health(user_id: int) -> dict[str, Any]:
 async def get_dashboard_challenges(user_id: int) -> dict[str, Any]:
     active_challenges = await challenge_service.list_active_challenges(limit=10)
     user_challenges = await challenge_service.list_user_challenges(user_id, limit=10)
+
+    challenge_ids = list({uc.challenge_id for uc in user_challenges})
+    challenges_by_id = {c.id: c for c in await Challenge.filter(id__in=challenge_ids)}
+
+    user_challenge_dicts = []
+    for uc in user_challenges:
+        data = UserChallengeResponse.model_validate(uc).model_dump(mode="json")
+        ch = challenges_by_id.get(uc.challenge_id)
+        if ch:
+            data["title"] = ch.title
+            data["category"] = str(ch.challenge_type)
+        user_challenge_dicts.append(data)
+
     return {
         "active_challenges": [
             ChallengeResponse.model_validate(challenge).model_dump(mode="json") for challenge in active_challenges
         ],
-        "user_challenges": [
-            UserChallengeResponse.model_validate(user_challenge).model_dump(mode="json")
-            for user_challenge in user_challenges
-        ],
+        "user_challenges": user_challenge_dicts,
     }
 
 
