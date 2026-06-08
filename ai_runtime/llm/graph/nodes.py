@@ -513,6 +513,9 @@ def trace_graph_node(
     state: HealthChatbotGraphState,
     metadata: dict[str, Any] | None = None,
 ) -> bool:
+    if not config.LANGFUSE_ENABLED:
+        return False
+
     trace_metadata = state.get("trace_metadata", {})
     graph_metadata = state.get("metadata", {})
     node_durations_ms = graph_metadata.get("node_durations_ms") or {}
