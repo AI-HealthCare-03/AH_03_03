@@ -1,0 +1,1655 @@
+{
+  "summary": {
+    "image_total": 43,
+    "drug_name_total": 171,
+    "correct": 42,
+    "wrong": 129,
+    "accuracy_percent": 24.6,
+    "correct_by_match_type": {
+      "정확일치": 26,
+      "유사도": 11,
+      "포함": 5
+    },
+    "similarity_threshold": 0.72,
+    "wrong_similarity_breakdown": [
+      {
+        "range": "0.6 이상 (근접 오인식 가능성 높음)",
+        "count": 6,
+        "examples": [
+          {
+            "image": "검증2",
+            "answer_name": "브롬헥신염산염정",
+            "closest_predicted": "브롱헥셀산염정",
+            "similarity": "0.62"
+          },
+          {
+            "image": "검증2",
+            "answer_name": "크로세프캡슐",
+            "closest_predicted": "크로셀프람",
+            "similarity": "0.67"
+          },
+          {
+            "image": "검증8",
+            "answer_name": "브롬헥신염산염정",
+            "closest_predicted": "브론헥실산염정",
+            "similarity": "0.62"
+          }
+        ]
+      },
+      {
+        "range": "0.4~0.6 (부분적으로 겹침)",
+        "count": 27,
+        "examples": [
+          {
+            "image": "검증2",
+            "answer_name": "시네츄라시럽",
+            "closest_predicted": "시넥스라시럽",
+            "similarity": "0.50"
+          },
+          {
+            "image": "검증8",
+            "answer_name": "메이액트시럽",
+            "closest_predicted": "메이에크텔림",
+            "similarity": "0.40"
+          },
+          {
+            "image": "검증8",
+            "answer_name": "노테몬패취",
+            "closest_predicted": "노테리핀정",
+            "similarity": "0.44"
+          }
+        ]
+      },
+      {
+        "range": "0.2~0.4 (약하게 겹침)",
+        "count": 40,
+        "examples": [
+          {
+            "image": "검증1",
+            "answer_name": "씨앤유캡슐",
+            "closest_predicted": "밀크씨슬추출물",
+            "similarity": "0.20"
+          },
+          {
+            "image": "검증3",
+            "answer_name": "미피드정",
+            "closest_predicted": "가루약세미에이드",
+            "similarity": "0.36"
+          },
+          {
+            "image": "검증4",
+            "answer_name": "넥실렌정",
+            "closest_predicted": "뇌실림증",
+            "similarity": "0.29"
+          }
+        ]
+      },
+      {
+        "range": "0.2 미만 (사실상 무관)",
+        "count": 56,
+        "examples": [
+          {
+            "image": "검증1",
+            "answer_name": "레가론캡슐",
+            "closest_predicted": "",
+            "similarity": "0.00"
+          },
+          {
+            "image": "검증3",
+            "answer_name": "한미클래리정",
+            "closest_predicted": "가루약세미에이드",
+            "similarity": "0.15"
+          },
+          {
+            "image": "검증3",
+            "answer_name": "덱시부정",
+            "closest_predicted": "",
+            "similarity": "0.00"
+          }
+        ]
+      }
+    ],
+    "_note": "correct_by_match_type 중 '포함'/'유사도'로 정답 처리된 항목은 느슨한 기준이 적용된 것이므로, wrong_rows와 함께 사람이 재검토하는 것을 권장합니다. wrong_similarity_breakdown의 구간 라벨은 대략적인 가이드일 뿐이며, examples를 직접 확인해 각 구간의 실제 오답 성격을 판단해야 합니다."
+  },
+  "results": [
+    {
+      "image": "검증1",
+      "answer_name": "씨앤유캡슐",
+      "predicted_names": "밀크씨슬추출물",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.20",
+      "closest_predicted": "밀크씨슬추출물"
+    },
+    {
+      "image": "검증1",
+      "answer_name": "레가론캡슐",
+      "predicted_names": "밀크씨슬추출물",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증2",
+      "answer_name": "암브로콜시럽",
+      "predicted_names": "암브로콜시럽 | 시넥스라시럽 | 브롱헥셀산염정 | 크로셀프람 | 페니라민정 | 야토크건조시럽",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증2",
+      "answer_name": "시네츄라시럽",
+      "predicted_names": "암브로콜시럽 | 시넥스라시럽 | 브롱헥셀산염정 | 크로셀프람 | 페니라민정 | 야토크건조시럽",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "시넥스라시럽"
+    },
+    {
+      "image": "검증2",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "암브로콜시럽 | 시넥스라시럽 | 브롱헥셀산염정 | 크로셀프람 | 페니라민정 | 야토크건조시럽",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.62",
+      "closest_predicted": "브롱헥셀산염정"
+    },
+    {
+      "image": "검증2",
+      "answer_name": "크로세프캡슐",
+      "predicted_names": "암브로콜시럽 | 시넥스라시럽 | 브롱헥셀산염정 | 크로셀프람 | 페니라민정 | 야토크건조시럽",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.67",
+      "closest_predicted": "크로셀프람"
+    },
+    {
+      "image": "검증2",
+      "answer_name": "페니라민정",
+      "predicted_names": "암브로콜시럽 | 시넥스라시럽 | 브롱헥셀산염정 | 크로셀프람 | 페니라민정 | 야토크건조시럽",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증2",
+      "answer_name": "아토크건조시럽",
+      "predicted_names": "암브로콜시럽 | 시넥스라시럽 | 브롱헥셀산염정 | 크로셀프람 | 페니라민정 | 야토크건조시럽",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.80",
+      "closest_predicted": "야토크건조시럽"
+    },
+    {
+      "image": "검증3",
+      "answer_name": "한미클래리정",
+      "predicted_names": "정수영 | 가루약세미에이드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.15",
+      "closest_predicted": "가루약세미에이드"
+    },
+    {
+      "image": "검증3",
+      "answer_name": "덱시부정",
+      "predicted_names": "정수영 | 가루약세미에이드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증3",
+      "answer_name": "미피드정",
+      "predicted_names": "정수영 | 가루약세미에이드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.36",
+      "closest_predicted": "가루약세미에이드"
+    },
+    {
+      "image": "검증3",
+      "answer_name": "코슈정",
+      "predicted_names": "정수영 | 가루약세미에이드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증4",
+      "answer_name": "타이레놀",
+      "predicted_names": "타이레놀 | 뇌실림증 | 미오벤정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증4",
+      "answer_name": "넥실렌정",
+      "predicted_names": "타이레놀 | 뇌실림증 | 미오벤정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.29",
+      "closest_predicted": "뇌실림증"
+    },
+    {
+      "image": "검증4",
+      "answer_name": "미오벤정",
+      "predicted_names": "타이레놀 | 뇌실림증 | 미오벤정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증5",
+      "answer_name": "신플랙스세이프정",
+      "predicted_names": "이라프론정 | 상상할 수 없는 불안정 상태에 있는 사람",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.36",
+      "closest_predicted": "이라프론정"
+    },
+    {
+      "image": "검증5",
+      "answer_name": "메부틴정",
+      "predicted_names": "이라프론정 | 상상할 수 없는 불안정 상태에 있는 사람",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증5",
+      "answer_name": "미오벤정",
+      "predicted_names": "이라프론정 | 상상할 수 없는 불안정 상태에 있는 사람",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증5",
+      "answer_name": "소론도정",
+      "predicted_names": "이라프론정 | 상상할 수 없는 불안정 상태에 있는 사람",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.29",
+      "closest_predicted": "이라프론정"
+    },
+    {
+      "image": "검증5",
+      "answer_name": "리리카캡슐",
+      "predicted_names": "이라프론정 | 상상할 수 없는 불안정 상태에 있는 사람",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증6",
+      "answer_name": "크록사신점안액",
+      "predicted_names": "청소액",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증6",
+      "answer_name": "베아플론점안액",
+      "predicted_names": "청소액",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증6",
+      "answer_name": "티아렌점안액",
+      "predicted_names": "청소액",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증7",
+      "answer_name": "비모보정",
+      "predicted_names": "비브리오백 500/20밀리리터 | 자쿠르 320 밀리리터 | 올로트라세이알리스베리",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.18",
+      "closest_predicted": "비브리오백 500/20밀리리터"
+    },
+    {
+      "image": "검증7",
+      "answer_name": "자큐보정",
+      "predicted_names": "비브리오백 500/20밀리리터 | 자쿠르 320 밀리리터 | 올로트라세이알리스베리",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "자쿠르 320 밀리리터"
+    },
+    {
+      "image": "검증7",
+      "answer_name": "울트라셋이알세미서방",
+      "predicted_names": "비브리오백 500/20밀리리터 | 자쿠르 320 밀리리터 | 올로트라세이알리스베리",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.38",
+      "closest_predicted": "올로트라세이알리스베리"
+    },
+    {
+      "image": "검증8",
+      "answer_name": "움카민시럽",
+      "predicted_names": "욘카미립 | 레보투시럽 | 페니라민정 | 브론헥실산염정 | 메이에크텔림 | 노테리핀정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.29",
+      "closest_predicted": "욘카미립"
+    },
+    {
+      "image": "검증8",
+      "answer_name": "레보투스시럽",
+      "predicted_names": "욘카미립 | 레보투시럽 | 페니라민정 | 브론헥실산염정 | 메이에크텔림 | 노테리핀정",
+      "is_correct": "O",
+      "match_type": "포함",
+      "similarity": "1.00",
+      "closest_predicted": "레보투시럽"
+    },
+    {
+      "image": "검증8",
+      "answer_name": "페니라민정",
+      "predicted_names": "욘카미립 | 레보투시럽 | 페니라민정 | 브론헥실산염정 | 메이에크텔림 | 노테리핀정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증8",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "욘카미립 | 레보투시럽 | 페니라민정 | 브론헥실산염정 | 메이에크텔림 | 노테리핀정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.62",
+      "closest_predicted": "브론헥실산염정"
+    },
+    {
+      "image": "검증8",
+      "answer_name": "메이액트시럽",
+      "predicted_names": "욘카미립 | 레보투시럽 | 페니라민정 | 브론헥실산염정 | 메이에크텔림 | 노테리핀정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.40",
+      "closest_predicted": "메이에크텔림"
+    },
+    {
+      "image": "검증8",
+      "answer_name": "노테몬패취",
+      "predicted_names": "욘카미립 | 레보투시럽 | 페니라민정 | 브론헥실산염정 | 메이에크텔림 | 노테리핀정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "노테리핀정"
+    },
+    {
+      "image": "검증9",
+      "answer_name": "비모보정",
+      "predicted_names": "비모플록사신 | 자크로마존 | 올로프레졸",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "비모플록사신"
+    },
+    {
+      "image": "검증9",
+      "answer_name": "자큐보정",
+      "predicted_names": "비모플록사신 | 자크로마존 | 올로프레졸",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.25",
+      "closest_predicted": "자크로마존"
+    },
+    {
+      "image": "검증9",
+      "answer_name": "올트라셋이알세미서방정",
+      "predicted_names": "비모플록사신 | 자크로마존 | 올로프레졸",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.13",
+      "closest_predicted": "올로프레졸"
+    },
+    {
+      "image": "검증10",
+      "answer_name": "씨잘액",
+      "predicted_names": "새콤약 | 클레니시림 | 바리나리렌 | 바실리코피모산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증10",
+      "answer_name": "콜민에이시럽",
+      "predicted_names": "새콤약 | 클레니시림 | 바리나리렌 | 바실리코피모산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증10",
+      "answer_name": "페니라민정",
+      "predicted_names": "새콤약 | 클레니시림 | 바리나리렌 | 바실리코피모산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "클레니시림"
+    },
+    {
+      "image": "검증10",
+      "answer_name": "바실리포미스산",
+      "predicted_names": "새콤약 | 클레니시림 | 바리나리렌 | 바실리코피모산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "바실리코피모산"
+    },
+    {
+      "image": "검증11",
+      "answer_name": "암브로콜시럽",
+      "predicted_names": "암브로콜시럽 | 소토트정 | 피나스터리드정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증11",
+      "answer_name": "소론도정",
+      "predicted_names": "암브로콜시럽 | 소토트정 | 피나스터리드정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "소토트정"
+    },
+    {
+      "image": "검증11",
+      "answer_name": "페니라민정",
+      "predicted_names": "암브로콜시럽 | 소토트정 | 피나스터리드정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증12",
+      "answer_name": "클라비오건조시럽",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증12",
+      "answer_name": "소론도정",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.25",
+      "closest_predicted": "미베랙소진"
+    },
+    {
+      "image": "검증12",
+      "answer_name": "브레톨패취",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.40",
+      "closest_predicted": "브레트리필#0.5밀리그램"
+    },
+    {
+      "image": "검증12",
+      "answer_name": "슈다페드정",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.89",
+      "closest_predicted": "슈다페티드"
+    },
+    {
+      "image": "검증12",
+      "answer_name": "페니라민정",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "슈다페티드"
+    },
+    {
+      "image": "검증12",
+      "answer_name": "세브론과립",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.29",
+      "closest_predicted": "플로세틴"
+    },
+    {
+      "image": "검증12",
+      "answer_name": "레보솔시럽",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "레보플록사신"
+    },
+    {
+      "image": "검증12",
+      "answer_name": "아스루카세립",
+      "predicted_names": "미베랙소진 | 플로세틴 | 브레트리필#0.5밀리그램 | 슈다페티드 | 페닐리나진 | 세르트랄린 | 레보플록사신 | 아스쿠파제림",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "아스쿠파제림"
+    },
+    {
+      "image": "검증13",
+      "answer_name": "이부프로펜정",
+      "predicted_names": "이부프로펜400밀리그램 | 엑스페리멘50밀리그램 | 에제투비정200mg | 레보투스정60mg | 브로콜렉신산엽정8mg",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증13",
+      "answer_name": "엑소페린정",
+      "predicted_names": "이부프로펜400밀리그램 | 엑스페리멘50밀리그램 | 에제투비정200mg | 레보투스정60mg | 브로콜렉신산엽정8mg",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "엑스페리멘50밀리그램"
+    },
+    {
+      "image": "검증13",
+      "answer_name": "에취투비정",
+      "predicted_names": "이부프로펜400밀리그램 | 엑스페리멘50밀리그램 | 에제투비정200mg | 레보투스정60mg | 브로콜렉신산엽정8mg",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.75",
+      "closest_predicted": "에제투비정200mg"
+    },
+    {
+      "image": "검증13",
+      "answer_name": "레보투스정",
+      "predicted_names": "이부프로펜400밀리그램 | 엑스페리멘50밀리그램 | 에제투비정200mg | 레보투스정60mg | 브로콜렉신산엽정8mg",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증13",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "이부프로펜400밀리그램 | 엑스페리멘50밀리그램 | 에제투비정200mg | 레보투스정60mg | 브로콜렉신산엽정8mg",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.43",
+      "closest_predicted": "브로콜렉신산엽정8mg"
+    },
+    {
+      "image": "검증14",
+      "answer_name": "삼아리도멕스크림",
+      "predicted_names": "삼아리도멕스크림",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증15",
+      "answer_name": "콜민에스시럽",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.36",
+      "closest_predicted": "글루민시스테인"
+    },
+    {
+      "image": "검증15",
+      "answer_name": "암브로콜시럽",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.75",
+      "closest_predicted": "앰브로콜"
+    },
+    {
+      "image": "검증15",
+      "answer_name": "크로세프캡슐",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.60",
+      "closest_predicted": "크로셀프리필"
+    },
+    {
+      "image": "검증15",
+      "answer_name": "페니라민정",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증15",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.18",
+      "closest_predicted": "앰브로콜"
+    },
+    {
+      "image": "검증15",
+      "answer_name": "타스펜정",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.20",
+      "closest_predicted": "글루민시스테인"
+    },
+    {
+      "image": "검증15",
+      "answer_name": "노테몬패취",
+      "predicted_names": "글루민시스테인 | 앰브로콜 | 크로셀프리필 | 페니라민 | 엡섹 | 어린이용스텔스 | 노르테미프라존",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "노르테미프라존"
+    },
+    {
+      "image": "검증16",
+      "answer_name": "세파클러캡슐",
+      "predicted_names": "세파클러정 | 펩타이드정 | 피디정 | 교과서형정 | 레바미피드정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증16",
+      "answer_name": "펠루비정",
+      "predicted_names": "세파클러정 | 펩타이드정 | 피디정 | 교과서형정 | 레바미피드정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증16",
+      "answer_name": "피디정",
+      "predicted_names": "세파클러정 | 펩타이드정 | 피디정 | 교과서형정 | 레바미피드정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증16",
+      "answer_name": "코싹엘정",
+      "predicted_names": "세파클러정 | 펩타이드정 | 피디정 | 교과서형정 | 레바미피드정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증16",
+      "answer_name": "레바미피드정",
+      "predicted_names": "세파클러정 | 펩타이드정 | 피디정 | 교과서형정 | 레바미피드정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증17",
+      "answer_name": "이텐시럽",
+      "predicted_names": "이텐시럽 | 골메이드시럽 | 페니라민정 | 보룬해산염정 | 뮤테리관리200밀리그램",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증17",
+      "answer_name": "콜민에이시럽",
+      "predicted_names": "이텐시럽 | 골메이드시럽 | 페니라민정 | 보룬해산염정 | 뮤테리관리200밀리그램",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "이텐시럽"
+    },
+    {
+      "image": "검증17",
+      "answer_name": "페니라민정",
+      "predicted_names": "이텐시럽 | 골메이드시럽 | 페니라민정 | 보룬해산염정 | 뮤테리관리200밀리그램",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증17",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "이텐시럽 | 골메이드시럽 | 페니라민정 | 보룬해산염정 | 뮤테리관리200밀리그램",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "보룬해산염정"
+    },
+    {
+      "image": "검증17",
+      "answer_name": "뮤테란과립",
+      "predicted_names": "이텐시럽 | 골메이드시럽 | 페니라민정 | 보룬해산염정 | 뮤테리관리200밀리그램",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "뮤테리관리200밀리그램"
+    },
+    {
+      "image": "검증18",
+      "answer_name": "암브로콜시럽",
+      "predicted_names": "암브로콜시럽 | 시네지핀시럽 | 페니라민정 | 롱솔화법 | 바실리포미산",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증18",
+      "answer_name": "시네츄라시럽",
+      "predicted_names": "암브로콜시럽 | 시네지핀시럽 | 페니라민정 | 롱솔화법 | 바실리포미산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "시네지핀시럽"
+    },
+    {
+      "image": "검증18",
+      "answer_name": "페니라민정",
+      "predicted_names": "암브로콜시럽 | 시네지핀시럽 | 페니라민정 | 롱솔화법 | 바실리포미산",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증18",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "암브로콜시럽 | 시네지핀시럽 | 페니라민정 | 롱솔화법 | 바실리포미산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.18",
+      "closest_predicted": "암브로콜시럽"
+    },
+    {
+      "image": "검증18",
+      "answer_name": "바실리포미스산",
+      "predicted_names": "암브로콜시럽 | 시네지핀시럽 | 페니라민정 | 롱솔화법 | 바실리포미산",
+      "is_correct": "O",
+      "match_type": "포함",
+      "similarity": "1.00",
+      "closest_predicted": "바실리포미산"
+    },
+    {
+      "image": "검증19",
+      "answer_name": "포리부틴드라이시럽",
+      "predicted_names": "포리부틴드라시탐 | 바실리리포미소산",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.80",
+      "closest_predicted": "포리부틴드라시탐"
+    },
+    {
+      "image": "검증19",
+      "answer_name": "바실리포미스산",
+      "predicted_names": "포리부틴드라시탐 | 바실리리포미소산",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.77",
+      "closest_predicted": "바실리리포미소산"
+    },
+    {
+      "image": "검증20",
+      "answer_name": "암브로콜시럽",
+      "predicted_names": "암브로롤시럽 | 시넥추라시럽 | 페니라민정 | 바실리포마산",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.75",
+      "closest_predicted": "암브로롤시럽"
+    },
+    {
+      "image": "검증20",
+      "answer_name": "시네츄라시럽",
+      "predicted_names": "암브로롤시럽 | 시넥추라시럽 | 페니라민정 | 바실리포마산",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "시넥추라시럽"
+    },
+    {
+      "image": "검증20",
+      "answer_name": "페니라민정",
+      "predicted_names": "암브로롤시럽 | 시넥추라시럽 | 페니라민정 | 바실리포마산",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증20",
+      "answer_name": "바실리포미스산",
+      "predicted_names": "암브로롤시럽 | 시넥추라시럽 | 페니라민정 | 바실리포마산",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.73",
+      "closest_predicted": "바실리포마산"
+    },
+    {
+      "image": "검증21",
+      "answer_name": "듀라티얼즈안연고",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증21",
+      "answer_name": "티아렌점안액",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증22",
+      "answer_name": "로닌정",
+      "predicted_names": "리도카인젤 | 크레온 | 하리덴 | 버지락트",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증22",
+      "answer_name": "뮤코스텐캡슐",
+      "predicted_names": "리도카인젤 | 크레온 | 하리덴 | 버지락트",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증22",
+      "answer_name": "페니라민정",
+      "predicted_names": "리도카인젤 | 크레온 | 하리덴 | 버지락트",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증22",
+      "answer_name": "모사렌정",
+      "predicted_names": "리도카인젤 | 크레온 | 하리덴 | 버지락트",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증22",
+      "answer_name": "코데닝정",
+      "predicted_names": "리도카인젤 | 크레온 | 하리덴 | 버지락트",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증22",
+      "answer_name": "펜잘이알서방정",
+      "predicted_names": "리도카인젤 | 크레온 | 하리덴 | 버지락트",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증23",
+      "answer_name": "오메크라정",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증23",
+      "answer_name": "록소디펜정",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증23",
+      "answer_name": "게이트정",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증24",
+      "answer_name": "신플랙스세이프정",
+      "predicted_names": "모티리정 | 사이톨정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.20",
+      "closest_predicted": "사이톨정"
+    },
+    {
+      "image": "검증24",
+      "answer_name": "오페릴50서방정",
+      "predicted_names": "모티리정 | 사이톨정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증24",
+      "answer_name": "레일라정",
+      "predicted_names": "모티리정 | 사이톨정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증24",
+      "answer_name": "모사렌정",
+      "predicted_names": "모티리정 | 사이톨정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "모티리정"
+    },
+    {
+      "image": "검증24",
+      "answer_name": "비엠파모티딘정",
+      "predicted_names": "모티리정 | 사이톨정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "모티리정"
+    },
+    {
+      "image": "검증25",
+      "answer_name": "알러리스정",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증25",
+      "answer_name": "프로맥정",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증25",
+      "answer_name": "피디정",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증26",
+      "answer_name": "다후렉스캡슐",
+      "predicted_names": "디후렉스캡슐 | 씨잘정5mg | 엔딕스크림 | 외용항진균제",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.75",
+      "closest_predicted": "디후렉스캡슐"
+    },
+    {
+      "image": "검증26",
+      "answer_name": "씨잘정",
+      "predicted_names": "디후렉스캡슐 | 씨잘정5mg | 엔딕스크림 | 외용항진균제",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증26",
+      "answer_name": "엔딕스크림",
+      "predicted_names": "디후렉스캡슐 | 씨잘정5mg | 엔딕스크림 | 외용항진균제",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증27",
+      "answer_name": "브론키시럽",
+      "predicted_names": "키오스크크리드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.20",
+      "closest_predicted": "키오스크크리드"
+    },
+    {
+      "image": "검증27",
+      "answer_name": "프리비투스현탁액",
+      "predicted_names": "키오스크크리드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.14",
+      "closest_predicted": "키오스크크리드"
+    },
+    {
+      "image": "검증27",
+      "answer_name": "비알코에이시럽",
+      "predicted_names": "키오스크크리드",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증28",
+      "answer_name": "경보세프포독심프록",
+      "predicted_names": "이부프로펜정 | 비타민B구성",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.14",
+      "closest_predicted": "이부프로펜정"
+    },
+    {
+      "image": "검증28",
+      "answer_name": "비오플",
+      "predicted_names": "이부프로펜정 | 비타민B구성",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "비타민B구성"
+    },
+    {
+      "image": "검증28",
+      "answer_name": "브론키시럽",
+      "predicted_names": "이부프로펜정 | 비타민B구성",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증28",
+      "answer_name": "프리비투스현탁액",
+      "predicted_names": "이부프로펜정 | 비타민B구성",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.17",
+      "closest_predicted": "이부프로펜정"
+    },
+    {
+      "image": "검증29",
+      "answer_name": "브론키시럽",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증29",
+      "answer_name": "프리비투스현탁액",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증29",
+      "answer_name": "비알코에이시럽",
+      "predicted_names": "",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증30",
+      "answer_name": "갈근탕엑스과립",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증30",
+      "answer_name": "형개연교탕엑스과립",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증30",
+      "answer_name": "소청룡탕엑스과립",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.18",
+      "closest_predicted": "소염진통제(아세트아미노펜)"
+    },
+    {
+      "image": "검증30",
+      "answer_name": "지실(枳實)건조엑스연조엑스",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.15",
+      "closest_predicted": "지사제(설사약)"
+    },
+    {
+      "image": "검증30",
+      "answer_name": "건강(乾薑)연조엑스",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증30",
+      "answer_name": "창출(蒼朮)연조엑스",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증30",
+      "answer_name": "보중익기탕액스과립",
+      "predicted_names": "감기약 | 항생제(SD펜실린) | 소염진통제(아세트아미노펜) | 지사제(설사약) | 위장약(제산제) | 기침약(엑스펙토란)",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.20",
+      "closest_predicted": "감기약"
+    },
+    {
+      "image": "검증31",
+      "answer_name": "신플랙스세이프정",
+      "predicted_names": "신플랙스 | 메버틴정 | 소론도정",
+      "is_correct": "O",
+      "match_type": "포함",
+      "similarity": "1.00",
+      "closest_predicted": "신플랙스"
+    },
+    {
+      "image": "검증31",
+      "answer_name": "메부틴정",
+      "predicted_names": "신플랙스 | 메버틴정 | 소론도정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.67",
+      "closest_predicted": "메버틴정"
+    },
+    {
+      "image": "검증31",
+      "answer_name": "소론도정",
+      "predicted_names": "신플랙스 | 메버틴정 | 소론도정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증32",
+      "answer_name": "텔미트렌정",
+      "predicted_names": "테미프테렌정 | 마르나자트로프리덴탄주",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "테미프테렌정"
+    },
+    {
+      "image": "검증32",
+      "answer_name": "마운자로프리필드펜",
+      "predicted_names": "테미프테렌정 | 마르나자트로프리덴탄주",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.53",
+      "closest_predicted": "마르나자트로프리덴탄주"
+    },
+    {
+      "image": "검증33",
+      "answer_name": "대웅바이오아세브로필린캡슐",
+      "predicted_names": "대용바이오아세프롤프테라100mg | 세팔로스포린5mg | 슈퍼데프틴 | 프로테지피린제제 | 레비트라CR제형 | 아르지닌-AF3",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.52",
+      "closest_predicted": "대용바이오아세프롤프테라100mg"
+    },
+    {
+      "image": "검증33",
+      "answer_name": "씨잘정",
+      "predicted_names": "대용바이오아세프롤프테라100mg | 세팔로스포린5mg | 슈퍼데프틴 | 프로테지피린제제 | 레비트라CR제형 | 아르지닌-AF3",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증33",
+      "answer_name": "슈다페드정",
+      "predicted_names": "대용바이오아세프롤프테라100mg | 세팔로스포린5mg | 슈퍼데프틴 | 프로테지피린제제 | 레비트라CR제형 | 아르지닌-AF3",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "슈퍼데프틴"
+    },
+    {
+      "image": "검증33",
+      "answer_name": "프로록소펜정",
+      "predicted_names": "대용바이오아세프롤프테라100mg | 세팔로스포린5mg | 슈퍼데프틴 | 프로테지피린제제 | 레비트라CR제형 | 아르지닌-AF3",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.31",
+      "closest_predicted": "프로테지피린제제"
+    },
+    {
+      "image": "검증33",
+      "answer_name": "아르티스F정",
+      "predicted_names": "대용바이오아세프롤프테라100mg | 세팔로스포린5mg | 슈퍼데프틴 | 프로테지피린제제 | 레비트라CR제형 | 아르지닌-AF3",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "아르지닌-AF3"
+    },
+    {
+      "image": "검증33",
+      "answer_name": "레보틱스CR서방정",
+      "predicted_names": "대용바이오아세프롤프테라100mg | 세팔로스포린5mg | 슈퍼데프틴 | 프로테지피린제제 | 레비트라CR제형 | 아르지닌-AF3",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.38",
+      "closest_predicted": "레비트라CR제형"
+    },
+    {
+      "image": "검증34",
+      "answer_name": "텔미트렌정",
+      "predicted_names": "델리트렌정 | 마운자르로프리필드프주2.5",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "델리트렌정"
+    },
+    {
+      "image": "검증34",
+      "answer_name": "마운자로프리필드펜",
+      "predicted_names": "델리트렌정 | 마운자르로프리필드프주2.5",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.73",
+      "closest_predicted": "마운자르로프리필드프주2.5"
+    },
+    {
+      "image": "검증35",
+      "answer_name": "마운자로프리필드펜",
+      "predicted_names": "마그네프리드주5mg",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.53",
+      "closest_predicted": "마그네프리드주5mg"
+    },
+    {
+      "image": "검증36",
+      "answer_name": "알마겔정",
+      "predicted_names": "알마겔 | 재채기탈리피리드 | 티로파정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증36",
+      "answer_name": "동광레보설피리드정",
+      "predicted_names": "알마겔 | 재채기탈리피리드 | 티로파정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.38",
+      "closest_predicted": "재채기탈리피리드"
+    },
+    {
+      "image": "검증36",
+      "answer_name": "티로파정",
+      "predicted_names": "알마겔 | 재채기탈리피리드 | 티로파정",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증37",
+      "answer_name": "클라비오건조시럽",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "조로통정(프라닥사출렛)"
+    },
+    {
+      "image": "검증37",
+      "answer_name": "소론도정",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증37",
+      "answer_name": "브레톨패취",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "브레인팩#0.5밀리그램"
+    },
+    {
+      "image": "검증37",
+      "answer_name": "슈다페드정",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.29",
+      "closest_predicted": "다루카정(슈도에페드린염산염)"
+    },
+    {
+      "image": "검증37",
+      "answer_name": "페니라민정",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "셀프리콜라(아세틸시스테인)"
+    },
+    {
+      "image": "검증37",
+      "answer_name": "세브론과립",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.29",
+      "closest_predicted": "브레인팩#0.5밀리그램"
+    },
+    {
+      "image": "검증37",
+      "answer_name": "레보솔시럽",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.40",
+      "closest_predicted": "레보드로프루핀"
+    },
+    {
+      "image": "검증37",
+      "answer_name": "아스루카세립",
+      "predicted_names": "미베프레스정 | 조로통정(프라닥사출렛) | 브레인팩#0.5밀리그램 | 다루카정(슈도에페드린염산염) | 아리만틴(온세트레틴) | 셀프리콜라(아세틸시스테인) | 레보드로프루핀 | 온레쿠카프",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.44",
+      "closest_predicted": "다루카정(슈도에페드린염산염)"
+    },
+    {
+      "image": "검증38",
+      "answer_name": "암브로콜시럽",
+      "predicted_names": "암브로콜시럽 | 시네츄라릴 | 블록헥셀유산샘경 | 크로세스프갈250밀리 | 순돈정 | 아토프리모자실",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증38",
+      "answer_name": "시네츄라시럽",
+      "predicted_names": "암브로콜시럽 | 시네츄라릴 | 블록헥셀유산샘경 | 크로세스프갈250밀리 | 순돈정 | 아토프리모자실",
+      "is_correct": "O",
+      "match_type": "포함",
+      "similarity": "1.00",
+      "closest_predicted": "시네츄라릴"
+    },
+    {
+      "image": "검증38",
+      "answer_name": "브롬헥신염산염정",
+      "predicted_names": "암브로콜시럽 | 시네츄라릴 | 블록헥셀유산샘경 | 크로세스프갈250밀리 | 순돈정 | 아토프리모자실",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.27",
+      "closest_predicted": "블록헥셀유산샘경"
+    },
+    {
+      "image": "검증38",
+      "answer_name": "크로세프캡슐",
+      "predicted_names": "암브로콜시럽 | 시네츄라릴 | 블록헥셀유산샘경 | 크로세스프갈250밀리 | 순돈정 | 아토프리모자실",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.53",
+      "closest_predicted": "크로세스프갈250밀리"
+    },
+    {
+      "image": "검증38",
+      "answer_name": "소론도정",
+      "predicted_names": "암브로콜시럽 | 시네츄라릴 | 블록헥셀유산샘경 | 크로세스프갈250밀리 | 순돈정 | 아토프리모자실",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증38",
+      "answer_name": "아토크건조시럽",
+      "predicted_names": "암브로콜시럽 | 시네츄라릴 | 블록헥셀유산샘경 | 크로세스프갈250밀리 | 순돈정 | 아토프리모자실",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "아토프리모자실"
+    },
+    {
+      "image": "검증39",
+      "answer_name": "Stogar tab",
+      "predicted_names": "Stogar tab | 가스모틴정 | 비오플롤250 | 폴리부틸렌",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증39",
+      "answer_name": "가스모틴정",
+      "predicted_names": "Stogar tab | 가스모틴정 | 비오플롤250 | 폴리부틸렌",
+      "is_correct": "O",
+      "match_type": "정확일치",
+      "similarity": "1.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증39",
+      "answer_name": "비오플",
+      "predicted_names": "Stogar tab | 가스모틴정 | 비오플롤250 | 폴리부틸렌",
+      "is_correct": "O",
+      "match_type": "포함",
+      "similarity": "1.00",
+      "closest_predicted": "비오플롤250"
+    },
+    {
+      "image": "검증39",
+      "answer_name": "포리부틴드라이시럽",
+      "predicted_names": "Stogar tab | 가스모틴정 | 비오플롤250 | 폴리부틸렌",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "폴리부틸렌"
+    },
+    {
+      "image": "검증40",
+      "answer_name": "P티어린피 점안액",
+      "predicted_names": "피터티지엑스 | 아이케어스의약품 | 듀라밀조제안고",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.15",
+      "closest_predicted": "피터티지엑스"
+    },
+    {
+      "image": "검증40",
+      "answer_name": "아이커비스점안액",
+      "predicted_names": "피터티지엑스 | 아이케어스의약품 | 듀라밀조제안고",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.40",
+      "closest_predicted": "아이케어스의약품"
+    },
+    {
+      "image": "검증40",
+      "answer_name": "듀라티얼즈안연고",
+      "predicted_names": "피터티지엑스 | 아이케어스의약품 | 듀라밀조제안고",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.46",
+      "closest_predicted": "듀라밀조제안고"
+    },
+    {
+      "image": "검증41",
+      "answer_name": "펠루비정",
+      "predicted_names": "루피룸 | 레푸드롬 | 클래리트romycin250mg | 레파드리정 | 마크로라이드형생제",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "루피룸"
+    },
+    {
+      "image": "검증41",
+      "answer_name": "레보드롭정",
+      "predicted_names": "루피룸 | 레푸드롬 | 클래리트romycin250mg | 레파드리정 | 마크로라이드형생제",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "레푸드롬"
+    },
+    {
+      "image": "검증41",
+      "answer_name": "클래리미신정",
+      "predicted_names": "루피룸 | 레푸드롬 | 클래리트romycin250mg | 레파드리정 | 마크로라이드형생제",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.38",
+      "closest_predicted": "클래리트romycin250mg"
+    },
+    {
+      "image": "검증41",
+      "answer_name": "레파드린정",
+      "predicted_names": "루피룸 | 레푸드롬 | 클래리트romycin250mg | 레파드리정 | 마크로라이드형생제",
+      "is_correct": "O",
+      "match_type": "유사도",
+      "similarity": "0.75",
+      "closest_predicted": "레파드리정"
+    },
+    {
+      "image": "검증42",
+      "answer_name": "타나민정",
+      "predicted_names": "흑염소환",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증43",
+      "answer_name": "펜잘이알서방정",
+      "predicted_names": "펜잘60mg | 바로스탁정 | 코데인정 | 투리덴캡슐200밀리리터 | 바이오정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.50",
+      "closest_predicted": "펜잘60mg"
+    },
+    {
+      "image": "검증43",
+      "answer_name": "베포스타비정",
+      "predicted_names": "펜잘60mg | 바로스탁정 | 코데인정 | 투리덴캡슐200밀리리터 | 바이오정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.22",
+      "closest_predicted": "바로스탁정"
+    },
+    {
+      "image": "검증43",
+      "answer_name": "코데닝정",
+      "predicted_names": "펜잘60mg | 바로스탁정 | 코데인정 | 투리덴캡슐200밀리리터 | 바이오정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.67",
+      "closest_predicted": "코데인정"
+    },
+    {
+      "image": "검증43",
+      "answer_name": "튜란트캡슐",
+      "predicted_names": "펜잘60mg | 바로스탁정 | 코데인정 | 투리덴캡슐200밀리리터 | 바이오정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.00",
+      "closest_predicted": ""
+    },
+    {
+      "image": "검증43",
+      "answer_name": "바미드정",
+      "predicted_names": "펜잘60mg | 바로스탁정 | 코데인정 | 투리덴캡슐200밀리리터 | 바이오정",
+      "is_correct": "X",
+      "match_type": "불일치",
+      "similarity": "0.33",
+      "closest_predicted": "바이오정"
+    }
+  ]
+}

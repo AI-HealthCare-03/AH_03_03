@@ -1,0 +1,345 @@
+{
+  "검증1": {
+    "medications": [
+      {"drug_name": "씨앤유캡슐"},
+      {"drug_name": "레가론캡슐"}
+    ]
+  },
+  "검증2": {
+    "medications": [
+      {"drug_name": "암브로콜시럽"},
+      {"drug_name": "시네츄라시럽"},
+      {"drug_name": "브롬헥신염산염정"},
+      {"drug_name": "크로세프캡슐"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "아토크건조시럽"}
+    ]
+  },
+  "검증3": {
+    "medications": [
+      {"drug_name": "한미클래리정"},
+      {"drug_name": "덱시부정"},
+      {"drug_name": "미피드정"},
+      {"drug_name": "코슈정"}
+    ]
+  },
+  "검증4": {
+    "medications": [
+      {"drug_name": "타이레놀"},
+      {"drug_name": "넥실렌정"},
+      {"drug_name": "미오벤정"}
+    ]
+  },
+  "검증5": {
+    "medications": [
+      {"drug_name": "신플랙스세이프정"},
+      {"drug_name": "메부틴정"},
+      {"drug_name": "미오벤정"},
+      {"drug_name": "소론도정"},
+      {"drug_name": "리리카캡슐"}
+    ]
+  },
+  "검증6": {
+    "medications": [
+      {"drug_name": "크록사신점안액"},
+      {"drug_name": "베아플론점안액"},
+      {"drug_name": "티아렌점안액"}
+    ]
+  },
+  "검증7": {
+    "medications": [
+      {"drug_name": "비모보정"},
+      {"drug_name": "자큐보정"},
+      {"drug_name": "울트라셋이알세미서방"}
+    ]
+  },
+  "검증8": {
+    "medications": [
+      {"drug_name": "움카민시럽"},
+      {"drug_name": "레보투스시럽"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "브롬헥신염산염정"},
+      {"drug_name": "메이액트시럽"},
+      {"drug_name": "노테몬패취"}
+    ]
+  },
+  "검증9": {
+    "medications": [
+      {"drug_name": "비모보정"},
+      {"drug_name": "자큐보정"},
+      {"drug_name": "올트라셋이알세미서방정"}
+    ]
+  },
+  "검증10": {
+    "medications": [
+      {"drug_name": "씨잘액"},
+      {"drug_name": "콜민에이시럽"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "바실리포미스산"}
+    ]
+  },
+  "검증11": {
+    "medications": [
+      {"drug_name": "암브로콜시럽"},
+      {"drug_name": "소론도정"},
+      {"drug_name": "페니라민정"}
+    ]
+  },
+  "검증12": {
+    "medications": [
+      {"drug_name": "클라비오건조시럽"},
+      {"drug_name": "소론도정"},
+      {"drug_name": "브레톨패취"},
+      {"drug_name": "슈다페드정"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "세브론과립"},
+      {"drug_name": "레보솔시럽"},
+      {"drug_name": "아스루카세립"}
+    ]
+  },
+  "검증13": {
+    "medications": [
+      {"drug_name": "이부프로펜정"},
+      {"drug_name": "엑소페린정"},
+      {"drug_name": "에취투비정"},
+      {"drug_name": "레보투스정"},
+      {"drug_name": "브롬헥신염산염정"}
+    ]
+  },
+  "검증14": {
+    "medications": [
+      {"drug_name": "삼아리도멕스크림"}
+    ]
+  },
+  "검증15": {
+    "medications": [
+      {"drug_name": "콜민에스시럽"},
+      {"drug_name": "암브로콜시럽"},
+      {"drug_name": "크로세프캡슐"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "브롬헥신염산염정"},
+      {"drug_name": "타스펜정"},
+      {"drug_name": "노테몬패취"}
+    ]
+  },
+  "검증16": {
+    "medications": [
+      {"drug_name": "세파클러캡슐"},
+      {"drug_name": "펠루비정"},
+      {"drug_name": "피디정"},
+      {"drug_name": "코싹엘정"},
+      {"drug_name": "레바미피드정"}
+    ]
+  },
+  "검증17": {
+    "medications": [
+      {"drug_name": "이텐시럽"},
+      {"drug_name": "콜민에이시럽"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "브롬헥신염산염정"},
+      {"drug_name": "뮤테란과립"}
+    ]
+  },
+  "검증18": {
+    "medications": [
+      {"drug_name": "암브로콜시럽"},
+      {"drug_name": "시네츄라시럽"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "브롬헥신염산염정"},
+      {"drug_name": "바실리포미스산"}
+    ]
+  },
+  "검증19": {
+    "medications": [
+      {"drug_name": "포리부틴드라이시럽"},
+      {"drug_name": "바실리포미스산"}
+    ]
+  },
+  "검증20": {
+    "medications": [
+      {"drug_name": "암브로콜시럽"},
+      {"drug_name": "시네츄라시럽"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "바실리포미스산"}
+    ]
+  },
+  "검증21": {
+    "medications": [
+      {"drug_name": "듀라티얼즈안연고"},
+      {"drug_name": "티아렌점안액"}
+    ]
+  },
+  "검증22": {
+    "medications": [
+      {"drug_name": "로닌정"},
+      {"drug_name": "뮤코스텐캡슐"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "모사렌정"},
+      {"drug_name": "코데닝정"},
+      {"drug_name": "펜잘이알서방정"}
+    ]
+  },
+  "검증23": {
+    "medications": [
+      {"drug_name": "오메크라정"},
+      {"drug_name": "록소디펜정"},
+      {"drug_name": "게이트정"}
+    ]
+  },
+  "검증24": {
+    "medications": [
+      {"drug_name": "신플랙스세이프정"},
+      {"drug_name": "오페릴50서방정"},
+      {"drug_name": "레일라정"},
+      {"drug_name": "모사렌정"},
+      {"drug_name": "비엠파모티딘정"}
+    ]
+  },
+  "검증25": {
+    "medications": [
+      {"drug_name": "알러리스정"},
+      {"drug_name": "프로맥정"},
+      {"drug_name": "피디정"}
+    ]
+  },
+  "검증26": {
+    "medications": [
+      {"drug_name": "다후렉스캡슐"},
+      {"drug_name": "씨잘정"},
+      {"drug_name": "엔딕스크림"}
+    ]
+  },
+  "검증27": {
+    "medications": [
+      {"drug_name": "브론키시럽"},
+      {"drug_name": "프리비투스현탁액"},
+      {"drug_name": "비알코에이시럽"}
+    ]
+  },
+  "검증28": {
+    "medications": [
+      {"drug_name": "경보세프포독심프록"},
+      {"drug_name": "비오플"},
+      {"drug_name": "브론키시럽"},
+      {"drug_name": "프리비투스현탁액"}
+    ]
+  },
+  "검증29": {
+    "medications": [
+      {"drug_name": "브론키시럽"},
+      {"drug_name": "프리비투스현탁액"},
+      {"drug_name": "비알코에이시럽"}
+    ]
+  },
+  "검증30": {
+    "medications": [
+      {"drug_name": "갈근탕엑스과립"},
+      {"drug_name": "형개연교탕엑스과립"},
+      {"drug_name": "소청룡탕엑스과립"},
+      {"drug_name": "지실(枳實)건조엑스연조엑스"},
+      {"drug_name": "건강(乾薑)연조엑스"},
+      {"drug_name": "창출(蒼朮)연조엑스"},
+      {"drug_name": "보중익기탕액스과립"}
+    ]
+  },
+  "검증31": {
+    "medications": [
+      {"drug_name": "신플랙스세이프정"},
+      {"drug_name": "메부틴정"},
+      {"drug_name": "소론도정"}
+    ]
+  },
+  "검증32": {
+    "medications": [
+      {"drug_name": "텔미트렌정"},
+      {"drug_name": "마운자로프리필드펜"}
+    ]
+  },
+  "검증33": {
+    "medications": [
+      {"drug_name": "대웅바이오아세브로필린캡슐"},
+      {"drug_name": "씨잘정"},
+      {"drug_name": "슈다페드정"},
+      {"drug_name": "프로록소펜정"},
+      {"drug_name": "아르티스F정"},
+      {"drug_name": "레보틱스CR서방정"}
+    ]
+  },
+  "검증34": {
+    "medications": [
+      {"drug_name": "텔미트렌정"},
+      {"drug_name": "마운자로프리필드펜"}
+    ]
+  },
+  "검증35": {
+    "medications": [
+      {"drug_name": "마운자로프리필드펜"}
+    ]
+  },
+  "검증36": {
+    "medications": [
+      {"drug_name": "알마겔정"},
+      {"drug_name": "동광레보설피리드정"},
+      {"drug_name": "티로파정"}
+    ]
+  },
+  "검증37": {
+    "medications": [
+      {"drug_name": "클라비오건조시럽"},
+      {"drug_name": "소론도정"},
+      {"drug_name": "브레톨패취"},
+      {"drug_name": "슈다페드정"},
+      {"drug_name": "페니라민정"},
+      {"drug_name": "세브론과립"},
+      {"drug_name": "레보솔시럽"},
+      {"drug_name": "아스루카세립"}
+    ]
+  },
+  "검증38": {
+    "medications": [
+      {"drug_name": "암브로콜시럽"},
+      {"drug_name": "시네츄라시럽"},
+      {"drug_name": "브롬헥신염산염정"},
+      {"drug_name": "크로세프캡슐"},
+      {"drug_name": "소론도정"},
+      {"drug_name": "아토크건조시럽"}
+    ]
+  },
+  "검증39": {
+    "medications": [
+      {"drug_name": "Stogar tab"},
+      {"drug_name": "가스모틴정"},
+      {"drug_name": "비오플"},
+      {"drug_name": "포리부틴드라이시럽"}
+    ]
+  },
+  "검증40": {
+    "medications": [
+      {"drug_name": "P티어린피 점안액"},
+      {"drug_name": "아이커비스점안액"},
+      {"drug_name": "듀라티얼즈안연고"}
+    ]
+  },
+  "검증41": {
+    "medications": [
+      {"drug_name": "펠루비정"},
+      {"drug_name": "레보드롭정"},
+      {"drug_name": "클래리미신정"},
+      {"drug_name": "레파드린정"}
+    ]
+  },
+  "검증42": {
+    "medications": [
+      {"drug_name": "타나민정"}
+    ]
+  },
+  "검증43": {
+    "medications": [
+      {"drug_name": "펜잘이알서방정"},
+      {"drug_name": "베포스타비정"},
+      {"drug_name": "코데닝정"},
+      {"drug_name": "튜란트캡슐"},
+      {"drug_name": "바미드정"}
+    ]
+  }
+}

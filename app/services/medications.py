@@ -224,10 +224,19 @@ async def _extract_medication_with_gpt_vision(
 ) -> dict[str, object] | None:
     if not image_bytes or not config.OPENAI_API_KEY:
         return None
+
+    # source_type에 따라 GPT Vision에 사용할 프롬프트(분석 타입)를 분기한다.
+    # - MEDICATION_BAG(약봉투): 약품명 위주의 단순 프롬프트
+    # - 그 외(PRESCRIPTION 등): 기존 처방전 프롬프트 (dosage/quantity 포함)
+    if source_type == "MEDICATION_BAG":
+        analysis_type = AnalysisType.MEDICATION_BAG
+    else:
+        analysis_type = AnalysisType.PRESCRIPTION
+
     try:
         client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.MEDICATION_GPT_VISION_MODEL)
         raw = await client.analyze(
-            analysis_type=AnalysisType.PRESCRIPTION,
+            analysis_type=analysis_type,
             image_bytes=image_bytes,
             media_type=image_media_type or "image/jpeg",
         )
