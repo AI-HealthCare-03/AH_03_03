@@ -135,3 +135,5 @@ var/
 
 ai_runtime/ocr/checkup/eval/pdfs/
 ai_runtime/ocr/checkup/eval/results/
+ai_runtime/cv/food/eval/sample_images/
+ai_runtime/ocr/medication/eval/images/
