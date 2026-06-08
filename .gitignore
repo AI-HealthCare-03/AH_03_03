@@ -134,3 +134,4 @@ ai_runtime/ml/artifacts/**/threshold_tuning.csv
 "@
 $content | Set-Content .gitignore -Encoding UTF8
 var/
+env
