@@ -272,12 +272,12 @@ def _family_sum(row: dict[str, Any], prefix: str) -> float:
 
 def _drinking_frequency(value: Any) -> float | None:
     mapping = {
-        "NONE": 0.0,
-        "RARE": 0.0,
-        "MONTHLY_1": 1.0,
-        "MONTHLY_2_4": 2.0,
-        "WEEKLY_2_3": 3.0,
-        "WEEKLY_4_PLUS": 4.0,
+        "NONE": 0.0,  # 마시지 않음
+        "RARE": 1.0,  # 월 1회 미만
+        "MONTHLY_1": 2.0,  # 월 1회
+        "MONTHLY_2_4": 3.0,  # 월 2-4회
+        "WEEKLY_2_3": 4.0,  # 주 2-3회
+        "WEEKLY_4_PLUS": 5.0,  # 주 4회 이상
         "DAILY": 5.0,
     }
     return mapping.get(str(value or "").upper())
@@ -286,13 +286,15 @@ def _drinking_frequency(value: Any) -> float | None:
 def _drinking_amount(value: Any) -> float | None:
     mapping = {
         "NONE": 0.0,
-        "LIGHT": 1.0,
         "ONE_TO_TWO": 1.0,
         "THREE_TO_FOUR": 2.0,
-        "THREE_TO_SIX": 3.0,
         "FIVE_TO_SIX": 3.0,
-        "SEVEN_PLUS": 4.0,
-        "HEAVY": 4.0,
+        "SEVEN_TO_NINE": 4.0,  # 추가
+        "TEN_PLUS": 5.0,  # 추가
+        "SEVEN_PLUS": 4.0,  # 기존 호환
+        "HEAVY": 4.0,  # 기존 호환
+        "LIGHT": 1.0,  # 기존 호환
+        "THREE_TO_SIX": 3.0,  # 기존 호환
     }
     return mapping.get(str(value or "").upper())
 

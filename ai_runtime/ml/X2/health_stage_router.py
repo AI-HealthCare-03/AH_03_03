@@ -16,11 +16,16 @@ from ai_runtime.ml.X2.health_stage_classifier import (
     SOURCE_VARIABLE_MAP,
     SUPPORTED_DISEASES,
     StageResult,
+    classify_abo,
     classify_all,
     classify_anem,
+    classify_ckd,
     classify_dl,
     classify_dm,
+    classify_fl,
     classify_htn,
+    classify_kf,
+    classify_lf,
     classify_obe,
 )
 
@@ -39,6 +44,13 @@ FEATURE_UNITS = {
     "height_cm": "cm",
     "weight_kg": "kg",
     "hemoglobin": "g/dL",
+    "ast": "U/L",
+    "alt": "U/L",
+    "waist_cm": "cm",
+    "gamma_gtp": "IU/L",
+    "urine_protein": "정성 (음성/-/미량/±/+1~+4)",
+    "creatinine": "mg/dL",
+    "egfr": "mL/min/1.73m²",
 }
 
 
@@ -58,6 +70,13 @@ class HealthStageRequest(BaseModel):
     weight_kg: Decimal | None = Field(default=None, ge=Decimal("20.0"), le=Decimal("300.0"))
     hemoglobin: Decimal | None = Field(default=None, ge=Decimal("3.0"), le=Decimal("25.0"))
     gender: str | None = None
+    ast: int | None = Field(default=None, ge=1, le=10000)
+    alt: int | None = Field(default=None, ge=1, le=10000)
+    waist_cm: Decimal | None = Field(default=None, ge=Decimal("30.0"), le=Decimal("250.0"))
+    gamma_gtp: int | None = Field(default=None, ge=1, le=10000)
+    urine_protein: str | None = None  # 예: "음성", "-", "미량", "±", "+1"~"+4", "1"~"4"
+    creatinine: Decimal | None = Field(default=None, ge=Decimal("0.1"), le=Decimal("30.0"))
+    egfr: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("200.0"))
 
     @field_validator("gender")
     @classmethod
@@ -77,7 +96,9 @@ class HealthStageResponse(BaseModel):
 
 
 @stage_router.post("", response_model=HealthStageResponse)
-async def classify_health_stage(request: HealthStageRequest) -> HealthStageResponse:
+async def classify_health_stage(
+    request: HealthStageRequest,
+) -> HealthStageResponse:
     results = classify_all(**request.classifier_kwargs())
     return _response(results)
 
@@ -87,9 +108,15 @@ async def classify_health_stage_by_code(code: str, request: HealthStageRequest) 
     normalized_code = code.strip().upper()
     kwargs = request.classifier_kwargs()
     if normalized_code == "HTN":
-        result = classify_htn(systolic_bp=kwargs.get("systolic_bp"), diastolic_bp=kwargs.get("diastolic_bp"))
+        result = classify_htn(
+            systolic_bp=kwargs.get("systolic_bp"),
+            diastolic_bp=kwargs.get("diastolic_bp"),
+        )
     elif normalized_code == "DM":
-        result = classify_dm(fasting_glucose=kwargs.get("fasting_glucose"), hba1c=kwargs.get("hba1c"))
+        result = classify_dm(
+            fasting_glucose=kwargs.get("fasting_glucose"),
+            hba1c=kwargs.get("hba1c"),
+        )
     elif normalized_code == "DL":
         result = classify_dl(
             total_cholesterol=kwargs.get("total_cholesterol"),
@@ -105,6 +132,32 @@ async def classify_health_stage_by_code(code: str, request: HealthStageRequest) 
         )
     elif normalized_code == "ANEM":
         result = classify_anem(hemoglobin=kwargs.get("hemoglobin"), gender=kwargs.get("gender"))
+    elif normalized_code == "FL":
+        result = classify_fl(
+            ast=kwargs.get("ast"),
+            alt=kwargs.get("alt"),
+            bmi=kwargs.get("bmi"),
+            height_cm=kwargs.get("height_cm"),
+            weight_kg=kwargs.get("weight_kg"),
+            gender=kwargs.get("gender"),
+        )
+    elif normalized_code == "ABO":
+        result = classify_abo(waist_cm=kwargs.get("waist_cm"), gender=kwargs.get("gender"))
+    elif normalized_code == "LF":
+        result = classify_lf(
+            ast=kwargs.get("ast"),
+            alt=kwargs.get("alt"),
+            gamma_gtp=kwargs.get("gamma_gtp"),
+            gender=kwargs.get("gender"),
+        )
+    elif normalized_code == "KF":
+        result = classify_kf(
+            urine_protein=kwargs.get("urine_protein"),
+            creatinine=kwargs.get("creatinine"),
+            egfr=kwargs.get("egfr"),
+        )
+    elif normalized_code == "CKD":
+        result = classify_ckd(egfr=kwargs.get("egfr"))
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -131,6 +184,13 @@ async def get_health_stage_info() -> dict[str, Any]:
             "weight_kg",
             "hemoglobin",
             "gender",
+            "ast",
+            "alt",
+            "waist_cm",
+            "gamma_gtp",
+            "urine_protein",
+            "creatinine",
+            "egfr",
         ],
         "feature_units": FEATURE_UNITS,
         "source_variable_map": SOURCE_VARIABLE_MAP,
