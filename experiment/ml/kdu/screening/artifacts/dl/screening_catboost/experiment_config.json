@@ -1,0 +1,15 @@
+{
+  "experiment_id": "kdu_dl_x1_service_runtime_dyslipidemia_screening_v2_screening_catboost",
+  "disease": "dyslipidemia",
+  "runtime_disease_key": "dl",
+  "label_policy": "dyslipidemia_screening_v2",
+  "role": "main_screening",
+  "feature_set": "x1_service_runtime",
+  "data_version": "x1_service_runtime_dyslipidemia_hn13_24_screening_v2",
+  "target_column": "target",
+  "source_years": "HN13-HN24",
+  "model_name": "screening_catboost",
+  "artifact_format": "ai_runtime_catboost_fold_ensemble",
+  "service_policy_allowed": false,
+  "medical_safety_note": "Screening/check-needed model only. Do not use confirmed diagnosis wording."
+}

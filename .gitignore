@@ -104,6 +104,7 @@ ai_runtime/ml/LGB18~24/outputs/
 *.joblib
 *.cbm
 *.npy
+*.sav
 *.pt
 *.pth
 *.onnx
@@ -117,6 +118,13 @@ ai_runtime/ml/LGB18~24/outputs/
 *.h5
 
 # Experiment datasets / model artifacts
+
+# KDU experiment area
+experiment/ml/kdu/*
+!experiment/ml/kdu/
+!experiment/ml/kdu/screening/
+!experiment/ml/kdu/screening/**
+
 experiment/**/raw/**
 !experiment/**/raw/
 !experiment/**/raw/README.md
@@ -129,6 +137,7 @@ experiment/**/models/**
 !experiment/**/models/
 !experiment/**/models/**/
 !experiment/**/models/**/README.md
+experiment/**/outputs/**
 experiment/**/runs/**
 experiment/**/checkpoints/**
 experiment/**/reports/**
@@ -148,6 +157,9 @@ experiment/**/*.PNG
 experiment/**/font/**
 experiment/**/font/
 experiment/**/*.log
+experiment/**/*.sqlite
+experiment/**/*.sqlite3
+experiment/**/*.db
 
 # ocr-compare 개인정보 파일
 ocr-compare/results/images/
@@ -176,3 +188,37 @@ ai_runtime/ml/artifacts/**/threshold_tuning.csv
 "@
 $content | Set-Content .gitignore -Encoding UTF8
 var/
+
+# KDU screening CatBoost staging package
+!experiment/ml/kdu/screening/
+!experiment/ml/kdu/screening/**
+
+# Keep screening source/config/docs
+!experiment/ml/kdu/screening/*.py
+!experiment/ml/kdu/screening/*.json
+!experiment/ml/kdu/screening/*.md
+
+# Keep screening CatBoost runtime artifacts
+!experiment/ml/kdu/screening/artifacts/
+!experiment/ml/kdu/screening/artifacts/**/
+!experiment/ml/kdu/screening/artifacts/**/model_fold*.cbm
+!experiment/ml/kdu/screening/artifacts/**/feature_columns.json
+!experiment/ml/kdu/screening/artifacts/**/threshold.json
+!experiment/ml/kdu/screening/artifacts/**/metrics.json
+!experiment/ml/kdu/screening/artifacts/**/model_params.json
+!experiment/ml/kdu/screening/artifacts/**/experiment_config.json
+
+# Keep optional screening verification reports
+!experiment/ml/kdu/screening/artifact_verification_report.json
+
+# Do not include large intermediate arrays unless explicitly needed
+experiment/ml/kdu/screening/artifacts/**/*.npy
+experiment/ml/kdu/screening/artifacts/**/oof_*.npy
+experiment/ml/kdu/screening/artifacts/**/oof*.npy
+
+# Local runtime/cache
+var/
+
+# KDU local experiment reports
+experiment/ml/kdu/reports/
+experiment/ml/kdu/reports/**
