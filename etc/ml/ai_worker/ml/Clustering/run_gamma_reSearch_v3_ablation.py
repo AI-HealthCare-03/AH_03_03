@@ -72,7 +72,32 @@ CONT_COLS_BMI_ONLY = [
 ] + ["BMI"]
 
 CAT_COLS           = ["성별코드", "연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
+
+# 이완기혈압 제거 (수축기혈압과 r=0.68, 중복 신호)
+CONT_COLS_NO_DBP = [
+    c for c in CONT_COLS_WITH_HW
+    if c != "이완기혈압"
+]  # 14개
 CAT_COLS_NO_GENDER = ["연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
+
+# N2 베이스 + 파생변수 전체 포함 (19개)
+# 트리글리세라이드: TG/HDL 계산용으로만 사용, CONT_COLS에 미포함
+CONT_COLS_WITH_DERIVED = [
+    c for c in CONT_COLS_WITH_HW
+    if c != "이완기혈압"  # 이완기 제거
+] + ["TG_HDL비율", "비HDL콜레스테롤", "맥압", "AST_ALT비율", "심혈관위험지수"]
+
+# 로그 변환 대상 변수 (대사 지표만 선택적 적용)
+LOG_COLS_SELECTIVE = [
+    "식전혈당(공복혈당)",
+    "트리글리세라이드",
+    "혈청지오티(AST)",
+    "혈청지피티(ALT)",
+    "감마지티피",
+    "혈청크레아티닌",
+    "TG_HDL비율",
+    # 맥압, AST_ALT비율, 심혈관위험지수는 로그 변환 불필요
+]
 
 # ────────────────────────────────────────────────
 # 임상 기준
@@ -82,10 +107,11 @@ CLINICAL_BOUNDS = {
     "이완기혈압":         (30,  150),
     "식전혈당(공복혈당)": (50,  500),
     "총콜레스테롤":       (50,  500),
+    "트리글리세라이드":   (10,  500),
     "HDL콜레스테롤":      (10,  150),
     "LDL콜레스테롤":      (10,  400),
     "혈색소":             (5,    22),
-    "혈청크레아티닌":     (0.3,  15),
+    "혈청크레아티닌":     (0.3,   5),  # 5 초과 = 말기 신부전 수준, 검진 데이터 신뢰도 낮음
     "혈청지오티(AST)":    (5,   200),
     "혈청지피티(ALT)":    (5,   200),
     "감마지티피":         (1,   300),
@@ -119,7 +145,18 @@ EXPERIMENTS = [
 
     # 신규 실험
     # {"tag": "L_no_gender", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "standard", "cat_cols": "no_gender"},
-    {"tag": "M_k6_standard", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "M_k6_standard", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "N_no_dbp", "cont_cols": CONT_COLS_NO_DBP, "use_log": False, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "O_k6_robust_cr5", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "robust", "cat_cols": "default"},
+    # {"tag": "P_k7_standard_no_dbp_cr5", "cont_cols": CONT_COLS_NO_DBP, "use_log": False, "k": 7, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "Q_k6_robust_no_dbp_cr5", "cont_cols": CONT_COLS_NO_DBP, "use_log": False, "k": 6, "scaler": "robust", "cat_cols": "default"},
+
+    # 신규 — 코치님 피드백 반영
+    # selective_log: 대사 지표만 선택적 로그 변환
+    # 파생변수: TG/HDL비율, 비HDL콜레스테롤, 트리글리세라이드 포함
+    # {"tag": "R_selective_log_derived", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    # {"tag": "S_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
+    {"tag": "T_k7_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 7, "scaler": "standard", "cat_cols": "default"},
 ]
 
 
@@ -141,6 +178,17 @@ def add_bmi(df):
     return df
 
 
+def add_derived_features(df):
+    """파생변수 생성"""
+    df = df.copy()
+    df["TG_HDL비율"]    = df["트리글리세라이드"] / df["HDL콜레스테롤"].replace(0, np.nan)
+    df["비HDL콜레스테롤"] = df["총콜레스테롤"] - df["HDL콜레스테롤"]
+    df["맥압"]          = df["수축기혈압"] - df["이완기혈압"]
+    df["AST_ALT비율"]   = df["혈청지오티(AST)"] / df["혈청지피티(ALT)"].replace(0, np.nan)
+    df["심혈관위험지수"] = df["총콜레스테롤"] / df["HDL콜레스테롤"].replace(0, np.nan)
+    return df
+
+
 def add_clinical_labels(df):
     df = df.copy()
     df["고혈압_기준"]       = ((df["수축기혈압"] >= 140) | (df["이완기혈압"] >= 90)).astype(int)
@@ -150,16 +198,18 @@ def add_clinical_labels(df):
     return df
 
 
-LOG_TARGET_COLS = [
-    "혈청지오티(AST)", "혈청지피티(ALT)", "감마지티피",
-    "혈청크레아티닌", "식전혈당(공복혈당)",
-]
-
-
-def apply_log_transform(df, cont_cols):
-    """use_log=True 일 때만 호출. 원본 df는 건드리지 않음."""
+def apply_log_transform(df, cont_cols, selective=False):
+    """
+    selective=False: use_log=True 실험 — cont_cols 전체 로그 적용 (기존 방식)
+    selective=True:  대사 지표만 선택적 로그 적용 (코치님 권장)
+    원본 df는 건드리지 않음.
+    """
     df = df.copy()
-    for col in LOG_TARGET_COLS:
+    target_cols = LOG_COLS_SELECTIVE if selective else [
+        "혈청지오티(AST)", "혈청지피티(ALT)", "감마지티피",
+        "혈청크레아티닌", "식전혈당(공복혈당)",
+    ]
+    for col in target_cols:
         if col in cont_cols and col in df.columns:
             df[col] = np.log1p(df[col].clip(lower=0))
     return df
@@ -260,11 +310,13 @@ def run_experiment(df_sampled, exp):
           f"연속형={len(cont_cols)}개 | 범주형={len(cat_cols)}개 | k_threshold={k_threshold:.3f}")
     print(f"{'=' * 70}")
 
-    df = add_clinical_labels(df_sampled)
+    df = add_derived_features(df_sampled)
+    df = add_clinical_labels(df)
     df_orig = df.copy()  # 원본 스케일 보존
 
-    if use_log:
-        df = apply_log_transform(df, cont_cols)
+    selective_log = exp.get("selective_log", False)
+    if use_log or selective_log:
+        df = apply_log_transform(df, cont_cols, selective=selective_log)
 
     # 실험 스케일러 적용 (학습용)
     df_use = df[cont_cols + cat_cols].copy()
@@ -370,10 +422,11 @@ def main():
     df = remove_outliers_clinical(df)
     df = add_bmi(df)
 
-    all_cont = list(set(CONT_COLS_WITH_HW + CONT_COLS_BMI_ONLY))
+    all_cont = list(set(CONT_COLS_WITH_HW + CONT_COLS_BMI_ONLY + ["트리글리세라이드", "이완기혈압"]))
     df = df.dropna(subset=all_cont + CAT_COLS)
     print(f"  outlier 제거 + dropna 후: {len(df):,}명")
 
+    df = add_derived_features(df)
     df_sampled = df.sample(n=SAMPLE_N, random_state=SAMPLE_SEED).reset_index(drop=True)
     print(f"  샘플 크기: {len(df_sampled):,}명 (seed={SAMPLE_SEED})")
     print(f"  실험 수: {len(EXPERIMENTS)}개")
