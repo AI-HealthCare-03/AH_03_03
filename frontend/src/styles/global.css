@@ -4339,7 +4339,7 @@ pre {
 
 .viz-card-label {
   color: var(--color-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4476,11 +4476,11 @@ pre {
 
 .viz-stat-row span {
   color: var(--color-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .viz-stat-row strong {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .admin-shell {
