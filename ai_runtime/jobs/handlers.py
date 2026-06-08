@@ -47,9 +47,9 @@ async def handle_exam_ocr(job_id: int, payload: dict[str, Any]) -> None:
         raise NonRetryableJobError("missing_exam_report_id")
 
     await async_job_service.mark_processing(job_id)
-    from app.services import exams as exam_service
+    from ai_runtime.jobs import exam_ocr_handler
 
-    response = await exam_service.run_exam_ocr_from_report(exam_report_id)
+    response = await exam_ocr_handler.run_exam_ocr_from_report(exam_report_id)
     await async_job_service.mark_success(
         job_id,
         {
@@ -66,10 +66,10 @@ async def handle_exam_ocr(job_id: int, payload: dict[str, Any]) -> None:
 async def handle_medication_ocr(job_id: int, payload: dict[str, Any]) -> None:
     _ = payload
     await async_job_service.mark_processing(job_id)
-    from app.services import medications as medication_service
+    from ai_runtime.jobs import medication_ocr_handler
 
     try:
-        response = await medication_service.run_medication_ocr_from_job(job_id)
+        response = await medication_ocr_handler.run_medication_ocr_from_job(job_id)
     except ValueError as exc:
         error_message = str(exc)
         if error_message in {
