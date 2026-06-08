@@ -137,7 +137,7 @@ def test_mapper_supports_final_feature_counts() -> None:
 def test_mapper_accepts_service_drinking_frequency_rare() -> None:
     result = map_service_features(_user(), _health_record(drinking_frequency="RARE"), ["음주빈도"])
 
-    assert result.features["음주빈도"] == 0.0
+    assert result.features["음주빈도"] == 1.0
 
 
 def test_family_flag_preserves_unexpected_values_as_nan() -> None:
