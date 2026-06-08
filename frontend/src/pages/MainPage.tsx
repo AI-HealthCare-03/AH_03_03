@@ -641,18 +641,19 @@ export default function MainPage() {
           {hasAnalysisResults ? (
             <>
               {displayAnalysisResults.length > 0 ? (
-                <div className="metric-grid">
+                <>
+                  <p style={{ color: "var(--color-muted)", fontSize: "13px", margin: "0 0 12px", textAlign: "right"}}>
+                    최근 분석일: <strong>{formatDate(displayAnalysisResults[0]?.analyzed_at ?? displayAnalysisResults[0]?.created_at)}</strong>
+                  </p>
+                  <div className="metric-grid">
                   {displayAnalysisResults.map((result) => (
                     <div key={String(result.id ?? result.analysis_type)}>
                       <span>{analysisTypeLabels[String(result.analysis_type)]}</span>
                       <strong>{formatRisk(result.risk_level)}</strong>
                     </div>
                   ))}
-                  <div>
-                    <span>최근 분석일</span>
-                    <strong>{formatDate(displayAnalysisResults[0]?.analyzed_at ?? displayAnalysisResults[0]?.created_at)}</strong>
-                  </div>
                 </div>
+              </>
               ) : (
                 <div className="empty-state analysis-empty-state">
                   <strong>최근 분석 결과가 없습니다.</strong>
