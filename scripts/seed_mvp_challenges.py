@@ -51,8 +51,8 @@ def _parse_int(value: str | None, default: int) -> int:
 
 def _category(value: str | None) -> ChallengeCategory:
     raw = _clean(value).upper() or ChallengeCategory.HABIT.value
-    if raw == "BLOOD_SUGAR":
-        raw = ChallengeCategory.BLOOD_GLUCOSE.value
+    if raw in {"BLOOD_SUGAR", "BLOOD_GLUCOSE", "BLOOD_PRESSURE"}:
+        raw = ChallengeCategory.MONITORING.value
     return ChallengeCategory(raw)
 
 

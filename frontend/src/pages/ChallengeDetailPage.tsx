@@ -21,18 +21,14 @@ const categoryIcon: Record<string, string> = {
   SLEEP: "🌙",
   MEDICATION: "💊",
   WATER: "💧",
-  BLOOD_SUGAR: "🩸",
-  BLOOD_GLUCOSE: "🩸",
-  BLOOD_PRESSURE: "🩺",
+  MONITORING: "📊",
   HABIT: "✅",
   COMMON: "🌿",
   WEIGHT: "⚖️",
 };
 
 const categoryLabel: Record<string, string> = {
-  BLOOD_PRESSURE: "혈압 관리",
-  BLOOD_SUGAR: "혈당 관리",
-  BLOOD_GLUCOSE: "혈당 관리",
+  MONITORING: "자가측정",
   DIET: "식단",
   EXERCISE: "운동",
   MEDICATION: "복약",
@@ -373,7 +369,7 @@ function buildHowToItems(challenge: Challenge | null): string[] {
   if (category === "MEDICATION") {
     return [...base, "복약 또는 영양제 섭취 후 완료 버튼을 눌러 기록하세요."];
   }
-  if (["BLOOD_PRESSURE", "BLOOD_GLUCOSE"].includes(category)) {
+  if (category === "MONITORING") {
     return [...base, "측정값이 있다면 건강정보나 검진 기록에 함께 남기면 추적에 도움이 됩니다."];
   }
   return [...base, "생활 패턴에 맞는 시간대를 정해 반복하면 기록을 이어가기 쉽습니다."];
@@ -390,7 +386,7 @@ function buildExpectedEffects(challenge: Challenge | null): string[] {
     effects.push("규칙적인 활동량을 쌓아 체중과 혈압 관리 습관을 만드는 데 도움이 될 수 있습니다.");
   } else if (category === "MEDICATION") {
     effects.push("복약 기록을 남기면 빠뜨린 날을 확인하고 관리 흐름을 유지하기 쉽습니다.");
-  } else if (["BLOOD_PRESSURE", "BLOOD_GLUCOSE"].includes(category)) {
+  } else if (category === "MONITORING") {
     effects.push("반복 기록을 통해 수치 변화 흐름을 확인하는 데 도움이 될 수 있습니다.");
   } else {
     effects.push(`${disease} 관점에서 무리 없는 건강관리 습관을 확인하는 데 참고할 수 있습니다.`);

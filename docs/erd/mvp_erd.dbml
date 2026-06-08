@@ -82,8 +82,7 @@ Enum challenge_category {
   SLEEP
   MEDICATION
   WATER
-  BLOOD_PRESSURE
-  BLOOD_GLUCOSE
+  MONITORING
   WEIGHT
   HABIT
 }

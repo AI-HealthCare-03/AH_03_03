@@ -650,10 +650,10 @@ def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bo
 async def _create_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
     active_challenges = await challenge_service.list_active_challenges(limit=100)
     target_category = {
-        AnalysisType.DIABETES: ChallengeCategory.BLOOD_GLUCOSE,
+        AnalysisType.DIABETES: ChallengeCategory.MONITORING,
         AnalysisType.OBESITY: ChallengeCategory.WEIGHT,
         AnalysisType.DYSLIPIDEMIA: ChallengeCategory.DIET,
-        AnalysisType.HYPERTENSION: ChallengeCategory.BLOOD_PRESSURE,
+        AnalysisType.HYPERTENSION: ChallengeCategory.MONITORING,
     }[result.analysis_type]
     challenge = next((item for item in active_challenges if item.category == target_category), None)
     if challenge is None and active_challenges:

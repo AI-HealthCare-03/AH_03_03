@@ -132,9 +132,7 @@ const analysisTypeLabels: Record<string, string> = {
 };
 
 const categoryLabel: Record<string, string> = {
-  BLOOD_PRESSURE: "혈압 관리",
-  BLOOD_SUGAR: "혈당 관리",
-  BLOOD_GLUCOSE: "혈당 관리",
+  MONITORING: "자가측정",
   DIET: "식단",
   EXERCISE: "운동",
   MEDICATION: "복약",

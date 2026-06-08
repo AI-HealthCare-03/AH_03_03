@@ -23,8 +23,7 @@ const tabToCategory: Record<string, string | null> = {
   수면: "SLEEP",
   복약: "MEDICATION",
   수분섭취: "WATER",
-  혈압: "BLOOD_PRESSURE",
-  혈당: "BLOOD_GLUCOSE",
+  자가측정: "MONITORING",
   생활습관: "HABIT",
 };
 
@@ -34,18 +33,14 @@ const categoryIcon: Record<string, string> = {
   SLEEP: "🌙",
   MEDICATION: "💊",
   WATER: "💧",
-  BLOOD_SUGAR: "🩸",
-  BLOOD_GLUCOSE: "🩸",
-  BLOOD_PRESSURE: "🩺",
+  MONITORING: "📊",
   HABIT: "✅",
   COMMON: "🌿",
   WEIGHT: "⚖️",
 };
 
 const categoryLabel: Record<string, string> = {
-  BLOOD_PRESSURE: "혈압 관리",
-  BLOOD_SUGAR: "혈당 관리",
-  BLOOD_GLUCOSE: "혈당 관리",
+  MONITORING: "자가측정",
   DIET: "식단",
   EXERCISE: "운동",
   MEDICATION: "복약",
