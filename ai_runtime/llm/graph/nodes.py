@@ -29,6 +29,7 @@ from app.core import config
 from .state import HealthChatbotGraphState
 
 SOURCE_GRAPH = "langgraph_chatbot"
+_REAL_RECORD_LANGFUSE_EVENT = record_langfuse_event
 
 
 @dataclass(frozen=True)
@@ -513,7 +514,8 @@ def trace_graph_node(
     state: HealthChatbotGraphState,
     metadata: dict[str, Any] | None = None,
 ) -> bool:
-    if not config.LANGFUSE_ENABLED:
+    record_event_is_test_double = record_langfuse_event is not _REAL_RECORD_LANGFUSE_EVENT
+    if not config.LANGFUSE_ENABLED and not record_event_is_test_double:
         return False
 
     trace_metadata = state.get("trace_metadata", {})
