@@ -98,7 +98,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   ```
 - 주의사항:
   - 이번 문서 작업에서는 커밋하지 않는다.
-  - `etc/ml` legacy 실험 파일은 건드리지 않는다.
+  - `experiment/ml` legacy 실험 파일은 건드리지 않는다.
 
 ### 2. dummy/stub 공식 경로 정리
 
