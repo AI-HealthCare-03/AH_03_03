@@ -66,7 +66,7 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
               <span className="avatar">{(backendUser?.nickname ?? backendUser?.name ?? "U").slice(0, 1)}</span>
               <span>{backendUser?.nickname ?? backendUser?.name ?? backendUser?.email}</span>
             </Link>
-            <button className="desktop-nav-action" type="button" onClick={logout}>
+            <button className="nav-logout-btn" type="button" onClick={logout}>
               로그아웃
             </button>
             {showMobileMenuButton && (
