@@ -9,6 +9,7 @@ class LabelRow:
     row_id: int
     image_path: str
     expected_foods: list[str]
+    image_exists: bool = True
 
 
 @dataclass(frozen=True)

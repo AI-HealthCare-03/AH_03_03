@@ -70,9 +70,17 @@ def load_labels(labels_path: Path, *, limit: int | None = None) -> list[LabelRow
         for row_id, row in enumerate(reader, start=1):
             image_path = str(row.get("image_path") or "").strip()
             expected_foods = split_food_names(str(row.get("expected_foods") or ""))
+            image_exists = _parse_bool(row.get("image_exists"), default=True)
             if not image_path:
                 continue
-            rows.append(LabelRow(row_id=row_id, image_path=image_path, expected_foods=expected_foods))
+            rows.append(
+                LabelRow(
+                    row_id=row_id,
+                    image_path=image_path,
+                    expected_foods=expected_foods,
+                    image_exists=image_exists,
+                )
+            )
             if limit is not None and len(rows) >= limit:
                 break
     return rows
@@ -86,12 +94,20 @@ async def evaluate_image(
     api_key: str | None,
 ) -> PredictionRow:
     started = time.perf_counter()
+    if not label.image_exists:
+        return _failure_row(
+            label,
+            started=started,
+            error_type="data_missing",
+            error_message="image_exists=false in labels CSV",
+        )
+
     image_path = _resolve_image_path(label.image_path, labels_dir)
     if not image_path.exists():
         return _failure_row(
             label,
             started=started,
-            error_type="image_not_found",
+            error_type="data_missing",
             error_message=str(image_path),
         )
     if not api_key:
@@ -248,18 +264,38 @@ def write_predictions_csv(path: Path, predictions: list[PredictionRow]) -> None:
             )
 
 
-def write_metrics_json(path: Path, metrics: dict[str, float | int]) -> None:
+def write_metrics_json(path: Path, metrics: dict[str, Any]) -> None:
     path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def write_report(path: Path, metrics: dict[str, float | int], predictions: list[PredictionRow]) -> None:
+def write_report(path: Path, metrics: dict[str, Any], predictions: list[PredictionRow]) -> None:
     lines = [
         "# GPT Vision Food Eval Report",
+        "",
+        "## Data Missing Policy",
+        "",
+        "`image_exists=false` rows and local `image_path` misses are counted as `data_missing`.",
+        "They are excluded from model-quality denominators such as API success, JSON parse success, and match rates.",
         "",
         "## Metrics",
         "",
     ]
-    lines.extend(f"- `{key}`: {value}" for key, value in metrics.items())
+    for key, value in metrics.items():
+        if key == "class_distribution":
+            continue
+        lines.append(f"- `{key}`: {value}")
+    lines.extend(
+        [
+            "",
+            "## Class Distribution",
+            "",
+        ]
+    )
+    class_distribution = metrics.get("class_distribution")
+    if isinstance(class_distribution, dict) and class_distribution:
+        lines.extend(f"- `{food_name}`: {count}" for food_name, count in class_distribution.items())
+    else:
+        lines.append("- None")
     lines.extend(
         [
             "",
@@ -299,6 +335,17 @@ def _failure_row(
 def _resolve_image_path(image_path: str, labels_dir: Path) -> Path:
     path = Path(image_path)
     return path if path.is_absolute() else labels_dir / path
+
+
+def _parse_bool(value: object, *, default: bool) -> bool:
+    if value is None:
+        return default
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "y"}:
+        return True
+    if normalized in {"0", "false", "no", "n"}:
+        return False
+    return default
 
 
 def _media_type_for_image(path: Path) -> str:
