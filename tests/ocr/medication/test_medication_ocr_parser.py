@@ -1,6 +1,6 @@
+from ai_runtime.jobs import medication_ocr_handler
 from ai_runtime.ocr.medication.parser import parse_medication_text
 from app.dtos.medications import MedicationOCRRequest
-from app.services import medications as medication_service
 
 
 def test_parse_medication_text_extracts_core_fields() -> None:
@@ -75,12 +75,12 @@ async def test_medication_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch)
                 ],
             }
 
-    monkeypatch.setattr(medication_service, "VisionClient", FakeVisionClient)
-    monkeypatch.setattr(medication_service.config, "MEDICATION_OCR_PROVIDER", "gpt_vision")
-    monkeypatch.setattr(medication_service.config, "MEDICATION_GPT_VISION_ENABLED", True)
-    monkeypatch.setattr(medication_service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(medication_ocr_handler, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(medication_ocr_handler.config, "OPENAI_API_KEY", "test-key")
 
-    response = await medication_service.run_medication_ocr(
+    response = await medication_ocr_handler.run_medication_ocr(
         MedicationOCRRequest(source_type="PRESCRIPTION"),
         image_bytes=b"image",
         image_media_type="image/png",
@@ -92,11 +92,11 @@ async def test_medication_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch)
 
 
 async def test_medication_ocr_marks_fallback_when_provider_key_missing(monkeypatch) -> None:
-    monkeypatch.setattr(medication_service.config, "MEDICATION_OCR_PROVIDER", "gpt_vision")
-    monkeypatch.setattr(medication_service.config, "MEDICATION_GPT_VISION_ENABLED", True)
-    monkeypatch.setattr(medication_service.config, "OPENAI_API_KEY", None)
+    monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_OCR_PROVIDER", "gpt_vision")
+    monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(medication_ocr_handler.config, "OPENAI_API_KEY", None)
 
-    response = await medication_service.run_medication_ocr(
+    response = await medication_ocr_handler.run_medication_ocr(
         MedicationOCRRequest(source_type="PRESCRIPTION"),
         image_bytes=b"image",
         image_media_type="image/png",

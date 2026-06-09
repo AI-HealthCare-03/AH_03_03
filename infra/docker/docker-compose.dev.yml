@@ -126,6 +126,7 @@ services:
 
   ai-worker:
     container_name: ai-health-dev-ai-worker
+    platform: linux/amd64
     build:
       context: ../..
       dockerfile: ai_runtime/Dockerfile

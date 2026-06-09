@@ -7,7 +7,10 @@ PaddleOCR 2.7.3 기반 건강검진표 수치 추출 모듈.
 import logging
 import re
 
-from paddleocr import PaddleOCR
+try:
+    from paddleocr import PaddleOCR as _PaddleOCR
+except ModuleNotFoundError:
+    _PaddleOCR = None
 
 from .pdf_handler import PdfType, detect_pdf_type, extract_text_from_pdf, parse_text_lines, pdf_to_images
 from .preprocessor import preprocess_for_ocr
@@ -16,20 +19,33 @@ from .schemas import CheckupOcrData, OcrStatus
 logger = logging.getLogger(__name__)
 
 # ── PaddleOCR 싱글톤 ──────────────────────────────────────────────────────────
+PaddleOCR = _PaddleOCR
 _ocr_engine = None
+
+
+class CheckupOcrDependencyError(RuntimeError):
+    """Raised when optional OCR dependencies are not installed."""
+
+
+def _get_paddle_ocr_class():
+    if PaddleOCR is None:
+        msg = "paddleocr is required for checkup OCR. Install OCR dependencies before running OCR."
+        raise CheckupOcrDependencyError(msg)
+    return PaddleOCR
 
 
 def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
         logger.info("PaddleOCR 모델 로딩 중...")
+        ocr_cls = _get_paddle_ocr_class()
         try:
-            _ocr_engine = PaddleOCR(
+            _ocr_engine = ocr_cls(
                 lang="korean",
                 use_textline_orientation=True,
             )
         except ValueError:
-            _ocr_engine = PaddleOCR(
+            _ocr_engine = ocr_cls(
                 use_angle_cls=True,
                 lang="korean",
             )

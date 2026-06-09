@@ -445,7 +445,7 @@ async def test_demo_echo_handler_marks_processing_and_success(monkeypatch) -> No
 
 @pytest.mark.asyncio
 async def test_exam_ocr_handler_runs_report_ocr_and_marks_success(monkeypatch) -> None:
-    from app.services import exams as exam_service
+    from ai_runtime.jobs import exam_ocr_handler
 
     calls: list[tuple[str, int, dict | None]] = []
 
@@ -465,7 +465,7 @@ async def test_exam_ocr_handler_runs_report_ocr_and_marks_success(monkeypatch) -
         calls.append(("success", job_id, result_payload))
 
     monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
-    monkeypatch.setattr(exam_service, "run_exam_ocr_from_report", fake_run_exam_ocr_from_report)
+    monkeypatch.setattr(exam_ocr_handler, "run_exam_ocr_from_report", fake_run_exam_ocr_from_report)
     monkeypatch.setattr(handlers.async_job_service, "mark_success", fake_mark_success)
 
     await handlers.handle_stream_job(15, "exam_ocr.run", {"exam_report_id": 33})
@@ -504,8 +504,8 @@ async def test_exam_ocr_handler_rejects_missing_exam_report_id(monkeypatch) -> N
 
 @pytest.mark.asyncio
 async def test_medication_ocr_handler_runs_job_ocr_and_marks_success(monkeypatch) -> None:
+    from ai_runtime.jobs import medication_ocr_handler
     from app.dtos.medications import MedicationOCRItem, MedicationOCRResponse
-    from app.services import medications as medication_service
 
     calls: list[tuple[str, int, dict | None]] = []
 
@@ -527,7 +527,7 @@ async def test_medication_ocr_handler_runs_job_ocr_and_marks_success(monkeypatch
         calls.append(("success", job_id, result_payload))
 
     monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
-    monkeypatch.setattr(medication_service, "run_medication_ocr_from_job", fake_run_medication_ocr_from_job)
+    monkeypatch.setattr(medication_ocr_handler, "run_medication_ocr_from_job", fake_run_medication_ocr_from_job)
     monkeypatch.setattr(handlers.async_job_service, "mark_success", fake_mark_success)
 
     await handlers.handle_stream_job(21, "medication_ocr.run", {})
@@ -541,7 +541,7 @@ async def test_medication_ocr_handler_runs_job_ocr_and_marks_success(monkeypatch
 
 @pytest.mark.asyncio
 async def test_medication_ocr_handler_rejects_missing_source(monkeypatch) -> None:
-    from app.services import medications as medication_service
+    from ai_runtime.jobs import medication_ocr_handler
 
     calls: list[tuple[int, str] | tuple[str, int]] = []
 
@@ -556,7 +556,7 @@ async def test_medication_ocr_handler_rejects_missing_source(monkeypatch) -> Non
         calls.append((job_id, error_message))
 
     monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
-    monkeypatch.setattr(medication_service, "run_medication_ocr_from_job", fake_run_medication_ocr_from_job)
+    monkeypatch.setattr(medication_ocr_handler, "run_medication_ocr_from_job", fake_run_medication_ocr_from_job)
     monkeypatch.setattr(handlers.async_job_service, "mark_failed", fake_mark_failed)
 
     with pytest.raises(handlers.NonRetryableJobError):

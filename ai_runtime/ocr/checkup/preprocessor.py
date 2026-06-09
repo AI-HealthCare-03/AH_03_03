@@ -5,8 +5,12 @@ ai_runtime/ocr/checkup/preprocessor.py
 
 import logging
 
-import cv2
 import numpy as np
+
+try:
+    import cv2 as _cv2
+except ModuleNotFoundError:
+    _cv2 = None
 
 from .schemas import QUALITY_GUIDE, ImageQualityReport, ImageQualityStatus
 
@@ -18,18 +22,32 @@ BRIGHT_THRESHOLD = 220.0
 SKEW_THRESHOLD = 5.0
 MIN_WIDTH = 400
 MIN_HEIGHT = 300
+cv2 = _cv2
+
+
+class OpenCvDependencyError(RuntimeError):
+    """Raised when optional OpenCV OCR preprocessing dependencies are not installed."""
+
+
+def _get_cv2_module():
+    if cv2 is None:
+        msg = "opencv-python is required for checkup OCR image preprocessing. Install OCR dependencies before running OCR."
+        raise OpenCvDependencyError(msg)
+    return cv2
 
 
 def bytes_to_cv2(image_bytes):
+    cv2_module = _get_cv2_module()
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    img = cv2_module.imdecode(arr, cv2_module.IMREAD_COLOR)
     if img is None:
         raise ValueError("이미지를 읽을 수 없습니다.")
     return img
 
 
 def check_blur(gray):
-    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    cv2_module = _get_cv2_module()
+    return float(cv2_module.Laplacian(gray, cv2_module.CV_64F).var())
 
 
 def check_brightness(gray):
@@ -37,9 +55,10 @@ def check_brightness(gray):
 
 
 def check_skew(gray):
+    cv2_module = _get_cv2_module()
     try:
-        edges = cv2.Canny(gray, 50, 150, apertureSize=3)
-        lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold=100)
+        edges = cv2_module.Canny(gray, 50, 150, apertureSize=3)
+        lines = cv2_module.HoughLines(edges, 1, np.pi / 180, threshold=100)
         if lines is None:
             return 0.0
         angles = []
@@ -54,6 +73,7 @@ def check_skew(gray):
 
 
 def assess_quality(image_bytes):
+    cv2_module = _get_cv2_module()
     try:
         img = bytes_to_cv2(image_bytes)
     except ValueError:
@@ -64,7 +84,7 @@ def assess_quality(image_bytes):
         )
 
     h, w = img.shape[:2]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2_module.cvtColor(img, cv2_module.COLOR_BGR2GRAY)
 
     blur_score = check_blur(gray)
     brightness = check_brightness(gray)
@@ -127,14 +147,15 @@ def assess_quality(image_bytes):
 
 
 def preprocess_for_ocr(image_bytes):
+    cv2_module = _get_cv2_module()
     img = bytes_to_cv2(image_bytes)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    denoised = cv2.fastNlMeansDenoising(gray, h=10)
-    binary = cv2.adaptiveThreshold(
+    gray = cv2_module.cvtColor(img, cv2_module.COLOR_BGR2GRAY)
+    denoised = cv2_module.fastNlMeansDenoising(gray, h=10)
+    binary = cv2_module.adaptiveThreshold(
         denoised,
         255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
+        cv2_module.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2_module.THRESH_BINARY,
         11,
         2,
     )
