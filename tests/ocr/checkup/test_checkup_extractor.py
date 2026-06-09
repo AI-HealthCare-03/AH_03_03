@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai_runtime.ocr.checkup import extractor, pdf_handler
+from ai_runtime.ocr.checkup import extractor, pdf_handler, preprocessor
 from ai_runtime.ocr.checkup.extractor import (
     parse_blood_pressure,
     parse_from_text_lines,
@@ -61,6 +61,13 @@ def test_pdf_to_images_uses_monkeypatched_pdf2image(monkeypatch) -> None:
     monkeypatch.setattr(pdf_handler, "pdf2image", FakePdf2Image)
 
     assert pdf_handler.pdf_to_images(b"%PDF") == [b"image-bytes"]
+
+
+def test_preprocess_for_ocr_requires_opencv_dependency(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessor, "cv2", None)
+
+    with pytest.raises(preprocessor.OpenCvDependencyError, match="opencv-python is required"):
+        preprocessor.preprocess_for_ocr(b"image")
 
 
 def test_parse_height_weight_does_not_reuse_150cm_as_weight() -> None:
