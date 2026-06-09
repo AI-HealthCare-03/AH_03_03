@@ -19,8 +19,7 @@ export const sidebarLinks: SidebarLink[] = [
   { to: "/challenges", icon: "✅", label: "챌린지" },
   { to: "/medications", icon: "💊", label: "복약/영양제" },
   { to: "/mypage", icon: "👤", label: "마이페이지" },
-  { to: "/inquiries", icon: "💬", label: "1:1 문의" },
-  { to: "/faq", icon: "?", label: "FAQ" },
+  { to: "/inquiries", icon: "💬", label: "문의/FAQ" },
   { to: "/settings", icon: "⚙️", label: "설정" },
 ];
 
