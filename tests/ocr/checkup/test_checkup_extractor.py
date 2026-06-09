@@ -12,6 +12,28 @@ from ai_runtime.ocr.checkup.extractor import (
 from ai_runtime.ocr.checkup.pdf_handler import PdfType
 
 
+def test_get_ocr_engine_requires_paddleocr_dependency(monkeypatch) -> None:
+    monkeypatch.setattr(extractor, "_ocr_engine", None)
+    monkeypatch.setattr(extractor, "PaddleOCR", None)
+
+    with pytest.raises(extractor.CheckupOcrDependencyError, match="paddleocr is required"):
+        extractor.get_ocr_engine()
+
+
+def test_get_ocr_engine_uses_monkeypatched_paddleocr(monkeypatch) -> None:
+    class FakePaddleOCR:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    monkeypatch.setattr(extractor, "_ocr_engine", None)
+    monkeypatch.setattr(extractor, "PaddleOCR", FakePaddleOCR)
+
+    engine = extractor.get_ocr_engine()
+
+    assert isinstance(engine, FakePaddleOCR)
+    assert engine.kwargs == {"lang": "korean", "use_textline_orientation": True}
+
+
 def test_parse_height_weight_does_not_reuse_150cm_as_weight() -> None:
     height, weight = parse_height_weight([("신장 150cm 체중 55kg", 0.99)])
 
