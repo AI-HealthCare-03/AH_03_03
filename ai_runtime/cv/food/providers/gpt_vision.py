@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ai_runtime.cv.food.providers.base import FoodDetectionProviderResult
+from ai_runtime.cv.food.providers.base import FoodDetectionProviderResult, build_food_detection_provider_result
 from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
 from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
 
@@ -29,9 +29,19 @@ class GptVisionFoodDetectionProvider:
         image_media_type: str | None = None,
     ) -> FoodDetectionProviderResult:
         if not image_bytes:
-            return FoodDetectionProviderResult(candidate=None, fallback_used=True, message="image file not provided")
+            return build_food_detection_provider_result(
+                provider_name="gpt_vision",
+                candidate=None,
+                fallback_used=True,
+                message="image file not provided",
+            )
         if not self._api_key:
-            return FoodDetectionProviderResult(candidate=None, fallback_used=True, message="OPENAI_API_KEY missing")
+            return build_food_detection_provider_result(
+                provider_name="gpt_vision",
+                candidate=None,
+                fallback_used=True,
+                message="OPENAI_API_KEY missing",
+            )
 
         try:
             client = self._vision_client_cls(api_key=self._api_key, model=self._model)
@@ -42,11 +52,17 @@ class GptVisionFoodDetectionProvider:
             )
         except Exception:
             logger.exception("Diet GPT Vision provider failed; using rule_based_food_detection fallback")
-            return FoodDetectionProviderResult(candidate=None, fallback_used=True, message="gpt_vision_failed")
+            return build_food_detection_provider_result(
+                provider_name="gpt_vision",
+                candidate=None,
+                fallback_used=True,
+                message="gpt_vision_failed",
+            )
 
         foods = raw.get("foods") if isinstance(raw, dict) else None
         if not isinstance(foods, list):
-            return FoodDetectionProviderResult(
+            return build_food_detection_provider_result(
+                provider_name="gpt_vision",
                 candidate=None,
                 fallback_used=True,
                 message="gpt_vision_returned_no_foods",
@@ -58,24 +74,28 @@ class GptVisionFoodDetectionProvider:
             if isinstance(food, dict) and str(food.get("name") or food.get("food_name") or "").strip()
         ]
         if not detected_foods:
-            return FoodDetectionProviderResult(
+            return build_food_detection_provider_result(
+                provider_name="gpt_vision",
                 candidate=None,
                 fallback_used=True,
                 message="gpt_vision_returned_empty_foods",
             )
 
-        return FoodDetectionProviderResult(
-            candidate=FoodDetectionCandidateSet(
-                provider="gpt_vision",
-                detected_foods=detected_foods,
-                confidence=_average_confidence_from_provider_foods(foods),
-                needs_review=False,
-                raw_output=raw,
-                raw_provider_status=str(raw.get("analysis_status") or "success"),
-                metadata={"model": self._model},
-            ),
+        candidate = FoodDetectionCandidateSet(
+            provider="gpt_vision",
+            detected_foods=detected_foods,
+            confidence=_average_confidence_from_provider_foods(foods),
+            needs_review=False,
+            raw_output=raw,
+            raw_provider_status=str(raw.get("analysis_status") or "success"),
+            metadata={"model": self._model},
+        )
+        return build_food_detection_provider_result(
+            provider_name="gpt_vision",
+            candidate=candidate,
             fallback_used=False,
             message="gpt_vision_food_detection",
+            metadata={"model": self._model},
         )
 
 

@@ -8,15 +8,18 @@ from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_ana
 @pytest.mark.asyncio
 async def test_pipeline_uses_rule_based_provider_when_gpt_disabled() -> None:
     result = await run_food_analysis_pipeline(
-        rule_based_foods=[{"name": "현미밥", "confidence": 0.9}],
+        rule_based_foods=[{"name": "쌀떡", "confidence": 0.9}],
         image_bytes=None,
         image_media_type=None,
         config=FoodAnalysisPipelineConfig(provider="rule_based", gpt_vision_enabled=False),
     )
 
     assert result.food_candidate.provider == "rule_based_food_detection"
-    assert result.detected_foods[0]["name"] == "현미밥"
+    assert result.detected_foods[0]["name"] == "가래떡"
     assert result.provider_candidate is None
+    assert result.provider_result.provider_name == "rule_based_food_detection"
+    assert result.provider_result.raw_food_names == ["쌀떡"]
+    assert result.provider_result.matched_food_names == ["가래떡"]
     assert result.fallback_used is True
     assert result.provider_message == "diet GPT Vision disabled"
 
@@ -52,7 +55,132 @@ async def test_pipeline_uses_gpt_vision_provider_with_injected_client() -> None:
 
     assert result.food_candidate.provider == "gpt_vision"
     assert result.provider_candidate is not None
+    assert result.provider_result.provider_name == "gpt_vision"
+    assert result.provider_result.raw_food_names == ["쌀떡"]
+    assert result.provider_result.matched_food_names == ["가래떡"]
     assert result.detected_foods[0]["name"] == "가래떡"
     assert result.detected_foods[0]["original_name"] == "쌀떡"
     assert result.fallback_used is False
     assert result.provider_message == "gpt_vision_food_detection"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_falls_back_to_rule_based_when_gpt_vision_raises() -> None:
+    class FailingVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            raise RuntimeError("vision unavailable")
+
+    result = await run_food_analysis_pipeline(
+        rule_based_foods=[{"name": "현미밥", "confidence": 0.9}],
+        image_bytes=b"image",
+        image_media_type="image/png",
+        config=FoodAnalysisPipelineConfig(
+            provider="gpt_vision",
+            gpt_vision_enabled=True,
+            openai_api_key="test-key",
+            vision_client_cls=FailingVisionClient,
+        ),
+    )
+
+    assert result.food_candidate.provider == "rule_based_food_detection"
+    assert result.provider_candidate is None
+    assert result.fallback_provider_result is not None
+    assert result.fallback_provider_result.provider_name == "rule_based_food_detection"
+    assert result.detected_foods[0]["name"] == "현미밥"
+    assert result.fallback_used is True
+    assert result.provider_message == "gpt_vision_failed"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_falls_back_to_rule_based_when_gpt_returns_no_foods() -> None:
+    class EmptyVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            return {"analysis_status": "failed", "foods": []}
+
+    result = await run_food_analysis_pipeline(
+        rule_based_foods=[{"name": "샐러드", "confidence": 0.8}],
+        image_bytes=b"image",
+        image_media_type="image/png",
+        config=FoodAnalysisPipelineConfig(
+            provider="gpt_vision",
+            gpt_vision_enabled=True,
+            openai_api_key="test-key",
+            vision_client_cls=EmptyVisionClient,
+        ),
+    )
+
+    assert result.food_candidate.provider == "rule_based_food_detection"
+    assert result.detected_foods[0]["name"] == "샐러드"
+    assert result.provider_result.unmatched_food_names == []
+    assert result.fallback_provider_result is not None
+    assert result.provider_message == "gpt_vision_returned_empty_foods"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_matches_raw_food_name_to_scorer_canonical_name() -> None:
+    class RiceVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            return {
+                "analysis_status": "success",
+                "foods": [{"name": "흰쌀밥", "confidence": 0.93}],
+            }
+
+    result = await run_food_analysis_pipeline(
+        rule_based_foods=[],
+        image_bytes=b"image",
+        image_media_type="image/png",
+        config=FoodAnalysisPipelineConfig(
+            provider="gpt_vision",
+            gpt_vision_enabled=True,
+            openai_api_key="test-key",
+            vision_client_cls=RiceVisionClient,
+        ),
+    )
+
+    assert result.detected_foods[0]["original_name"] == "흰쌀밥"
+    assert result.detected_foods[0]["name"] == "쌀밥"
+    assert result.detected_foods[0]["matched_food_name"] == "쌀밥"
+    assert result.detected_foods[0]["needs_user_confirmation"] is False
+    assert result.provider_result.raw_food_names == ["흰쌀밥"]
+    assert result.provider_result.matched_food_names == ["쌀밥"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_keeps_unmatched_food_name_without_failing_analysis() -> None:
+    class UnknownVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            return {
+                "analysis_status": "success",
+                "foods": [{"name": "미확인테스트음식", "confidence": 0.51}],
+            }
+
+    result = await run_food_analysis_pipeline(
+        rule_based_foods=[{"name": "현미밥", "confidence": 0.9}],
+        image_bytes=b"image",
+        image_media_type="image/png",
+        config=FoodAnalysisPipelineConfig(
+            provider="gpt_vision",
+            gpt_vision_enabled=True,
+            openai_api_key="test-key",
+            vision_client_cls=UnknownVisionClient,
+        ),
+    )
+
+    assert result.food_candidate.provider == "gpt_vision"
+    assert result.detected_foods[0]["name"] == "미확인테스트음식"
+    assert result.detected_foods[0]["matched_food_name"] is None
+    assert result.detected_foods[0]["needs_user_confirmation"] is True
+    assert result.provider_result.unmatched_food_names == ["미확인테스트음식"]
+    assert result.fallback_used is False

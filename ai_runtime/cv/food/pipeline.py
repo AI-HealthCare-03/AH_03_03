@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
+from ai_runtime.cv.food.providers.base import FoodDetectionProviderResult
 from ai_runtime.cv.food.providers.gpt_vision import GptVisionFoodDetectionProvider
 from ai_runtime.cv.food.providers.rule_based import RuleBasedFoodDetectionProvider
 from ai_runtime.cv.food.schemas import CV_CONFIDENCE_THRESHOLD, FoodDetectionCandidateSet
@@ -28,6 +29,8 @@ class FoodAnalysisPipelineResult:
     provider_candidate: FoodDetectionCandidateSet | None
     fallback_used: bool
     provider_message: str | None
+    provider_result: FoodDetectionProviderResult
+    fallback_provider_result: FoodDetectionProviderResult | None = None
 
 
 async def run_food_analysis_pipeline(
@@ -39,7 +42,8 @@ async def run_food_analysis_pipeline(
 ) -> FoodAnalysisPipelineResult:
     provider_name = str(config.provider or "rule_based").lower()
     if provider_name != "gpt_vision" or not config.gpt_vision_enabled:
-        result = await RuleBasedFoodDetectionProvider(rule_based_foods=rule_based_foods).detect(
+        result = await _run_rule_based_provider(
+            rule_based_foods=rule_based_foods,
             image_bytes=image_bytes,
             image_media_type=image_media_type,
         )
@@ -50,6 +54,7 @@ async def run_food_analysis_pipeline(
             provider_candidate=None,
             fallback_used=True,
             provider_message="diet GPT Vision disabled",
+            provider_result=result,
         )
 
     provider_result = await GptVisionFoodDetectionProvider(
@@ -61,6 +66,23 @@ async def run_food_analysis_pipeline(
         image_media_type=image_media_type,
     )
     provider_candidate = provider_result.candidate
+    if provider_candidate is None:
+        fallback_result = await _run_rule_based_provider(
+            rule_based_foods=rule_based_foods,
+            image_bytes=image_bytes,
+            image_media_type=image_media_type,
+        )
+        food_candidate = _require_candidate(fallback_result.candidate)
+        return FoodAnalysisPipelineResult(
+            food_candidate=food_candidate,
+            detected_foods=food_candidate.to_scorer_foods(),
+            provider_candidate=None,
+            fallback_used=True,
+            provider_message=provider_result.message or fallback_result.message,
+            provider_result=provider_result,
+            fallback_provider_result=fallback_result,
+        )
+
     food_candidate = select_food_detection_candidate(
         cv_result=provider_candidate,
         rule_based_foods=rule_based_foods,
@@ -79,6 +101,19 @@ async def run_food_analysis_pipeline(
         provider_candidate=provider_candidate,
         fallback_used=fallback_used,
         provider_message=provider_message,
+        provider_result=provider_result,
+    )
+
+
+async def _run_rule_based_provider(
+    *,
+    rule_based_foods: list[dict[str, Any]],
+    image_bytes: bytes | None,
+    image_media_type: str | None,
+) -> FoodDetectionProviderResult:
+    return await RuleBasedFoodDetectionProvider(rule_based_foods=rule_based_foods).detect(
+        image_bytes=image_bytes,
+        image_media_type=image_media_type,
     )
 
 

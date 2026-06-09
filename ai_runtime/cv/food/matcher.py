@@ -35,6 +35,12 @@ _LOCAL_ALIAS_MATCHES = {
     "ricecakes": ("가래떡", "local_stub:garaetteok", 0.86),
     "koreanricecake": ("가래떡", "local_stub:garaetteok", 0.86),
     "garaetteok": ("가래떡", "local_stub:garaetteok", 0.95),
+    "흰쌀밥": ("쌀밥", "local_stub:white_rice", 0.92),
+    "흰밥": ("쌀밥", "local_stub:white_rice", 0.9),
+    "백미밥": ("쌀밥", "local_stub:white_rice", 0.9),
+    "white밥": ("쌀밥", "local_stub:white_rice", 0.84),
+    "whiterice": ("쌀밥", "local_stub:white_rice", 0.88),
+    "plainrice": ("쌀밥", "local_stub:white_rice", 0.84),
 }
 
 
