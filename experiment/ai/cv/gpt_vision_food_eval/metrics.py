@@ -43,7 +43,9 @@ def compute_metrics(predictions: list[PredictionRow]) -> dict[str, Any]:
     evaluable_image_count = len(evaluable_predictions)
     api_failed_count = sum(is_api_failed(row) for row in evaluable_predictions)
     json_parse_failed_count = sum(is_json_parse_failed(row) for row in evaluable_predictions)
-    empty_result_count = sum(row.empty_result for row in evaluable_predictions)
+    empty_result_count = sum(
+        row.empty_result and row.api_success and row.json_parse_success for row in evaluable_predictions
+    )
     invalid_label_count = sum(row.invalid_label_count for row in evaluable_predictions)
     unknown_count = sum(food == "unknown" for row in evaluable_predictions for food in row.allowed_food_names)
     predicted_food_count = sum(len(row.raw_food_names) for row in evaluable_predictions)

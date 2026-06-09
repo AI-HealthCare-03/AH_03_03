@@ -108,19 +108,42 @@ Builder outputs are written to `experiment/ai/cv/gpt_vision_food_eval/outputs/`:
 
 ## Metrics
 
-- `image_count`
+- `total_rows`
+- `evaluable_image_count`
+- `data_missing_count`
+- `api_failed_count`
+- `json_parse_failed_count`
+- `empty_result_count`
 - `api_success_rate`
 - `json_parse_success_rate`
-- `exact_match_rate_raw`
-- `exact_match_rate_canonical`
+- `raw_exact_match_rate`
+- `canonical_exact_match_rate`
 - `constrained_exact_match_rate`
-- `any_food_hit_rate`
+- `any_hit_rate`
+- `canonical_any_hit_rate`
 - `constrained_any_hit_rate`
+- `precision`
+- `recall`
+- `f1_score`
+- `macro_precision`
+- `macro_recall`
+- `macro_f1_score`
+- `invalid_label_count`
 - `invalid_label_rate`
+- `unknown_count`
+- `unknown_rate`
 - `unmatched_food_rate`
 - `empty_result_rate`
+- `avg_confidence`
+- `confidence_correct_avg`
+- `confidence_wrong_avg`
+- `confidence_bins`
 - `avg_latency_seconds`
+- `p50_latency_seconds`
 - `p95_latency_seconds`
+- `max_latency_seconds`
+- `class_distribution`
+- `class_level_metrics`
 
 ## Matching
 
