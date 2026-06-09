@@ -5,6 +5,7 @@ from dataclasses import field
 from enum import StrEnum
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -95,6 +96,28 @@ class Config(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 14 * 24 * 60
     JWT_LEEWAY: int = 5
+
+    @model_validator(mode="after")
+    def validate_production_security_settings(self) -> "Config":
+        if not self.is_production:
+            return self
+
+        secret_key = self.SECRET_KEY.strip()
+        if not secret_key or secret_key == "PLEASE_CHANGE_ME" or secret_key.startswith("default-secret-key"):
+            raise ValueError("SECRET_KEY must be set to a strong non-default value in production.")
+
+        if not self.refresh_token_cookie_secure:
+            raise ValueError("REFRESH_TOKEN_COOKIE_SECURE must be true in production.")
+
+        cookie_domain = self.COOKIE_DOMAIN.strip().lower()
+        if cookie_domain in {"localhost", "127.0.0.1", "::1"}:
+            raise ValueError("COOKIE_DOMAIN must not point to localhost in production.")
+
+        same_site = self.REFRESH_TOKEN_COOKIE_SAMESITE.strip().lower()
+        if same_site not in {"lax", "strict", "none"}:
+            raise ValueError("REFRESH_TOKEN_COOKIE_SAMESITE must be one of: lax, strict, none.")
+
+        return self
 
     @property
     def cors_allow_origins(self) -> list[str]:
