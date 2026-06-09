@@ -84,13 +84,13 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
           </>
         ) : (
           <>
-            <NavLink className="desktop-nav-action" to="/">
+            <NavLink className="icon-button desktop-nav-action" to="/">
               서비스 소개
             </NavLink>
-            <NavLink className="desktop-nav-action" to="/faqs">
+            <NavLink className="icon-button desktop-nav-action" to="/faqs">
               FAQ
             </NavLink>
-            <NavLink className="mobile-core-action" to="/login">
+            <NavLink className="icon-button desktop-nav-action" to="/login">
               로그인
             </NavLink>
             <NavLink className="button mobile-core-action" to="/signup">
