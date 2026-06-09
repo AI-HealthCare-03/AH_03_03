@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import base64
 import csv
+import difflib
 import json
 import os
 import sys
@@ -15,13 +16,22 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from metrics import compute_metrics, split_food_names
-from prompts import FOOD_EVAL_PROMPT
+from metrics import (
+    compute_metrics,
+    has_any_food_hit,
+    is_exact_canonical_match,
+    is_exact_raw_match,
+    row_precision_recall_f1,
+    split_food_names,
+)
+from prompts import build_food_eval_prompt
 from schemas import LabelRow, PredictionRow
 
 from ai_runtime.cv.food.matcher import match_food_name
+from ai_runtime.cv.food.normalization import normalize_food_name
 
 DEFAULT_MODEL = "gpt-4o-mini"
+UNKNOWN_ALLOWED_FOOD = "unknown"
 
 
 class GptJsonParseError(ValueError):
@@ -35,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None, help="Limit number of rows for smoke runs.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="OpenAI vision model name.")
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY", help="Environment variable containing API key.")
+    parser.add_argument("--allowed-foods", default=None, help="Optional JSON list of allowed food labels.")
     return parser.parse_args()
 
 
@@ -45,12 +56,14 @@ async def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     labels = load_labels(labels_path, limit=args.limit)
+    allowed_foods = load_allowed_foods(Path(args.allowed_foods)) if args.allowed_foods else None
     predictions = [
         await evaluate_image(
             label=label,
             labels_dir=labels_path.parent,
             model=args.model,
             api_key=os.getenv(args.api_key_env),
+            allowed_foods=allowed_foods,
         )
         for label in labels
     ]
@@ -86,12 +99,21 @@ def load_labels(labels_path: Path, *, limit: int | None = None) -> list[LabelRow
     return rows
 
 
+def load_allowed_foods(path: Path) -> list[str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        msg = f"allowed_foods must be a JSON list: {path}"
+        raise ValueError(msg)
+    return [food_name for item in payload if (food_name := str(item).strip())]
+
+
 async def evaluate_image(
     *,
     label: LabelRow,
     labels_dir: Path,
     model: str,
     api_key: str | None,
+    allowed_foods: list[str] | None,
 ) -> PredictionRow:
     started = time.perf_counter()
     if not label.image_exists:
@@ -100,6 +122,7 @@ async def evaluate_image(
             started=started,
             error_type="data_missing",
             error_message="image_exists=false in labels CSV",
+            constrained_by_allowed_foods=bool(allowed_foods),
         )
 
     image_path = _resolve_image_path(label.image_path, labels_dir)
@@ -109,6 +132,7 @@ async def evaluate_image(
             started=started,
             error_type="data_missing",
             error_message=str(image_path),
+            constrained_by_allowed_foods=bool(allowed_foods),
         )
     if not api_key:
         return _failure_row(
@@ -116,6 +140,7 @@ async def evaluate_image(
             started=started,
             error_type="api_key_missing",
             error_message="OPENAI_API_KEY is not set",
+            constrained_by_allowed_foods=bool(allowed_foods),
         )
 
     try:
@@ -124,6 +149,7 @@ async def evaluate_image(
             media_type=_media_type_for_image(image_path),
             model=model,
             api_key=api_key,
+            allowed_foods=allowed_foods,
         )
     except GptJsonParseError as exc:
         return PredictionRow(
@@ -136,6 +162,7 @@ async def evaluate_image(
             latency_seconds=round(time.perf_counter() - started, 4),
             error_type=type(exc).__name__,
             error_message=str(exc),
+            constrained_by_allowed_foods=bool(allowed_foods),
         )
     except Exception as exc:
         return _failure_row(
@@ -143,17 +170,24 @@ async def evaluate_image(
             started=started,
             error_type=type(exc).__name__,
             error_message=str(exc),
+            constrained_by_allowed_foods=bool(allowed_foods),
         )
 
     raw_food_names = extract_food_names(raw_response)
+    confidence = extract_avg_confidence(raw_response)
+    allowed_food_names, invalid_label_count = constrain_food_names(raw_food_names, allowed_foods)
     canonical_food_names, unmatched_food_names = match_canonical_food_names(raw_food_names)
     return PredictionRow(
         row_id=label.row_id,
         image_path=label.image_path,
         expected_foods=label.expected_foods,
         raw_food_names=raw_food_names,
+        allowed_food_names=allowed_food_names,
         canonical_food_names=canonical_food_names,
         unmatched_food_names=unmatched_food_names,
+        invalid_label_count=invalid_label_count,
+        constrained_by_allowed_foods=bool(allowed_foods),
+        confidence=confidence,
         api_success=True,
         json_parse_success=True,
         empty_result=not raw_food_names,
@@ -168,10 +202,12 @@ async def call_gpt_vision(
     media_type: str,
     model: str,
     api_key: str,
+    allowed_foods: list[str] | None,
 ) -> dict[str, Any]:
     from openai import AsyncOpenAI
 
     data_url = f"data:{media_type};base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+    prompt = build_food_eval_prompt(allowed_foods)
     client = AsyncOpenAI(api_key=api_key, timeout=20.0, max_retries=2)
     response = await client.chat.completions.create(
         model=model,
@@ -180,7 +216,7 @@ async def call_gpt_vision(
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": FOOD_EVAL_PROMPT},
+                    {"type": "text", "text": prompt},
                     {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
                 ],
             }
@@ -214,6 +250,23 @@ def extract_food_names(raw_response: dict[str, Any]) -> list[str]:
     ]
 
 
+def extract_avg_confidence(raw_response: dict[str, Any]) -> float | None:
+    foods = raw_response.get("foods")
+    if not isinstance(foods, list):
+        return None
+    confidences: list[float] = []
+    for food in foods:
+        if not isinstance(food, dict):
+            continue
+        try:
+            confidences.append(float(food.get("confidence")))
+        except (TypeError, ValueError):
+            continue
+    if not confidences:
+        return None
+    return round(sum(confidences) / len(confidences), 4)
+
+
 def match_canonical_food_names(raw_food_names: list[str]) -> tuple[list[str], list[str]]:
     canonical_food_names: list[str] = []
     unmatched_food_names: list[str] = []
@@ -227,14 +280,60 @@ def match_canonical_food_names(raw_food_names: list[str]) -> tuple[list[str], li
     return canonical_food_names, unmatched_food_names
 
 
+def constrain_food_names(
+    raw_food_names: list[str],
+    allowed_foods: list[str] | None,
+) -> tuple[list[str], int]:
+    if not allowed_foods:
+        return [], 0
+
+    allowed_index = {_normalize_for_allowed(food_name): food_name for food_name in allowed_foods}
+    allowed_food_names: list[str] = []
+    invalid_label_count = 0
+    for raw_name in raw_food_names:
+        normalized_raw = _normalize_for_allowed(raw_name)
+        if normalized_raw in allowed_index:
+            allowed_food_names.append(allowed_index[normalized_raw])
+            continue
+
+        invalid_label_count += 1
+        allowed_food_names.append(_correct_to_allowed_food(raw_name, allowed_index) or UNKNOWN_ALLOWED_FOOD)
+    return allowed_food_names, invalid_label_count
+
+
+def _correct_to_allowed_food(raw_name: str, allowed_index: dict[str, str]) -> str | None:
+    match = match_food_name(raw_name)
+    for candidate in (match.matched_food_name, match.query_name):
+        normalized_candidate = _normalize_for_allowed(candidate or "")
+        if normalized_candidate in allowed_index:
+            return allowed_index[normalized_candidate]
+
+    close_matches = difflib.get_close_matches(_normalize_for_allowed(raw_name), allowed_index.keys(), n=1, cutoff=0.86)
+    if close_matches:
+        return allowed_index[close_matches[0]]
+    return None
+
+
 def write_predictions_csv(path: Path, predictions: list[PredictionRow]) -> None:
     fieldnames = [
         "row_id",
         "image_path",
         "expected_foods",
         "raw_food_names",
+        "allowed_food_names",
         "canonical_food_names",
         "unmatched_food_names",
+        "invalid_label_count",
+        "confidence",
+        "constrained_by_allowed_foods",
+        "status",
+        "failure_reason",
+        "exact_match_raw",
+        "exact_match_canonical",
+        "any_hit",
+        "precision",
+        "recall",
+        "f1_score",
         "api_success",
         "json_parse_success",
         "empty_result",
@@ -246,14 +345,27 @@ def write_predictions_csv(path: Path, predictions: list[PredictionRow]) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for row in predictions:
+            row_scores = row_precision_recall_f1(row)
             writer.writerow(
                 {
                     "row_id": row.row_id,
                     "image_path": row.image_path,
                     "expected_foods": "|".join(row.expected_foods),
                     "raw_food_names": "|".join(row.raw_food_names),
+                    "allowed_food_names": "|".join(row.allowed_food_names),
                     "canonical_food_names": "|".join(row.canonical_food_names),
                     "unmatched_food_names": "|".join(row.unmatched_food_names),
+                    "invalid_label_count": row.invalid_label_count,
+                    "confidence": row.confidence if row.confidence is not None else "",
+                    "constrained_by_allowed_foods": row.constrained_by_allowed_foods,
+                    "status": row_status(row),
+                    "failure_reason": row.error_message or "",
+                    "exact_match_raw": is_exact_raw_match(row),
+                    "exact_match_canonical": is_exact_canonical_match(row),
+                    "any_hit": has_any_food_hit(row),
+                    "precision": row_scores["precision"],
+                    "recall": row_scores["recall"],
+                    "f1_score": row_scores["f1_score"],
                     "api_success": row.api_success,
                     "json_parse_success": row.json_parse_success,
                     "empty_result": row.empty_result,
@@ -269,37 +381,97 @@ def write_metrics_json(path: Path, metrics: dict[str, Any]) -> None:
 
 
 def write_report(path: Path, metrics: dict[str, Any], predictions: list[PredictionRow]) -> None:
+    class_distribution = metrics.get("class_distribution")
+    class_level_metrics = metrics.get("class_level_metrics")
+    confidence_bins = metrics.get("confidence_bins")
     lines = [
         "# GPT Vision Food Eval Report",
         "",
-        "## Data Missing Policy",
+        "## 1. 평가 요약",
         "",
-        "`image_exists=false` rows and local `image_path` misses are counted as `data_missing`.",
-        "They are excluded from model-quality denominators such as API success, JSON parse success, and match rates.",
+        f"- total_rows: {metrics['total_rows']}",
+        f"- evaluable_image_count: {metrics['evaluable_image_count']}",
+        f"- raw_exact_match_rate: {metrics['raw_exact_match_rate']}",
+        f"- canonical_exact_match_rate: {metrics['canonical_exact_match_rate']}",
+        f"- precision / recall / f1: {metrics['precision']} / {metrics['recall']} / {metrics['f1_score']}",
         "",
-        "## Metrics",
+        "## 2. 데이터 누락/평가 가능 이미지 수",
+        "",
+        f"- data_missing_count: {metrics['data_missing_count']}",
+        f"- api_failed_count: {metrics['api_failed_count']}",
+        f"- json_parse_failed_count: {metrics['json_parse_failed_count']}",
+        f"- empty_result_count: {metrics['empty_result_count']}",
+        "",
+        "image_exists=false 또는 image_path 없음은 data_missing으로 분리했고 모델 실패로 계산하지 않았음.",
+        "",
+        "## 3. Raw 기준 결과",
+        "",
+        f"- raw_exact_match_rate: {metrics['raw_exact_match_rate']}",
+        f"- any_hit_rate: {metrics['any_hit_rate']}",
+        "",
+        "## 4. Canonical matcher 기준 결과",
+        "",
+        f"- canonical_exact_match_rate: {metrics['canonical_exact_match_rate']}",
+        f"- canonical_any_hit_rate: {metrics['canonical_any_hit_rate']}",
+        "",
+        "raw 기준과 canonical 기준을 분리해 음식명 흔들림과 서비스 매칭 후 성능을 따로 평가함.",
+        "",
+        "## 5. Allowed foods constrained 기준 결과",
+        "",
+        f"- constrained_by_allowed_foods: {metrics['constrained_by_allowed_foods']}",
+        f"- constrained_exact_match_rate: {metrics['constrained_exact_match_rate']}",
+        f"- constrained_any_hit_rate: {metrics['constrained_any_hit_rate']}",
+        f"- invalid_label_count: {metrics['invalid_label_count']}",
+        f"- invalid_label_rate: {metrics['invalid_label_rate']}",
+        f"- unknown_count: {metrics['unknown_count']}",
+        f"- unknown_rate: {metrics['unknown_rate']}",
+        "",
+        "allowed_foods 제한 평가가 켜진 경우 invalid_label_rate로 GPT가 허용 목록 밖 음식을 생성하는 비율을 측정함.",
+        "",
+        "## 6. Precision / Recall / F1",
+        "",
+        f"- precision: {metrics['precision']}",
+        f"- recall: {metrics['recall']}",
+        f"- f1_score: {metrics['f1_score']}",
+        f"- macro_precision: {metrics['macro_precision']}",
+        f"- macro_recall: {metrics['macro_recall']}",
+        f"- macro_f1_score: {metrics['macro_f1_score']}",
+        "",
+        "## 7. Confidence 구간별 정확도",
+        "",
+        f"- avg_confidence: {metrics['avg_confidence']}",
+        f"- confidence_correct_avg: {metrics['confidence_correct_avg']}",
+        f"- confidence_wrong_avg: {metrics['confidence_wrong_avg']}",
         "",
     ]
-    for key, value in metrics.items():
-        if key == "class_distribution":
-            continue
-        lines.append(f"- `{key}`: {value}")
+    if isinstance(confidence_bins, dict):
+        for bin_name, bin_metrics in confidence_bins.items():
+            lines.append(
+                f"- {bin_name}: sample_count={bin_metrics['sample_count']}, accuracy={bin_metrics['accuracy']}"
+            )
     lines.extend(
         [
             "",
-            "## Class Distribution",
+            "## 8. 클래스별 결과",
             "",
         ]
     )
-    class_distribution = metrics.get("class_distribution")
     if isinstance(class_distribution, dict) and class_distribution:
+        lines.append("### Class Distribution")
         lines.extend(f"- `{food_name}`: {count}" for food_name, count in class_distribution.items())
-    else:
-        lines.append("- None")
+    if isinstance(class_level_metrics, list) and class_level_metrics:
+        lines.extend(["", "### Class Level Metrics"])
+        for row in class_level_metrics:
+            lines.append(
+                "- "
+                f"{row['expected_food']}: sample_count={row['sample_count']}, "
+                f"exact={row['exact_match_rate']}, any_hit={row['any_hit_rate']}, "
+                f"precision={row['precision']}, recall={row['recall']}, f1={row['f1_score']}"
+            )
     lines.extend(
         [
             "",
-            "## Failure Cases",
+            "## 9. 실패 케이스 요약",
             "",
         ]
     )
@@ -307,9 +479,33 @@ def write_report(path: Path, metrics: dict[str, Any], predictions: list[Predicti
     if not failures:
         lines.append("- None")
     else:
-        for row in failures:
-            lines.append(f"- row={row.row_id} image={row.image_path} error={row.error_type or 'empty_result'}")
+        for row in failures[:100]:
+            lines.append(
+                f"- row={row.row_id} image={row.image_path} status={row_status(row)} reason={row.error_message or ''}"
+            )
+        if len(failures) > 100:
+            lines.append(f"- ... truncated {len(failures) - 100} additional failure rows")
+    lines.extend(
+        [
+            "",
+            "## 10. 해석",
+            "",
+            "- image_exists=false 또는 image_path 없음은 data_missing으로 분리했고 모델 실패로 계산하지 않았음.",
+            "- raw 기준과 canonical 기준을 분리해 음식명 흔들림과 서비스 매칭 후 성능을 따로 평가함.",
+            "- allowed_foods 제한 평가가 켜진 경우 invalid_label_rate로 GPT가 허용 목록 밖 음식을 생성하는 비율을 측정함.",
+        ]
+    )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def row_status(row: PredictionRow) -> str:
+    if row.error_type == "data_missing":
+        return "data_missing"
+    if row.error_type:
+        return "failed"
+    if row.empty_result:
+        return "empty_result"
+    return "success"
 
 
 def _failure_row(
@@ -318,6 +514,7 @@ def _failure_row(
     started: float,
     error_type: str,
     error_message: str,
+    constrained_by_allowed_foods: bool,
 ) -> PredictionRow:
     return PredictionRow(
         row_id=label.row_id,
@@ -329,6 +526,7 @@ def _failure_row(
         latency_seconds=round(time.perf_counter() - started, 4),
         error_type=error_type,
         error_message=error_message,
+        constrained_by_allowed_foods=constrained_by_allowed_foods,
     )
 
 
@@ -346,6 +544,10 @@ def _parse_bool(value: object, *, default: bool) -> bool:
     if normalized in {"0", "false", "no", "n"}:
         return False
     return default
+
+
+def _normalize_for_allowed(value: str) -> str:
+    return normalize_food_name(value).casefold()
 
 
 def _media_type_for_image(path: Path) -> str:

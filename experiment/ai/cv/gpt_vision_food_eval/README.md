@@ -75,13 +75,36 @@ The output CSV columns are:
 
 The builder uses JSON `"Code Name"` as `image_filename`. For `expected_foods`, it prefers the nearest Korean parent folder name such as `군고구마 json` -> `군고구마`; if no Korean folder label is found, it falls back to JSON `"Name"`. If `--image-root` is provided, the builder matches `image_filename` to local jpg/png files and writes an `image_path` relative to the generated CSV so `run_gpt_vision_eval.py` can read it directly. Broken JSON files and missing images are summarized in `outputs/aihub_label_summary.json`.
 
+The builder also writes `outputs/allowed_foods.json`, a unique list of generated `expected_foods` labels.
+
+## Constrained Label Eval
+
+Free-form GPT Vision evaluation lets the model produce arbitrary food names. Constrained evaluation passes `allowed_foods.json` to the prompt and asks the model to return only labels from that list:
+
+```bash
+uv run python experiment/ai/cv/gpt_vision_food_eval/run_gpt_vision_eval.py \
+  --labels experiment/ai/cv/gpt_vision_food_eval/data/labels/aihub_labels_sample.csv \
+  --allowed-foods experiment/ai/cv/gpt_vision_food_eval/outputs/allowed_foods.json \
+  --limit 5
+```
+
+If GPT returns a food name outside the allowed list, the runner records it as an invalid label, then tries to correct it through the runtime normalization/matcher layer and a conservative string match. Uncorrectable labels are written as `unknown`.
+
+This mode can increase prompt size and API cost when `allowed_foods.json` is large. For broad full-dataset evaluations, consider limiting the allowed list by class group or running smaller batches.
+
 ## Outputs
 
-Outputs are written to `experiment/ai/cv/gpt_vision_food_eval/outputs/` by default:
+Evaluation outputs are written to `<labels_dir>/outputs/` by default:
 
 - `predictions.csv`
 - `metrics.json`
 - `report.md`
+
+Builder outputs are written to `experiment/ai/cv/gpt_vision_food_eval/outputs/`:
+
+- `allowed_foods.json`
+- `aihub_label_summary.json`
+- `aihub_missing_images.csv`
 
 ## Metrics
 
@@ -90,7 +113,10 @@ Outputs are written to `experiment/ai/cv/gpt_vision_food_eval/outputs/` by defau
 - `json_parse_success_rate`
 - `exact_match_rate_raw`
 - `exact_match_rate_canonical`
+- `constrained_exact_match_rate`
 - `any_food_hit_rate`
+- `constrained_any_hit_rate`
+- `invalid_label_rate`
 - `unmatched_food_rate`
 - `empty_result_rate`
 - `avg_latency_seconds`

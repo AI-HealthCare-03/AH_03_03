@@ -18,8 +18,12 @@ class PredictionRow:
     image_path: str
     expected_foods: list[str]
     raw_food_names: list[str] = field(default_factory=list)
+    allowed_food_names: list[str] = field(default_factory=list)
     canonical_food_names: list[str] = field(default_factory=list)
     unmatched_food_names: list[str] = field(default_factory=list)
+    invalid_label_count: int = 0
+    constrained_by_allowed_foods: bool = False
+    confidence: float | None = None
     api_success: bool = False
     json_parse_success: bool = False
     empty_result: bool = False

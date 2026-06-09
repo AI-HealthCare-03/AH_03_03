@@ -102,6 +102,7 @@ def main() -> None:
     output_dir = Path(__file__).resolve().parent / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
     missing_report_path = output_dir / "aihub_missing_images.csv"
+    allowed_foods_path = output_dir / "allowed_foods.json"
 
     image_root = Path(args.image_root) if args.image_root else None
     if args.json_root:
@@ -120,10 +121,13 @@ def main() -> None:
         )
 
     write_labels_csv(output_path, aggregates)
+    write_allowed_foods_json(allowed_foods_path, aggregates)
     write_missing_images_csv(missing_report_path, aggregates, image_root=image_root)
+    summary["allowed_foods_path"] = str(allowed_foods_path)
     summary["missing_report_path"] = str(missing_report_path)
     write_summary(output_dir / "aihub_label_summary.json", summary)
     print(f"Wrote {output_path}")
+    print(f"Wrote {allowed_foods_path}")
     print(f"Wrote {output_dir / 'aihub_label_summary.json'}")
     print(f"Wrote {missing_report_path}")
 
@@ -358,6 +362,11 @@ def write_labels_csv(output_path: Path, aggregates: list[LabelAggregate]) -> Non
                     "cat_3": aggregate.cat_3,
                 }
             )
+
+
+def write_allowed_foods_json(path: Path, aggregates: list[LabelAggregate]) -> None:
+    allowed_foods = sorted({food for aggregate in aggregates for food in aggregate.expected_foods if food})
+    path.write_text(json.dumps(allowed_foods, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def write_missing_images_csv(
