@@ -482,7 +482,7 @@ export default function HealthProfilePage() {
       <div className="page-header">
         <div>
           <h1>필수 건강정보 관리</h1>
-          <p>모델 x1 기본 입력과 x2 정밀 검진값을 한 화면에서 관리합니다.</p>
+          <p>기본 건강 정보와 정밀 건강 정보를 한 화면에서 관리합니다.</p>
         </div>
         <div className="button-row">
           {!editing && (
@@ -501,7 +501,7 @@ export default function HealthProfilePage() {
         <Card title="분석 준비도">
           <div className="readiness-card">
             <strong>
-              x1 기본 입력 {completedRequiredCount} / {x1RequiredFields.length}
+              기본 건강 정보 입력 {completedRequiredCount} / {x1RequiredFields.length}
             </strong>
             <div className="progress-bar">
               <div
@@ -523,7 +523,7 @@ export default function HealthProfilePage() {
               )}
             </div>
             <div className="state-box">
-              정밀 분석 입력 {completedX2Count} / {x2Fields.length}
+              정밀 건강 정보 입력 {completedX2Count} / {x2Fields.length}
               {backendMissingLabels.length > 0 && (
                 <p>기본 분석 부족 항목: {backendMissingLabels.join(", ")}</p>
               )}

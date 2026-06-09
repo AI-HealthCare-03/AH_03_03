@@ -9,18 +9,34 @@ import io
 import logging
 from enum import StrEnum
 
-import pdf2image
 import pdfplumber
+
+try:
+    import pdf2image as _pdf2image
+except ModuleNotFoundError:
+    _pdf2image = None
 
 logger = logging.getLogger(__name__)
 
 MIN_TEXT_LENGTH = 50
 MAX_PAGES: int | None = None
+pdf2image = _pdf2image
+
+
+class PdfImageDependencyError(RuntimeError):
+    """Raised when optional PDF image conversion dependencies are not installed."""
 
 
 class PdfType(StrEnum):
     TEXT = "text"
     SCAN = "scan"
+
+
+def _get_pdf2image_module():
+    if pdf2image is None:
+        msg = "pdf2image is required for scanned checkup PDF OCR. Install OCR dependencies before converting PDFs."
+        raise PdfImageDependencyError(msg)
+    return pdf2image
 
 
 def detect_pdf_type(pdf_bytes):
@@ -53,12 +69,13 @@ def extract_text_from_pdf(pdf_bytes):
 
 
 def pdf_to_images(pdf_bytes, dpi=200):
+    pdf2image_module = _get_pdf2image_module()
     image_bytes_list = []
     try:
         options = {"dpi": dpi, "first_page": 1}
         if MAX_PAGES is not None:
             options["last_page"] = MAX_PAGES
-        images = pdf2image.convert_from_bytes(pdf_bytes, **options)
+        images = pdf2image_module.convert_from_bytes(pdf_bytes, **options)
         for i, img in enumerate(images):
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=95)

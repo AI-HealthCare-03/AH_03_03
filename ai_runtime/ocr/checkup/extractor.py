@@ -7,27 +7,48 @@ PaddleOCR 2.7.3 기반 건강검진표 수치 추출 모듈.
 import logging
 import re
 
-from paddleocr import PaddleOCR
+try:
+    from paddleocr import PaddleOCR as _PaddleOCR
+except ModuleNotFoundError:
+    _PaddleOCR = None
 
-from .pdf_handler import PdfType, detect_pdf_type, extract_text_from_pdf, extract_text_from_health_check_pdf, parse_text_lines, pdf_to_images
+from .pdf_handler import PdfType, detect_pdf_type, extract_text_from_pdf, parse_text_lines, pdf_to_images
 from .preprocessor import preprocess_for_ocr
 from .schemas import CheckupOcrData, OcrStatus
 
 logger = logging.getLogger(__name__)
 
 # ── PaddleOCR 싱글톤 ──────────────────────────────────────────────────────────
-
+PaddleOCR = _PaddleOCR
 _ocr_engine = None
+
+
+class CheckupOcrDependencyError(RuntimeError):
+    """Raised when optional OCR dependencies are not installed."""
+
+
+def _get_paddle_ocr_class():
+    if PaddleOCR is None:
+        msg = "paddleocr is required for checkup OCR. Install OCR dependencies before running OCR."
+        raise CheckupOcrDependencyError(msg)
+    return PaddleOCR
+
 
 def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
         logger.info("PaddleOCR 모델 로딩 중...")
-        _ocr_engine = PaddleOCR(
-            use_angle_cls=False,
-            lang="korean",
-            enable_mkldnn=False
-        )
+        ocr_cls = _get_paddle_ocr_class()
+        try:
+            _ocr_engine = ocr_cls(
+                lang="korean",
+                use_textline_orientation=True,
+            )
+        except ValueError:
+            _ocr_engine = ocr_cls(
+                use_angle_cls=True,
+                lang="korean",
+            )
         logger.info("PaddleOCR 모델 로딩 완료")
     return _ocr_engine
 
@@ -141,76 +162,36 @@ def calculate_bmi(height_cm, weight_kg) -> float | None:
     return None
 
 
-def parse_blood_pressure(text_lines, is_health_check=False):
-    for i, (text, _) in enumerate(text_lines):
+def parse_blood_pressure(text_lines):
+    for text, _ in text_lines:
         if is_keyword_match(text, FIELD_KEYWORDS["systolic_bp"]):
-            if is_health_check:
-                for k in range(0, len(text_lines)):
-                    next_text, _ = text_lines[k]
-                    if 'mmHg' in next_text:
-                        if '/' in next_text:
-                            parts = next_text.split('/')
-                            systolic_nums = [n for n in extract_numbers(parts[0]) if 60 <= n <= 250]
-                            diastolic_nums = [n for n in extract_numbers(parts[1]) if 40 <= n <= 150]
-                            if systolic_nums and diastolic_nums:
-                                # 공단 원본: 슬래시 앞이 수축기
-                                s, d = systolic_nums[-1], diastolic_nums[0]
-                                return (s, d) if s > d else (d, s)
-                            if diastolic_nums and not systolic_nums:
-                                # 합성 구조: 슬래시 뒤 첫 번째가 이완기, 줄 맨 끝이 수축기
-                                all_nums = extract_numbers(next_text)
-                                bp_nums = [n for n in all_nums if 60 <= n <= 250]
-                                if bp_nums:
-                                    s = bp_nums[-1]
-                                    d = diastolic_nums[0]
-                                    if validate_value("systolic_bp", s) and validate_value("diastolic_bp", d) and s != d:
-                                        return (s, d) if s > d else (d, s)
-                        # mmHg 줄 앞뒤 3줄에서 슬래시 수치 탐색
-                        for offset in [-3, -2, -1, 1, 2, 3]:
-                            idx = k + offset
-                            if 0 <= idx < len(text_lines):
-                                nearby_text, _ = text_lines[idx]
-                                if '/' in nearby_text and 'mmHg' not in nearby_text:
-                                    parts = nearby_text.split('/')
-                                    if len(parts) == 2:
-                                        systolic_nums = [n for n in extract_numbers(parts[0]) if 60 <= n <= 250]
-                                        diastolic_nums = [n for n in extract_numbers(parts[1]) if 40 <= n <= 150]
-                                        if systolic_nums and len(diastolic_nums) == 1:
-                                            s, d = systolic_nums[-1], diastolic_nums[0]
-                                            return (s, d) if s > d else (d, s)
-            else:
-                if '/' in text:
-                    parts = text.split('/')
-                    systolic_nums = [n for n in extract_numbers(parts[0]) if 60 <= n <= 250]
-                    diastolic_nums = [n for n in extract_numbers(parts[1]) if 40 <= n <= 150] if len(parts) > 1 else []
-                    if systolic_nums and diastolic_nums:
-                        return systolic_nums[-1], diastolic_nums[0]
-                bp_candidates = [n for n in extract_numbers(text) if 40 <= n <= 250]
-                if len(bp_candidates) >= 2:
-                    first, second = bp_candidates[:2]
-                    return max(first, second), min(first, second)
-                if len(bp_candidates) == 1:
-                    return bp_candidates[0], None
+            bp_candidates = [n for n in extract_numbers(text) if 40 <= n <= 250]
+            if len(bp_candidates) >= 2:
+                first, second = bp_candidates[:2]
+                return max(first, second), min(first, second)
+            if len(bp_candidates) == 1:
+                return bp_candidates[0], None
     return None, None
 
 
 def parse_height_weight(text_lines):
+    """
+    키와 몸무게를 파싱합니다.
+    같은 줄 또는 이후 줄에서 순서대로 탐색합니다.
+    """
     for i, (text, _) in enumerate(text_lines):
         if is_keyword_match(text, FIELD_KEYWORDS["height_cm"]):
-            context = text_lines[i : i + 15]
+            # 현재 줄 + 이후 6줄 안에서 키/몸무게 탐색
+            context = text_lines[i : i + 7]
             all_nums = []
             for ctx_text, _ in context:
-                # BMI 줄의 수치는 몸무게 후보로 잘못 집힐 수 있으므로 제외
-                if is_keyword_match(ctx_text, FIELD_KEYWORDS["bmi"]):
-                    continue
                 all_nums.extend(extract_numbers(ctx_text))
-            # 키 범위: 100~250, 단 혈압 범위(60~180)와 겹치므로 140 이상만 허용
-            candidates_h = [n for n in all_nums if 140 <= n <= 220]
+            candidates_h = [n for n in all_nums if 100 <= n <= 250]
             if not candidates_h:
                 continue
             height = candidates_h[0]
             height_index = all_nums.index(height)
-            weight_pool = all_nums[height_index + 1:]
+            weight_pool = all_nums[height_index + 1 :] or all_nums
             candidates_w = [n for n in weight_pool if 20 <= n <= 150 and n != height and n < height]
             if not candidates_w:
                 candidates_w = [n for n in weight_pool if 20 <= n <= 150 and n != height]
@@ -223,10 +204,9 @@ def parse_hb(text_lines) -> tuple[float | None, float | None]:
     """
     혈색소(Hb) 수치를 파싱합니다.
     당화혈색소(HbA1c)와 혼동하지 않도록 "당화" 포함 줄은 제외합니다.
-    키워드와 수치가 멀리 떨어진 공단 PDF 양식도 처리합니다.
     """
-    hb_keyword_idx = None
     for i, (text, conf) in enumerate(text_lines):
+        # 당화혈색소 줄은 스킵
         if "당화" in text:
             continue
         if not is_keyword_match(text, FIELD_KEYWORDS["hb"]):
@@ -235,20 +215,14 @@ def parse_hb(text_lines) -> tuple[float | None, float | None]:
         nums = [n for n in extract_numbers(text) if HB_RANGE[0] <= n <= HB_RANGE[1]]
         if nums:
             return nums[0], conf
-        hb_keyword_idx = i
-        break
-
-    if hb_keyword_idx is None:
-        return None, None
-
-    # 키워드 이후 전체 줄에서 탐색 (공단 PDF는 수치가 멀리 있음)
-    for j in range(hb_keyword_idx + 1, len(text_lines)):
-        next_text, next_conf = text_lines[j]
-        if "당화" in next_text:
-            continue
-        nums = [n for n in extract_numbers(next_text) if HB_RANGE[0] <= n <= HB_RANGE[1]]
-        if nums:
-            return nums[0], next_conf
+        # 다음 2줄 탐색
+        for j in range(i + 1, min(i + 3, len(text_lines))):
+            next_text, next_conf = text_lines[j]
+            if "당화" in next_text:
+                break
+            nums = [n for n in extract_numbers(next_text) if HB_RANGE[0] <= n <= HB_RANGE[1]]
+            if nums:
+                return nums[0], next_conf
     return None, None
 
 
@@ -280,16 +254,11 @@ def parse_bmi(text_lines) -> float | None:
 
 
 def _extract_value_from_context(text_lines, i, text):
-    # 참고치 패턴 제거 후 첫 번째 유효 숫자 추출
-    ref_pattern = re.compile(r"\d+\.?\d*\s*(미만|이상|이하|초과)")
-    cleaned = ref_pattern.sub("", text)
-    value = extract_first_number(cleaned)
+    value = extract_first_number(text)
     confidence = text_lines[i][1]
     if value is None:
-        for j in range(i + 1, min(i + 15, len(text_lines))):
-            next_text = text_lines[j][0]
-            next_cleaned = ref_pattern.sub("", next_text)
-            value = extract_first_number(next_cleaned)
+        for j in range(i + 1, min(i + 3, len(text_lines))):
+            value = extract_first_number(text_lines[j][0])
             if value is not None:
                 confidence = text_lines[j][1]
                 break
@@ -308,11 +277,10 @@ def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
                 continue
 
             # 이상지질혈증 4개 필드는 비해당 먼저 체크
-            # extractor.py의 _parse_general_fields 함수 내부
             if field in DYSLIPIDEMIA_FIELDS:
+                # 현재 줄 + 다음 2줄 안에 비해당 있으면 비해당으로 처리
                 check_lines = [text] + [text_lines[j][0] for j in range(i + 1, min(i + 3, len(text_lines)))]
                 if any(is_not_applicable(line) for line in check_lines):
-                    extracted[field] = "비해당"  # ← None 대신 "비해당"으로 채움
                     continue
 
             value, confidence = _extract_value_from_context(text_lines, i, text)
@@ -323,13 +291,13 @@ def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
                 logger.info("필드 추출 | %s = %s (신뢰도: %.2f)", field, value, confidence)
 
 
-def parse_from_text_lines(text_lines, is_health_check=False):
+def parse_from_text_lines(text_lines):
     raw_texts = [t for t, _ in text_lines]
     extracted: dict = {f: None for f in FIELD_KEYWORDS}
     low_conf = []
 
     # 혈압
-    systolic, diastolic = parse_blood_pressure(text_lines, is_health_check=is_health_check)
+    systolic, diastolic = parse_blood_pressure(text_lines)
     if systolic and validate_value("systolic_bp", systolic):
         extracted["systolic_bp"] = systolic
     if diastolic and validate_value("diastolic_bp", diastolic):
@@ -417,44 +385,30 @@ async def run_ocr(image_bytes):
     return data, low_conf, raw, status
 
 
-async def run_ocr_on_pdf(pdf_bytes, filename: str = ""):
-    is_health_check = filename.startswith("health_check")
-    # 기존
-    if is_health_check:
-        texts = extract_text_from_health_check_pdf(pdf_bytes)
-        page_text_lines = [[(line, 1.0) for line in parse_text_lines([text])] for text in texts]
+async def run_ocr_on_pdf(pdf_bytes):
+    pdf_type = detect_pdf_type(pdf_bytes)
+    page_text_lines: list[list[tuple[str, float]]] = []
 
-    # 변경
-    if is_health_check:
-        texts = extract_text_from_health_check_pdf(pdf_bytes)
-        if texts:
-            page_text_lines = [[(line, 1.0) for line in parse_text_lines([text])] for text in texts]
-        else:
-            image_bytes_list = pdf_to_images(pdf_bytes)
-            if not image_bytes_list:
-                return CheckupOcrData(), [], [], OcrStatus.FAILED
-            page_text_lines = []
-            for img_bytes in image_bytes_list:
-                page_lines = run_ocr_on_image(img_bytes)
-                page_text_lines.append(page_lines)
+    if pdf_type == PdfType.TEXT:
+        logger.info("텍스트 PDF 처리 중...")
+        texts = extract_text_from_pdf(pdf_bytes)
+        page_text_lines = [[(line, 1.0) for line in parse_text_lines([text])] for text in texts]
     else:
-        pdf_type = detect_pdf_type(pdf_bytes)
-        page_text_lines = []
-        if pdf_type == PdfType.TEXT:
-            texts = extract_text_from_pdf(pdf_bytes)
-            page_text_lines = [[(line, 1.0) for line in parse_text_lines([text])] for text in texts]
-        else:
-            image_bytes_list = pdf_to_images(pdf_bytes)
-            if not image_bytes_list:
-                return CheckupOcrData(), [], [], OcrStatus.FAILED
-            for i, img_bytes in enumerate(image_bytes_list):
-                page_lines = run_ocr_on_image(img_bytes)
-                page_text_lines.append(page_lines)
+        logger.info("스캔 PDF 처리 중...")
+        image_bytes_list = pdf_to_images(pdf_bytes)
+        if not image_bytes_list:
+            logger.error("PDF 이미지 변환 실패")
+            return CheckupOcrData(), [], [], OcrStatus.FAILED
+        for i, img_bytes in enumerate(image_bytes_list):
+            logger.info("페이지 %d OCR 실행 중...", i + 1)
+            page_lines = run_ocr_on_image(img_bytes)
+            page_text_lines.append(page_lines)
 
     measurement_lines = select_measurement_page_lines(page_text_lines)
-    data, low_conf, raw = parse_from_text_lines(measurement_lines, is_health_check=is_health_check)
+    data, low_conf, raw = parse_from_text_lines(measurement_lines)
     status = determine_status(data, low_conf)
     if status == OcrStatus.FAILED and measurement_lines != flatten_page_lines(page_text_lines):
+        logger.info("측정값 페이지 우선 추출 실패, 전체 PDF 텍스트 fallback")
         data, low_conf, raw = parse_from_text_lines(flatten_page_lines(page_text_lines))
         status = determine_status(data, low_conf)
     return data, low_conf, raw, status

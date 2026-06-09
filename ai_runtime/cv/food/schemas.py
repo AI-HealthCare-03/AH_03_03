@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from ai_runtime.cv.food.matcher import match_food_name
+
 FoodDetectionProvider = Literal["cv_model", "gpt_vision", "rule_based_food_detection"]
 
 CV_CONFIDENCE_THRESHOLD = 0.75
@@ -29,11 +31,25 @@ class FoodDetectionCandidateSet:
         return bool(self.detected_foods) and not self.needs_review
 
     def to_scorer_foods(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "name": food_name,
-                "confidence": self.confidence,
-                "provider": self.provider,
-            }
-            for food_name in self.detected_foods
-        ]
+        foods: list[dict[str, Any]] = []
+        for food_name in self.detected_foods:
+            match = match_food_name(food_name)
+            display_name = match.matched_food_name or match.query_name
+            if not display_name:
+                continue
+
+            foods.append(
+                {
+                    "name": display_name,
+                    "original_name": match.original_name,
+                    "query_name": match.query_name,
+                    "matched_food_name": match.matched_food_name,
+                    "matched_food_code": match.matched_food_code,
+                    "match_source": match.match_source,
+                    "match_confidence": match.match_confidence,
+                    "needs_user_confirmation": match.needs_user_confirmation,
+                    "confidence": self.confidence,
+                    "provider": self.provider,
+                }
+            )
+        return foods

@@ -94,7 +94,7 @@ Dashboard는 별도 저장 테이블을 만들지 않고 다음 테이블을 실
 
 식단 이미지 분석 이후 영양 DB와 매칭할 수 있도록 식품별 질병군 점수 테이블을 별도 모듈로 분리한다.
 
-- 원본 엑셀 위치: `etc/ai/cv/food/nutrition/raw/food_nutrition_db.xlsx`
+- 원본 엑셀 위치: `experiment/ai/cv/food/nutrition/raw/food_nutrition_db.xlsx`
 - 런타임 점수 CSV: `ai_runtime/cv/food/nutrition/data/food_disease_scores.csv`
 - 점수 규칙: `ai_runtime/cv/food/nutrition/rules/disease_score_rules.json`
 - 스코어러: `ai_runtime/cv/food/nutrition/scoring/disease_food_scorer.py`

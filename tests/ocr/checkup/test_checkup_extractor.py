@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai_runtime.ocr.checkup import extractor
+from ai_runtime.ocr.checkup import extractor, pdf_handler, preprocessor
 from ai_runtime.ocr.checkup.extractor import (
     parse_blood_pressure,
     parse_from_text_lines,
@@ -10,6 +10,64 @@ from ai_runtime.ocr.checkup.extractor import (
     select_measurement_page_lines,
 )
 from ai_runtime.ocr.checkup.pdf_handler import PdfType
+
+
+def test_get_ocr_engine_requires_paddleocr_dependency(monkeypatch) -> None:
+    monkeypatch.setattr(extractor, "_ocr_engine", None)
+    monkeypatch.setattr(extractor, "PaddleOCR", None)
+
+    with pytest.raises(extractor.CheckupOcrDependencyError, match="paddleocr is required"):
+        extractor.get_ocr_engine()
+
+
+def test_get_ocr_engine_uses_monkeypatched_paddleocr(monkeypatch) -> None:
+    class FakePaddleOCR:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    monkeypatch.setattr(extractor, "_ocr_engine", None)
+    monkeypatch.setattr(extractor, "PaddleOCR", FakePaddleOCR)
+
+    engine = extractor.get_ocr_engine()
+
+    assert isinstance(engine, FakePaddleOCR)
+    assert engine.kwargs == {"lang": "korean", "use_textline_orientation": True}
+
+
+def test_pdf_to_images_requires_pdf2image_dependency(monkeypatch) -> None:
+    monkeypatch.setattr(pdf_handler, "pdf2image", None)
+
+    with pytest.raises(pdf_handler.PdfImageDependencyError, match="pdf2image is required"):
+        pdf_handler.pdf_to_images(b"%PDF")
+
+
+def test_pdf_to_images_uses_monkeypatched_pdf2image(monkeypatch) -> None:
+    class FakeImage:
+        width = 10
+        height = 20
+
+        def save(self, buffer, *, format, quality) -> None:
+            assert format == "JPEG"
+            assert quality == 95
+            buffer.write(b"image-bytes")
+
+    class FakePdf2Image:
+        @staticmethod
+        def convert_from_bytes(pdf_bytes, **options):
+            assert pdf_bytes == b"%PDF"
+            assert options["dpi"] == 200
+            return [FakeImage()]
+
+    monkeypatch.setattr(pdf_handler, "pdf2image", FakePdf2Image)
+
+    assert pdf_handler.pdf_to_images(b"%PDF") == [b"image-bytes"]
+
+
+def test_preprocess_for_ocr_requires_opencv_dependency(monkeypatch) -> None:
+    monkeypatch.setattr(preprocessor, "cv2", None)
+
+    with pytest.raises(preprocessor.OpenCvDependencyError, match="opencv-python is required"):
+        preprocessor.preprocess_for_ocr(b"image")
 
 
 def test_parse_height_weight_does_not_reuse_150cm_as_weight() -> None:
