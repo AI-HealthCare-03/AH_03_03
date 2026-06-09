@@ -4,20 +4,28 @@ import argparse
 import csv
 import io
 import json
+import os
+import re
+import unicodedata
 import zipfile
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 CSV_COLUMNS = [
+    "image_path",
     "image_filename",
     "expected_foods",
+    "image_exists",
     "label_source",
     "annotation_count",
     "cat_1",
     "cat_2",
     "cat_3",
 ]
+
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
 @dataclass
@@ -29,6 +37,8 @@ class LabelAggregate:
     cat_1: str = ""
     cat_2: str = ""
     cat_3: str = ""
+    image_path: str = ""
+    image_exists: bool = False
 
     def add(
         self,
@@ -51,9 +61,19 @@ class LabelAggregate:
         self.cat_3 = self.cat_3 or cat_3
 
 
+@dataclass(frozen=True)
+class JsonRecord:
+    payload: Any
+    source_name: str
+    json_path: str
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build GPT Vision eval labels from AI-Hub food JSON zips.")
-    parser.add_argument("--zip-path", required=True, help="Outer AI-Hub archive zip path.")
+    parser = argparse.ArgumentParser(description="Build GPT Vision eval labels from AI-Hub food JSON labels.")
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--zip-path", help="Outer AI-Hub archive zip path or direct *_Val_json.zip path.")
+    input_group.add_argument("--json-root", help="Root directory containing extracted AI-Hub JSON files.")
+    parser.add_argument("--image-root", help="Root directory containing extracted food images.")
     parser.add_argument("--output", required=True, help="Output labels CSV path.")
     parser.add_argument("--limit", type=int, default=None, help="Limit output image rows for smoke runs.")
     return parser.parse_args()
@@ -61,74 +81,154 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    zip_path = Path(args.zip_path)
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_dir = Path(__file__).resolve().parent / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    aggregates, summary = build_labels_from_aihub_zip(zip_path, limit=args.limit)
+    image_root = Path(args.image_root) if args.image_root else None
+    if args.json_root:
+        aggregates, summary = build_labels_from_json_root(
+            Path(args.json_root),
+            image_root=image_root,
+            output_path=output_path,
+            limit=args.limit,
+        )
+    else:
+        aggregates, summary = build_labels_from_aihub_zip(
+            Path(args.zip_path),
+            image_root=image_root,
+            output_path=output_path,
+            limit=args.limit,
+        )
+
     write_labels_csv(output_path, aggregates)
     write_summary(output_dir / "aihub_label_summary.json", summary)
     print(f"Wrote {output_path}")
     print(f"Wrote {output_dir / 'aihub_label_summary.json'}")
 
 
+def build_labels_from_json_root(
+    json_root: Path,
+    *,
+    image_root: Path | None,
+    output_path: Path,
+    limit: int | None = None,
+) -> tuple[list[LabelAggregate], dict[str, Any]]:
+    summary = _base_summary(output_path)
+    summary["json_root"] = str(json_root)
+    aggregates = _build_labels_from_records(
+        iter_json_root_records(json_root, summary=summary),
+        image_root=image_root,
+        output_path=output_path,
+        summary=summary,
+        limit=limit,
+    )
+    return aggregates, summary
+
+
 def build_labels_from_aihub_zip(
     zip_path: Path,
     *,
+    image_root: Path | None,
+    output_path: Path,
     limit: int | None = None,
 ) -> tuple[list[LabelAggregate], dict[str, Any]]:
-    aggregates: dict[str, LabelAggregate] = {}
-    summary: dict[str, Any] = {
-        "zip_path": str(zip_path),
-        "nested_zip_count": 0,
-        "json_count": 0,
-        "skipped_json_count": 0,
-        "missing_image_filename_count": 0,
-        "output_row_count": 0,
-    }
+    summary = _base_summary(output_path)
+    summary["zip_path"] = str(zip_path)
+    summary["nested_zip_count"] = 0
+    aggregates = _build_labels_from_records(
+        iter_zip_records(zip_path, summary=summary),
+        image_root=image_root,
+        output_path=output_path,
+        summary=summary,
+        limit=limit,
+    )
+    return aggregates, summary
 
+
+def _build_labels_from_records(
+    records: Iterable[JsonRecord],
+    *,
+    image_root: Path | None,
+    output_path: Path,
+    summary: dict[str, Any],
+    limit: int | None,
+) -> list[LabelAggregate]:
+    aggregates: dict[str, LabelAggregate] = {}
+    image_index = build_image_index(image_root) if image_root else {}
+
+    for record in records:
+        summary["parsed_json_count"] += 1
+        extracted = extract_label_payload(
+            record.payload,
+            source_name=record.source_name,
+            json_path=record.json_path,
+        )
+        if extracted is None:
+            summary["skipped_json_count"] += 1
+            continue
+
+        aggregate = aggregates.setdefault(
+            extracted.image_filename,
+            LabelAggregate(image_filename=extracted.image_filename),
+        )
+        aggregate.add(
+            foods=extracted.expected_foods,
+            label_source=extracted.label_sources[0],
+            annotation_count=extracted.annotation_count,
+            cat_1=extracted.cat_1,
+            cat_2=extracted.cat_2,
+            cat_3=extracted.cat_3,
+        )
+        if limit is not None and len(aggregates) >= limit:
+            break
+
+    apply_image_matches(aggregates.values(), image_index=image_index, output_path=output_path)
+    summary["unique_image_count"] = len(aggregates)
+    summary["matched_image_count"] = sum(1 for aggregate in aggregates.values() if aggregate.image_exists)
+    summary["missing_image_count"] = summary["unique_image_count"] - summary["matched_image_count"]
+    return list(aggregates.values())
+
+
+def iter_json_root_records(json_root: Path, *, summary: dict[str, Any]) -> Iterable[JsonRecord]:
+    for json_path in sorted(json_root.rglob("*.json")):
+        if not json_path.is_file():
+            continue
+        summary["total_json_count"] += 1
+        try:
+            payload = json.loads(json_path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            summary["skipped_json_count"] += 1
+            continue
+        yield JsonRecord(
+            payload=payload,
+            source_name=str(json_root),
+            json_path=str(json_path.relative_to(json_root)),
+        )
+
+
+def iter_zip_records(zip_path: Path, *, summary: dict[str, Any]) -> Iterable[JsonRecord]:
     for nested_zip_name, nested_zip_bytes in iter_nested_label_zip_bytes(zip_path):
         summary["nested_zip_count"] += 1
-        with zipfile.ZipFile(io.BytesIO(nested_zip_bytes)) as nested_zip:
-            for json_info in nested_zip.infolist():
-                if json_info.is_dir() or not json_info.filename.lower().endswith(".json"):
-                    continue
-                summary["json_count"] += 1
-                try:
-                    payload = json.loads(nested_zip.read(json_info).decode("utf-8-sig"))
-                except (UnicodeDecodeError, json.JSONDecodeError, OSError, zipfile.BadZipFile):
-                    summary["skipped_json_count"] += 1
-                    continue
-
-                extracted = extract_label_payload(
-                    payload,
-                    nested_zip_name=nested_zip_name,
-                    json_path=json_info.filename,
-                )
-                if extracted is None:
-                    summary["missing_image_filename_count"] += 1
-                    continue
-
-                aggregate = aggregates.setdefault(
-                    extracted.image_filename,
-                    LabelAggregate(image_filename=extracted.image_filename),
-                )
-                aggregate.add(
-                    foods=extracted.expected_foods,
-                    label_source=extracted.label_sources[0],
-                    annotation_count=extracted.annotation_count,
-                    cat_1=extracted.cat_1,
-                    cat_2=extracted.cat_2,
-                    cat_3=extracted.cat_3,
-                )
-                if limit is not None and len(aggregates) >= limit:
-                    summary["output_row_count"] = len(aggregates)
-                    return list(aggregates.values()), summary
-
-    summary["output_row_count"] = len(aggregates)
-    return list(aggregates.values()), summary
+        try:
+            with zipfile.ZipFile(io.BytesIO(nested_zip_bytes)) as nested_zip:
+                for json_info in nested_zip.infolist():
+                    if json_info.is_dir() or not json_info.filename.lower().endswith(".json"):
+                        continue
+                    summary["total_json_count"] += 1
+                    try:
+                        payload = json.loads(nested_zip.read(json_info).decode("utf-8-sig"))
+                    except (UnicodeDecodeError, json.JSONDecodeError, OSError, zipfile.BadZipFile):
+                        summary["skipped_json_count"] += 1
+                        continue
+                    yield JsonRecord(
+                        payload=payload,
+                        source_name=nested_zip_name,
+                        json_path=json_info.filename,
+                    )
+        except zipfile.BadZipFile:
+            summary["skipped_json_count"] += 1
 
 
 def iter_nested_label_zip_bytes(zip_path: Path) -> list[tuple[str, bytes]]:
@@ -152,10 +252,10 @@ def iter_nested_label_zip_bytes(zip_path: Path) -> list[tuple[str, bytes]]:
 def extract_label_payload(
     payload: Any,
     *,
-    nested_zip_name: str,
+    source_name: str,
     json_path: str,
 ) -> LabelAggregate | None:
-    image_filename = _first_string_value(payload, "Code Name")
+    image_filename = Path(_first_string_value(payload, "Code Name")).name
     if not image_filename:
         return None
 
@@ -163,17 +263,45 @@ def extract_label_payload(
     cat_1 = _first_string_value(payload, "cat_1") or path_categories["cat_1"]
     cat_2 = _first_string_value(payload, "cat_2") or path_categories["cat_2"]
     cat_3 = _first_string_value(payload, "cat_3") or path_categories["cat_3"]
+    folder_food = _food_name_from_path(json_path)
     names = _string_values(payload, "Name")
-    foods = _dedupe([name for name in names if name] or [cat_3, cat_2, Path(json_path).parent.name])
+    foods = _dedupe([folder_food] if folder_food else [name for name in names if name] or [cat_3, cat_2])
     return LabelAggregate(
         image_filename=image_filename,
         expected_foods=foods,
-        label_sources=[f"{nested_zip_name}:{json_path}"],
+        label_sources=[f"{source_name}:{json_path}"],
         annotation_count=max(1, len(foods)),
         cat_1=cat_1,
         cat_2=cat_2,
         cat_3=cat_3,
     )
+
+
+def build_image_index(image_root: Path | None) -> dict[str, Path]:
+    if image_root is None:
+        return {}
+    image_index: dict[str, Path] = {}
+    for image_path in image_root.rglob("*"):
+        if not image_path.is_file() or image_path.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        image_index.setdefault(image_path.name, image_path)
+    return image_index
+
+
+def apply_image_matches(
+    aggregates: Iterable[LabelAggregate],
+    *,
+    image_index: dict[str, Path],
+    output_path: Path,
+) -> None:
+    for aggregate in aggregates:
+        matched_path = image_index.get(aggregate.image_filename)
+        if matched_path is None:
+            aggregate.image_path = aggregate.image_filename
+            aggregate.image_exists = False
+            continue
+        aggregate.image_path = os.path.relpath(matched_path, output_path.parent)
+        aggregate.image_exists = True
 
 
 def write_labels_csv(output_path: Path, aggregates: list[LabelAggregate]) -> None:
@@ -183,8 +311,10 @@ def write_labels_csv(output_path: Path, aggregates: list[LabelAggregate]) -> Non
         for aggregate in aggregates:
             writer.writerow(
                 {
+                    "image_path": aggregate.image_path or aggregate.image_filename,
                     "image_filename": aggregate.image_filename,
                     "expected_foods": "|".join(aggregate.expected_foods),
+                    "image_exists": str(aggregate.image_exists).lower(),
                     "label_source": "|".join(aggregate.label_sources),
                     "annotation_count": aggregate.annotation_count,
                     "cat_1": aggregate.cat_1,
@@ -196,6 +326,18 @@ def write_labels_csv(output_path: Path, aggregates: list[LabelAggregate]) -> Non
 
 def write_summary(path: Path, summary: dict[str, Any]) -> None:
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _base_summary(output_path: Path) -> dict[str, Any]:
+    return {
+        "total_json_count": 0,
+        "parsed_json_count": 0,
+        "skipped_json_count": 0,
+        "unique_image_count": 0,
+        "matched_image_count": 0,
+        "missing_image_count": 0,
+        "output_csv_path": str(output_path),
+    }
 
 
 def _first_string_value(payload: Any, key: str) -> str:
@@ -210,7 +352,7 @@ def _string_values(payload: Any, key: str) -> list[str]:
         if _normalize_key(found_key) != normalized_key:
             continue
         if isinstance(value, str) and value.strip():
-            values.append(value.strip())
+            values.append(_clean_label_text(value))
     return _dedupe(values)
 
 
@@ -225,7 +367,7 @@ def _walk_key_values(payload: Any):
 
 
 def _path_categories(json_path: str) -> dict[str, str]:
-    parts = [part for part in Path(json_path).parts[:-1] if part not in {".", ""}]
+    parts = [_clean_label_text(part) for part in Path(json_path).parts[:-1] if part not in {".", ""}]
     tail = parts[-3:]
     padded = [""] * (3 - len(tail)) + tail
     return {
@@ -235,6 +377,33 @@ def _path_categories(json_path: str) -> dict[str, str]:
     }
 
 
+def _food_name_from_path(json_path: str) -> str:
+    for part in reversed(Path(json_path).parts[:-1]):
+        cleaned = _clean_folder_label(part)
+        if not cleaned:
+            continue
+        if "_val_json" in cleaned.lower() or cleaned.startswith("[라벨]"):
+            continue
+        if _contains_korean(cleaned):
+            return cleaned
+    return ""
+
+
+def _clean_folder_label(value: str) -> str:
+    cleaned = _clean_label_text(value)
+    cleaned = re.sub(r"\s+json$", "", cleaned, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"\.json$", "", cleaned, flags=re.IGNORECASE).strip()
+    return cleaned
+
+
+def _clean_label_text(value: str) -> str:
+    return unicodedata.normalize("NFC", value).strip()
+
+
+def _contains_korean(value: str) -> bool:
+    return any("가" <= char <= "힣" for char in unicodedata.normalize("NFC", value))
+
+
 def _normalize_key(value: str) -> str:
     return "".join(ch for ch in value.lower() if ch.isalnum())
 
@@ -242,7 +411,7 @@ def _normalize_key(value: str) -> str:
 def _dedupe(values: list[str]) -> list[str]:
     result: list[str] = []
     for value in values:
-        cleaned = value.strip()
+        cleaned = _clean_label_text(value)
         if cleaned and cleaned not in result:
             result.append(cleaned)
     return result

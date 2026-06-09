@@ -39,26 +39,41 @@ The script reads `OPENAI_API_KEY` from the environment. Missing images, missing 
 
 ## Build AI-Hub Labels
 
-AI-Hub food archives can contain nested `*_Val_json.zip` files. Convert those JSON labels to an evaluation CSV with:
+AI-Hub food labels can be used either as extracted JSON directories or as archive zips with nested `*_Val_json.zip` files.
+
+For the current local extracted dataset, run:
+
+```bash
+uv run python experiment/ai/cv/gpt_vision_food_eval/build_aihub_labels.py \
+  --json-root experiment/ai/cv/gpt_vision_food_eval/data/json_zips \
+  --image-root experiment/ai/cv/gpt_vision_food_eval/data/images \
+  --output experiment/ai/cv/gpt_vision_food_eval/data/labels/aihub_labels_sample.csv \
+  --limit 1000
+```
+
+Zip input is still supported:
 
 ```bash
 uv run python experiment/ai/cv/gpt_vision_food_eval/build_aihub_labels.py \
   --zip-path "experiment/ai/cv/gpt_vision_food_eval/data/json_zips/아카이브.zip" \
+  --image-root experiment/ai/cv/gpt_vision_food_eval/data/images \
   --output experiment/ai/cv/gpt_vision_food_eval/data/labels/aihub_labels_sample.csv \
   --limit 100
 ```
 
 The output CSV columns are:
 
+- `image_path`
 - `image_filename`
 - `expected_foods`
+- `image_exists`
 - `label_source`
 - `annotation_count`
 - `cat_1`
 - `cat_2`
 - `cat_3`
 
-The builder uses JSON `"Code Name"` as `image_filename`, JSON `"Name"` as the first food label candidate, and path categories as fallback. Broken JSON files are skipped and summarized in `outputs/aihub_label_summary.json`.
+The builder uses JSON `"Code Name"` as `image_filename`. For `expected_foods`, it prefers the nearest Korean parent folder name such as `군고구마 json` -> `군고구마`; if no Korean folder label is found, it falls back to JSON `"Name"`. If `--image-root` is provided, the builder matches `image_filename` to local jpg/png files and writes an `image_path` relative to the generated CSV so `run_gpt_vision_eval.py` can read it directly. Broken JSON files and missing images are summarized in `outputs/aihub_label_summary.json`.
 
 ## Outputs
 
