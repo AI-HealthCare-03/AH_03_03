@@ -72,8 +72,8 @@
 - `ai_runtime/llm/recommendation_message.py`
 - `ai_runtime/llm/schemas.py`
 - `ai_runtime/llm/prompt_templates.py`
-- `etc/ai/llm/notebooks/01_recommendation_message_experiment.ipynb`
-- `etc/ai/llm/experiments/run_health_chatbot_poc.py`
+- `experiment/ai/llm/notebooks/01_recommendation_message_experiment.ipynb`
+- `experiment/ai/llm/experiments/run_health_chatbot_poc.py`
 
 입력 흐름:
 
@@ -204,7 +204,7 @@ RAG 프롬프트 원칙:
 
 실험 위치:
 
-- `etc/ai/llm/notebooks/01_recommendation_message_experiment.ipynb`
+- `experiment/ai/llm/notebooks/01_recommendation_message_experiment.ipynb`
 - `ai_runtime/llm/recommendation_message.py`
 - `ai_runtime/llm/prompt_templates.py`
 
@@ -244,8 +244,8 @@ RAG 프롬프트 원칙:
 
 실험 위치:
 
-- `etc/ai/llm/experiments/run_health_chatbot_poc.py`
-- `etc/ai/llm/experiments/dummy_health_cases.py`
+- `experiment/ai/llm/experiments/run_health_chatbot_poc.py`
+- `experiment/ai/llm/experiments/dummy_health_cases.py`
 - `ai_runtime/llm/health_chatbot.py`
 - `ai_runtime/llm/llm_generator.py`
 - `ai_runtime/llm/response_router.py`
@@ -278,9 +278,9 @@ RAG 프롬프트 원칙:
 
 실험 위치:
 
-- `etc/ai/llm/experiments/run_health_chatbot_poc.py`
-- `etc/ai/llm/experiments/run_rule_vs_llm_comparison.py`
-- `etc/ai/llm/experiments/dummy_health_cases.py`
+- `experiment/ai/llm/experiments/run_health_chatbot_poc.py`
+- `experiment/ai/llm/experiments/run_rule_vs_llm_comparison.py`
+- `experiment/ai/llm/experiments/dummy_health_cases.py`
 - `ai_runtime/llm/grounding.py`
 - `ai_runtime/llm/llm_generator.py`
 
@@ -312,7 +312,7 @@ RAG 프롬프트 원칙:
 
 실험 위치:
 
-- `etc/ai/llm/experiments/run_rule_vs_llm_comparison.py`
+- `experiment/ai/llm/experiments/run_rule_vs_llm_comparison.py`
 
 실험 목적:
 

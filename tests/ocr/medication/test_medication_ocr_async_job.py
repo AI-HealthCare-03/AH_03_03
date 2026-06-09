@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ai_runtime.jobs import medication_ocr_handler
 from app.dtos.medications import MedicationOCRResponse
 from app.services import medications as medication_service
 
@@ -37,9 +38,9 @@ async def test_run_medication_ocr_from_job_loads_uploaded_file(monkeypatch, tmp_
         )
 
     monkeypatch.setattr("app.services.async_jobs.get_job", fake_get_job)
-    monkeypatch.setattr(medication_service, "run_medication_ocr", fake_run_medication_ocr)
+    monkeypatch.setattr(medication_ocr_handler, "run_medication_ocr", fake_run_medication_ocr)
 
-    response = await medication_service.run_medication_ocr_from_job(77)
+    response = await medication_ocr_handler.run_medication_ocr_from_job(77)
 
     assert response.source_type == "MEDICATION_BAG"
     assert captured == {
@@ -113,9 +114,9 @@ async def test_run_medication_ocr_from_job_loads_storage_key(monkeypatch: pytest
         )
 
     monkeypatch.setattr("app.services.async_jobs.get_job", fake_get_job)
-    monkeypatch.setattr(medication_service, "run_medication_ocr", fake_run_medication_ocr)
+    monkeypatch.setattr(medication_ocr_handler, "run_medication_ocr", fake_run_medication_ocr)
 
-    response = await medication_service.run_medication_ocr_from_job(79)
+    response = await medication_ocr_handler.run_medication_ocr_from_job(79)
 
     assert response.source_type == "MEDICATION_BAG"
     assert captured == {
@@ -135,4 +136,4 @@ async def test_run_medication_ocr_from_job_rejects_missing_source(monkeypatch) -
     monkeypatch.setattr("app.services.async_jobs.get_job", fake_get_job)
 
     with pytest.raises(ValueError, match="medication_ocr_source_missing"):
-        await medication_service.run_medication_ocr_from_job(78)
+        await medication_ocr_handler.run_medication_ocr_from_job(78)

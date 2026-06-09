@@ -356,6 +356,31 @@ def test_langgraph_rag_no_result_falls_back_safely(monkeypatch) -> None:
     assert "근거 문서를 찾지 못했습니다" in result.answer
 
 
+def test_langgraph_node_exception_records_fallback_state(monkeypatch) -> None:
+    def fail_retrieval(state):
+        raise RuntimeError("retriever secret=my-test-token failed")
+
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+    monkeypatch.setattr("ai_runtime.llm.graph.builder.retrieve_rag_context", fail_retrieval)
+
+    result = run_chatbot_graph(
+        user_message="혈당 관리 방법",
+        context_type="MAIN",
+        use_real_llm=False,
+        use_rag=True,
+    )
+
+    graph_error = result.metadata["graph_error"]
+    assert result.fallback_reason == "retrieve_rag_context_exception_fallback"
+    assert result.metadata["graph_errors"] == [graph_error]
+    assert result.trace_metadata["graph_error"] == graph_error
+    assert graph_error["node"] == "retrieve_rag_context"
+    assert graph_error["exception_type"] == "RuntimeError"
+    assert graph_error["fallback_required"] is True
+    assert "my-test-token" not in graph_error["exception_message"]
+    assert result.answer
+
+
 def test_langgraph_rag_low_trust_source_uses_conservative_grounding_copy(monkeypatch) -> None:
     class LowTrustRetriever:
         def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):

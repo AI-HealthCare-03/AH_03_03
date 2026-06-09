@@ -126,6 +126,7 @@ services:
 
   ai-worker:
     container_name: ai-health-dev-ai-worker
+    platform: linux/amd64
     build:
       context: ../..
       dockerfile: ai_runtime/Dockerfile
@@ -151,6 +152,16 @@ services:
       S3_REGION: ${S3_REGION:-ap-northeast-2}
       S3_PREFIX: ${S3_PREFIX:-ai-health/dev}
       S3_PRESIGNED_URL_EXPIRES_SECONDS: ${S3_PRESIGNED_URL_EXPIRES_SECONDS:-3600}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      EMAIL_VERIFICATION_DEBUG: ${EMAIL_VERIFICATION_DEBUG:-true}
+      PASSWORD_RESET_DEBUG: ${PASSWORD_RESET_DEBUG:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-AI HealthCare}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       CHATBOT_USE_REAL_LLM: ${CHATBOT_USE_REAL_LLM:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}

@@ -1,0 +1,15 @@
+{
+  "experiment_id": "kdu_dm_x1_service_runtime_screening_risk_screening_catboost",
+  "disease": "diabetes",
+  "runtime_disease_key": "dm",
+  "label_policy": "screening_risk",
+  "role": "main_screening",
+  "feature_set": "x1_service_runtime",
+  "data_version": "x1_service_runtime_diabetes_hn13_24_screening",
+  "target_column": "target",
+  "source_years": "HN13-HN24",
+  "model_name": "screening_catboost",
+  "artifact_format": "ai_runtime_catboost_fold_ensemble",
+  "service_policy_allowed": false,
+  "medical_safety_note": "Screening/check-needed model only. Do not use confirmed diagnosis wording."
+}
