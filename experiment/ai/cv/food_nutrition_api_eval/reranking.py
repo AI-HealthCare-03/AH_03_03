@@ -182,6 +182,7 @@ def needs_fallback(match_status: str | None) -> bool:
 
 def needs_user_confirmation(match_status: str | None) -> bool:
     return match_status in {
+        MatchStatus.LIKELY_MATCH.value,
         MatchStatus.MULTIPLE_CANDIDATES.value,
         MatchStatus.WEAK_MATCH.value,
         MatchStatus.NO_CANDIDATES.value,

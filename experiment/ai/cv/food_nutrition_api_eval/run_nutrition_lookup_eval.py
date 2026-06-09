@@ -16,6 +16,7 @@ if str(EXPERIMENT_DIR) not in sys.path:
 
 from providers.base import NutritionProvider
 from providers.local_cache import LocalJsonNutritionCache
+from providers.mfds_provider import MfdsNutritionProvider
 from providers.stub_provider import StubNutritionProvider
 from schemas import NutritionLookupResult
 
@@ -29,6 +30,13 @@ OUTPUT_COLUMNS = [
     "normalized_query",
     "provider",
     "status",
+    "match_status",
+    "original_query",
+    "used_query",
+    "fallback_queries",
+    "fallback_used",
+    "rank_score",
+    "rank_reason",
     "matched_food_name",
     "matched_food_code",
     "candidate_count",
@@ -51,16 +59,34 @@ OUTPUT_COLUMNS = [
 ]
 
 NUTRITION_FIELDS = ["energy_kcal", "carbohydrate_g", "protein_g", "fat_g", "sodium_mg"]
-SUCCESS_STATUSES = {"matched", "multiple_candidates"}
+LOOKUP_SUCCESS_STATUSES = {"matched", "likely_match", "multiple_candidates", "weak_match", "fallback_used"}
+CONFIRMATION_STATUSES = {
+    "likely_match",
+    "multiple_candidates",
+    "weak_match",
+    "no_candidates",
+    "needs_user_confirmation",
+    "fallback_used",
+    "api_unavailable",
+    "parse_failed",
+    "no_query",
+}
+AUTO_CONFIRMABLE_STATUSES = {"matched"}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate food nutrition API lookup using GPT Vision predictions.")
     parser.add_argument("--predictions", required=True, help="GPT Vision predictions.csv path.")
     parser.add_argument("--output-dir", default=str(EXPERIMENT_DIR / "outputs"), help="Output directory.")
-    parser.add_argument("--provider", choices=["stub"], default="stub", help="Nutrition provider to use.")
+    parser.add_argument("--provider", choices=["stub", "mfds"], default="stub", help="Nutrition provider to use.")
     parser.add_argument("--limit", type=int, default=None, help="Limit prediction rows for smoke runs.")
     parser.add_argument("--cache-path", default=None, help="Optional local JSON cache path.")
+    parser.add_argument("--max-candidates", type=int, default=10, help="Maximum candidates to request per query.")
+    parser.add_argument(
+        "--allow-expected-fallback",
+        action="store_true",
+        help="Use expected_foods as the last lookup fallback for comparison-only leakage checks.",
+    )
     return parser.parse_args()
 
 
@@ -68,14 +94,16 @@ def main() -> None:
     args = parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    provider = build_provider(args.provider)
-    cache_path = Path(args.cache_path) if args.cache_path else output_dir / "nutrition_lookup_cache.json"
+    provider = build_provider(args.provider, max_candidates=args.max_candidates)
+    cache_path = (
+        Path(args.cache_path) if args.cache_path else output_dir / f"{args.provider}_nutrition_lookup_cache_v2.json"
+    )
     cache = LocalJsonNutritionCache(cache_path)
 
     prediction_rows = load_prediction_rows(Path(args.predictions), limit=args.limit)
     output_rows: list[dict[str, object]] = []
     for row in prediction_rows:
-        query_candidates = build_query_candidates(row)
+        query_candidates = build_query_candidates(row, allow_expected_fallback=args.allow_expected_fallback)
         if not query_candidates:
             query_candidates = [""]
         for query in query_candidates:
@@ -83,18 +111,20 @@ def main() -> None:
             output_rows.append(build_output_row(row, result))
     cache.flush()
 
-    metrics = compute_metrics(output_rows)
+    metrics = compute_metrics(output_rows, expected_fallback_enabled=args.allow_expected_fallback)
     write_predictions_csv(output_dir / "nutrition_predictions.csv", output_rows)
     write_metrics_json(output_dir / "nutrition_metrics.json", metrics)
-    write_report(output_dir / "nutrition_report.md", metrics)
+    write_report(output_dir / "nutrition_report.md", metrics, output_rows)
     print(f"Wrote {output_dir / 'nutrition_predictions.csv'}")
     print(f"Wrote {output_dir / 'nutrition_metrics.json'}")
     print(f"Wrote {output_dir / 'nutrition_report.md'}")
 
 
-def build_provider(provider_name: str) -> NutritionProvider:
+def build_provider(provider_name: str, *, max_candidates: int) -> NutritionProvider:
     if provider_name == "stub":
         return StubNutritionProvider()
+    if provider_name == "mfds":
+        return MfdsNutritionProvider(max_candidates=max_candidates)
     msg = f"Unsupported provider: {provider_name}"
     raise ValueError(msg)
 
@@ -110,10 +140,16 @@ def load_prediction_rows(path: Path, *, limit: int | None) -> list[dict[str, str
     return rows
 
 
-def build_query_candidates(row: dict[str, str]) -> list[str]:
+def build_query_candidates(row: dict[str, str], *, allow_expected_fallback: bool) -> list[str]:
+    row_status = str(row.get("status") or "").strip()
+    if row_status in {"empty_result", "no_query", "data_missing"}:
+        return []
+
     candidates: list[str] = []
-    for column in ("raw_food_names", "canonical_food_names", "allowed_food_names"):
+    for column in ("allowed_food_names", "canonical_food_names", "raw_food_names"):
         candidates.extend(split_food_names(row.get(column, "")))
+    if allow_expected_fallback and not candidates and row_status == "success":
+        candidates.extend(split_food_names(row.get("expected_foods", "")))
     return dedupe(candidates)
 
 
@@ -142,6 +178,13 @@ def build_output_row(row: dict[str, str], result: NutritionLookupResult) -> dict
         "normalized_query": result.normalized_query,
         "provider": result.provider,
         "status": result.status,
+        "match_status": result.match_status or result.status,
+        "original_query": result.original_query or result.query,
+        "used_query": result.used_query or result.query,
+        "fallback_queries": "|".join(result.fallback_queries),
+        "fallback_used": result.fallback_used,
+        "rank_score": result.rank_score if result.rank_score is not None else "",
+        "rank_reason": result.rank_reason or "",
         "matched_food_name": result.matched_food_name or "",
         "matched_food_code": result.matched_food_code or "",
         "candidate_count": result.candidate_count,
@@ -164,18 +207,42 @@ def build_output_row(row: dict[str, str], result: NutritionLookupResult) -> dict
     }
 
 
-def compute_metrics(rows: list[dict[str, object]]) -> dict[str, object]:
+def compute_metrics(rows: list[dict[str, object]], *, expected_fallback_enabled: bool) -> dict[str, object]:
     row_count = len(rows)
-    success_rows = [row for row in rows if str(row["status"]) in SUCCESS_STATUSES]
+    success_rows = [row for row in rows if str(row["status"]) in LOOKUP_SUCCESS_STATUSES]
+    no_query_count = sum(str(row["status"]) == "no_query" for row in rows)
+    api_success_count = sum(str(row["status"]) not in {"api_unavailable", "parse_failed"} for row in rows)
+    matched_count = sum(str(row["match_status"]) == "matched" for row in rows)
+    weak_match_count = sum(str(row["match_status"]) == "weak_match" for row in rows)
+    multiple_candidates_count = sum(str(row["match_status"]) == "multiple_candidates" for row in rows)
+    no_candidates_count = sum(str(row["match_status"]) == "no_candidates" for row in rows)
+    auto_confirmable_count = sum(
+        str(row["match_status"]) in AUTO_CONFIRMABLE_STATUSES and not bool(row["fallback_used"]) for row in rows
+    )
+    needs_user_confirmation_count = sum(bool(row["needs_user_confirmation"]) for row in rows)
     latencies = [float(row["latency_seconds"]) for row in rows if row.get("latency_seconds") != ""]
     return {
+        "total_rows": row_count,
         "row_count": row_count,
+        "expected_fallback_enabled": expected_fallback_enabled,
+        "production_like_mode": not expected_fallback_enabled,
+        "no_query_count": no_query_count,
+        "api_success_count": api_success_count,
+        "matched_count": matched_count,
+        "weak_match_count": weak_match_count,
+        "multiple_candidates_count": multiple_candidates_count,
+        "needs_user_confirmation_count": needs_user_confirmation_count,
+        "no_candidates_count": no_candidates_count,
         "nutrition_lookup_success_rate": rate(len(success_rows), row_count),
+        "auto_confirmable_rate": rate(auto_confirmable_count, row_count),
         "top1_food_match_rate": rate(sum(bool(row["top1_food_match"]) for row in rows), row_count),
         "top3_candidate_hit_rate": rate(sum(bool(row["top3_candidate_hit"]) for row in rows), row_count),
         "multiple_candidate_rate": rate(sum(str(row["status"]) == "multiple_candidates" for row in rows), row_count),
         "needs_user_confirmation_rate": rate(sum(bool(row["needs_user_confirmation"]) for row in rows), row_count),
-        "api_failure_rate": rate(sum(str(row["status"]) == "api_error" for row in rows), row_count),
+        "api_failure_rate": rate(
+            sum(str(row["status"]) in {"api_unavailable", "parse_failed", "api_error"} for row in rows),
+            row_count,
+        ),
         "cache_hit_rate": rate(sum(bool(row["cache_hit"]) for row in rows), row_count),
         "avg_lookup_latency": round(mean(latencies), 4) if latencies else 0.0,
         "nutrition_field_completeness": round(mean(float(row["nutrition_field_completeness"]) for row in rows), 4)
@@ -197,18 +264,28 @@ def write_metrics_json(path: Path, metrics: dict[str, object]) -> None:
     path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def write_report(path: Path, metrics: dict[str, object]) -> None:
+def write_report(path: Path, metrics: dict[str, object], rows: list[dict[str, object]]) -> None:
     lines = [
         "# Food Nutrition API Lookup Eval Report",
         "",
         "## Summary",
         "",
-        f"- row_count: {metrics['row_count']}",
+        f"- total_rows: {metrics['total_rows']}",
+        f"- production_like_mode: {metrics['production_like_mode']}",
+        f"- expected_fallback_enabled: {metrics['expected_fallback_enabled']}",
+        f"- no_query_count: {metrics['no_query_count']}",
+        f"- api_success_count: {metrics['api_success_count']}",
+        f"- matched_count: {metrics['matched_count']}",
+        f"- weak_match_count: {metrics['weak_match_count']}",
+        f"- multiple_candidates_count: {metrics['multiple_candidates_count']}",
+        f"- needs_user_confirmation_count: {metrics['needs_user_confirmation_count']}",
+        f"- no_candidates_count: {metrics['no_candidates_count']}",
         f"- nutrition_lookup_success_rate: {metrics['nutrition_lookup_success_rate']}",
+        f"- auto_confirmable_rate: {metrics['auto_confirmable_rate']}",
+        f"- needs_user_confirmation_rate: {metrics['needs_user_confirmation_rate']}",
         f"- top1_food_match_rate: {metrics['top1_food_match_rate']}",
         f"- top3_candidate_hit_rate: {metrics['top3_candidate_hit_rate']}",
         f"- multiple_candidate_rate: {metrics['multiple_candidate_rate']}",
-        f"- needs_user_confirmation_rate: {metrics['needs_user_confirmation_rate']}",
         f"- api_failure_rate: {metrics['api_failure_rate']}",
         f"- cache_hit_rate: {metrics['cache_hit_rate']}",
         f"- avg_lookup_latency: {metrics['avg_lookup_latency']}",
@@ -224,11 +301,55 @@ def write_report(path: Path, metrics: dict[str, object]) -> None:
     lines.extend(
         [
             "",
+            "## Query Results",
+            "",
+            "| query | used_query | status | match_status | selected candidate | candidate_count | needs_confirmation | top_candidates |",
+            "|---|---|---|---|---|---:|---|---|",
+        ]
+    )
+    for row in rows:
+        lines.append(
+            "| {query} | {used_query} | {status} | {match_status} | {matched_food_name} | "
+            "{candidate_count} | {needs_user_confirmation} | {top_candidates} |".format(
+                query=row.get("query") or "",
+                used_query=row.get("used_query") or "",
+                status=row.get("status") or "",
+                match_status=row.get("match_status") or "",
+                matched_food_name=row.get("matched_food_name") or "",
+                candidate_count=row.get("candidate_count") or 0,
+                needs_user_confirmation=row.get("needs_user_confirmation"),
+                top_candidates=row.get("top_candidates") or "",
+            )
+        )
+    append_report_list(
+        lines,
+        title="Auto Confirmable Candidates",
+        rows=[row for row in rows if str(row.get("match_status")) == "matched" and not bool(row.get("fallback_used"))],
+    )
+    append_report_list(
+        lines, title="Needs User Confirmation", rows=[row for row in rows if row["needs_user_confirmation"]]
+    )
+    append_report_list(
+        lines,
+        title="Risky Cases",
+        rows=[
+            row
+            for row in rows
+            if str(row.get("match_status")) in {"weak_match", "multiple_candidates", "likely_match"}
+            or bool(row.get("fallback_used"))
+        ],
+    )
+    lines.extend(
+        [
+            "",
             "## Notes",
             "",
             "- This experiment is not connected to production runtime.",
-            "- The stub provider is a fake response provider for E2E flow validation only.",
-            "- MFDS/RDA API clients should be implemented and validated in this experiment before service integration.",
+            "- Production-like mode uses `allowed_food_names`, `canonical_food_names`, and `raw_food_names` only.",
+            "- `expected_foods` is an evaluation label and is excluded from lookup queries unless `--allow-expected-fallback` is set.",
+            "- `matched` without fallback is the only auto-confirmable status in this experiment.",
+            "- `weak_match`, `multiple_candidates`, and `fallback_used` should be routed to user confirmation.",
+            "- MFDS single-provider matching remains risky for ingredients, beverages, broad food groups, and brand-like products.",
         ]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -254,7 +375,11 @@ def nutrition_field_completeness(result: NutritionLookupResult) -> float:
 
 
 def score_available(result: NutritionLookupResult) -> bool:
-    return result.status in SUCCESS_STATUSES and nutrition_field_completeness(result) >= 1.0
+    return (
+        result.status in AUTO_CONFIRMABLE_STATUSES
+        and not result.needs_user_confirmation
+        and nutrition_field_completeness(result) >= 1.0
+    )
 
 
 def status_counts(rows: list[dict[str, object]]) -> dict[str, int]:
@@ -285,6 +410,23 @@ def rate(numerator: int, denominator: int) -> float:
     if denominator == 0:
         return 0.0
     return round(numerator / denominator, 4)
+
+
+def append_report_list(lines: list[str], *, title: str, rows: list[dict[str, object]]) -> None:
+    lines.extend(["", f"## {title}", ""])
+    if not rows:
+        lines.append("- none")
+        return
+    for row in rows:
+        lines.append(
+            "- {query} -> {matched_food_name} ({match_status}, status={status}, used_query={used_query})".format(
+                query=row.get("query") or "",
+                matched_food_name=row.get("matched_food_name") or "",
+                match_status=row.get("match_status") or "",
+                status=row.get("status") or "",
+                used_query=row.get("used_query") or "",
+            )
+        )
 
 
 if __name__ == "__main__":

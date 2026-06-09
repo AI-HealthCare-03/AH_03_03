@@ -23,11 +23,11 @@ experiment/ai/cv/gpt_vision_food_eval/outputs/predictions.csv
 
 The runner builds lookup queries from:
 
-- `raw_food_names`
-- `canonical_food_names`
 - `allowed_food_names`
+- `canonical_food_names`
+- `raw_food_names`
 
-`expected_foods` is used only as the evaluation reference.
+By default this is a production-like evaluation: `expected_foods` is used only as the evaluation reference and is not used as a lookup query. For a leakage comparison run, pass `--allow-expected-fallback` to use `expected_foods` as the final fallback query.
 
 ## Outputs
 
@@ -50,6 +50,27 @@ uv run python experiment/ai/cv/food_nutrition_api_eval/run_nutrition_lookup_eval
   --output-dir experiment/ai/cv/food_nutrition_api_eval/outputs \
   --provider stub \
   --limit 30
+```
+
+MFDS production-like lookup run:
+
+```bash
+uv run python experiment/ai/cv/food_nutrition_api_eval/run_nutrition_lookup_eval.py \
+  --predictions experiment/ai/cv/gpt_vision_food_eval/outputs/predictions.csv \
+  --output-dir experiment/ai/cv/food_nutrition_api_eval/outputs \
+  --provider mfds \
+  --limit 30
+```
+
+Expected-label fallback comparison run:
+
+```bash
+uv run python experiment/ai/cv/food_nutrition_api_eval/run_nutrition_lookup_eval.py \
+  --predictions experiment/ai/cv/gpt_vision_food_eval/outputs/predictions.csv \
+  --output-dir experiment/ai/cv/food_nutrition_api_eval/outputs_expected_fallback \
+  --provider mfds \
+  --limit 30 \
+  --allow-expected-fallback
 ```
 
 MFDS public API probe:

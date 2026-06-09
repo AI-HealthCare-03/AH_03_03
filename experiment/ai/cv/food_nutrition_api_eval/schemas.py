@@ -20,6 +20,13 @@ class NutritionLookupResult:
     normalized_query: str
     provider: str
     status: str
+    original_query: str | None = None
+    used_query: str | None = None
+    fallback_queries: list[str] = field(default_factory=list)
+    fallback_used: bool = False
+    match_status: str | None = None
+    rank_score: float | None = None
+    rank_reason: str | None = None
     matched_food_name: str | None = None
     matched_food_code: str | None = None
     candidate_count: int = 0
@@ -57,6 +64,15 @@ class NutritionLookupResult:
             normalized_query=str(payload.get("normalized_query") or ""),
             provider=str(payload.get("provider") or ""),
             status=str(payload.get("status") or ""),
+            original_query=_optional_string(payload.get("original_query")),
+            used_query=_optional_string(payload.get("used_query")),
+            fallback_queries=[str(item).strip() for item in payload.get("fallback_queries", []) if str(item).strip()]
+            if isinstance(payload.get("fallback_queries"), list)
+            else [],
+            fallback_used=bool(payload.get("fallback_used", False)),
+            match_status=_optional_string(payload.get("match_status")),
+            rank_score=_optional_float(payload.get("rank_score")),
+            rank_reason=_optional_string(payload.get("rank_reason")),
             matched_food_name=_optional_string(payload.get("matched_food_name")),
             matched_food_code=_optional_string(payload.get("matched_food_code")),
             candidate_count=int(payload.get("candidate_count") or 0),
