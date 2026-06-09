@@ -25,6 +25,14 @@ CSV_COLUMNS = [
     "cat_3",
 ]
 
+MISSING_IMAGE_COLUMNS = [
+    "image_filename",
+    "expected_foods",
+    "json_path",
+    "searched_image_root",
+    "reason",
+]
+
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
@@ -68,6 +76,14 @@ class JsonRecord:
     json_path: str
 
 
+@dataclass(frozen=True)
+class ImageIndex:
+    image_root: Path | None
+    by_name: dict[str, Path]
+    by_normalized_name: dict[str, Path]
+    by_normalized_stem: dict[str, Path]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build GPT Vision eval labels from AI-Hub food JSON labels.")
     input_group = parser.add_mutually_exclusive_group(required=True)
@@ -85,6 +101,7 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_dir = Path(__file__).resolve().parent / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
+    missing_report_path = output_dir / "aihub_missing_images.csv"
 
     image_root = Path(args.image_root) if args.image_root else None
     if args.json_root:
@@ -103,9 +120,12 @@ def main() -> None:
         )
 
     write_labels_csv(output_path, aggregates)
+    write_missing_images_csv(missing_report_path, aggregates, image_root=image_root)
+    summary["missing_report_path"] = str(missing_report_path)
     write_summary(output_dir / "aihub_label_summary.json", summary)
     print(f"Wrote {output_path}")
     print(f"Wrote {output_dir / 'aihub_label_summary.json'}")
+    print(f"Wrote {missing_report_path}")
 
 
 def build_labels_from_json_root(
@@ -156,7 +176,7 @@ def _build_labels_from_records(
     limit: int | None,
 ) -> list[LabelAggregate]:
     aggregates: dict[str, LabelAggregate] = {}
-    image_index = build_image_index(image_root) if image_root else {}
+    image_index = build_image_index(image_root)
 
     for record in records:
         summary["parsed_json_count"] += 1
@@ -188,6 +208,8 @@ def _build_labels_from_records(
     summary["unique_image_count"] = len(aggregates)
     summary["matched_image_count"] = sum(1 for aggregate in aggregates.values() if aggregate.image_exists)
     summary["missing_image_count"] = summary["unique_image_count"] - summary["matched_image_count"]
+    summary["image_match_strategy"] = "recursive exact basename match under --image-root"
+    summary["searched_image_root"] = str(image_root) if image_root else ""
     return list(aggregates.values())
 
 
@@ -277,25 +299,39 @@ def extract_label_payload(
     )
 
 
-def build_image_index(image_root: Path | None) -> dict[str, Path]:
+def build_image_index(image_root: Path | None) -> ImageIndex:
     if image_root is None:
-        return {}
-    image_index: dict[str, Path] = {}
+        return ImageIndex(
+            image_root=None,
+            by_name={},
+            by_normalized_name={},
+            by_normalized_stem={},
+        )
+    by_name: dict[str, Path] = {}
+    by_normalized_name: dict[str, Path] = {}
+    by_normalized_stem: dict[str, Path] = {}
     for image_path in image_root.rglob("*"):
         if not image_path.is_file() or image_path.suffix.lower() not in IMAGE_SUFFIXES:
             continue
-        image_index.setdefault(image_path.name, image_path)
-    return image_index
+        by_name.setdefault(image_path.name, image_path)
+        by_normalized_name.setdefault(_normalize_filename(image_path.name), image_path)
+        by_normalized_stem.setdefault(_normalize_filename(image_path.stem), image_path)
+    return ImageIndex(
+        image_root=image_root,
+        by_name=by_name,
+        by_normalized_name=by_normalized_name,
+        by_normalized_stem=by_normalized_stem,
+    )
 
 
 def apply_image_matches(
     aggregates: Iterable[LabelAggregate],
     *,
-    image_index: dict[str, Path],
+    image_index: ImageIndex,
     output_path: Path,
 ) -> None:
     for aggregate in aggregates:
-        matched_path = image_index.get(aggregate.image_filename)
+        matched_path = image_index.by_name.get(aggregate.image_filename)
         if matched_path is None:
             aggregate.image_path = aggregate.image_filename
             aggregate.image_exists = False
@@ -322,6 +358,41 @@ def write_labels_csv(output_path: Path, aggregates: list[LabelAggregate]) -> Non
                     "cat_3": aggregate.cat_3,
                 }
             )
+
+
+def write_missing_images_csv(
+    path: Path,
+    aggregates: list[LabelAggregate],
+    *,
+    image_root: Path | None,
+) -> None:
+    image_index = build_image_index(image_root)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=MISSING_IMAGE_COLUMNS)
+        writer.writeheader()
+        for aggregate in aggregates:
+            if aggregate.image_exists:
+                continue
+            writer.writerow(
+                {
+                    "image_filename": aggregate.image_filename,
+                    "expected_foods": "|".join(aggregate.expected_foods),
+                    "json_path": "|".join(_json_path_from_label_source(source) for source in aggregate.label_sources),
+                    "searched_image_root": str(image_root) if image_root else "",
+                    "reason": diagnose_missing_image_reason(aggregate.image_filename, image_index),
+                }
+            )
+
+
+def diagnose_missing_image_reason(image_filename: str, image_index: ImageIndex) -> str:
+    if image_index.image_root is None:
+        return "image_root_not_provided"
+    normalized_name = _normalize_filename(image_filename)
+    if normalized_name in image_index.by_normalized_name:
+        return "case_or_unicode_filename_difference"
+    if _normalize_filename(Path(image_filename).stem) in image_index.by_normalized_stem:
+        return "extension_difference"
+    return "not_found_under_recursive_image_root"
 
 
 def write_summary(path: Path, summary: dict[str, Any]) -> None:
@@ -406,6 +477,15 @@ def _contains_korean(value: str) -> bool:
 
 def _normalize_key(value: str) -> str:
     return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def _normalize_filename(value: str) -> str:
+    return unicodedata.normalize("NFC", value).casefold().strip()
+
+
+def _json_path_from_label_source(value: str) -> str:
+    _, separator, json_path = value.partition(":")
+    return json_path if separator else value
 
 
 def _dedupe(values: list[str]) -> list[str]:
