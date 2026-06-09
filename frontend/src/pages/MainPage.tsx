@@ -580,19 +580,26 @@ export default function MainPage() {
           {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
           <div className="viz-card" style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "16px", alignItems: "start" }}>
             {/* 챌린지 현황 작은 카드 */}
-            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", minWidth: "160px" }}>
+            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", width: "220px", flexShrink: 0 }}>
               <span className="viz-card-label">챌린지 현황</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
                 <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
                   <circle cx="55" cy="55" r="44" fill="none" stroke="#e0e0e0" strokeWidth="10"/>
                   <circle cx="55" cy="55" r="44" fill="none" stroke="#1D9E75" strokeWidth="10"
                     strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
                     strokeLinecap="round" transform="rotate(-90 55 55)"/>
                 </svg>
-                <div>
+                <div style={{ paddingBottom: "4px" }}>
                   <div className="viz-ring-value">{challengeCount}개</div>
                   <div className="viz-ring-label">참여 중</div>
                 </div>
+              </div>
+              <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: "1.6", borderTop: "0.5px solid var(--color-border)", paddingTop: "10px", wordBreak: "keep-all" }}>
+                {challengeCount === 0
+                  ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
+                  : challengeCount < 3
+                  ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
+                  : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
               </div>
             </div>
 
