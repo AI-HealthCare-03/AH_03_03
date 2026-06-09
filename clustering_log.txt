@@ -1,0 +1,82 @@
+[0] 데이터 로드 | shape: (336389, 33)
+
+[1] 임상 기준 이상치 제거
+  식전혈당(공복혈당): 2개 제거 (허용범위: 30~1000)
+  총콜레스테롤: 7개 제거 (허용범위: 50~1000)
+  트리글리세라이드: 46개 제거 (허용범위: 10~6000)
+  HDL콜레스테롤: 36개 제거 (허용범위: 10~200)
+  LDL콜레스테롤: 128개 제거 (허용범위: 10~1000)
+  혈색소: 4개 제거 (허용범위: 3~25)
+  혈청크레아티닌: 2개 제거 (허용범위: 0.1~50)
+  혈청지오티(AST): 11개 제거 (허용범위: 5~5000)
+  혈청지피티(ALT): 214개 제거 (허용범위: 5~5000)
+  감마지티피: 2개 제거 (허용범위: 1~5000)
+  허리둘레: 1개 제거 (허용범위: 40~200)
+
+[gamma 탐색] 1단계 (굵은 탐색) | K=4 | gamma 범위: [0.01, 0.05, 0.1, 0.3, 0.5, 0.7, 1.0, 2.0, 5.0]
+======================================================================
+  gamma=0.010 | Silhouette: 0.1167 | Diversity: 30.4699 | Cost: 3,960,205
+  gamma=0.050 | Silhouette: 0.1167 | Diversity: 30.3914 | Cost: 3,985,281
+  gamma=0.100 | Silhouette: 0.1170 | Diversity: 30.3223 | Cost: 4,016,509
+  gamma=0.300 | Silhouette: 0.1157 | Diversity: 30.3613 | Cost: 4,139,056
+  gamma=0.500 | Silhouette: 0.1143 | Diversity: 30.5801 | Cost: 4,257,788
+  gamma=0.700 | Silhouette: 0.1120 | Diversity: 30.8614 | Cost: 4,373,745
+  gamma=1.000 | Silhouette: 0.1080 | Diversity: 31.2057 | Cost: 4,543,167
+  gamma=2.000 | Silhouette: 0.0977 | Diversity: 29.7985 | Cost: 5,082,376
+  gamma=5.000 | Silhouette: 0.0529 | Diversity: 22.7308 | Cost: 6,502,755
+
+  → 1단계 최적 gamma: 1.0 (diversity: 31.2057)
+
+[gamma 탐색] 2단계 (세밀한 탐색) | K=4 | gamma 범위: [np.float64(0.9), np.float64(0.91), np.float64(0.92), np.float64(0.93), np.float64(0.94), np.float64(0.95), np.float64(0.96), np.float64(0.97), np.float64(0.98), np.float64(0.99), np.float64(1.0), np.float64(1.01), np.float64(1.02), np.float64(1.03), np.float64(1.04), np.float64(1.05), np.float64(1.06), np.float64(1.07), np.float64(1.08), np.float64(1.09), np.float64(1.1), np.float64(1.11)]
+======================================================================
+  gamma=0.900 | Silhouette: 0.1091 | Diversity: 31.2452 | Cost: 4,487,218
+  gamma=0.910 | Silhouette: 0.1090 | Diversity: 31.2452 | Cost: 4,492,835
+  gamma=0.920 | Silhouette: 0.1088 | Diversity: 31.1751 | Cost: 4,498,447
+  gamma=0.930 | Silhouette: 0.1088 | Diversity: 31.2081 | Cost: 4,504,055
+  gamma=0.940 | Silhouette: 0.1087 | Diversity: 31.2328 | Cost: 4,509,657
+  gamma=0.950 | Silhouette: 0.1087 | Diversity: 31.1967 | Cost: 4,515,255
+  gamma=0.960 | Silhouette: 0.1085 | Diversity: 31.1635 | Cost: 4,520,847
+  gamma=0.970 | Silhouette: 0.1084 | Diversity: 31.1645 | Cost: 4,526,434
+  gamma=0.980 | Silhouette: 0.1081 | Diversity: 31.2008 | Cost: 4,532,016
+  gamma=0.990 | Silhouette: 0.1081 | Diversity: 31.1779 | Cost: 4,537,594
+  gamma=1.000 | Silhouette: 0.1080 | Diversity: 31.2057 | Cost: 4,543,167
+  gamma=1.010 | Silhouette: 0.1078 | Diversity: 31.1727 | Cost: 4,548,736
+  gamma=1.020 | Silhouette: 0.1075 | Diversity: 31.2465 | Cost: 4,554,299
+  gamma=1.030 | Silhouette: 0.1073 | Diversity: 31.2221 | Cost: 4,559,855
+  gamma=1.040 | Silhouette: 0.1072 | Diversity: 31.2219 | Cost: 4,565,406
+  gamma=1.050 | Silhouette: 0.1071 | Diversity: 31.1484 | Cost: 4,570,953
+  gamma=1.060 | Silhouette: 0.1069 | Diversity: 31.1743 | Cost: 4,576,494
+  gamma=1.070 | Silhouette: 0.1067 | Diversity: 31.1743 | Cost: 4,582,031
+  gamma=1.080 | Silhouette: 0.1066 | Diversity: 31.1500 | Cost: 4,587,566
+  gamma=1.090 | Silhouette: 0.1064 | Diversity: 31.2008 | Cost: 4,593,094
+  gamma=1.100 | Silhouette: 0.1064 | Diversity: 31.1990 | Cost: 4,598,617
+  gamma=1.110 | Silhouette: 0.1063 | Diversity: 31.1990 | Cost: 4,604,136
+
+[최종] 최적 gamma: 1.02 (diversity: 31.2465)
+
+[군집 분석] K=4 | gamma=1.02
+======================================================================
+cluster          0        1        2         3
+샘플수        90873.0  57064.0  81480.0  106972.0
+고혈압_기준         5.1     31.7     25.8       8.1
+당뇨_기준          1.8     18.1     16.3       4.6
+이상지질혈증_기준     24.3     22.0      2.3      13.3
+비만_기준          6.3     86.7     39.8      35.0
+
+[성별 분포]
+성별코드         1      2
+cluster              
+0        0.109  0.891
+1        0.890  0.110
+2        0.251  0.749
+3        0.950  0.050
+
+[연령대 분포]
+cluster
+0    11.5
+1    10.4
+2    13.7
+3    10.4
+
+[저장 완료] → /Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/Clustering/outputs/gamma_search
+  gamma_search_coarse.csv / gamma_search_fine.csv / final_cluster_summary.csv

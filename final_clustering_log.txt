@@ -1,0 +1,308 @@
+[0] 데이터 로드
+  shape: (336389, 33)
+[0] 불필요 컬럼 제거 후 | shape: (336389, 20)
+
+[1] 임상 기준 이상치 제거
+  식전혈당(공복혈당): 2개 제거 (허용범위: 30~1000)
+  총콜레스테롤: 7개 제거 (허용범위: 50~1000)
+  트리글리세라이드: 46개 제거 (허용범위: 10~6000)
+  HDL콜레스테롤: 36개 제거 (허용범위: 10~200)
+  LDL콜레스테롤: 128개 제거 (허용범위: 10~1000)
+  혈색소: 4개 제거 (허용범위: 3~25)
+  혈청크레아티닌: 2개 제거 (허용범위: 0.1~50)
+  혈청지오티(AST): 11개 제거 (허용범위: 5~5000)
+  혈청지피티(ALT): 214개 제거 (허용범위: 5~5000)
+  감마지티피: 2개 제거 (허용범위: 1~5000)
+  허리둘레: 1개 제거 (허용범위: 40~200)
+
+[2] BMI 추가 | 연속형: 16개 | 범주형: 5개
+[2] 결측치 처리 완료 | 잔여: 0
+
+[최종 군집화] K=4 | gamma=1.02 | 전체 336,389명
+Init: initializing centroids
+Init: initializing clusters
+Starting iterations...
+Run: 1, iteration: 1/100, moves: 136626, ncost: 4648640.25173213
+Run: 1, iteration: 2/100, moves: 32235, ncost: 4621006.286218144
+Run: 1, iteration: 3/100, moves: 18602, ncost: 4598197.610972253
+Run: 1, iteration: 4/100, moves: 14685, ncost: 4582830.620104162
+Run: 1, iteration: 5/100, moves: 12052, ncost: 4573359.844708178
+Run: 1, iteration: 6/100, moves: 10445, ncost: 4566680.153128554
+Run: 1, iteration: 7/100, moves: 9320, ncost: 4561917.087561561
+Run: 1, iteration: 8/100, moves: 8086, ncost: 4558630.611913484
+Run: 1, iteration: 9/100, moves: 6633, ncost: 4556583.736761863
+Run: 1, iteration: 10/100, moves: 4984, ncost: 4555514.719482328
+Run: 1, iteration: 11/100, moves: 3560, ncost: 4554988.416057881
+Run: 1, iteration: 12/100, moves: 2756, ncost: 4554672.176270246
+Run: 1, iteration: 13/100, moves: 1902, ncost: 4554516.661406222
+Run: 1, iteration: 14/100, moves: 1430, ncost: 4554434.025124547
+Run: 1, iteration: 15/100, moves: 1122, ncost: 4554384.439609758
+Run: 1, iteration: 16/100, moves: 951, ncost: 4554350.490805291
+Run: 1, iteration: 17/100, moves: 724, ncost: 4554330.657526684
+Run: 1, iteration: 18/100, moves: 568, ncost: 4554318.033497622
+Run: 1, iteration: 19/100, moves: 411, ncost: 4554311.789910698
+Run: 1, iteration: 20/100, moves: 317, ncost: 4554308.1573313605
+Run: 1, iteration: 21/100, moves: 259, ncost: 4554305.463870705
+Run: 1, iteration: 22/100, moves: 233, ncost: 4554303.366606891
+Run: 1, iteration: 23/100, moves: 171, ncost: 4554302.263054108
+Run: 1, iteration: 24/100, moves: 130, ncost: 4554301.691730957
+Run: 1, iteration: 25/100, moves: 109, ncost: 4554301.2217975715
+Run: 1, iteration: 26/100, moves: 103, ncost: 4554300.79214682
+Run: 1, iteration: 27/100, moves: 98, ncost: 4554300.406719271
+Run: 1, iteration: 28/100, moves: 58, ncost: 4554300.287856887
+Run: 1, iteration: 29/100, moves: 45, ncost: 4554300.165174207
+Run: 1, iteration: 30/100, moves: 63, ncost: 4554300.0136656575
+Run: 1, iteration: 31/100, moves: 67, ncost: 4554299.811087825
+Run: 1, iteration: 32/100, moves: 58, ncost: 4554299.670304672
+Run: 1, iteration: 33/100, moves: 49, ncost: 4554299.554000492
+Run: 1, iteration: 34/100, moves: 65, ncost: 4554299.371678321
+Run: 1, iteration: 35/100, moves: 65, ncost: 4554299.182365761
+Run: 1, iteration: 36/100, moves: 50, ncost: 4554299.064345658
+Run: 1, iteration: 37/100, moves: 42, ncost: 4554298.996404987
+Run: 1, iteration: 38/100, moves: 25, ncost: 4554298.956857297
+Run: 1, iteration: 39/100, moves: 26, ncost: 4554298.896288243
+Run: 1, iteration: 40/100, moves: 38, ncost: 4554298.830713184
+Run: 1, iteration: 41/100, moves: 25, ncost: 4554298.802693673
+Run: 1, iteration: 42/100, moves: 10, ncost: 4554298.7972762855
+Run: 1, iteration: 43/100, moves: 4, ncost: 4554298.794750184
+Run: 1, iteration: 44/100, moves: 4, ncost: 4554298.7930535395
+Run: 1, iteration: 45/100, moves: 8, ncost: 4554298.7826181585
+Run: 1, iteration: 46/100, moves: 17, ncost: 4554298.745011449
+Run: 1, iteration: 47/100, moves: 19, ncost: 4554298.718878773
+Run: 1, iteration: 48/100, moves: 13, ncost: 4554298.702672104
+Run: 1, iteration: 49/100, moves: 19, ncost: 4554298.681986001
+Run: 1, iteration: 50/100, moves: 15, ncost: 4554298.670015145
+Run: 1, iteration: 51/100, moves: 16, ncost: 4554298.651587576
+Run: 1, iteration: 52/100, moves: 21, ncost: 4554298.621239954
+Run: 1, iteration: 53/100, moves: 23, ncost: 4554298.595098136
+Run: 1, iteration: 54/100, moves: 16, ncost: 4554298.57508862
+Run: 1, iteration: 55/100, moves: 10, ncost: 4554298.569055179
+Run: 1, iteration: 56/100, moves: 3, ncost: 4554298.568273092
+Run: 1, iteration: 57/100, moves: 1, ncost: 4554298.568075167
+Run: 1, iteration: 58/100, moves: 0, ncost: 4554298.568075167
+Init: initializing centroids
+Init: initializing clusters
+Starting iterations...
+Run: 2, iteration: 1/100, moves: 111791, ncost: 4594696.04486107
+Run: 2, iteration: 2/100, moves: 37642, ncost: 4564903.8482878385
+Run: 2, iteration: 3/100, moves: 16231, ncost: 4558503.091318181
+Run: 2, iteration: 4/100, moves: 8746, ncost: 4556468.29004901
+Run: 2, iteration: 5/100, moves: 5384, ncost: 4555711.727006755
+Run: 2, iteration: 6/100, moves: 3359, ncost: 4555405.151861394
+Run: 2, iteration: 7/100, moves: 2168, ncost: 4555275.183069481
+Run: 2, iteration: 8/100, moves: 1414, ncost: 4555218.2080857465
+Run: 2, iteration: 9/100, moves: 956, ncost: 4555190.338774378
+Run: 2, iteration: 10/100, moves: 683, ncost: 4555175.389027905
+Run: 2, iteration: 11/100, moves: 544, ncost: 4555164.295838657
+Run: 2, iteration: 12/100, moves: 468, ncost: 4555156.605742326
+Run: 2, iteration: 13/100, moves: 344, ncost: 4555151.800179334
+Run: 2, iteration: 14/100, moves: 332, ncost: 4555147.571406888
+Run: 2, iteration: 15/100, moves: 254, ncost: 4555144.926653038
+Run: 2, iteration: 16/100, moves: 182, ncost: 4555143.885660233
+Run: 2, iteration: 17/100, moves: 121, ncost: 4555143.334041543
+Run: 2, iteration: 18/100, moves: 84, ncost: 4555143.019685596
+Run: 2, iteration: 19/100, moves: 82, ncost: 4555142.801306442
+Run: 2, iteration: 20/100, moves: 53, ncost: 4555142.69155662
+Run: 2, iteration: 21/100, moves: 43, ncost: 4555142.6246830905
+Run: 2, iteration: 22/100, moves: 36, ncost: 4555142.557247149
+Run: 2, iteration: 23/100, moves: 54, ncost: 4555142.419912779
+Run: 2, iteration: 24/100, moves: 43, ncost: 4555142.321473362
+Run: 2, iteration: 25/100, moves: 42, ncost: 4555142.24498043
+Run: 2, iteration: 26/100, moves: 38, ncost: 4555142.164033445
+Run: 2, iteration: 27/100, moves: 64, ncost: 4555142.032676398
+Run: 2, iteration: 28/100, moves: 43, ncost: 4555141.940300514
+Run: 2, iteration: 29/100, moves: 43, ncost: 4555141.8180551175
+Run: 2, iteration: 30/100, moves: 55, ncost: 4555141.670047222
+Run: 2, iteration: 31/100, moves: 36, ncost: 4555141.6283220975
+Run: 2, iteration: 32/100, moves: 35, ncost: 4555141.581366412
+Run: 2, iteration: 33/100, moves: 30, ncost: 4555141.531650129
+Run: 2, iteration: 34/100, moves: 33, ncost: 4555141.473922337
+Run: 2, iteration: 35/100, moves: 44, ncost: 4555141.409750974
+Run: 2, iteration: 36/100, moves: 31, ncost: 4555141.351527307
+Run: 2, iteration: 37/100, moves: 31, ncost: 4555141.3038390055
+Run: 2, iteration: 38/100, moves: 18, ncost: 4555141.2811466735
+Run: 2, iteration: 39/100, moves: 22, ncost: 4555141.2411176
+Run: 2, iteration: 40/100, moves: 27, ncost: 4555141.187816642
+Run: 2, iteration: 41/100, moves: 36, ncost: 4555141.106378921
+Run: 2, iteration: 42/100, moves: 48, ncost: 4555140.994869252
+Run: 2, iteration: 43/100, moves: 27, ncost: 4555140.96717254
+Run: 2, iteration: 44/100, moves: 30, ncost: 4555140.920213697
+Run: 2, iteration: 45/100, moves: 33, ncost: 4555140.862926225
+Run: 2, iteration: 46/100, moves: 32, ncost: 4555140.809402045
+Run: 2, iteration: 47/100, moves: 22, ncost: 4555140.787211557
+Run: 2, iteration: 48/100, moves: 11, ncost: 4555140.78117395
+Run: 2, iteration: 49/100, moves: 5, ncost: 4555140.777789628
+Run: 2, iteration: 50/100, moves: 8, ncost: 4555140.77312836
+Run: 2, iteration: 51/100, moves: 9, ncost: 4555140.765572756
+Run: 2, iteration: 52/100, moves: 3, ncost: 4555140.765116273
+Run: 2, iteration: 53/100, moves: 0, ncost: 4555140.765116273
+Init: initializing centroids
+Init: initializing clusters
+Starting iterations...
+Run: 3, iteration: 1/100, moves: 159032, ncost: 4639995.082417527
+Run: 3, iteration: 2/100, moves: 41711, ncost: 4600204.498102207
+Run: 3, iteration: 3/100, moves: 20148, ncost: 4587580.42572196
+Run: 3, iteration: 4/100, moves: 12955, ncost: 4581846.712202314
+Run: 3, iteration: 5/100, moves: 9432, ncost: 4578854.103265618
+Run: 3, iteration: 6/100, moves: 6969, ncost: 4577216.549056129
+Run: 3, iteration: 7/100, moves: 5224, ncost: 4576301.22515043
+Run: 3, iteration: 8/100, moves: 3890, ncost: 4575760.5266032
+Run: 3, iteration: 9/100, moves: 2920, ncost: 4575454.767478179
+Run: 3, iteration: 10/100, moves: 2272, ncost: 4575255.728242036
+Run: 3, iteration: 11/100, moves: 1757, ncost: 4575134.922442276
+Run: 3, iteration: 12/100, moves: 1305, ncost: 4575066.84573961
+Run: 3, iteration: 13/100, moves: 894, ncost: 4575033.170113794
+Run: 3, iteration: 14/100, moves: 606, ncost: 4575016.815011427
+Run: 3, iteration: 15/100, moves: 507, ncost: 4575005.427830478
+Run: 3, iteration: 16/100, moves: 381, ncost: 4574998.286747157
+Run: 3, iteration: 17/100, moves: 287, ncost: 4574994.390490352
+Run: 3, iteration: 18/100, moves: 199, ncost: 4574992.3230016865
+Run: 3, iteration: 19/100, moves: 201, ncost: 4574990.296093943
+Run: 3, iteration: 20/100, moves: 177, ncost: 4574988.708045021
+Run: 3, iteration: 21/100, moves: 134, ncost: 4574987.921806432
+Run: 3, iteration: 22/100, moves: 107, ncost: 4574987.398969839
+Run: 3, iteration: 23/100, moves: 64, ncost: 4574987.183127116
+Run: 3, iteration: 24/100, moves: 68, ncost: 4574986.956365544
+Run: 3, iteration: 25/100, moves: 59, ncost: 4574986.787862866
+Run: 3, iteration: 26/100, moves: 30, ncost: 4574986.705775549
+Run: 3, iteration: 27/100, moves: 37, ncost: 4574986.488250911
+Run: 3, iteration: 28/100, moves: 39, ncost: 4574986.44033839
+Run: 3, iteration: 29/100, moves: 11, ncost: 4574986.431517
+Run: 3, iteration: 30/100, moves: 5, ncost: 4574986.429908045
+Run: 3, iteration: 31/100, moves: 1, ncost: 4574986.429757985
+Run: 3, iteration: 32/100, moves: 0, ncost: 4574986.429757985
+Init: initializing centroids
+Init: initializing clusters
+Starting iterations...
+Run: 4, iteration: 1/100, moves: 159572, ncost: 4653177.627351997
+Run: 4, iteration: 2/100, moves: 52723, ncost: 4594823.610435958
+Run: 4, iteration: 3/100, moves: 29064, ncost: 4570648.650875447
+Run: 4, iteration: 4/100, moves: 17851, ncost: 4560745.750213951
+Run: 4, iteration: 5/100, moves: 11199, ncost: 4556848.263432538
+Run: 4, iteration: 6/100, moves: 6716, ncost: 4555444.808294678
+Run: 4, iteration: 7/100, moves: 4274, ncost: 4554855.750999133
+Run: 4, iteration: 8/100, moves: 2888, ncost: 4554578.434094245
+Run: 4, iteration: 9/100, moves: 1873, ncost: 4554457.5147263
+Run: 4, iteration: 10/100, moves: 1304, ncost: 4554394.088072961
+Run: 4, iteration: 11/100, moves: 981, ncost: 4554357.2156781005
+Run: 4, iteration: 12/100, moves: 719, ncost: 4554335.358223786
+Run: 4, iteration: 13/100, moves: 606, ncost: 4554320.757145945
+Run: 4, iteration: 14/100, moves: 464, ncost: 4554312.779901391
+Run: 4, iteration: 15/100, moves: 340, ncost: 4554308.963331658
+Run: 4, iteration: 16/100, moves: 284, ncost: 4554305.997061823
+Run: 4, iteration: 17/100, moves: 235, ncost: 4554303.792920432
+Run: 4, iteration: 18/100, moves: 187, ncost: 4554302.455009335
+Run: 4, iteration: 19/100, moves: 118, ncost: 4554301.885342554
+Run: 4, iteration: 20/100, moves: 116, ncost: 4554301.391479278
+Run: 4, iteration: 21/100, moves: 107, ncost: 4554300.952269744
+Run: 4, iteration: 22/100, moves: 86, ncost: 4554300.635389754
+Run: 4, iteration: 23/100, moves: 87, ncost: 4554300.3414592305
+Run: 4, iteration: 24/100, moves: 59, ncost: 4554300.197510675
+Run: 4, iteration: 25/100, moves: 61, ncost: 4554300.043255958
+Run: 4, iteration: 26/100, moves: 58, ncost: 4554299.871935687
+Run: 4, iteration: 27/100, moves: 49, ncost: 4554299.749440425
+Run: 4, iteration: 28/100, moves: 62, ncost: 4554299.592353264
+Run: 4, iteration: 29/100, moves: 64, ncost: 4554299.417429531
+Run: 4, iteration: 30/100, moves: 73, ncost: 4554299.201260735
+Run: 4, iteration: 31/100, moves: 49, ncost: 4554299.099885348
+Run: 4, iteration: 32/100, moves: 41, ncost: 4554299.021262769
+Run: 4, iteration: 33/100, moves: 28, ncost: 4554298.978416962
+Run: 4, iteration: 34/100, moves: 27, ncost: 4554298.9355736
+Run: 4, iteration: 35/100, moves: 31, ncost: 4554298.867185583
+Run: 4, iteration: 36/100, moves: 33, ncost: 4554298.817792224
+Run: 4, iteration: 37/100, moves: 20, ncost: 4554298.798248154
+Run: 4, iteration: 38/100, moves: 5, ncost: 4554298.795984939
+Run: 4, iteration: 39/100, moves: 4, ncost: 4554298.793631035
+Run: 4, iteration: 40/100, moves: 11, ncost: 4554298.782618157
+Run: 4, iteration: 41/100, moves: 17, ncost: 4554298.745011452
+Run: 4, iteration: 42/100, moves: 19, ncost: 4554298.718878764
+Run: 4, iteration: 43/100, moves: 13, ncost: 4554298.702672101
+Run: 4, iteration: 44/100, moves: 19, ncost: 4554298.681986001
+Run: 4, iteration: 45/100, moves: 15, ncost: 4554298.670015132
+Run: 4, iteration: 46/100, moves: 16, ncost: 4554298.651587578
+Run: 4, iteration: 47/100, moves: 21, ncost: 4554298.621239965
+Run: 4, iteration: 48/100, moves: 23, ncost: 4554298.59509814
+Run: 4, iteration: 49/100, moves: 16, ncost: 4554298.575088614
+Run: 4, iteration: 50/100, moves: 10, ncost: 4554298.569055183
+Run: 4, iteration: 51/100, moves: 3, ncost: 4554298.568273098
+Run: 4, iteration: 52/100, moves: 1, ncost: 4554298.56807518
+Run: 4, iteration: 53/100, moves: 0, ncost: 4554298.56807518
+Init: initializing centroids
+Init: initializing clusters
+Starting iterations...
+Run: 5, iteration: 1/100, moves: 90674, ncost: 4841418.537346859
+Run: 5, iteration: 2/100, moves: 67298, ncost: 4715366.324527885
+Run: 5, iteration: 3/100, moves: 27021, ncost: 4640172.441184724
+Run: 5, iteration: 4/100, moves: 13880, ncost: 4630235.52822074
+Run: 5, iteration: 5/100, moves: 4254, ncost: 4629575.571249057
+Run: 5, iteration: 6/100, moves: 2247, ncost: 4629396.600360883
+Run: 5, iteration: 7/100, moves: 1525, ncost: 4629308.417419677
+Run: 5, iteration: 8/100, moves: 1137, ncost: 4629254.30442163
+Run: 5, iteration: 9/100, moves: 942, ncost: 4629219.600285735
+Run: 5, iteration: 10/100, moves: 843, ncost: 4629191.466249623
+Run: 5, iteration: 11/100, moves: 748, ncost: 4629169.069923423
+Run: 5, iteration: 12/100, moves: 654, ncost: 4629151.192939943
+Run: 5, iteration: 13/100, moves: 575, ncost: 4629138.009295882
+Run: 5, iteration: 14/100, moves: 532, ncost: 4629127.494774211
+Run: 5, iteration: 15/100, moves: 452, ncost: 4629119.337424586
+Run: 5, iteration: 16/100, moves: 377, ncost: 4629112.994782754
+Run: 5, iteration: 17/100, moves: 348, ncost: 4629108.043930673
+Run: 5, iteration: 18/100, moves: 287, ncost: 4629104.969497868
+Run: 5, iteration: 19/100, moves: 226, ncost: 4629102.800434038
+Run: 5, iteration: 20/100, moves: 170, ncost: 4629101.292812254
+Run: 5, iteration: 21/100, moves: 160, ncost: 4629100.280293723
+Run: 5, iteration: 22/100, moves: 117, ncost: 4629099.778069517
+Run: 5, iteration: 23/100, moves: 80, ncost: 4629099.4270747015
+Run: 5, iteration: 24/100, moves: 64, ncost: 4629099.2528712675
+Run: 5, iteration: 25/100, moves: 47, ncost: 4629099.129272619
+Run: 5, iteration: 26/100, moves: 52, ncost: 4629098.973516062
+Run: 5, iteration: 27/100, moves: 54, ncost: 4629098.823103507
+Run: 5, iteration: 28/100, moves: 37, ncost: 4629098.754586607
+Run: 5, iteration: 29/100, moves: 30, ncost: 4629098.711913043
+Run: 5, iteration: 30/100, moves: 18, ncost: 4629098.693293484
+Run: 5, iteration: 31/100, moves: 37, ncost: 4629098.593763127
+Run: 5, iteration: 32/100, moves: 57, ncost: 4629098.438358553
+Run: 5, iteration: 33/100, moves: 46, ncost: 4629098.335118308
+Run: 5, iteration: 34/100, moves: 57, ncost: 4629098.170370514
+Run: 5, iteration: 35/100, moves: 52, ncost: 4629098.068366548
+Run: 5, iteration: 36/100, moves: 27, ncost: 4629098.032046082
+Run: 5, iteration: 37/100, moves: 16, ncost: 4629098.018254041
+Run: 5, iteration: 38/100, moves: 19, ncost: 4629097.999206823
+Run: 5, iteration: 39/100, moves: 14, ncost: 4629097.984726002
+Run: 5, iteration: 40/100, moves: 14, ncost: 4629097.974843705
+Run: 5, iteration: 41/100, moves: 6, ncost: 4629097.9703659145
+Run: 5, iteration: 42/100, moves: 7, ncost: 4629097.963560728
+Run: 5, iteration: 43/100, moves: 7, ncost: 4629097.960110723
+Run: 5, iteration: 44/100, moves: 10, ncost: 4629097.951798612
+Run: 5, iteration: 45/100, moves: 10, ncost: 4629097.943016524
+Run: 5, iteration: 46/100, moves: 19, ncost: 4629097.92062687
+Run: 5, iteration: 47/100, moves: 21, ncost: 4629097.894113238
+Run: 5, iteration: 48/100, moves: 8, ncost: 4629097.8902328145
+Run: 5, iteration: 49/100, moves: 1, ncost: 4629097.890141668
+Run: 5, iteration: 50/100, moves: 0, ncost: 4629097.890141668
+Best run was number 1
+
+[군집 분석]
+            샘플수  고혈압_기준  당뇨_기준  이상지질혈증_기준  비만_기준
+cluster                                         
+0        106977     8.1    4.6       13.3   35.0
+1         57056    31.7   18.1       22.0   86.7
+2         90877     5.1    1.8       24.3    6.3
+3         81479    25.8   16.3        2.3   39.8
+
+[성별 분포]
+성별코드         1      2
+cluster              
+0        0.950  0.050
+1        0.890  0.110
+2        0.109  0.891
+3        0.251  0.749
+
+[연령대 분포]
+cluster
+0    10.4
+1    10.4
+2    11.5
+3    13.7
+
+[저장 완료] → /Users/admin/PycharmProjects/AH_03_03/ai_worker/ml/Clustering/outputs/gamma_search
