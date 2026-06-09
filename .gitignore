@@ -99,6 +99,7 @@ ai_runtime/ml/LGB18~24/outputs/
 !ML/models/report/*.csv
 !experiment/ml/ML/models/report/*.csv
 !ai_runtime/cv/food/nutrition/data/food_disease_scores.csv
+!experiment/ai/cv/gpt_vision_food_eval/sample_labels.csv
 *.parquet
 *.pkl
 *.joblib
