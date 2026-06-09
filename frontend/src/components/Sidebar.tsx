@@ -9,19 +9,41 @@ export type SidebarLink = {
   to: string;
 };
 
-export const sidebarLinks: SidebarLink[] = [
-  { to: "/", icon: "🏠", label: "홈" },
-  { to: "/health", icon: "🧭", label: "건강 분석" },
-  { to: "/ocr", icon: "📄", label: "검진·복약 등록" },
-  { to: "/chatbot", icon: "🤖", label: "AI 건강 상담" },
-  { to: "/diets", icon: "🥗", label: "식단 분석" },
-  { to: "/dashboard", icon: "📊", label: "건강 리포트" },
-  { to: "/challenges", icon: "✅", label: "챌린지" },
-  { to: "/medications", icon: "💊", label: "복약/영양제" },
-  { to: "/mypage", icon: "👤", label: "마이페이지" },
-  { to: "/inquiries", icon: "💬", label: "문의/FAQ" },
-  { to: "/settings", icon: "⚙️", label: "설정" },
+type SidebarSection = {
+  title: string;
+  links: SidebarLink[];
+};
+
+export const sidebarSections: SidebarSection[] = [
+  {
+    title: "핵심 기능",
+    links: [
+      { to: "/", icon: "🏠", label: "홈" },
+      { to: "/health", icon: "🧭", label: "건강 분석" },
+      { to: "/dashboard", icon: "📊", label: "건강 리포트" },
+    ],
+  },
+  {
+    title: "기록/관리",
+    links: [
+      { to: "/ocr", icon: "📄", label: "검진·복약 등록" },
+      { to: "/medications", icon: "💊", label: "복약/영양제" },
+      { to: "/diets", icon: "🥗", label: "식단 분석" },
+      { to: "/challenges", icon: "✅", label: "챌린지" },
+      { to: "/chatbot", icon: "🤖", label: "AI 건강 상담" },
+    ],
+  },
+  {
+    title: "계정/지원",
+    links: [
+      { to: "/mypage", icon: "👤", label: "마이페이지" },
+      { to: "/settings", icon: "⚙️", label: "설정" },
+      { to: "/inquiries", icon: "💬", label: "문의/FAQ" },
+    ],
+  },
 ];
+
+export const sidebarLinks: SidebarLink[] = sidebarSections.flatMap((s) => s.links);
 
 export default function Sidebar() {
   const { backendUser } = useAuth();
@@ -31,12 +53,17 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {sidebarLinks.map((link) => (
-        <NavLink aria-label={link.label} className={getLinkClass} key={link.to} title={link.label} to={link.to}>
-          <span aria-hidden="true" className="sidebar-active-indicator" />
-          <span className="sidebar-link-icon">{link.icon}</span>
-          <span className="sidebar-link-label">{link.label}</span>
-        </NavLink>
+      {sidebarSections.map((section) => (
+        <div key={section.title}>
+          <p className="sidebar-section-title">{section.title}</p>
+          {section.links.map((link) => (
+            <NavLink aria-label={link.label} className={getLinkClass} key={link.to} title={link.label} to={link.to}>
+              <span aria-hidden="true" className="sidebar-active-indicator" />
+              <span className="sidebar-link-icon">{link.icon}</span>
+              <span className="sidebar-link-label">{link.label}</span>
+            </NavLink>
+          ))}
+        </div>
       ))}
       {showAdminLink && (
         <NavLink aria-label="관리자 콘솔" className={getLinkClass} title="관리자 콘솔" to="/admin">
