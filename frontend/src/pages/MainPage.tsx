@@ -470,18 +470,25 @@ export default function MainPage() {
                 </span>
               </div>
               {displayAnalysisResults.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", justifyItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   {displayAnalysisResults.map((result) => {
                     const level = String(result.risk_level ?? "").toUpperCase();
-                    const color = level === "HIGH" ? "#d35d5d" : level === "MEDIUM" ? "#d99a3d" : "#3a8b7a";
-                    const dash = level === "HIGH" ? "168 33" : level === "MEDIUM" ? "101 100" : "134 67";
+                    const score = typeof result.risk_score === "number" ? result.risk_score : parseFloat(String(result.risk_score ?? "0"));
+                    const pct = Math.round(score * 100);
+                    const circumference = 2 * Math.PI * 28;
+                    const dashFilled = (score * circumference).toFixed(1);
+                    const dashEmpty = (circumference - score * circumference).toFixed(1);
+                    const color = level === "HIGH" ? "#d35d5d" : level === "MEDIUM" ? "#d99a3d" : "#1D9E75";
+                    const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
+                    const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
                     return (
-                      <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "8px" }}>
-                        <svg width="110" height="110" viewBox="0 0 80 80" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
-                          <circle cx="40" cy="40" r="32" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                          <circle cx="40" cy="40" r="32" fill="none" stroke={color} strokeWidth="10" strokeDasharray={dash} strokeLinecap="round" transform="rotate(-90 40 40)"/>
+                      <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
+                        <svg width="110" height="110" viewBox="0 0 110 110" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
+                          <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                          <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 55 55)"/>
+                          <text x="55" y="61" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
                         </svg>
-                        <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
                       </div>
                     );
                   })}
@@ -573,14 +580,14 @@ export default function MainPage() {
           {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
           <div className="viz-card" style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "16px", alignItems: "start" }}>
             {/* 챌린지 현황 작은 카드 */}
-            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "12px", minWidth: "120px" }}>
+            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", minWidth: "160px" }}>
               <span className="viz-card-label">챌린지 현황</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px" }}>
-                <svg width="64" height="64" viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="#e0e0e0" strokeWidth="8"/>
-                  <circle cx="32" cy="32" r="28" fill="none" stroke="#3a8b7a" strokeWidth="8"
-                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 175, 175) : 0} 175`}
-                    strokeLinecap="round" transform="rotate(-90 32 32)"/>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "12px" }}>
+                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="#e0e0e0" strokeWidth="10"/>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="#1D9E75" strokeWidth="10"
+                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
+                    strokeLinecap="round" transform="rotate(-90 55 55)"/>
                 </svg>
                 <div>
                   <div className="viz-ring-value">{challengeCount}개</div>
