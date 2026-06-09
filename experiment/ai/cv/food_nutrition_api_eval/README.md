@@ -52,6 +52,36 @@ uv run python experiment/ai/cv/food_nutrition_api_eval/run_nutrition_lookup_eval
   --limit 30
 ```
 
+MFDS public API probe:
+
+```bash
+uv run python experiment/ai/cv/food_nutrition_api_eval/probe_public_api.py \
+  --provider mfds \
+  --limit 20 \
+  --enable-fallback
+```
+
+The MFDS probe uses `FOOD_NM_KR` search against:
+
+```text
+https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02
+```
+
+It records original top1 and reranked top1 separately. The reranker is intentionally conservative:
+
+- `matched` can be considered an experiment-level auto-accept candidate.
+- `likely_match`, `multiple_candidates`, and `weak_match` should remain user-confirmation candidates.
+- `no_candidates`, `api_unavailable`, and `parse_failed` should not block the whole batch.
+- `fallback_used` means the original query was not enough and a fallback query provided the selected candidate.
+
+Current penalty keywords are heuristic and experiment-only:
+
+```text
+과자, 크래커, 케이크, 라떼, 새우칩, 스낵, 음료, 아이스크림, 초콜릿, 사탕, 쿠키, 와플, 시리얼, 소스
+```
+
+These can incorrectly penalize legitimate foods, so they must be validated before any production use.
+
 ## Metrics
 
 - `nutrition_lookup_success_rate`
@@ -94,7 +124,8 @@ The current stub provider does not require an API key.
 Future MFDS/RDA providers should read API keys from environment variables such as:
 
 ```env
-MFDS_FOOD_NUTRITION_API_KEY=<MFDS_API_KEY>
+MFDS_SERVICE_KEY=<MFDS_API_KEY>
+MFDS_SERVICE_KEY_ENCODED=<MFDS_ENCODED_API_KEY>
 RDA_FOOD_NUTRITION_API_KEY=<RDA_API_KEY>
 ```
 
@@ -110,4 +141,3 @@ Recommended next steps:
 2. Add MFDS/RDA clients under this experiment directory.
 3. Measure public API latency, top candidate quality, failure rate, and cache effectiveness.
 4. Only after the provider is stable, introduce a production `NutritionProvider` adapter behind a feature flag.
-

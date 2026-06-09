@@ -13,27 +13,54 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from reranking import MatchStatus, build_query_variants, needs_fallback, needs_user_confirmation, rerank_candidates
+
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 DEFAULT_QUERIES = [
     "가래떡",
     "가리비",
     "샌드위치",
     "blt샌드위치",
+    "BLT 샌드위치",
     "파프리카",
+    "노랑파프리카",
+    "녹색피망",
     "자몽",
     "홍차",
     "핫초코",
     "냉면",
+    "비빔냉면",
     "미역국",
+    "고등어",
+    "고등어구이",
+    "달걀볶음밥",
+    "육회비빔밥",
+    "카페라떼",
+    "블루베리",
 ]
 OUTPUT_COLUMNS = [
     "provider",
     "operation_url",
     "key_mode",
     "query",
+    "original_query",
+    "used_query",
+    "query_variants",
+    "fallback_queries",
+    "fallback_used",
     "status",
+    "match_status",
+    "needs_user_confirmation",
     "candidate_count",
     "top_candidates",
+    "original_top_candidate",
+    "reranked_top_candidate",
+    "original_top_food_name",
+    "reranked_food_name",
+    "reranked_food_code",
+    "reranked_source_query",
+    "rank_score",
+    "rank_reason",
     "food_name",
     "food_code",
     "serving_size",
@@ -42,6 +69,7 @@ OUTPUT_COLUMNS = [
     "protein_g",
     "fat_g",
     "sodium_mg",
+    "nutrition_field_completeness",
     "raw_response_sample",
     "latency_seconds",
     "error_message",
@@ -69,6 +97,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None, help="Limit query count.")
     parser.add_argument("--output-dir", default=str(EXPERIMENT_DIR / "outputs"))
     parser.add_argument("--page-size", type=int, default=10)
+    parser.add_argument("--max-candidates", type=int, default=10)
+    fallback_group = parser.add_mutually_exclusive_group()
+    fallback_group.add_argument("--enable-fallback", dest="enable_fallback", action="store_true")
+    fallback_group.add_argument("--disable-fallback", dest="enable_fallback", action="store_false")
+    parser.set_defaults(enable_fallback=True)
     return parser.parse_args()
 
 
@@ -96,7 +129,14 @@ def main() -> int:
     rows: list[dict[str, Any]] = []
     for provider in providers:
         for query in queries:
-            rows.append(probe_query(provider=provider, query=query, page_size=args.page_size))
+            rows.append(
+                probe_query(
+                    provider=provider,
+                    query=query,
+                    page_size=args.max_candidates or args.page_size,
+                    enable_fallback=args.enable_fallback,
+                )
+            )
 
     write_csv(output_dir / "api_probe_results.csv", rows)
     write_json(output_dir / "api_probe_results.json", rows)
@@ -135,8 +175,16 @@ def encoded_api_key_for_provider(provider: str) -> str | None:
     return value.strip() if value and value.strip() else None
 
 
-def probe_query(*, provider: str, query: str, page_size: int) -> dict[str, Any]:
+def probe_query(*, provider: str, query: str, page_size: int, enable_fallback: bool) -> dict[str, Any]:
     started = time.perf_counter()
+    if provider == "mfds":
+        return probe_mfds_query(
+            query=query,
+            page_size=page_size,
+            started=started,
+            enable_fallback=enable_fallback,
+        )
+
     try:
         payload, key_mode, operation_url = fetch_provider_payload(
             provider=provider,
@@ -155,9 +203,24 @@ def probe_query(*, provider: str, query: str, page_size: int) -> dict[str, Any]:
             "operation_url": endpoint_for_provider(provider),
             "key_mode": None,
             "query": query,
-            "status": "api_error",
+            "original_query": query,
+            "used_query": query,
+            "query_variants": [],
+            "fallback_queries": [],
+            "fallback_used": False,
+            "status": MatchStatus.API_UNAVAILABLE.value,
+            "match_status": MatchStatus.API_UNAVAILABLE.value,
+            "needs_user_confirmation": True,
             "candidate_count": 0,
             "top_candidates": [],
+            "original_top_candidate": None,
+            "reranked_top_candidate": None,
+            "original_top_food_name": None,
+            "reranked_food_name": None,
+            "reranked_food_code": None,
+            "reranked_source_query": None,
+            "rank_score": None,
+            "rank_reason": None,
             "food_name": None,
             "food_code": None,
             "serving_size": None,
@@ -166,10 +229,114 @@ def probe_query(*, provider: str, query: str, page_size: int) -> dict[str, Any]:
             "protein_g": None,
             "fat_g": None,
             "sodium_mg": None,
+            "nutrition_field_completeness": 0.0,
             "raw_response_sample": {},
             "latency_seconds": round(time.perf_counter() - started, 4),
             "error_message": str(exc),
         }
+
+
+def probe_mfds_query(*, query: str, page_size: int, started: float, enable_fallback: bool) -> dict[str, Any]:
+    query_variants = build_query_variants(query) if enable_fallback else [query]
+    first_payload: dict[str, Any] = {}
+    first_items: list[dict[str, Any]] = []
+    first_candidates: list[dict[str, Any]] = []
+    all_candidates: list[dict[str, Any]] = []
+    key_mode = None
+    operation_url = MFDS_ENDPOINT
+    error_messages: list[str] = []
+
+    for index, query_variant in enumerate(query_variants):
+        if index > 0 and not should_try_fallback(query=query, candidates=first_candidates):
+            break
+        try:
+            payload, current_key_mode, operation_url = fetch_mfds_payload(query=query_variant, page_size=page_size)
+        except Exception as exc:
+            error_messages.append(f"{query_variant}: {exc}")
+            continue
+        key_mode = key_mode or current_key_mode
+        items = extract_items(payload)
+        candidates = build_candidates(provider="mfds", items=items)
+        for candidate in candidates:
+            candidate["source_query"] = query_variant
+        if index == 0:
+            first_payload = payload
+            first_items = items
+            first_candidates = candidates
+        all_candidates.extend(candidates)
+        if index == 0 and not should_try_fallback(query=query, candidates=candidates):
+            break
+
+    if not first_payload and error_messages:
+        return api_failure_row(
+            query=query,
+            started=started,
+            error_message=" | ".join(error_messages),
+            parse_failed=any("json" in message.lower() for message in error_messages),
+        )
+
+    result = normalize_probe_result(
+        provider="mfds",
+        query=query,
+        items=first_items,
+        payload=first_payload,
+        candidates=all_candidates,
+        original_candidates=first_candidates,
+        query_variants=query_variants,
+    )
+    result["operation_url"] = operation_url
+    result["key_mode"] = key_mode
+    result["latency_seconds"] = round(time.perf_counter() - started, 4)
+    if error_messages:
+        result["error_message"] = " | ".join(error_messages)
+    return result
+
+
+def should_try_fallback(*, query: str, candidates: list[dict[str, Any]]) -> bool:
+    if not candidates:
+        return True
+    _, top = rerank_candidates(query=query, candidates=candidates)
+    return needs_fallback(top.match_status if top else MatchStatus.NO_CANDIDATES.value)
+
+
+def api_failure_row(*, query: str, started: float, error_message: str, parse_failed: bool) -> dict[str, Any]:
+    status = MatchStatus.PARSE_FAILED.value if parse_failed else MatchStatus.API_UNAVAILABLE.value
+    return {
+        "provider": "mfds",
+        "operation_url": MFDS_ENDPOINT,
+        "key_mode": None,
+        "query": query,
+        "original_query": query,
+        "used_query": query,
+        "query_variants": [query],
+        "fallback_queries": [],
+        "fallback_used": False,
+        "status": status,
+        "match_status": status,
+        "needs_user_confirmation": True,
+        "candidate_count": 0,
+        "top_candidates": [],
+        "original_top_candidate": None,
+        "reranked_top_candidate": None,
+        "original_top_food_name": None,
+        "reranked_food_name": None,
+        "reranked_food_code": None,
+        "reranked_source_query": None,
+        "rank_score": None,
+        "rank_reason": None,
+        "food_name": None,
+        "food_code": None,
+        "serving_size": None,
+        "energy_kcal": None,
+        "carbohydrate_g": None,
+        "protein_g": None,
+        "fat_g": None,
+        "sodium_mg": None,
+        "nutrition_field_completeness": 0.0,
+        "raw_response_sample": {},
+        "latency_seconds": round(time.perf_counter() - started, 4),
+        "error_message": error_message,
+    }
 
 
 def fetch_provider_payload(*, provider: str, query: str, page_size: int) -> tuple[dict[str, Any], str, str]:
@@ -330,18 +497,44 @@ def normalize_probe_result(
     query: str,
     items: list[dict[str, Any]],
     payload: dict[str, Any],
+    candidates: list[dict[str, Any]] | None = None,
+    original_candidates: list[dict[str, Any]] | None = None,
+    query_variants: list[str] | None = None,
 ) -> dict[str, Any]:
-    candidates = build_candidates(provider=provider, items=items)
-    top_candidate = candidates[0] if candidates else {}
-    status = "success" if candidates else "no_candidates"
+    candidates = candidates if candidates is not None else build_candidates(provider=provider, items=items)
+    original_candidates = original_candidates if original_candidates is not None else candidates
+    ranked_candidates, reranked_top = rerank_candidates(query=query, candidates=candidates)
+    original_top_candidate = original_candidates[0] if original_candidates else {}
+    top_candidate = reranked_top.candidate if reranked_top else {}
+    match_status = reranked_top.match_status if reranked_top else MatchStatus.NO_CANDIDATES.value
+    used_query = reranked_top.source_query if reranked_top else query
+    query_variants = query_variants or [query]
+    fallback_queries = query_variants[1:]
+    fallback_used = bool(reranked_top and reranked_top.source_query != query)
+    status = MatchStatus.FALLBACK_USED.value if fallback_used else match_status
     return {
         "operation_url": endpoint_for_provider(provider),
         "key_mode": None,
         "provider": provider,
         "query": query,
+        "original_query": query,
+        "used_query": used_query,
+        "query_variants": query_variants,
+        "fallback_queries": fallback_queries,
+        "fallback_used": fallback_used,
         "status": status,
+        "match_status": match_status,
+        "needs_user_confirmation": fallback_used or needs_user_confirmation(match_status),
         "candidate_count": len(candidates),
-        "top_candidates": candidates[:5],
+        "top_candidates": serialize_ranked_candidates(ranked_candidates[:5]) if ranked_candidates else candidates[:5],
+        "original_top_candidate": original_top_candidate or None,
+        "reranked_top_candidate": top_candidate or None,
+        "original_top_food_name": original_top_candidate.get("food_name"),
+        "reranked_food_name": top_candidate.get("food_name"),
+        "reranked_food_code": top_candidate.get("food_code"),
+        "reranked_source_query": reranked_top.source_query if reranked_top else None,
+        "rank_score": reranked_top.rank_score if reranked_top else None,
+        "rank_reason": reranked_top.rank_reason if reranked_top else None,
         "food_name": top_candidate.get("food_name"),
         "food_code": top_candidate.get("food_code"),
         "serving_size": top_candidate.get("serving_size"),
@@ -350,15 +543,36 @@ def normalize_probe_result(
         "protein_g": top_candidate.get("protein_g"),
         "fat_g": top_candidate.get("fat_g"),
         "sodium_mg": top_candidate.get("sodium_mg"),
+        "nutrition_field_completeness": nutrition_field_completeness(top_candidate),
         "raw_response_sample": sample_response(payload=payload, items=items),
         "error_message": None,
     }
+
+
+def serialize_ranked_candidates(ranked_candidates: list[Any]) -> list[dict[str, Any]]:
+    serialized: list[dict[str, Any]] = []
+    for ranked_candidate in ranked_candidates:
+        candidate = dict(ranked_candidate.candidate)
+        candidate["rank_score"] = ranked_candidate.rank_score
+        candidate["rank_reason"] = ranked_candidate.rank_reason
+        candidate["match_status"] = ranked_candidate.match_status
+        candidate["source_query"] = ranked_candidate.source_query
+        serialized.append(candidate)
+    return serialized
 
 
 def build_candidates(*, provider: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if provider == "rda":
         return build_rda_candidates(items)
     return [build_row_candidate(item) for item in items]
+
+
+def nutrition_field_completeness(candidate: dict[str, Any]) -> float:
+    fields = ["energy_kcal", "carbohydrate_g", "protein_g", "fat_g", "sodium_mg"]
+    if not candidate:
+        return 0.0
+    present_count = sum(candidate.get(field) is not None for field in fields)
+    return round(present_count / len(fields), 4)
 
 
 def build_rda_candidates(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -510,9 +724,9 @@ def write_json(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def write_report(path: Path, rows: list[dict[str, Any]]) -> None:
     total = len(rows)
-    success = sum(row.get("status") == "success" for row in rows)
-    no_candidates = sum(row.get("status") == "no_candidates" for row in rows)
-    api_error = sum(row.get("status") == "api_error" for row in rows)
+    status_counts = count_by(rows, "match_status")
+    confirmation_rows = [row for row in rows if row.get("needs_user_confirmation")]
+    fallback_rows = [row for row in rows if row.get("fallback_used")]
     lines = [
         "# Public Nutrition API Probe Report",
         "",
@@ -521,9 +735,9 @@ def write_report(path: Path, rows: list[dict[str, Any]]) -> None:
         "## Summary",
         "",
         f"- total_requests: {total}",
-        f"- success: {success}",
-        f"- no_candidates: {no_candidates}",
-        f"- api_error: {api_error}",
+        *[f"- {status}: {count}" for status, count in sorted(status_counts.items())],
+        f"- needs_user_confirmation: {len(confirmation_rows)}",
+        f"- fallback_used: {len(fallback_rows)}",
         "",
         "## Operation URLs",
         "",
@@ -547,34 +761,107 @@ def write_report(path: Path, rows: list[dict[str, Any]]) -> None:
         )
     lines.extend(
         [
-            "## Results",
+            "## Original Top1 vs Reranked Top1",
             "",
-            "| provider | key_mode | query | status | candidate_count | top food | energy_kcal | carbs_g | protein_g | fat_g | sodium_mg |",
-            "|---|---|---|---|---:|---|---:|---:|---:|---:|---:|",
+            "| provider | key_mode | original_query | used_query | status | match_status | fallback_used | candidate_count | API top | reranked top | score | reason | nutrition_completeness |",
+            "|---|---|---|---|---|---|---|---:|---|---|---:|---|---:|",
         ]
     )
     for row in rows:
         lines.append(
-            "| {provider} | {key_mode} | {query} | {status} | {candidate_count} | {food_name} | {energy_kcal} | "
-            "{carbohydrate_g} | {protein_g} | {fat_g} | {sodium_mg} |".format(
+            "| {provider} | {key_mode} | {original_query} | {used_query} | {status} | {match_status} | "
+            "{fallback_used} | {candidate_count} | {original_top_food_name} | {food_name} | {rank_score} | "
+            "{rank_reason} | {nutrition_field_completeness} |".format(
                 provider=row.get("provider") or "",
                 key_mode=row.get("key_mode") or "",
-                query=row.get("query") or "",
+                original_query=row.get("original_query") or row.get("query") or "",
+                used_query=row.get("used_query") or "",
                 status=row.get("status") or "",
+                match_status=row.get("match_status") or "",
+                fallback_used=row.get("fallback_used"),
                 candidate_count=row.get("candidate_count") or 0,
+                original_top_food_name=row.get("original_top_food_name") or "",
                 food_name=row.get("food_name") or "",
-                energy_kcal=display_value(row.get("energy_kcal")),
-                carbohydrate_g=display_value(row.get("carbohydrate_g")),
-                protein_g=display_value(row.get("protein_g")),
-                fat_g=display_value(row.get("fat_g")),
-                sodium_mg=display_value(row.get("sodium_mg")),
+                rank_score=display_value(row.get("rank_score")),
+                rank_reason=row.get("rank_reason") or "",
+                nutrition_field_completeness=display_value(row.get("nutrition_field_completeness")),
             )
         )
+    append_food_list_section(
+        lines,
+        title="Automatically Acceptable Candidates",
+        rows=[
+            row for row in rows if row.get("match_status") == MatchStatus.MATCHED.value and not row.get("fallback_used")
+        ],
+    )
+    append_food_list_section(
+        lines,
+        title="Likely Match Candidates",
+        rows=[row for row in rows if row.get("match_status") == MatchStatus.LIKELY_MATCH.value],
+    )
+    append_food_list_section(
+        lines,
+        title="Needs User Confirmation Candidates",
+        rows=confirmation_rows,
+    )
+    append_food_list_section(
+        lines,
+        title="No Candidates",
+        rows=[row for row in rows if row.get("match_status") == MatchStatus.NO_CANDIDATES.value],
+    )
+    append_food_list_section(lines, title="Fallback Used", rows=fallback_rows)
+    risky_rows = [
+        row
+        for row in rows
+        if row.get("match_status")
+        in {
+            MatchStatus.WEAK_MATCH.value,
+            MatchStatus.MULTIPLE_CANDIDATES.value,
+            MatchStatus.NEEDS_USER_CONFIRMATION.value,
+        }
+    ]
+    append_food_list_section(lines, title="Risky With MFDS Only", rows=risky_rows)
+    lines.extend(
+        [
+            "",
+            "## Before Production Integration",
+            "",
+            "- Treat `matched` as the only auto-accept candidate in this experiment.",
+            "- Route `likely_match`, `multiple_candidates`, and `weak_match` to user confirmation or candidate selection.",
+            "- Add query normalization for generic ingredients, beverages, colors, and romanized names.",
+            "- Compare MFDS against RDA/FoodNara-style APIs before using a single provider in production.",
+            "- The processed-food penalty keywords are experimental heuristics and need validation on a larger sample.",
+        ]
+    )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def display_value(value: Any) -> str:
     return "" if value is None else str(value)
+
+
+def count_by(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        value = str(row.get(key) or "")
+        if not value:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def append_food_list_section(lines: list[str], *, title: str, rows: list[dict[str, Any]]) -> None:
+    lines.extend(["", f"## {title}", ""])
+    if not rows:
+        lines.append("- none")
+        return
+    for row in rows:
+        original_query = row.get("original_query") or row.get("query") or ""
+        used_query = row.get("used_query") or ""
+        food_name = row.get("food_name") or ""
+        match_status = row.get("match_status") or ""
+        score = display_value(row.get("rank_score"))
+        lines.append(f"- {original_query} -> {food_name} ({match_status}, score={score}, used_query={used_query})")
 
 
 if __name__ == "__main__":
