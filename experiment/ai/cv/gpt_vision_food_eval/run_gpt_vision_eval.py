@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default=DEFAULT_MODEL, help="OpenAI vision model name.")
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY", help="Environment variable containing API key.")
     parser.add_argument("--allowed-foods", default=None, help="Optional JSON list of allowed food labels.")
+    parser.add_argument("--eval-run-id", default=None, help="Optional Langfuse/grouping ID for this eval run.")
     return parser.parse_args()
 
 
@@ -57,6 +59,9 @@ async def main() -> None:
 
     labels = load_labels(labels_path, limit=args.limit)
     allowed_foods = load_allowed_foods(Path(args.allowed_foods)) if args.allowed_foods else None
+    eval_run_id = args.eval_run_id or build_eval_run_id()
+    prompt = build_food_eval_prompt(allowed_foods)
+    tracer = EvalLangfuseTracer.from_env(eval_run_id=eval_run_id, model=args.model, prompt=prompt)
     predictions = [
         await evaluate_image(
             label=label,
@@ -67,6 +72,9 @@ async def main() -> None:
         )
         for label in labels
     ]
+    for prediction in predictions:
+        tracer.record_prediction(prediction)
+    tracer.flush()
     metrics = compute_metrics(predictions)
     write_predictions_csv(output_dir / "predictions.csv", predictions)
     write_metrics_json(output_dir / "metrics.json", metrics)
@@ -74,6 +82,124 @@ async def main() -> None:
     print(f"Wrote {output_dir / 'predictions.csv'}")
     print(f"Wrote {output_dir / 'metrics.json'}")
     print(f"Wrote {output_dir / 'report.md'}")
+
+
+def build_eval_run_id() -> str:
+    return f"food-eval-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+
+
+class EvalLangfuseTracer:
+    def __init__(
+        self,
+        *,
+        client: Any | None,
+        eval_run_id: str,
+        model: str,
+        prompt: str,
+    ) -> None:
+        self.client = client
+        self.eval_run_id = eval_run_id
+        self.model = model
+        self.prompt = prompt
+
+    @classmethod
+    def from_env(cls, *, eval_run_id: str, model: str, prompt: str) -> EvalLangfuseTracer:
+        if not _env_flag_enabled(os.getenv("LANGFUSE_ENABLED")):
+            return cls(client=None, eval_run_id=eval_run_id, model=model, prompt=prompt)
+
+        public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+        secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+        host = os.getenv("LANGFUSE_BASE_URL") or os.getenv("LANGFUSE_HOST")
+        if not public_key or not secret_key or not host:
+            return cls(client=None, eval_run_id=eval_run_id, model=model, prompt=prompt)
+
+        try:
+            from langfuse import Langfuse
+
+            client = Langfuse(public_key=public_key, secret_key=secret_key, host=host)
+        except Exception:
+            client = None
+        return cls(client=client, eval_run_id=eval_run_id, model=model, prompt=prompt)
+
+    def record_prediction(self, row: PredictionRow) -> bool:
+        if self.client is None:
+            return False
+
+        row_scores = row_precision_recall_f1(row)
+        metadata = {
+            "eval_run_id": self.eval_run_id,
+            "image_path": row.image_path,
+            "image_filename": Path(row.image_path).name,
+            "expected_foods": row.expected_foods,
+            "raw_food_names": row.raw_food_names,
+            "allowed_food_names": row.allowed_food_names,
+            "canonical_food_names": row.canonical_food_names,
+            "unmatched_food_names": row.unmatched_food_names,
+            "invalid_label_count": row.invalid_label_count,
+            "constrained_by_allowed_foods": row.constrained_by_allowed_foods,
+            "status": row_status(row),
+            "failure_reason": row.error_message,
+            "confidence": row.confidence,
+            "latency_seconds": row.latency_seconds,
+            "exact_match_raw": is_exact_raw_match(row),
+            "exact_match_canonical": is_exact_canonical_match(row),
+            "any_hit": has_any_food_hit(row),
+            "precision": row_scores["precision"],
+            "recall": row_scores["recall"],
+            "f1_score": row_scores["f1_score"],
+        }
+        input_payload = {
+            "prompt": self.prompt,
+            "image_path": row.image_path,
+            "image_filename": Path(row.image_path).name,
+            "expected_foods": row.expected_foods,
+        }
+        output_payload = {
+            "raw_food_names": row.raw_food_names,
+            "allowed_food_names": row.allowed_food_names,
+            "canonical_food_names": row.canonical_food_names,
+            "status": row_status(row),
+            "failure_reason": row.error_message,
+        }
+        try:
+            observation_context = self.client.start_as_current_observation(
+                name="gpt_vision_food_eval",
+                as_type="generation",
+                input=input_payload,
+                metadata=metadata,
+                model=self.model,
+            )
+            observation = observation_context.__enter__()
+        except Exception:
+            return False
+
+        try:
+            try:
+                observation.update(output=output_payload)
+            except Exception:
+                pass
+            return True
+        finally:
+            try:
+                observation_context.__exit__(None, None, None)
+            except Exception:
+                pass
+
+    def flush(self) -> None:
+        if self.client is None:
+            return
+        for method_name in ("flush", "shutdown"):
+            method = getattr(self.client, method_name, None)
+            if not callable(method):
+                continue
+            try:
+                method()
+            except Exception:
+                pass
+
+
+def _env_flag_enabled(value: str | None) -> bool:
+    return value is not None and value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def load_labels(labels_path: Path, *, limit: int | None = None) -> list[LabelRow]:

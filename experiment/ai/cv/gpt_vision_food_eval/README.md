@@ -37,6 +37,42 @@ uv run python experiment/ai/cv/gpt_vision_food_eval/run_gpt_vision_eval.py \
 
 The script reads `OPENAI_API_KEY` from the environment. Missing images, missing API keys, API failures, JSON parse failures, and empty food results are recorded as failure rows instead of stopping the full evaluation.
 
+## Optional Langfuse Tracing
+
+The evaluation runner can record one Langfuse generation per image when Langfuse is configured. Tracing is optional and best-effort: missing Langfuse settings or Langfuse SDK errors do not fail the evaluation.
+
+Local terminal example:
+
+```bash
+export LANGFUSE_ENABLED=true
+export LANGFUSE_HOST=http://localhost:3000
+export LANGFUSE_BASE_URL=http://localhost:3000
+export LANGFUSE_PUBLIC_KEY=<LANGFUSE_PUBLIC_KEY>
+export LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
+```
+
+Docker container example:
+
+```bash
+export LANGFUSE_ENABLED=true
+export LANGFUSE_HOST=http://host.docker.internal:3000
+export LANGFUSE_BASE_URL=http://host.docker.internal:3000
+export LANGFUSE_PUBLIC_KEY=<LANGFUSE_PUBLIC_KEY>
+export LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
+```
+
+Run with a stable eval run ID:
+
+```bash
+uv run python experiment/ai/cv/gpt_vision_food_eval/run_gpt_vision_eval.py \
+  --labels experiment/ai/cv/gpt_vision_food_eval/data/labels/aihub_labels_sample.csv \
+  --allowed-foods experiment/ai/cv/gpt_vision_food_eval/outputs/allowed_foods.json \
+  --limit 5 \
+  --eval-run-id smoke-langfuse
+```
+
+If `--eval-run-id` is omitted, the runner creates a timestamp-based ID. Langfuse metadata records image path, image filename, expected foods, predicted food names, canonical matches, row metrics, status, failure reason, confidence, and latency. Image bytes are never uploaded to Langfuse.
+
 ## Build AI-Hub Labels
 
 AI-Hub food labels can be used either as extracted JSON directories or as archive zips with nested `*_Val_json.zip` files.
