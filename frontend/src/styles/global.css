@@ -269,15 +269,21 @@ pre {
   gap: 10px;
 }
 .nav-logout-btn {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  background: none;
-  border: none;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 8px;
+  padding: 8px 12px;
   cursor: pointer;
-  padding: 4px 8px;
+  font-size: 14px;
 }
 .nav-logout-btn:hover {
-  color: var(--color-text);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
 }
 .desktop-nav-action {
   font-size: 14px;
@@ -330,6 +336,9 @@ pre {
   font-weight: 700;
   gap: 8px;
   padding: 8px 12px;
+}
+.user-chip {
+  padding: 2px 10px 2px 2px;
 }
 
 .icon-button {
@@ -4079,15 +4088,21 @@ pre {
   }
 
   .nav-logout-btn {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  background: none;
-  border: none;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 8px;
+  padding: 8px 12px;
   cursor: pointer;
-  padding: 4px 8px;
+  font-size: 14px;
 }
 .nav-logout-btn:hover {
-  color: var(--color-text);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
 }
 .desktop-nav-action {
     display: none;
