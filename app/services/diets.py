@@ -3,13 +3,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
 from ai_runtime.cv.food.matcher import FoodMatchResult, match_food_name
 from ai_runtime.cv.food.normalization import normalize_food_name
 from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
-from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
-from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
+from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_analysis_pipeline
+from ai_runtime.cv.providers.gpt_vision import VisionClient
 from ai_runtime.llm.explanation_service import generate_diet_score_explanation
 from ai_runtime.llm.schemas import DietScoreExplanationInput
 from app.core import config
@@ -83,20 +82,24 @@ async def run_diet_analysis(
     image_media_type: str | None = None,
 ) -> dict[str, object]:
     case = _select_rule_based_diet_case(request)
-    cv_result, fallback_used, provider_message = await _detect_foods_with_provider(
+    food_analysis = await run_food_analysis_pipeline(
+        rule_based_foods=case["detected_foods"],
         image_bytes=image_bytes,
         image_media_type=image_media_type,
+        config=FoodAnalysisPipelineConfig(
+            provider=str(config.DIET_VISION_PROVIDER or "rule_based"),
+            gpt_vision_enabled=bool(config.DIET_GPT_VISION_ENABLED),
+            gpt_vision_fallback_enabled=bool(config.GPT_VISION_FALLBACK_ENABLED),
+            confidence_threshold=float(config.FOOD_CV_CONFIDENCE_THRESHOLD),
+            openai_api_key=config.OPENAI_API_KEY,
+            gpt_vision_model=config.DIET_GPT_VISION_MODEL,
+            vision_client_cls=VisionClient,
+        ),
     )
-    food_candidate = select_food_detection_candidate(
-        cv_result=cv_result,
-        rule_based_foods=case["detected_foods"],
-        gpt_vision_fallback_enabled=config.GPT_VISION_FALLBACK_ENABLED,
-        confidence_threshold=config.FOOD_CV_CONFIDENCE_THRESHOLD,
-    )
-    if cv_result is None or food_candidate.provider != cv_result.provider:
-        fallback_used = True
-        provider_message = provider_message or "rule_based_food_detection fallback used"
-    detected_foods = food_candidate.to_scorer_foods()
+    food_candidate = food_analysis.food_candidate
+    detected_foods = food_analysis.detected_foods
+    fallback_used = food_analysis.fallback_used
+    provider_message = food_analysis.provider_message
     scoring_result = _safe_build_nutrition_scoring_result(detected_foods)
     explanation = _safe_generate_diet_explanation(scoring_result["disease_scores"])
     nutrition_summary = {
@@ -130,7 +133,7 @@ async def run_diet_analysis(
                 "needs_review": food_candidate.needs_review,
                 "fallback_reason": food_candidate.fallback_reason,
                 "scoring_source": scoring_result["scoring_source"],
-                "gpt_vision_called": cv_result is not None,
+                "gpt_vision_called": food_analysis.provider_candidate is not None,
                 "fallback_used": fallback_used,
                 "provider_message": provider_message,
             },
@@ -224,72 +227,6 @@ async def run_diet_analysis_from_job(job_id: int) -> DietAnalyzeResponse:
         image_media_type=str(payload.get("image_media_type") or "") or _media_type_from_upload_path(upload_path),
     )
     return DietAnalyzeResponse.model_validate(response)
-
-
-async def _detect_foods_with_provider(
-    image_bytes: bytes | None,
-    image_media_type: str | None,
-) -> tuple[FoodDetectionCandidateSet | None, bool, str | None]:
-    provider = str(config.DIET_VISION_PROVIDER or "rule_based").lower()
-    if provider != "gpt_vision" or not config.DIET_GPT_VISION_ENABLED:
-        return None, True, "diet GPT Vision disabled"
-    if not image_bytes:
-        return None, True, "image file not provided"
-    if not config.OPENAI_API_KEY:
-        return None, True, "OPENAI_API_KEY missing"
-
-    try:
-        client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.DIET_GPT_VISION_MODEL)
-        raw = await client.analyze(
-            analysis_type=AnalysisType.DIET,
-            image_bytes=image_bytes,
-            media_type=image_media_type or "image/jpeg",
-        )
-    except Exception:
-        logger.exception("Diet GPT Vision provider failed; using rule_based_food_detection fallback")
-        return None, True, "gpt_vision_failed"
-
-    foods = raw.get("foods") if isinstance(raw, dict) else None
-    if not isinstance(foods, list):
-        return None, True, "gpt_vision_returned_no_foods"
-
-    detected_foods = [
-        str(food.get("name") or food.get("food_name") or "").strip()
-        for food in foods
-        if isinstance(food, dict) and str(food.get("name") or food.get("food_name") or "").strip()
-    ]
-    if not detected_foods:
-        return None, True, "gpt_vision_returned_empty_foods"
-
-    confidence = _average_confidence_from_provider_foods(foods)
-    return (
-        FoodDetectionCandidateSet(
-            provider="gpt_vision",
-            detected_foods=detected_foods,
-            confidence=confidence,
-            needs_review=False,
-            raw_output=raw,
-            raw_provider_status=str(raw.get("analysis_status") or "success"),
-            metadata={"model": config.DIET_GPT_VISION_MODEL},
-        ),
-        False,
-        "gpt_vision_food_detection",
-    )
-
-
-def _average_confidence_from_provider_foods(foods: list[Any]) -> float | None:
-    values = [float(value) for food in foods if isinstance(food, dict) and _is_number(value := food.get("confidence"))]
-    if not values:
-        return None
-    return round(sum(values) / len(values), 4)
-
-
-def _is_number(value: Any) -> bool:
-    try:
-        float(value)
-    except (TypeError, ValueError):
-        return False
-    return True
 
 
 def _build_diet_analysis_upload_key(*, user_id: int, suffix: str) -> str:
