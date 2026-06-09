@@ -268,6 +268,22 @@ pre {
   flex-wrap: wrap;
   gap: 10px;
 }
+.desktop-nav-action {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: var(--border-radius-md);
+  transition: color 0.15s;
+}
+.desktop-nav-action:hover {
+  color: var(--color-text);
+}
+.desktop-nav-action.active {
+  color: var(--color-primary);
+  font-weight: 500;
+  border-bottom: 2px solid var(--color-primary);
+}
 
 .theme-toggle {
   align-items: center;
