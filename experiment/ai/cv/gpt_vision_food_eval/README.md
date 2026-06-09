@@ -121,6 +121,19 @@ The builder uses JSON `"Code Name"` as `image_filename`. For `expected_foods`, i
 
 The builder also writes `outputs/allowed_foods.json`, a unique list of generated `expected_foods` labels.
 
+Balanced per-class sampling is available for small evaluation batches:
+
+```bash
+uv run python experiment/ai/cv/gpt_vision_food_eval/build_aihub_labels.py \
+  --json-root experiment/ai/cv/gpt_vision_food_eval/data/json_zips \
+  --image-root experiment/ai/cv/gpt_vision_food_eval/data/images \
+  --output experiment/ai/cv/gpt_vision_food_eval/data/labels/aihub_balanced_10_per_class.csv \
+  --per-class-limit 10 \
+  --seed 42
+```
+
+By default, balanced sampling excludes `image_exists=false` rows from the output CSV while still recording them in `outputs/aihub_label_summary.json` and `outputs/aihub_missing_images.csv`. Add `--include-missing` only when you intentionally want missing-image rows in the sampled CSV.
+
 ## Constrained Label Eval
 
 Free-form GPT Vision evaluation lets the model produce arbitrary food names. Constrained evaluation passes `allowed_foods.json` to the prompt and asks the model to return only labels from that list:

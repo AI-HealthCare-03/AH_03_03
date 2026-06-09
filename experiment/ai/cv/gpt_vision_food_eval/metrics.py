@@ -48,7 +48,9 @@ def compute_metrics(predictions: list[PredictionRow]) -> dict[str, Any]:
     )
     invalid_label_count = sum(row.invalid_label_count for row in evaluable_predictions)
     unknown_count = sum(food == "unknown" for row in evaluable_predictions for food in row.allowed_food_names)
-    predicted_food_count = sum(len(row.raw_food_names) for row in evaluable_predictions)
+    raw_predicted_food_count = sum(len(row.raw_food_names) for row in evaluable_predictions)
+    allowed_predicted_food_count = sum(len(row.allowed_food_names) for row in evaluable_predictions)
+    scoring_predicted_food_count = sum(len(selected_prediction_set(row)) for row in evaluable_predictions)
     latencies = [row.latency_seconds for row in evaluable_predictions if row.latency_seconds is not None]
     confidences = [row.confidence for row in evaluable_predictions if row.confidence is not None]
 
@@ -96,13 +98,13 @@ def compute_metrics(predictions: list[PredictionRow]) -> dict[str, Any]:
         "macro_recall": macro["macro_recall"],
         "macro_f1_score": macro["macro_f1_score"],
         "invalid_label_count": invalid_label_count,
-        "invalid_label_rate": _rate(invalid_label_count, predicted_food_count),
+        "invalid_label_rate": _rate(invalid_label_count, raw_predicted_food_count),
         "constrained_by_allowed_foods": any(row.constrained_by_allowed_foods for row in predictions),
         "unknown_count": unknown_count,
-        "unknown_rate": _rate(unknown_count, predicted_food_count),
+        "unknown_rate": _rate(unknown_count, allowed_predicted_food_count),
         "unmatched_food_rate": _rate(
-            sum(len(row.unmatched_food_names) for row in evaluable_predictions),
-            predicted_food_count,
+            sum(row_unmatched_prediction_count(row) for row in evaluable_predictions),
+            scoring_predicted_food_count,
         ),
         "empty_result_rate": _rate(empty_result_count, evaluable_image_count),
         "avg_confidence": round(mean(confidences), 4) if confidences else 0.0,
@@ -229,6 +231,14 @@ def selected_prediction_set(row: PredictionRow) -> set[str]:
     if row.canonical_food_names:
         return normalized_food_set(row.canonical_food_names)
     return normalized_food_set(row.raw_food_names)
+
+
+def row_unmatched_prediction_count(row: PredictionRow) -> int:
+    expected = normalized_food_set(row.expected_foods) | normalized_food_set(
+        canonicalize_food_names(row.expected_foods)
+    )
+    predicted = selected_prediction_set(row)
+    return len(predicted - expected)
 
 
 def is_exact_raw_match(row: PredictionRow) -> bool:

@@ -5,9 +5,11 @@ import csv
 import io
 import json
 import os
+import random
 import re
 import unicodedata
 import zipfile
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -92,6 +94,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-root", help="Root directory containing extracted food images.")
     parser.add_argument("--output", required=True, help="Output labels CSV path.")
     parser.add_argument("--limit", type=int, default=None, help="Limit output image rows for smoke runs.")
+    parser.add_argument(
+        "--per-class-limit", type=int, default=None, help="Maximum output rows per expected food class."
+    )
+    parser.add_argument(
+        "--include-missing", action="store_true", help="Include image_exists=false rows in balanced samples."
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for balanced per-class sampling.")
     return parser.parse_args()
 
 
@@ -105,22 +114,38 @@ def main() -> None:
     allowed_foods_path = output_dir / "allowed_foods.json"
 
     image_root = Path(args.image_root) if args.image_root else None
+    build_limit = None if args.per_class_limit is not None else args.limit
     if args.json_root:
         aggregates, summary = build_labels_from_json_root(
             Path(args.json_root),
             image_root=image_root,
             output_path=output_path,
-            limit=args.limit,
+            limit=build_limit,
         )
     else:
         aggregates, summary = build_labels_from_aihub_zip(
             Path(args.zip_path),
             image_root=image_root,
             output_path=output_path,
-            limit=args.limit,
+            limit=build_limit,
         )
 
-    write_labels_csv(output_path, aggregates)
+    sampled_aggregates = select_output_aggregates(
+        aggregates,
+        per_class_limit=args.per_class_limit,
+        include_missing=args.include_missing,
+        seed=args.seed,
+        limit=args.limit,
+    )
+    summary.update(
+        build_sampling_summary(
+            sampled_aggregates,
+            per_class_limit=args.per_class_limit,
+            include_missing=args.include_missing,
+            seed=args.seed,
+        )
+    )
+    write_labels_csv(output_path, sampled_aggregates)
     write_allowed_foods_json(allowed_foods_path, aggregates)
     write_missing_images_csv(missing_report_path, aggregates, image_root=image_root)
     summary["allowed_foods_path"] = str(allowed_foods_path)
@@ -215,6 +240,56 @@ def _build_labels_from_records(
     summary["image_match_strategy"] = "recursive exact basename match under --image-root"
     summary["searched_image_root"] = str(image_root) if image_root else ""
     return list(aggregates.values())
+
+
+def select_output_aggregates(
+    aggregates: list[LabelAggregate],
+    *,
+    per_class_limit: int | None,
+    include_missing: bool,
+    seed: int,
+    limit: int | None,
+) -> list[LabelAggregate]:
+    if per_class_limit is None:
+        return aggregates[:limit] if limit is not None else aggregates
+
+    rng = random.Random(seed)
+    by_class: dict[str, list[LabelAggregate]] = defaultdict(list)
+    for aggregate in aggregates:
+        if not include_missing and not aggregate.image_exists:
+            continue
+        by_class[primary_expected_food(aggregate)].append(aggregate)
+
+    sampled: list[LabelAggregate] = []
+    for class_name in sorted(by_class):
+        candidates = by_class[class_name]
+        rng.shuffle(candidates)
+        sampled.extend(candidates[:per_class_limit])
+
+    sampled.sort(key=lambda aggregate: (primary_expected_food(aggregate), aggregate.image_filename))
+    return sampled[:limit] if limit is not None else sampled
+
+
+def build_sampling_summary(
+    aggregates: list[LabelAggregate],
+    *,
+    per_class_limit: int | None,
+    include_missing: bool,
+    seed: int,
+) -> dict[str, Any]:
+    return {
+        "per_class_limit": per_class_limit,
+        "include_missing": include_missing,
+        "seed": seed,
+        "sampling_strategy": "per_class_random_sample" if per_class_limit is not None else "none",
+        "sampled_class_distribution": dict(
+            sorted(Counter(primary_expected_food(aggregate) for aggregate in aggregates).items())
+        ),
+    }
+
+
+def primary_expected_food(aggregate: LabelAggregate) -> str:
+    return aggregate.expected_foods[0] if aggregate.expected_foods else "unknown"
 
 
 def iter_json_root_records(json_root: Path, *, summary: dict[str, Any]) -> Iterable[JsonRecord]:
