@@ -1,4 +1,4 @@
-$content = @"
+﻿$content = @"
 __pycache__/
 *.py[oc]
 *.py[cod]
@@ -39,7 +39,7 @@ serviceAccountKey.json
 ai_runtime/outputs/
 ai_runtime/data/
 experiment/ml/ai_worker/data/
-# CV 평가 데이터 (로컬 전용)
+# CV ?됯? ?곗씠??(濡쒖뺄 ?꾩슜)
 ai_runtime/cv/data/
 
 # CLOVA OCR PoC local inputs/outputs
@@ -56,7 +56,7 @@ ai_runtime/ocr/providers/clova_ocr/ground_truth/*
 .venv-ocr2/
 .venv-easyocr/
 
-# ocr-compare 건강검진표 원본 파일 제외 (개인정보)
+# ocr-compare 嫄닿컯寃吏꾪몴 ?먮낯 ?뚯씪 ?쒖쇅 (媛쒖씤?뺣낫)
 ocr-compare/results/images/
 ocr-compare/results/*.json
 ocr-compare/01_tesseract/node_modules/
@@ -161,7 +161,7 @@ experiment/**/*.sqlite
 experiment/**/*.sqlite3
 experiment/**/*.db
 
-# ocr-compare 개인정보 파일
+# ocr-compare 媛쒖씤?뺣낫 ?뚯씪
 ocr-compare/results/images/
 ocr-compare/eval/images/
 ocr-compare/eval/pdfs/
@@ -222,3 +222,5 @@ var/
 # KDU local experiment reports
 experiment/ml/kdu/reports/
 experiment/ml/kdu/reports/**
+experiment/ai/ocr/checkup/eval/pdfs/
+experiment/ai/ocr/checkup/eval/results/

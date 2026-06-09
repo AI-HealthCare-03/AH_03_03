@@ -1,0 +1,16 @@
+"""
+ai_runtime/ocr/checkup/
+PaddleOCR 2.7.3 기반 건강검진표 수치 추출 모듈 (MVP).
+"""
+
+from .extractor import run_ocr, run_ocr_on_pdf
+from .preprocessor import assess_quality
+from .schemas import CheckupOcrData, CheckupOcrResponse
+
+__all__ = [
+    "run_ocr",
+    "run_ocr_on_pdf",
+    "assess_quality",
+    "CheckupOcrData",
+    "CheckupOcrResponse",
+]
