@@ -7,8 +7,10 @@ import csv
 import difflib
 import json
 import os
+import random
 import sys
 import time
+from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,7 @@ from ai_runtime.cv.food.normalization import normalize_food_name
 DEFAULT_MODEL = "gpt-4o-mini"
 UNKNOWN_ALLOWED_FOOD = "unknown"
 EXPERIMENT_DIR = Path(__file__).resolve().parent
+PROCESSED_RESUME_STATUSES = {"success", "failed", "empty_result", "data_missing"}
 
 
 class GptJsonParseError(ValueError):
@@ -53,6 +56,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY", help="Environment variable containing API key.")
     parser.add_argument("--allowed-foods", default=None, help="Optional JSON list of allowed food labels.")
     parser.add_argument("--eval-run-id", default=None, help="Optional Langfuse/grouping ID for this eval run.")
+    parser.add_argument("--per-class-limit", type=int, default=None, help="Maximum rows to evaluate per expected food.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for per-class label sampling.")
+    parser.add_argument("--progress-every", type=int, default=10, help="Print progress every N evaluated rows.")
+    parser.add_argument("--save-every", type=int, default=50, help="Save intermediate outputs every N evaluated rows.")
+    parser.add_argument(
+        "--resume", action="store_true", help="Skip image_path rows already present in predictions.csv."
+    )
     return parser.parse_args()
 
 
@@ -62,28 +72,45 @@ async def main() -> None:
     output_dir = Path(args.output_dir) if args.output_dir else EXPERIMENT_DIR / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    labels = load_labels(labels_path, limit=args.limit)
+    labels = load_labels(labels_path, limit=None if args.per_class_limit is not None else args.limit)
+    labels = select_eval_labels(
+        labels,
+        per_class_limit=args.per_class_limit,
+        seed=args.seed,
+        limit=args.limit,
+    )
     allowed_foods = load_allowed_foods(Path(args.allowed_foods)) if args.allowed_foods else None
     eval_run_id = args.eval_run_id or build_eval_run_id()
     prompt = build_food_eval_prompt(allowed_foods)
     tracer = EvalLangfuseTracer.from_env(eval_run_id=eval_run_id, model=args.model, prompt=prompt)
-    predictions = [
-        await evaluate_image(
+    predictions_path = output_dir / "predictions.csv"
+    existing_predictions = load_existing_predictions(predictions_path) if args.resume else []
+    processed_image_paths = {row.image_path for row in existing_predictions}
+    labels_to_eval = [label for label in labels if label.image_path not in processed_image_paths]
+    predictions = list(existing_predictions)
+    started = time.perf_counter()
+    for processed_count, label in enumerate(labels_to_eval, start=1):
+        prediction = await evaluate_image(
             label=label,
             labels_dir=labels_path.parent,
             model=args.model,
             api_key=os.getenv(args.api_key_env),
             allowed_foods=allowed_foods,
         )
-        for label in labels
-    ]
-    for prediction in predictions:
+        predictions.append(prediction)
         tracer.record_prediction(prediction)
+        if args.progress_every > 0 and processed_count % args.progress_every == 0:
+            print_progress(
+                processed_count=processed_count,
+                total_count=len(labels_to_eval),
+                predictions=predictions,
+                started=started,
+            )
+        if args.save_every > 0 and processed_count % args.save_every == 0:
+            save_outputs(output_dir, predictions)
+
     tracer.flush()
-    metrics = compute_metrics(predictions)
-    write_predictions_csv(output_dir / "predictions.csv", predictions)
-    write_metrics_json(output_dir / "metrics.json", metrics)
-    write_report(output_dir / "report.md", metrics, predictions)
+    save_outputs(output_dir, predictions)
     print(f"Wrote {output_dir / 'predictions.csv'}")
     print(f"Wrote {output_dir / 'metrics.json'}")
     print(f"Wrote {output_dir / 'report.md'}")
@@ -230,12 +257,78 @@ def load_labels(labels_path: Path, *, limit: int | None = None) -> list[LabelRow
     return rows
 
 
+def select_eval_labels(
+    labels: list[LabelRow],
+    *,
+    per_class_limit: int | None,
+    seed: int,
+    limit: int | None,
+) -> list[LabelRow]:
+    if per_class_limit is None:
+        return labels
+
+    rng = random.Random(seed)
+    by_class: dict[str, list[LabelRow]] = defaultdict(list)
+    for label in labels:
+        if not label.image_exists:
+            continue
+        by_class[primary_expected_food(label)].append(label)
+
+    selected: list[LabelRow] = []
+    for class_name in sorted(by_class):
+        candidates = by_class[class_name]
+        rng.shuffle(candidates)
+        selected.extend(candidates[:per_class_limit])
+
+    selected.sort(key=lambda label: (primary_expected_food(label), label.row_id))
+    return selected[:limit] if limit is not None else selected
+
+
+def primary_expected_food(label: LabelRow) -> str:
+    return label.expected_foods[0] if label.expected_foods else "unknown"
+
+
 def load_allowed_foods(path: Path) -> list[str]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
         msg = f"allowed_foods must be a JSON list: {path}"
         raise ValueError(msg)
     return [food_name for item in payload if (food_name := str(item).strip())]
+
+
+def load_existing_predictions(path: Path) -> list[PredictionRow]:
+    if not path.exists():
+        return []
+
+    predictions: list[PredictionRow] = []
+    with path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            status = str(row.get("status") or "").strip()
+            image_path = str(row.get("image_path") or "").strip()
+            if not image_path or status not in PROCESSED_RESUME_STATUSES:
+                continue
+            predictions.append(
+                PredictionRow(
+                    row_id=_parse_int(row.get("row_id")),
+                    image_path=image_path,
+                    expected_foods=split_food_names(str(row.get("expected_foods") or "")),
+                    raw_food_names=split_food_names(str(row.get("raw_food_names") or "")),
+                    allowed_food_names=split_food_names(str(row.get("allowed_food_names") or "")),
+                    canonical_food_names=split_food_names(str(row.get("canonical_food_names") or "")),
+                    unmatched_food_names=split_food_names(str(row.get("unmatched_food_names") or "")),
+                    invalid_label_count=_parse_int(row.get("invalid_label_count")),
+                    constrained_by_allowed_foods=_parse_bool(row.get("constrained_by_allowed_foods"), default=False),
+                    confidence=_parse_optional_float(row.get("confidence")),
+                    api_success=_parse_bool(row.get("api_success"), default=False),
+                    json_parse_success=_parse_bool(row.get("json_parse_success"), default=False),
+                    empty_result=_parse_bool(row.get("empty_result"), default=status == "empty_result"),
+                    latency_seconds=_parse_optional_float(row.get("latency_seconds")),
+                    error_type=str(row.get("error_type") or "") or None,
+                    error_message=str(row.get("error_message") or row.get("failure_reason") or "") or None,
+                )
+            )
+    return predictions
 
 
 async def evaluate_image(
@@ -308,6 +401,7 @@ async def evaluate_image(
     confidence = extract_avg_confidence(raw_response)
     allowed_food_names, invalid_label_count = constrain_food_names(raw_food_names, allowed_foods)
     canonical_food_names, unmatched_food_names = match_canonical_food_names(raw_food_names)
+    empty_result = not raw_food_names
     return PredictionRow(
         row_id=label.row_id,
         image_path=label.image_path,
@@ -321,8 +415,9 @@ async def evaluate_image(
         confidence=confidence,
         api_success=True,
         json_parse_success=True,
-        empty_result=not raw_food_names,
+        empty_result=empty_result,
         latency_seconds=round(time.perf_counter() - started, 4),
+        error_message="model_returned_empty_foods" if empty_result else None,
         raw_response=raw_response,
     )
 
@@ -449,6 +544,7 @@ def write_predictions_csv(path: Path, predictions: list[PredictionRow]) -> None:
     fieldnames = [
         "row_id",
         "image_path",
+        "image_filename",
         "expected_foods",
         "raw_food_names",
         "allowed_food_names",
@@ -481,6 +577,7 @@ def write_predictions_csv(path: Path, predictions: list[PredictionRow]) -> None:
                 {
                     "row_id": row.row_id,
                     "image_path": row.image_path,
+                    "image_filename": Path(row.image_path).name,
                     "expected_foods": "|".join(row.expected_foods),
                     "raw_food_names": "|".join(row.raw_food_names),
                     "allowed_food_names": "|".join(row.allowed_food_names),
@@ -509,6 +606,42 @@ def write_predictions_csv(path: Path, predictions: list[PredictionRow]) -> None:
 
 def write_metrics_json(path: Path, metrics: dict[str, Any]) -> None:
     path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def save_outputs(output_dir: Path, predictions: list[PredictionRow]) -> None:
+    metrics = compute_metrics(predictions)
+    write_predictions_csv(output_dir / "predictions.csv", predictions)
+    write_metrics_json(output_dir / "metrics.json", metrics)
+    write_report(output_dir / "report.md", metrics, predictions)
+
+
+def print_progress(
+    *,
+    processed_count: int,
+    total_count: int,
+    predictions: list[PredictionRow],
+    started: float,
+) -> None:
+    elapsed_seconds = max(time.perf_counter() - started, 0.0)
+    remaining_count = max(total_count - processed_count, 0)
+    avg_seconds_per_row = elapsed_seconds / processed_count if processed_count else 0.0
+    eta_seconds = avg_seconds_per_row * remaining_count
+    latencies = [row.latency_seconds for row in predictions if row.latency_seconds is not None]
+    avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
+    status_counts = {
+        "success": sum(row_status(row) == "success" for row in predictions),
+        "failed": sum(row_status(row) in {"failed", "data_missing"} for row in predictions),
+        "empty": sum(row_status(row) == "empty_result" for row in predictions),
+    }
+    print(
+        "[progress] "
+        f"{processed_count}/{total_count} "
+        f"success={status_counts['success']} "
+        f"failed={status_counts['failed']} "
+        f"empty={status_counts['empty']} "
+        f"avg_latency={avg_latency:.2f}s "
+        f"eta={format_duration(eta_seconds)}"
+    )
 
 
 def write_report(path: Path, metrics: dict[str, Any], predictions: list[PredictionRow]) -> None:
@@ -675,6 +808,32 @@ def _parse_bool(value: object, *, default: bool) -> bool:
     if normalized in {"0", "false", "no", "n"}:
         return False
     return default
+
+
+def _parse_int(value: object, *, default: int = 0) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse_optional_float(value: object) -> float | None:
+    try:
+        raw_value = str(value).strip()
+        return float(raw_value) if raw_value else None
+    except (TypeError, ValueError):
+        return None
+
+
+def format_duration(seconds: float) -> str:
+    total_seconds = max(int(seconds), 0)
+    minutes, sec = divmod(total_seconds, 60)
+    hours, minute = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minute}m {sec}s"
+    if minute:
+        return f"{minute}m {sec}s"
+    return f"{sec}s"
 
 
 def _normalize_for_allowed(value: str) -> str:
