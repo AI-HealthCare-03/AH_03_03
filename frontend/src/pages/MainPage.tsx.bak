@@ -75,7 +75,7 @@ const landingPersonas = [
     icon: "🚶",
     title: "생활습관을 바꾸고 싶은 사용자",
     quote: "혈당, 혈압, 체중 관리를 위해 식단과 운동 습관을 만들고 싶어요.",
-    features: ["식단 분석", "챌린지", "건강 리포트"],
+    features: ["식단 분석", "챌린지", "추적 대시보드"],
     flow: [
       { icon: "🥗", title: "식단 기록", description: "사진과 기본 정보를 입력합니다." },
       { icon: "📈", title: "변화 추적", description: "건강 점수와 추이를 봅니다." },
@@ -470,25 +470,18 @@ export default function MainPage() {
                 </span>
               </div>
               {displayAnalysisResults.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", justifyItems: "center" }}>
                   {displayAnalysisResults.map((result) => {
                     const level = String(result.risk_level ?? "").toUpperCase();
-                    const score = typeof result.risk_score === "number" ? result.risk_score : parseFloat(String(result.risk_score ?? "0"));
-                    const pct = Math.round(score * 100);
-                    const circumference = 2 * Math.PI * 28;
-                    const dashFilled = (score * circumference).toFixed(1);
-                    const dashEmpty = (circumference - score * circumference).toFixed(1);
-                    const color = level === "HIGH" ? "#d35d5d" : level === "MEDIUM" ? "#d99a3d" : "#1D9E75";
-                    const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
-                    const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
+                    const color = level === "HIGH" ? "#d35d5d" : level === "MEDIUM" ? "#d99a3d" : "#3a8b7a";
+                    const dash = level === "HIGH" ? "168 33" : level === "MEDIUM" ? "101 100" : "134 67";
                     return (
-                      <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
-                        <svg width="110" height="110" viewBox="0 0 110 110" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
-                          <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                          <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 55 55)"/>
-                          <text x="55" y="61" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
+                      <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "8px" }}>
+                        <svg width="110" height="110" viewBox="0 0 80 80" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
+                          <circle cx="40" cy="40" r="32" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                          <circle cx="40" cy="40" r="32" fill="none" stroke={color} strokeWidth="10" strokeDasharray={dash} strokeLinecap="round" transform="rotate(-90 40 40)"/>
                         </svg>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
                       </div>
                     );
                   })}
@@ -580,26 +573,19 @@ export default function MainPage() {
           {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
           <div className="viz-card" style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "16px", alignItems: "start" }}>
             {/* 챌린지 현황 작은 카드 */}
-            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", width: "220px", flexShrink: 0 }}>
+            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "12px", minWidth: "120px" }}>
               <span className="viz-card-label">챌린지 현황</span>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
-                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
-                  <circle cx="55" cy="55" r="44" fill="none" stroke="#e0e0e0" strokeWidth="10"/>
-                  <circle cx="55" cy="55" r="44" fill="none" stroke="#1D9E75" strokeWidth="10"
-                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
-                    strokeLinecap="round" transform="rotate(-90 55 55)"/>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px" }}>
+                <svg width="64" height="64" viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#e0e0e0" strokeWidth="8"/>
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#3a8b7a" strokeWidth="8"
+                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 175, 175) : 0} 175`}
+                    strokeLinecap="round" transform="rotate(-90 32 32)"/>
                 </svg>
-                <div style={{ paddingBottom: "4px" }}>
+                <div>
                   <div className="viz-ring-value">{challengeCount}개</div>
                   <div className="viz-ring-label">참여 중</div>
                 </div>
-              </div>
-              <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: "1.6", borderTop: "0.5px solid var(--color-border)", paddingTop: "10px", wordBreak: "keep-all" }}>
-                {challengeCount === 0
-                  ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
-                  : challengeCount < 3
-                  ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
-                  : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
               </div>
             </div>
 
@@ -650,9 +636,9 @@ export default function MainPage() {
         <div className="mobile-health-card">
           <div className="hero-card-topline">
             <span className="badge badge-reference">예시 화면</span>
-          </div>
-          <div style={{ fontSize: "14px", color: "var(--color-text)", marginBottom: "6px" }}>
-            당뇨 관리 필요 수준입니다.
+            <div className="mini-gauge" style={toGaugeStyle(landingPreview.healthScore)}>
+              <span>{landingPreview.healthScore}</span>
+            </div>
           </div>
           <div className="sparkline-row">
             <div>
@@ -670,7 +656,7 @@ export default function MainPage() {
           <div className="sparkline-row">
             <div>
               <span>혈압</span>
-              <strong>132/84 mmHg</strong>
+              <strong>132/84</strong>
             </div>
             <div className="sparkline sparkline-pressure" aria-hidden="true">
               <span />
@@ -774,46 +760,41 @@ export default function MainPage() {
       </section>
       <section className="landing-section">
         <Card title="예시 대시보드 미리보기">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <div>
-              <span className="viz-card-label">질환별 위험도</span>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
-                {[
-                  { label: "고혈압", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
-                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#d99a3d", text: "관리필요" },
-                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
-                  { label: "콜레스테롤", score: 0.22, color: "#1D9E75", text: "낮음" },
-                ].map(({ label, score, color, text }) => (
-                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{label}</span>
-                    <svg width="80" height="80" viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r="30" fill="none" stroke="var(--color-border)" strokeWidth="8"/>
-                      <circle cx="40" cy="40" r="30" fill="none" stroke={color} strokeWidth="8"
-                        strokeDasharray={`${(score * 2 * Math.PI * 30).toFixed(1)} ${(2 * Math.PI * 30 * (1 - score)).toFixed(1)}`}
-                        strokeLinecap="round" transform="rotate(-90 40 40)"/>
-                      <text x="40" y="44" textAnchor="middle" fontSize="12" fontWeight="500" fill={color}>{text}</text>
-                    </svg>
-                  </div>
-                ))}
+          <div className="preview-dashboard-grid">
+            <div className="preview-score-card">
+              <div className="score-gauge" style={toGaugeStyle(landingPreview.healthScore)}>
+                <span>{landingPreview.healthScore}</span>
               </div>
+              <strong>오늘의 건강 점수</strong>
+              <p>최근 기록 기반 예시 화면입니다.</p>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div>
-                <span className="viz-card-label">최근 검진표</span>
-                <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>105 mg/dL</strong></div>
-                <div className="viz-stat-row"><span>혈압</span><strong>132/84 mmHg</strong></div>
-                <div className="viz-stat-row"><span>총콜레스테롤</span><strong>198 mg/dL</strong></div>
-              </div>
-              <div>
-                <span className="viz-card-label">챌린지 진행률</span>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>참여 중</span>
-                  <strong style={{ fontSize: "13px", color: "#1D9E75" }}>{landingPreview.challengeProgress}%</strong>
+            <div className="preview-bars">
+              <div className="preview-bar-row">
+                <span>당뇨 위험도</span>
+                <strong>관리 필요</strong>
+                <div className="progress-bar">
+                  <div className="progress-fill warning-fill" style={toPercentStyle(landingPreview.diabetesRiskScore)} />
                 </div>
+              </div>
+              <div className="preview-bar-row">
+                <span>고혈압 위험도</span>
+                <strong>낮음</strong>
+                <div className="progress-bar">
+                  <div className="progress-fill success-fill" style={toPercentStyle(landingPreview.hypertensionRiskScore)} />
+                </div>
+              </div>
+              <div className="preview-bar-row">
+                <span>챌린지 진행률</span>
+                <strong>{landingPreview.challengeProgress}%</strong>
                 <div className="progress-bar">
                   <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
                 </div>
               </div>
+            </div>
+            <div className="preview-record-card">
+              <span className="badge badge-reference">최근 기록</span>
+              <strong>{previewMetrics[4][1]}</strong>
+              <p>검진표 등록과 직접 입력 기록을 함께 관리합니다.</p>
             </div>
           </div>
         </Card>

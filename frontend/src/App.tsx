@@ -6,6 +6,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminLayout from "./components/AdminLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
+import ScrollToTop from "./components/ScrollToTop";
 import Loading from "./components/Loading";
 
 const AnalysisHistoryPage = lazy(() => import("./pages/AnalysisHistoryPage"));
@@ -53,6 +54,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<Loading />}>
+        <ScrollToTop />
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<MainPage />} />

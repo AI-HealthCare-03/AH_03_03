@@ -21,6 +21,12 @@ const settingLabels: Record<string, string> = {
   medication_reminder_enabled: "복약/영양제 알림",
   diet_reminder_enabled: "식단 기록 알림",
 };
+const settingDescriptions: Record<string, string> = {
+  notification_enabled: "서비스 공지, 건강 분석 완료 등 주요 알림을 받습니다.",
+  challenge_reminder_enabled: "참여 중인 챌린지의 오늘 수행 여부 및 완료 알림을 받습니다.",
+  medication_reminder_enabled: "등록된 복약/영양제의 복용 시간 알림을 받습니다.",
+  diet_reminder_enabled: "식단 기록이 없을 때 기록을 유도하는 알림을 받습니다.",
+};
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({});
@@ -138,7 +144,10 @@ export default function SettingsPage() {
         {["notification_enabled", "challenge_reminder_enabled", "medication_reminder_enabled", "diet_reminder_enabled"].map(
           (key) => (
             <label key={key} className="toggle-row">
-              <span>{settingLabels[key]}</span>
+              <span>
+                <span>{settingLabels[key]}</span>
+                <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>{settingDescriptions[key]}</p>
+              </span>
               <input checked={Boolean(settings[key])} onChange={() => void toggle(key)} type="checkbox" />
             </label>
           ),
