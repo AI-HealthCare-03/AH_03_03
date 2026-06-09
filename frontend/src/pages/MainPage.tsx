@@ -651,8 +651,11 @@ export default function MainPage() {
           <div className="hero-card-topline">
             <span className="badge badge-reference">예시 화면</span>
             <div className="mini-gauge" style={toGaugeStyle(landingPreview.healthScore)}>
-              <span>{landingPreview.healthScore}</span>
+              <span>{landingPreview.healthScore}점</span>
             </div>
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "6px" }}>
+            당뇨 관리 필요 수준입니다.
           </div>
           <div className="sparkline-row">
             <div>
@@ -670,7 +673,7 @@ export default function MainPage() {
           <div className="sparkline-row">
             <div>
               <span>혈압</span>
-              <strong>132/84</strong>
+              <strong>132/84 mmHg</strong>
             </div>
             <div className="sparkline sparkline-pressure" aria-hidden="true">
               <span />
