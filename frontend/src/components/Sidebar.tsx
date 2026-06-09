@@ -15,7 +15,7 @@ export const sidebarLinks: SidebarLink[] = [
   { to: "/ocr", icon: "📄", label: "검진·복약 등록" },
   { to: "/chatbot", icon: "🤖", label: "AI 건강 상담" },
   { to: "/diets", icon: "🥗", label: "식단 분석" },
-  { to: "/dashboard", icon: "📊", label: "추적 대시보드" },
+  { to: "/dashboard", icon: "📊", label: "건강 리포트" },
   { to: "/challenges", icon: "✅", label: "챌린지" },
   { to: "/medications", icon: "💊", label: "복약/영양제" },
   { to: "/family", icon: "👥", label: "가족 관리" },

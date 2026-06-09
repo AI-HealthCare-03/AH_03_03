@@ -744,7 +744,7 @@ export default function DashboardPage() {
     <div className="dashboard-shell">
       <header className="dashboard-header">
         <div>
-          <h1>추적 대시보드</h1>
+          <h1>건강 리포트</h1>
           <p>혈당, 혈압, 체중, 식단, 챌린지 변화를 한 번에 확인합니다.</p>
         </div>
         <div className="dashboard-period-tabs" aria-label="조회 기간">
