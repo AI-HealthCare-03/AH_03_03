@@ -37,11 +37,19 @@ uv run python experiment/ai/cv/gpt_vision_food_eval/run_gpt_vision_eval.py \
 
 The script reads `OPENAI_API_KEY` from the environment. Missing images, missing API keys, API failures, JSON parse failures, and empty food results are recorded as failure rows instead of stopping the full evaluation.
 
+By default, evaluation outputs are written to:
+
+```text
+experiment/ai/cv/gpt_vision_food_eval/outputs/
+```
+
+Use `--output-dir <path>` only when you want a custom output location.
+
 ## Optional Langfuse Tracing
 
 The evaluation runner can record one Langfuse generation per image when Langfuse is configured. Tracing is optional and best-effort: missing Langfuse settings or Langfuse SDK errors do not fail the evaluation.
 
-Local terminal example:
+Local terminal example. Use `localhost:3000` when running the script directly with local `uv run`:
 
 ```bash
 export LANGFUSE_ENABLED=true
@@ -51,7 +59,7 @@ export LANGFUSE_PUBLIC_KEY=<LANGFUSE_PUBLIC_KEY>
 export LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
 ```
 
-Docker container example:
+Docker container example. Use `host.docker.internal:3000` when running from inside a Docker container:
 
 ```bash
 export LANGFUSE_ENABLED=true
@@ -130,7 +138,7 @@ This mode can increase prompt size and API cost when `allowed_foods.json` is lar
 
 ## Outputs
 
-Evaluation outputs are written to `<labels_dir>/outputs/` by default:
+Evaluation outputs are written to `experiment/ai/cv/gpt_vision_food_eval/outputs/` by default:
 
 - `predictions.csv`
 - `metrics.json`

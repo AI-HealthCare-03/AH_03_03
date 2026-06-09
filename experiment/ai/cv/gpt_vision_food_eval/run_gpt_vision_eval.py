@@ -33,6 +33,7 @@ from ai_runtime.cv.food.normalization import normalize_food_name
 
 DEFAULT_MODEL = "gpt-4o-mini"
 UNKNOWN_ALLOWED_FOOD = "unknown"
+EXPERIMENT_DIR = Path(__file__).resolve().parent
 
 
 class GptJsonParseError(ValueError):
@@ -42,7 +43,11 @@ class GptJsonParseError(ValueError):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate GPT Vision food detection against image labels.")
     parser.add_argument("--labels", required=True, help="CSV path with image_path and expected_foods columns.")
-    parser.add_argument("--output-dir", default=None, help="Output directory. Defaults to <labels_dir>/outputs.")
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Output directory. Defaults to experiment/ai/cv/gpt_vision_food_eval/outputs.",
+    )
     parser.add_argument("--limit", type=int, default=None, help="Limit number of rows for smoke runs.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="OpenAI vision model name.")
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY", help="Environment variable containing API key.")
@@ -54,7 +59,7 @@ def parse_args() -> argparse.Namespace:
 async def main() -> None:
     args = parse_args()
     labels_path = Path(args.labels)
-    output_dir = Path(args.output_dir) if args.output_dir else labels_path.parent / "outputs"
+    output_dir = Path(args.output_dir) if args.output_dir else EXPERIMENT_DIR / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     labels = load_labels(labels_path, limit=args.limit)
