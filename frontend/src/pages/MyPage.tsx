@@ -400,16 +400,10 @@ export default function MyPage() {
                 수정
               </button>
             )}
-            <button className="secondary" onClick={() => setShowPasswordForm((prev) => !prev)} type="button">
-              비밀번호 변경
-            </button>
-            <Link className="button secondary" to="/settings">
-              설정으로 이동
-            </Link>
           </div>
         </Card>
 
-        {showPasswordForm && (
+        {(showPasswordForm || isEditingProfile) && (
           <Card title="비밀번호 변경">
             <div className="form three-col">
               <label>
