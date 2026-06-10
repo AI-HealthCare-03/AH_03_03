@@ -14,7 +14,7 @@ type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
-  service_title: "HealthCare",
+  service_title: "Health Ladder",
   service_description: "AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
 };
 
@@ -647,7 +647,7 @@ export default function MainPage() {
     <div className="landing-page">
       <section className="hero-panel">
         <div>
-          <span className="eyebrow">HealthCare</span>
+          <span className="eyebrow">Health Ladder</span>
           <h1>건강검진표부터 생활습관까지, 내 건강 위험도를 쉽게 확인하세요</h1>
           <p>{String(data.service_description)}</p>
           <div className="button-row">

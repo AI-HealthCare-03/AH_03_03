@@ -14,7 +14,7 @@ function initializeFirebaseMessaging(firebaseConfig) {
   firebaseMessagingInitialized = true;
 
   firebase.messaging().onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || payload.data?.title || "AI HealthCare 알림";
+    const title = payload.notification?.title || payload.data?.title || "AI Health Ladder 알림";
     const options = {
       body: payload.notification?.body || payload.data?.body || "새 알림이 도착했습니다.",
       icon: "/favicon.svg",

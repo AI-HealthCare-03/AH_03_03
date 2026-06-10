@@ -66,7 +66,7 @@ export default function FindLoginIdPage() {
       <Card>
         <div className="page-header">
           <div>
-            <span className="eyebrow">HealthCare</span>
+            <span className="eyebrow">Health Ladder</span>
             <h1>아이디 찾기</h1>
             <p>가입 시 입력한 이름과 이메일 또는 휴대폰 번호를 입력해주세요.</p>
           </div>

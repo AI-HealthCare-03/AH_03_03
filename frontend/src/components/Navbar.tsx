@@ -44,7 +44,7 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
     <header className="topbar">
       <Link className="brand" to="/">
         <span className="brand-mark">H</span>
-        HealthCare
+        Health Ladder
       </Link>
       <div className="navbar-actions">
         <ThemeToggle />
