@@ -567,20 +567,22 @@ export default function MyPage() {
                 const progress = getChallengeProgress(challenge);
                 return (
                   <div className="mini-card" key={String(challenge.id)}>
-                    <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong>{getChallengeTitle(challenge, challengeMasters)}</strong>
-                      <p className="muted">{getChallengeStatusLabel(challenge)}</p>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${progress}%` }} />
-                    </div>
-                    <div className="button-row">
-                      <span className="badge badge-reference">진행률 {progress}%</span>
                       {getChallengeId(challenge) && (
-                        <Link className="button secondary" to={`/challenges/${String(getChallengeId(challenge))}`}>
-                          상세보기
+                        <Link className="muted" style={{ fontSize: "13px" }} to={`/challenges/${String(getChallengeId(challenge))}`}>
+                          상세보기 →
                         </Link>
                       )}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span className="muted" style={{ fontSize: "13px" }}>진행률</span>
+                        <span className="muted" style={{ fontSize: "13px" }}>{progress}%</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${progress}%` }} />
+                      </div>
                     </div>
                   </div>
                 );
