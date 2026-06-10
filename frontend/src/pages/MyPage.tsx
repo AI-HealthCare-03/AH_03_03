@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { changePassword, deactivateMe, updateMe } from "../api/auth";
+import { changePassword, updateMe } from "../api/auth";
 import { getLatestAnalysisResults } from "../api/analysis";
 import { listChallenges, listMyChallenges } from "../api/challenges";
 import { listHealthRecords } from "../api/health";
@@ -53,7 +53,6 @@ const myPageMenuItems = [
   { label: "복약/영양제", to: "/medications" },
   { label: "챌린지 현황", to: "/challenges" },
   { label: "내 가족", to: "/family" },
-  { label: "회원탈퇴", action: "deactivate", danger: true },
 ];
 
 function getText(item: Item | undefined | null, key: string, fallback = "-"): string {
@@ -295,23 +294,6 @@ export default function MyPage() {
     }
   };
 
-  const deactivateAccount = async () => {
-    setError("");
-    setNotice("");
-    if (!window.confirm("회원탈퇴를 진행하면 계정이 비활성화됩니다. 계속하시겠습니까?")) {
-      return;
-    }
-    if (!window.confirm("탈퇴 후에는 현재 계정으로 서비스 이용이 제한됩니다. 정말 탈퇴하시겠습니까?")) {
-      return;
-    }
-    try {
-      await deactivateMe();
-      await logout();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "회원탈퇴 처리에 실패했습니다.");
-    }
-  };
-
   return (
     <div className="dashboard-grid">
       <Card title="마이페이지">
@@ -420,9 +402,6 @@ export default function MyPage() {
             )}
             <button className="secondary" onClick={() => setShowPasswordForm((prev) => !prev)} type="button">
               비밀번호 변경
-            </button>
-            <button className="danger-ghost" onClick={() => void deactivateAccount()} type="button">
-              회원탈퇴
             </button>
             <Link className="button secondary" to="/settings">
               설정으로 이동
