@@ -563,29 +563,6 @@ export default function MyPage() {
             </div>
           </Card>
         </div>
-
-        <Card title="복용중인 약물/영양제 목록">
-          <div className="empty-state">
-            <strong>복약/영양제 정보는 복약 관리 화면에서 확인할 수 있습니다.</strong>
-            <p>등록된 약물, 영양제, 복약 기록을 한 곳에서 관리해보세요.</p>
-            <Link className="button secondary" to="/medications">
-              복약 관리로 이동
-            </Link>
-          </div>
-        </Card>
-
-        <Card title="가족 요약">
-          <div className="family-summary-card">
-            <div>
-              <span className="badge badge-reference">내 가족</span>
-              <h3>가족을 연결하면 건강정보 공유와 보호자 알림을 설정할 수 있습니다.</h3>
-              <p className="muted">현재 연결된 가족 0명, 공유 알림 0건입니다.</p>
-            </div>
-            <Link className="button" to="/family">
-              가족 관리로 이동
-            </Link>
-          </div>
-        </Card>
       </div>
     </div>
   );
