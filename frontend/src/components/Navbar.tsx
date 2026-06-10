@@ -50,13 +50,13 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
         <ThemeToggle />
         {isAuthenticated ? (
           <>
-            <Link className="icon-button navbar-notification-link" to="/notifications" aria-label="알림">
+            <NavLink className={({ isActive }) => `icon-button navbar-notification-link desktop-nav-action${isActive ? " active" : ""}`} to="/notifications" aria-label="알림">
               알림
               {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
-            </Link>
-            <Link className="icon-button desktop-nav-action" to="/chatbot" aria-label="AI 건강 상담">
+            </NavLink>
+            <NavLink className={({ isActive }) => `icon-button desktop-nav-action${isActive ? " active" : ""}`} to="/chatbot" aria-label="AI 건강 상담">
               상담
-            </Link>
+            </NavLink>
             {showAdminLink && (
               <Link className="icon-button desktop-nav-action" to="/admin" aria-label="관리자 콘솔">
                 관리자
