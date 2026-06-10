@@ -411,6 +411,11 @@ export default function MainPage() {
     return (
       <div className="page-stack">
         <div className="main-dashboard-hero">
+          <img
+            src="/images/hero-main.png"
+            alt="헬스케어 서비스"
+            style={{ width: "auto", height: "100%", maxHeight: "280px", objectFit: "contain" }}
+          />
           <div>
             <h1>안녕하세요, {backendUser?.nickname ?? backendUser?.name ?? "회원"}님</h1>
             <p>오늘의 건강 관리 상태를 확인해보세요.</p>

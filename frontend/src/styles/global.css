@@ -1004,7 +1004,7 @@ pre {
   display: flex;
   gap: 20px;
   justify-content: space-between;
-  padding: 28px;
+  padding: 16px 28px;
 }
 
 .main-dashboard-hero h1 {
