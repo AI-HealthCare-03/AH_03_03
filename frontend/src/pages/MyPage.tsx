@@ -301,30 +301,17 @@ export default function MyPage() {
               return (
                 <Link className="mypage-menu-item" key={item.label} to={item.to}>
                   <span>{item.label}</span>
-                  {item.badge && <span className="badge badge-reference">{item.badge}</span>}
                 </Link>
               );
             }
 
             return (
               <button
-                className={[
-                  "mypage-menu-item",
-                  item.status === "active" ? "active" : "",
-                  item.danger ? "danger-ghost" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className="mypage-menu-item"
                 key={item.label}
                 type="button"
-                onClick={() => {
-                  if (item.action === "deactivate") {
-                    void deactivateAccount();
-                  }
-                }}
               >
                 <span>{item.label}</span>
-                {item.badge && <span className="badge badge-reference">{item.badge}</span>}
               </button>
             );
           })}
