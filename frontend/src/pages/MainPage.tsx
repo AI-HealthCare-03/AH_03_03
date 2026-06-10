@@ -478,7 +478,7 @@ export default function MainPage() {
                     const circumference = 2 * Math.PI * 28;
                     const dashFilled = (score * circumference).toFixed(1);
                     const dashEmpty = (circumference - score * circumference).toFixed(1);
-                    const color = level === "HIGH" ? "#d35d5d" : level === "MEDIUM" ? "#d99a3d" : "#1D9E75";
+                    const color = level === "HIGH" ? "#EF4444" : level === "MEDIUM" ? "#F59E0B" : "#1D9E75";
                     const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
                     const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
                     return (
@@ -673,8 +673,8 @@ export default function MainPage() {
               <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: "0px", marginTop: "2px" }}>
                 {[
                   { label: "고혈압", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
-                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#d99a3d", text: "관리필요" },
-                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#d99a3d", text: "관리필요" },
+                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#F59E0B", text: "관리필요" },
+                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#F59E0B", text: "관리필요" },
                   { label: "콜레스테롤", score: 0.22, color: "#1D9E75", text: "낮음" },
                 ].map(({ label, score, color, text }) => (
                   <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
