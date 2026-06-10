@@ -723,13 +723,13 @@ export default function ChallengePage() {
               })}
             </div>
             <div className="pagination-row">
-              <button className="secondary compact-button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+              <button className="secondary compact-button" disabled={page <= 1} onClick={() => { setPage((prev) => Math.max(1, prev - 1)); window.scrollTo(0, 0); }}>
                 이전
               </button>
               <span>
                 {page} / {pageCount}
               </span>
-              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}>
+              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => { setPage((prev) => Math.min(pageCount, prev + 1)); window.scrollTo(0, 0); }}>
                 다음
               </button>
             </div>

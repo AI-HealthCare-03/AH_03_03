@@ -125,6 +125,11 @@ export default function DietResultPage() {
   return (
     <div className="page-grid">
       {error && <ErrorMessage message={error} />}
+      <div style={{ marginBottom: "8px", gridColumn: "1 / -1" }}>
+        <button className="button secondary" onClick={() => navigate(-1)} type="button">
+          ← 이전으로
+        </button>
+      </div>
       <Card
         title={isManual ? "식단 직접 기록" : "식단 분석 결과"}
         actions={
