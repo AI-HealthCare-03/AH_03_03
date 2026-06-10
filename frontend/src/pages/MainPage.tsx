@@ -487,11 +487,11 @@ export default function MainPage() {
                     const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
                     return (
                       <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
-                        <svg width="110" height="110" viewBox="0 0 110 110" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
-                          <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                          <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 55 55)"/>
-                          <text x="55" y="61" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
+                        <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
+                        <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 52).toFixed(1)} ${(2 * Math.PI * 52 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 65 65)"/>
+                          <text x="65" y="71" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
                         </svg>
                       </div>
                     );
