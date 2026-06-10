@@ -14,7 +14,7 @@ type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
-  service_title: "HealthCare",
+  service_title: "Health Ladder",
   service_description: "AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
 };
 
@@ -411,6 +411,11 @@ export default function MainPage() {
     return (
       <div className="page-stack">
         <div className="main-dashboard-hero">
+          <img
+            src="/images/hero-main.png"
+            alt="헬스케어 서비스"
+            style={{ width: "auto", height: "100%", maxHeight: "280px", objectFit: "contain" }}
+          />
           <div>
             <h1>안녕하세요, {backendUser?.nickname ?? backendUser?.name ?? "회원"}님</h1>
             <p>오늘의 건강 관리 상태를 확인해보세요.</p>
@@ -446,7 +451,6 @@ export default function MainPage() {
           <div className="todo-card-grid">
             {todayCards.map((task) => (
               <Link className="todo-card" key={task.title} to={task.to}>
-                <span className="badge badge-reference">오늘</span>
                 <strong>{task.title}</strong>
                 <p>{task.description}</p>
                 <em>{task.buttonLabel}</em>
@@ -478,16 +482,16 @@ export default function MainPage() {
                     const circumference = 2 * Math.PI * 28;
                     const dashFilled = (score * circumference).toFixed(1);
                     const dashEmpty = (circumference - score * circumference).toFixed(1);
-                    const color = level === "HIGH" ? "#d35d5d" : level === "MEDIUM" ? "#d99a3d" : "#1D9E75";
+                    const color = level === "HIGH" ? "#EF4444" : level === "MEDIUM" ? "#F59E0B" : "#1D9E75";
                     const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
                     const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
                     return (
                       <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
-                        <svg width="110" height="110" viewBox="0 0 110 110" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
-                          <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                          <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 55 55)"/>
-                          <text x="55" y="61" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
+                        <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
+                        <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 52).toFixed(1)} ${(2 * Math.PI * 52 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 65 65)"/>
+                          <text x="65" y="71" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
                         </svg>
                       </div>
                     );
@@ -505,12 +509,11 @@ export default function MainPage() {
             <div className="viz-card" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {/* 최근 검진표 */}
               <div className="viz-card-row">
-                <span className="viz-card-label">최근 검진표</span>
+                <span className="viz-card-label">최근 검진표 <span style={{ fontSize: "12px", color: "var(--color-muted)", fontWeight: 400 }}>{latestExam ? formatDate(latestExam.exam_date ?? latestExam.uploaded_at) : ""}</span></span>
                 <Link className="muted" style={{ fontSize: 12 }} to="/ocr/exam">검진표 입력 →</Link>
               </div>
               {latestExam ? (
                 <>
-                  <div className="viz-card-sub">{formatDate(latestExam.exam_date ?? latestExam.uploaded_at)}</div>
                   {(() => {
                     const glucose = getExamMeasurement(examMeasurements, "fasting_glucose");
                     return (
@@ -536,6 +539,15 @@ export default function MainPage() {
                       <div className="viz-stat-row">
                         <span>총콜레스테롤</span>
                         <strong>{chol?.value ? `${String(chol.value)} mg/dL` : "-"}</strong>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const bmi = getExamMeasurement(examMeasurements, "bmi");
+                    return (
+                      <div className="viz-stat-row">
+                        <span>BMI</span>
+                        <strong>{bmi?.value ? String(bmi.value) : "-"}</strong>
                       </div>
                     );
                   })()}
@@ -635,7 +647,7 @@ export default function MainPage() {
     <div className="landing-page">
       <section className="hero-panel">
         <div>
-          <span className="eyebrow">HealthCare</span>
+          <span className="eyebrow">Health Ladder</span>
           <h1>건강검진표부터 생활습관까지, 내 건강 위험도를 쉽게 확인하세요</h1>
           <p>{String(data.service_description)}</p>
           <div className="button-row">
@@ -647,50 +659,70 @@ export default function MainPage() {
             </Link>
           </div>
         </div>
-        <div className="mobile-health-card">
-          <div className="hero-card-topline">
-            <span className="badge badge-reference">예시 화면</span>
-          </div>
-          <div style={{ fontSize: "14px", color: "var(--color-text)", marginBottom: "6px" }}>
-            당뇨 관리 필요 수준입니다.
-          </div>
-          <div className="sparkline-row">
-            <div>
-              <span>혈당</span>
-              <strong>108 mg/dL</strong>
-            </div>
-            <div className="sparkline sparkline-glucose" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div className="sparkline-row">
-            <div>
-              <span>혈압</span>
-              <strong>132/84 mmHg</strong>
-            </div>
-            <div className="sparkline sparkline-pressure" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div>
-            <div className="progress-label">
-              <span>챌린지 수행률</span>
-              <strong>{landingPreview.challengeProgress}%</strong>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
-            </div>
-          </div>
-          <p className="muted">건강 점수와 주요 지표를 한눈에 확인합니다.</p>
+        <div className="hero-image-area">
+          <img
+            src="/images/hero-preview.png"
+            alt="서비스 미리보기"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              borderRadius: "var(--border-radius-lg)",
+              display: "block",
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
         </div>
+      </section>
+
+      <section className="landing-section">
+        <Card title="예시 대시보드 미리보기">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <span className="viz-card-label">질환별 위험도</span>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: "0px", marginTop: "2px" }}>
+                {[
+                  { label: "고혈압", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
+                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#F59E0B", text: "관리필요" },
+                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#F59E0B", text: "관리필요" },
+                  { label: "콜레스테롤", score: 0.22, color: "#1D9E75", text: "낮음" },
+                ].map(({ label, score, color, text }) => (
+                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{label}</span>
+                    <svg width="110" height="110" viewBox="0 0 110 110">
+                      <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                      <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10"
+                        strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`}
+                        strokeLinecap="round" transform="rotate(-90 55 55)"/>
+                      <text x="55" y="61" textAnchor="middle" fontSize="14" fontWeight="500" fill={color}>{text}</text>
+                    </svg>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <span className="viz-card-label">최근 검진표</span>
+                <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>132 mg/dL</strong></div>
+                <div className="viz-stat-row"><span>혈압</span><strong>132/84 mmHg</strong></div>
+                <div className="viz-stat-row"><span>총콜레스테롤</span><strong>198 mg/dL</strong></div>
+                <div className="viz-stat-row"><span>BMI</span><strong>24.3</strong></div>
+              </div>
+              <div style={{ marginTop: "32px" }}>
+                <span className="viz-card-label">챌린지 진행률</span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>참여 중</span>
+                  <strong style={{ fontSize: "13px", color: "#1D9E75" }}>{landingPreview.challengeProgress}%</strong>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
       </section>
 
       <section className="landing-section">
@@ -748,15 +780,7 @@ export default function MainPage() {
           <h2>기능 미리보기</h2>
           <p>아이콘을 눌러 관심 기능을 확인하고 로그인 후 바로 이어갈 수 있습니다.</p>
         </div>
-        <div className="service-flow-strip">
-          {serviceFlow.map((item, index) => (
-            <div className="service-flow-item" key={item.label}>
-              <span>{item.icon}</span>
-              <strong>{item.label}</strong>
-              {index < serviceFlow.length - 1 ? <em aria-hidden="true">→</em> : null}
-            </div>
-          ))}
-        </div>
+
         <div className="landing-feature-grid">
           {landingFeatures.map((feature) => (
             <Link
@@ -771,52 +795,6 @@ export default function MainPage() {
             </Link>
           ))}
         </div>
-      </section>
-      <section className="landing-section">
-        <Card title="예시 대시보드 미리보기">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <div>
-              <span className="viz-card-label">질환별 위험도</span>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
-                {[
-                  { label: "고혈압", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
-                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#d99a3d", text: "관리필요" },
-                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
-                  { label: "콜레스테롤", score: 0.22, color: "#1D9E75", text: "낮음" },
-                ].map(({ label, score, color, text }) => (
-                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{label}</span>
-                    <svg width="80" height="80" viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r="30" fill="none" stroke="var(--color-border)" strokeWidth="8"/>
-                      <circle cx="40" cy="40" r="30" fill="none" stroke={color} strokeWidth="8"
-                        strokeDasharray={`${(score * 2 * Math.PI * 30).toFixed(1)} ${(2 * Math.PI * 30 * (1 - score)).toFixed(1)}`}
-                        strokeLinecap="round" transform="rotate(-90 40 40)"/>
-                      <text x="40" y="44" textAnchor="middle" fontSize="12" fontWeight="500" fill={color}>{text}</text>
-                    </svg>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div>
-                <span className="viz-card-label">최근 검진표</span>
-                <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>105 mg/dL</strong></div>
-                <div className="viz-stat-row"><span>혈압</span><strong>132/84 mmHg</strong></div>
-                <div className="viz-stat-row"><span>총콜레스테롤</span><strong>198 mg/dL</strong></div>
-              </div>
-              <div>
-                <span className="viz-card-label">챌린지 진행률</span>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>참여 중</span>
-                  <strong style={{ fontSize: "13px", color: "#1D9E75" }}>{landingPreview.challengeProgress}%</strong>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
       </section>
       <section className="landing-cta">
         <div>

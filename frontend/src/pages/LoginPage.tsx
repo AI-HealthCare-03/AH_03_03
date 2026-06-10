@@ -42,7 +42,7 @@ export default function LoginPage() {
       <Card>
         <div className="page-header">
           <div>
-            <span className="eyebrow">HealthCare</span>
+            <span className="eyebrow">Health Ladder</span>
             <h1>다시 만나 반가워요!</h1>
             <p>아이디 또는 이메일로 로그인하고 오늘의 건강 상태를 확인하세요.</p>
           </div>

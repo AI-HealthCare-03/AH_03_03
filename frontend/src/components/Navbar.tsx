@@ -44,28 +44,21 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
     <header className="topbar">
       <Link className="brand" to="/">
         <span className="brand-mark">H</span>
-        HealthCare
+        Health Ladder
       </Link>
       <div className="navbar-actions">
         <ThemeToggle />
         {isAuthenticated ? (
           <>
-            <Link className="icon-button navbar-notification-link" to="/notifications" aria-label="알림">
+            <NavLink className={({ isActive }) => `icon-button navbar-notification-link desktop-nav-action${isActive ? " active" : ""}`} to="/notifications" aria-label="알림">
               알림
               {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
-            </Link>
-            <Link className="icon-button desktop-nav-action" to="/chatbot" aria-label="AI 건강 상담">
-              상담
-            </Link>
+            </NavLink>
             {showAdminLink && (
               <Link className="icon-button desktop-nav-action" to="/admin" aria-label="관리자 콘솔">
                 관리자
               </Link>
             )}
-            <Link className="user-chip desktop-nav-action" to="/mypage">
-              <span className="avatar">{(backendUser?.nickname ?? backendUser?.name ?? "U").slice(0, 1)}</span>
-              <span>{backendUser?.nickname ?? backendUser?.name ?? backendUser?.email}</span>
-            </Link>
             <button className="nav-logout-btn" type="button" onClick={logout}>
               로그아웃
             </button>

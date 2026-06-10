@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
+import { deactivateMe } from "../api/auth";
 import { getMySettings, updateMySettings } from "../api/settings";
+import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import {
@@ -29,6 +31,7 @@ const settingDescriptions: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  const { logout } = useAuth();
   const [settings, setSettings] = useState<Settings>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -66,11 +69,21 @@ export default function SettingsPage() {
     }).then((cleanup) => {
       unsubscribe = cleanup;
     });
-
     return () => {
       unsubscribe?.();
     };
   }, []);
+
+  const handleDeactivate = async () => {
+      if (!window.confirm("회원탈퇴를 진행하면 계정이 비활성화됩니다. 계속하시겠습니까?")) return;
+      if (!window.confirm("탈퇴 후에는 현재 계정으로 서비스 이용이 제한됩니다. 정말 탈퇴하시겠습니까?")) return;
+      try {
+        await deactivateMe();
+        await logout();
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
   const toggle = async (key: string) => {
     const next = { [key]: !settings[key] };
@@ -186,6 +199,12 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+      </div>
+      <div style={{ marginTop: "32px", paddingTop: "20px", borderTop: "1px solid var(--color-border)" }}>
+        <p className="muted" style={{ marginTop: "4px", marginBottom: "12px" }}>회원탈퇴 시 계정이 비활성화되며 복구가 어렵습니다.</p>
+        <button className="danger-ghost" onClick={() => void handleDeactivate()} type="button">
+          회원탈퇴
+        </button>
       </div>
     </Card>
   );
