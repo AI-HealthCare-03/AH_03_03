@@ -337,7 +337,13 @@ export default function MyPage() {
         {notice && <div className="state-box">{notice}</div>}
         {error && <ErrorMessage message={error} />}
 
-        <Card title="프로필/기본 내역">
+        <Card title="프로필/기본 내역" actions={
+          !isEditingProfile ? (
+            <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
+              수정
+            </button>
+          ) : undefined
+        }>
           <div className="profile-card-row">
             <span className="avatar avatar-large">{profileInitial}</span>
             <div className="profile-card-main">
@@ -395,11 +401,8 @@ export default function MyPage() {
                   취소
                 </button>
               </>
-            ) : (
-              <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
-                수정
-              </button>
-            )}
+            ) : null}
+
           </div>
         </Card>
 
