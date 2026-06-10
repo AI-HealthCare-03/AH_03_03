@@ -647,49 +647,21 @@ export default function MainPage() {
             </Link>
           </div>
         </div>
-        <div className="mobile-health-card">
-          <div className="hero-card-topline">
-            <span className="badge badge-reference">예시 화면</span>
-          </div>
-          <div style={{ fontSize: "14px", color: "var(--color-text)", marginBottom: "6px" }}>
-            당뇨 관리 필요 수준입니다.
-          </div>
-          <div className="sparkline-row">
-            <div>
-              <span>혈당</span>
-              <strong>132 mg/dL</strong>
-            </div>
-            <div className="sparkline sparkline-glucose" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div className="sparkline-row">
-            <div>
-              <span>혈압</span>
-              <strong>132/84 mmHg</strong>
-            </div>
-            <div className="sparkline sparkline-pressure" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div>
-            <div className="progress-label">
-              <span>챌린지 수행률</span>
-              <strong>{landingPreview.challengeProgress}%</strong>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
-            </div>
-          </div>
-          <p className="muted">건강 점수와 주요 지표를 한눈에 확인합니다.</p>
+        <div className="hero-image-area">
+          <img
+            src="/images/hero-preview.png"
+            alt="서비스 미리보기"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              borderRadius: "var(--border-radius-lg)",
+              display: "block",
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
         </div>
       </section>
 
