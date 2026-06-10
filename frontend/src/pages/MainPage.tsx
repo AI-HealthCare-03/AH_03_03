@@ -509,12 +509,11 @@ export default function MainPage() {
             <div className="viz-card" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {/* 최근 검진표 */}
               <div className="viz-card-row">
-                <span className="viz-card-label">최근 검진표</span>
+                <span className="viz-card-label">최근 검진표 <span style={{ fontSize: "12px", color: "var(--color-muted)", fontWeight: 400 }}>{latestExam ? formatDate(latestExam.exam_date ?? latestExam.uploaded_at) : ""}</span></span>
                 <Link className="muted" style={{ fontSize: 12 }} to="/ocr/exam">검진표 입력 →</Link>
               </div>
               {latestExam ? (
                 <>
-                  <div className="viz-card-sub">{formatDate(latestExam.exam_date ?? latestExam.uploaded_at)}</div>
                   {(() => {
                     const glucose = getExamMeasurement(examMeasurements, "fasting_glucose");
                     return (
@@ -540,6 +539,15 @@ export default function MainPage() {
                       <div className="viz-stat-row">
                         <span>총콜레스테롤</span>
                         <strong>{chol?.value ? `${String(chol.value)} mg/dL` : "-"}</strong>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const bmi = getExamMeasurement(examMeasurements, "bmi");
+                    return (
+                      <div className="viz-stat-row">
+                        <span>BMI</span>
+                        <strong>{bmi?.value ? String(bmi.value) : "-"}</strong>
                       </div>
                     );
                   })()}
