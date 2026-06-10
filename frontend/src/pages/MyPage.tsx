@@ -541,20 +541,19 @@ export default function MyPage() {
                 const resultId = Number(result.id);
                 return (
                   <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
-                    <div>
-                      <span className="muted">분석 유형</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type ?? "-")}</strong>
+                      {Number.isFinite(resultId) && (
+                        <Link className="muted" style={{ fontSize: "13px" }} to={`/analysis/${resultId}`}>
+                          상세보기 →
+                        </Link>
+                      )}
                     </div>
-                    <div className="button-row">
+                    <div className="button-row" style={{ marginTop: "6px" }}>
                       <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
                       <span className="badge badge-reference">{score}/100</span>
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
-                    {Number.isFinite(resultId) && (
-                      <Link className="button secondary" to={`/analysis/${resultId}`}>
-                        상세보기
-                      </Link>
-                    )}
                   </div>
                 );
               })}
