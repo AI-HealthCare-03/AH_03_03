@@ -2384,7 +2384,7 @@ pre {
   border-radius: var(--radius-md);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 1fr auto;
   min-width: 0;
   padding: 14px;
 }

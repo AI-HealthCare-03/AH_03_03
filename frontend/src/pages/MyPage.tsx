@@ -238,8 +238,6 @@ export default function MyPage() {
       ["성별", backendUser?.gender === "FEMALE" ? "여성" : backendUser?.gender === "MALE" ? "남성" : "-"],
       ["키/몸무게", `${getText(latestHealth, "height_cm")}cm / ${getText(latestHealth, "weight_kg")}kg`],
       ["BMI", getText(latestHealth, "bmi")],
-      ["휴대폰", backendUser?.phone_number ?? "-"],
-      ["이메일", backendUser?.email ?? "-"],
     ],
     [backendUser, latestHealth],
   );
@@ -372,6 +370,7 @@ export default function MyPage() {
                 <>
                   <strong>{displayName}</strong>
                   <p className="muted">{backendUser?.email ?? "이메일 정보 없음"}</p>
+                  <p className="muted">{backendUser?.phone_number ?? "휴대폰 미등록"}</p>
                   <div className="chip-list">
                     <span className="badge badge-saved">{backendUser?.role ?? "USER"}</span>
                     <span className="badge badge-reference">{backendUser?.login_id ?? "로그인 ID 미등록"}</span>
