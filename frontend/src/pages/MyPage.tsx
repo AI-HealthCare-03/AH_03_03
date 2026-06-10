@@ -444,6 +444,7 @@ export default function MyPage() {
           </Card>
         )}
 
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         <Card title="기본 건강정보">
           <div className="table-list">
             {profileRows.map(([label, value]) => (
@@ -466,8 +467,7 @@ export default function MyPage() {
           </div>
         </Card>
 
-        <div className="page-grid">
-          <Card title="현재 상태">
+        <Card title="현재 상태">
             <div className="metric-grid mypage-metric-grid">
               <div>
                 <span>BMI</span>
@@ -489,6 +489,7 @@ export default function MyPage() {
               </div>
             </div>
           </Card>
+          </div>
 
           <Card title="건강 목표">
             <div className="card-list">
@@ -502,7 +503,6 @@ export default function MyPage() {
               </div>
             </div>
           </Card>
-        </div>
 
         <div className="page-grid">
           <Card title="최근 분석 결과">
