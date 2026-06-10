@@ -748,15 +748,7 @@ export default function MainPage() {
           <h2>기능 미리보기</h2>
           <p>아이콘을 눌러 관심 기능을 확인하고 로그인 후 바로 이어갈 수 있습니다.</p>
         </div>
-        <div className="service-flow-strip">
-          {serviceFlow.map((item, index) => (
-            <div className="service-flow-item" key={item.label}>
-              <span>{item.icon}</span>
-              <strong>{item.label}</strong>
-              {index < serviceFlow.length - 1 ? <em aria-hidden="true">→</em> : null}
-            </div>
-          ))}
-        </div>
+
         <div className="landing-feature-grid">
           {landingFeatures.map((feature) => (
             <Link
