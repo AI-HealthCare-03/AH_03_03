@@ -451,7 +451,6 @@ export default function MainPage() {
           <div className="todo-card-grid">
             {todayCards.map((task) => (
               <Link className="todo-card" key={task.title} to={task.to}>
-                <span className="badge badge-reference">오늘</span>
                 <strong>{task.title}</strong>
                 <p>{task.description}</p>
                 <em>{task.buttonLabel}</em>
