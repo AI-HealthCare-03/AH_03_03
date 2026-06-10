@@ -53,8 +53,6 @@ const myPageMenuItems = [
   { label: "복약/영양제", to: "/medications" },
   { label: "챌린지 현황", to: "/challenges" },
   { label: "내 가족", to: "/family" },
-  { label: "알림 설정", to: "/settings" },
-  { label: "개인정보", to: "/settings", badge: "설정에서 관리" },
   { label: "회원탈퇴", action: "deactivate", danger: true },
 ];
 
