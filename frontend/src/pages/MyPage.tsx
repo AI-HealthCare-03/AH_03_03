@@ -355,13 +355,12 @@ export default function MyPage() {
                 </div>
               ) : (
                 <>
-                  <strong>{displayName}</strong>
-                  <p className="muted">{backendUser?.email ?? "이메일 정보 없음"}</p>
-                  <p className="muted">{backendUser?.phone_number ?? "휴대폰 미등록"}</p>
-                  <div className="chip-list">
-                    <span className="badge badge-saved">{backendUser?.role ?? "USER"}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <strong style={{ fontSize: "40px" }}>{displayName}</strong>
                     <span className="badge badge-reference">{backendUser?.login_id ?? "로그인 ID 미등록"}</span>
                   </div>
+                  <p className="muted" style={{ marginBottom: "4px" }}>이메일: {backendUser?.email ?? "이메일 정보 없음"}</p>
+                  <p className="muted" style={{ margin: 0 }}>휴대폰: {backendUser?.phone_number ?? "미등록"}</p>
                 </>
               )}
             </div>
