@@ -2231,6 +2231,8 @@ pre {
 .mypage-menu {
   display: grid;
   gap: 10px;
+  position: sticky;
+  top: 80px;
 }
 
 .mypage-menu-item {
