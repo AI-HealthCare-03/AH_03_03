@@ -14,6 +14,15 @@ import { Activity, Gauge, Droplet, Moon } from "lucide-react";
 
 type Item = Record<string, unknown>;
 
+type MyPageMenuItem = {
+  label: string;
+  to?: string;
+  status?: "active";
+  badge?: string;
+  danger?: boolean;
+  action?: "deactivate";
+};
+
 type ProfileDraft = {
   nickname: string;
   phoneNumber: string;
@@ -50,7 +59,7 @@ const challengeStatusLabels: Record<string, string> = {
   GIVEN_UP: "참여 전",
 };
 
-const myPageMenuItems = [
+const myPageMenuItems: MyPageMenuItem[] = [
   { label: "프로필", status: "active" },
   { label: "기본 건강정보", to: "/health/profile" },
   { label: "복약/영양제", to: "/medications" },
@@ -293,6 +302,10 @@ export default function MyPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "비밀번호 변경에 실패했습니다.");
     }
+  };
+
+  const deactivateAccount = () => {
+    window.alert("회원 탈퇴 기능은 준비 중입니다.");
   };
 
   return (
