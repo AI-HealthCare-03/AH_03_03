@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MoonStar, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
@@ -33,7 +34,9 @@ export default function ThemeToggle() {
       onClick={() => setTheme(nextTheme)}
       type="button"
     >
-      <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
+      <span aria-hidden="true">
+  {theme === "dark" ? <Sun size={16} /> : <MoonStar size={16} />}
+</span>
       <span className="theme-toggle-label">{theme === "dark" ? "라이트" : "다크"}</span>
     </button>
   );
