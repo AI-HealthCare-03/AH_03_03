@@ -11,9 +11,9 @@
 | `prod` | `infra/docker/docker-compose.prod.yml` | 표준 EC2/운영 이미지 기반 스택 | `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`, `certbot` |
 | `langfuse` | `infra/langfuse/docker-compose.yml` | Langfuse self-host optional 관측 스택 | `langfuse-web`, `langfuse-worker`, `postgres`, `redis`, `clickhouse`, `minio` |
 
-`scripts/docker_stack.sh`와 `Makefile`은 자주 쓰는 `app`, `dev`, `langfuse` 스택 실행을 감싼다. `prod`는 이미지 태그와 운영 환경변수 확인이 필요하므로 명시적으로 compose 파일을 지정해서 실행한다.
+`Makefile`은 표준 dev full stack 실행을 감싼다. `scripts/docker_stack.sh`는 legacy `app` 스택과 optional `langfuse` 스택 wrapper로 보존한다. `prod`는 이미지 태그와 운영 환경변수 확인이 필요하므로 명시적으로 compose 파일을 지정해서 실행한다.
 
-현재 표준 로컬 실행은 `infra/docker/docker-compose.dev.yml`이다. 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용으로만 유지하며, frontend, Firebase Web Push build args, storage, scheduler, 최신 dev full stack 검증에는 사용하지 않는다.
+현재 표준 로컬 실행은 `make dev-up`이며 내부적으로 `infra/docker/docker-compose.dev.yml`을 사용한다. 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용으로만 유지하며, frontend, Firebase Web Push build args, storage, scheduler, 최신 dev full stack 검증에는 사용하지 않는다.
 
 ## 현재 Redis / async job 범위
 
@@ -98,38 +98,39 @@ frontend, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 올린다.
 
 `ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer와 scheduler loop를 실행한다. 처리 job은 `DEMO_ECHO`뿐 아니라 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`, 이메일/비밀번호/가족초대/FCM/가족알림 service job을 포함한다.
 
-로컬 개발에서는 `.env`를 직접 계속 바꾸지 않도록 provider 성격에 따라 아래 프로필을 사용한다.
+로컬 개발/시연 표준은 루트 `.env` 하나를 사용한다. 시작할 때 `envs/example.local.env`를 복사하고, 실제 secret 값은 `.env`에만 채운다.
 
 ```bash
-make dev-up-mock
-make dev-up-real
+cp envs/example.local.env .env
 ```
 
 직접 compose 명령을 사용할 때는 Docker Compose variable interpolation이 `env_file`이 아니라 `--env-file` 또는 루트 `.env`를 기준으로 동작한다는 점에 주의한다.
 
 ```bash
-./scripts/docker_stack.sh dev up
-./scripts/docker_stack.sh dev ps
-./scripts/docker_stack.sh dev down
+make dev-up
+make dev-ps
+make dev-down
 ```
 
 Makefile:
 
 ```bash
 make dev-up
-make dev-up-mock
-make dev-up-real
 make dev-ps
+make dev-logs
+make dev-migrate
+make dev-seed
+make dev-health
 make dev-down
 ```
 
-직접 compose 명령:
+`make dev-up`은 `ai-health-shared` Docker network가 없으면 생성한 뒤 아래 compose를 실행한다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
-docker compose --env-file .env.local.mock -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
-docker compose --env-file .env.local.real -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
 ```
+
+프론트엔드는 Vite dev server가 아니라 `frontend/Dockerfile`에서 정적 파일로 빌드된 뒤 frontend 컨테이너 내부 Nginx로 서빙된다. dev Nginx는 기본 `http://localhost:8080`에서 `/api/`를 FastAPI로, 나머지 요청을 frontend로 proxy한다.
 
 ### langfuse 스택
 
@@ -163,15 +164,16 @@ make langfuse-down
 
 ## 3. prod 스택
 
-운영/EC2 표준 스택은 `infra/docker/docker-compose.prod.yml` 기준이다. 로컬 시연용 기본 명령에 포함하지 않는다.
+운영/EC2 표준 스택은 `infra/docker/docker-compose.prod.yml` 기준이다. 로컬 시연용 기본 명령에 포함하지 않는다. prod compose는 app, ai-worker, frontend service image를 registry에서 pull하는 구조이며, EC2에서 직접 build하지 않는다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.prod.yml up -d --build --force-recreate
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
 ```
 
 운영 실행 전 확인할 것:
 
-- image registry와 tag가 준비되어 있는지
+- app, ai-worker, frontend image registry와 tag가 준비되어 있는지
 - prod env 값이 placeholder가 아닌지
 - HTTPS/certbot 설정이 실제 도메인과 맞는지
 - DB backup/restore 계획이 있는지

@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 APP_COMPOSE="${ROOT_DIR}/docker-compose.yml"
-DEV_COMPOSE="${ROOT_DIR}/infra/docker/docker-compose.dev.yml"
 LANGFUSE_COMPOSE="${ROOT_DIR}/infra/langfuse/docker-compose.yml"
 SHARED_NETWORK="ai-health-shared"
 APP_IMAGES=(
@@ -26,9 +25,6 @@ Usage:
   ./scripts/docker_stack.sh app ps
   ./scripts/docker_stack.sh app logs
   ./scripts/docker_stack.sh app worker-logs
-  ./scripts/docker_stack.sh dev up
-  ./scripts/docker_stack.sh dev down
-  ./scripts/docker_stack.sh dev ps
   ./scripts/docker_stack.sh langfuse up
   ./scripts/docker_stack.sh langfuse down
   ./scripts/docker_stack.sh langfuse ps
@@ -36,7 +32,6 @@ Usage:
 
 Stacks:
   app       Legacy/minimal root docker-compose.yml for backend/AI checks.
-  dev       infra/docker/docker-compose.dev.yml. Standard full dev stack.
   langfuse  infra/langfuse/docker-compose.yml. Optional Langfuse self-host stack.
 USAGE
 }
@@ -102,26 +97,6 @@ clean_app_images() {
   done
 }
 
-run_dev() {
-  local action="$1"
-  case "${action}" in
-    up)
-      ensure_shared_network
-      docker compose -f "${DEV_COMPOSE}" up -d
-      ;;
-    down)
-      docker compose -f "${DEV_COMPOSE}" down
-      ;;
-    ps)
-      docker compose -f "${DEV_COMPOSE}" ps
-      ;;
-    *)
-      usage
-      exit 1
-      ;;
-  esac
-}
-
 run_langfuse() {
   local action="$1"
   case "${action}" in
@@ -157,9 +132,6 @@ main() {
   case "${stack}" in
     app)
       run_app "${action}"
-      ;;
-    dev)
-      run_dev "${action}"
       ;;
     langfuse)
       run_langfuse "${action}"

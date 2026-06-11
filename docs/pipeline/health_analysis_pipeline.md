@@ -130,8 +130,6 @@ uv run python -m ai_runtime.cv.food.nutrition.scoring.disease_food_scorer
 
 설정 기준:
 
-- `CHECKUP_OCR_PRIMARY_PROVIDER=paddle`
-- `ENABLE_CLOVA_OCR=false`
 - `GPT_VISION_FALLBACK_ENABLED=false`
 
 현재 `/api/v1/exams/{exam_id}/ocr`는 외부 Clova API를 호출하지 않고, OCR 결과 확인/confirm 후 `ExamMeasurement` 값을 `HealthRecord` X2 필드에 반영하는 서비스 흐름을 검증하는 데 초점을 둔다. Clova OCR provider 코드는 향후 provider 비교 또는 운영 전환 검토를 위한 reference로 보존한다.

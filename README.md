@@ -9,10 +9,10 @@ AI HealthCare MVP는 건강정보 입력, 건강검진 OCR, 식단/복약 분석
 ```bash
 cp envs/example.local.env .env
 uv sync
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync aerich upgrade
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
-curl -fsS http://localhost:8080/api/v1/system/health
+make dev-up
+make dev-migrate
+make dev-seed
+make dev-health
 ```
 
 접속:
@@ -27,7 +27,7 @@ curl -fsS http://localhost:8080/api/v1/system/health
 - Python 3.13 이상
 - `uv`
 
-Full Docker dev stack은 프론트엔드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 함께 실행합니다. 웹 시연만 할 때는 Node.js/npm을 직접 실행할 필요가 없습니다.
+Full Docker dev stack은 프론트엔드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 함께 실행합니다. 웹 시연만 할 때는 Node.js/npm을 직접 실행할 필요가 없습니다. 프론트엔드는 Docker build 단계에서 정적 파일로 빌드되고, frontend 컨테이너 내부 Nginx가 이를 서빙합니다.
 
 로컬 스크립트 실행과 의존성 동기화를 위해 한 번 실행합니다.
 
@@ -88,35 +88,37 @@ LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
 팀원/시연 표준은 `infra/docker/docker-compose.dev.yml`입니다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
+make dev-up
 ```
 
 중지:
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml down --remove-orphans
+make dev-down
 ```
 
 중요:
 
 - 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용입니다.
 - 팀원/시연 표준 실행은 반드시 `infra/docker/docker-compose.dev.yml`을 사용합니다.
+- `make dev-up`은 내부적으로 `docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build`를 실행합니다.
 - `docker compose up -d`만 단독 실행하지 마세요. 의도와 다른 루트 compose가 실행될 수 있습니다.
 - `docker rm -f redis postgres fastapi ai-worker nginx` 방식으로 컨테이너를 직접 지우지 마세요.
 - `down -v`는 DB volume을 삭제할 수 있으므로 시연/협업 중 사용하지 마세요.
+- prod compose는 Docker Hub image pull 전용입니다. prod 배포 전에는 app, ai-worker, frontend 이미지가 먼저 registry에 push되어 있어야 합니다.
 
 ## DB Migration / Seed
 
 DB migration:
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync aerich upgrade
+make dev-migrate
 ```
 
 챌린지 seed:
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
+make dev-seed
 ```
 
 데모 seed:
@@ -137,20 +139,19 @@ DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 ## Health Check
 
 ```bash
-curl -fsS http://localhost:8080/api/v1/system/health
+make dev-health
 ```
 
 컨테이너 상태 확인:
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml ps
+make dev-ps
 ```
 
 로그 확인 예시:
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml logs fastapi --tail=100
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml logs ai-worker --tail=100
+make dev-logs
 ```
 
 ## 주요 Provider Flag 요약
@@ -183,7 +184,7 @@ FastAPI 요청
 따라서 실제 이메일 발송을 켜려면 SMTP 환경변수가 `fastapi`와 `ai-worker` 양쪽에 전달되어야 합니다. dev stack을 실행할 때는 반드시 아래처럼 `--env-file .env`를 붙이세요.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
+make dev-up
 ```
 
 로컬에서 실제 SMTP를 쓰지 않을 때는 다음처럼 debug 모드를 사용합니다.
@@ -214,7 +215,7 @@ SMTP_USE_TLS=true
 루트 `docker-compose.yml`은 표준 dev stack이 아닙니다. 아래 명령을 사용하세요.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
+make dev-up
 ```
 
 ### 이메일 인증 버튼은 눌리지만 메일이 안 옴
@@ -225,8 +226,8 @@ docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --bu
 - `docker compose config` 전체 출력은 secret 노출 위험이 있으므로 공유하지 않습니다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml ps
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml logs ai-worker --tail=100
+make dev-ps
+make dev-logs
 ```
 
 ### migration 명령에서 `aerich`를 못 찾음
@@ -234,7 +235,7 @@ docker compose --env-file .env -f infra/docker/docker-compose.dev.yml logs ai-wo
 컨테이너 내부에서 실행하세요.
 
 ```bash
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi uv run --no-sync aerich upgrade
+make dev-migrate
 ```
 
 ### DB를 초기화하고 싶음

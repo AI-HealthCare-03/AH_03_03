@@ -49,7 +49,7 @@ ANEM을 공식 분석 결과에 포함하려면 `AnalysisType` enum, DB schema, 
 | 기능 | 경로 | 현재 상태 | 주의사항 |
 | --- | --- | --- | --- |
 | GPT Vision 식단 이미지 분석 후보 | `ai_runtime/cv/providers/gpt_vision.py` | provider 코드 존재 | 기본값은 off이며 `GPT_VISION_FALLBACK_ENABLED=true`와 사용자 확인 정책이 있을 때만 fallback 후보 |
-| Clova OCR provider | `ai_runtime/ocr/providers/clova_ocr/` | PoC/deferred provider로 보존 | 공식 건강검진 OCR 시연 경로에서는 호출하지 않으며 `ENABLE_CLOVA_OCR=false`가 기본 |
+| Clova OCR provider | `ai_runtime/ocr/providers/clova_ocr/` | PoC/deferred provider로 보존 | 공식 건강검진 OCR 시연 경로에서는 호출하지 않는다 |
 | OpenAI LLM | `ai_runtime/llm/` | 챗봇, 설명 생성, fallback/rewrite 구조 존재 | 기본은 rule-based/fallback 설명이며 실제 LLM 호출은 설정에 따라 제한적으로 사용 |
 
 외부 provider는 API key, 비용, 개인정보 처리 정책이 연결되므로 기본 시연 경로에서 무조건 호출하지 않는다.

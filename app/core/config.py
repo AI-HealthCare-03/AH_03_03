@@ -61,8 +61,6 @@ class Config(BaseSettings):
     SMTP_USE_TLS: bool = True
     FRONTEND_BASE_URL: str = "http://localhost:5173"
     # OCR/CV 외부 provider는 비용/안정성 때문에 명시 플래그가 켜진 경우에만 공식 경로에서 사용한다.
-    CHECKUP_OCR_PRIMARY_PROVIDER: str = "paddle"
-    ENABLE_CLOVA_OCR: bool = False
     GPT_VISION_FALLBACK_ENABLED: bool = False
     FOOD_CV_CONFIDENCE_THRESHOLD: float = 0.75
     OPENAI_API_KEY: str | None = None

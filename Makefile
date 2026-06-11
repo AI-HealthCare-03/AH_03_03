@@ -1,7 +1,9 @@
 .PHONY: app-up app-up-full app-worker-up app-build app-worker-build app-rebuild app-clean-image app-down app-ps app-logs app-worker-logs
-.PHONY: dev-up dev-up-real dev-up-mock dev-down dev-ps
+.PHONY: dev-network dev-up dev-down dev-ps dev-logs dev-migrate dev-seed dev-health
 .PHONY: demo-up demo-down demo-ps demo-logs demo-health
 .PHONY: langfuse-up langfuse-down langfuse-ps langfuse-logs
+
+COMPOSE_DEV = docker compose --env-file .env -f infra/docker/docker-compose.dev.yml
 
 app-up:
 	./scripts/docker_stack.sh app up
@@ -36,36 +38,39 @@ app-logs:
 app-worker-logs:
 	./scripts/docker_stack.sh app worker-logs
 
-dev-up:
-	./scripts/docker_stack.sh dev up
+dev-network:
+	docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared >/dev/null
 
-dev-up-real:
-	docker compose --env-file .env.local.real -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
-
-dev-up-mock:
-	docker compose --env-file .env.local.mock -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+dev-up: dev-network
+	$(COMPOSE_DEV) up -d --build
 
 dev-down:
-	./scripts/docker_stack.sh dev down
+	$(COMPOSE_DEV) down --remove-orphans
 
 dev-ps:
-	./scripts/docker_stack.sh dev ps
+	$(COMPOSE_DEV) ps
 
-demo-up:
-	docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared >/dev/null
-	docker compose -f infra/docker/docker-compose.dev.yml up -d --build
+dev-logs:
+	$(COMPOSE_DEV) logs --tail=100 fastapi ai-worker frontend nginx
 
-demo-down:
-	docker compose -f infra/docker/docker-compose.dev.yml down
+dev-migrate:
+	$(COMPOSE_DEV) exec fastapi uv run --no-sync aerich upgrade
 
-demo-ps:
-	docker compose -f infra/docker/docker-compose.dev.yml ps
+dev-seed:
+	$(COMPOSE_DEV) exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
 
-demo-logs:
-	docker compose -f infra/docker/docker-compose.dev.yml logs --tail=100 nginx frontend fastapi
-
-demo-health:
+dev-health:
 	curl -fsS http://localhost:8080/api/v1/system/health
+
+demo-up: dev-up
+
+demo-down: dev-down
+
+demo-ps: dev-ps
+
+demo-logs: dev-logs
+
+demo-health: dev-health
 
 langfuse-up:
 	./scripts/docker_stack.sh langfuse up
