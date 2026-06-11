@@ -206,6 +206,19 @@ async def list_exam_measurements(exam_report_id: int) -> list[ExamMeasurement]:
     return await exam_repository.list_exam_measurements(exam_report_id)
 
 
+async def get_latest_confirmed_exam_measurements_for_analysis(
+    user_id: int,
+) -> tuple[ExamReport | None, list[ExamMeasurement]]:
+    report = (
+        await ExamReport.filter(user_id=user_id, is_confirmed=True, ocr_status=OCRStatus.CONFIRMED)
+        .order_by("-confirmed_at", "-updated_at", "-uploaded_at", "-id")
+        .first()
+    )
+    if report is None:
+        return None, []
+    return report, await list_exam_measurements(int(report.id))
+
+
 async def update_exam_measurement(measurement_id: int, request: ExamMeasurementUpdateRequest) -> ExamMeasurement | None:
     data = request.model_dump(exclude_unset=True)
     return await exam_repository.update_exam_measurement(measurement_id, data)

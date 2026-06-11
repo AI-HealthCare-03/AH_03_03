@@ -10,6 +10,8 @@ import pytest
 from app.models.analysis import AnalysisMode, AnalysisType, RiskLevel
 from app.services import analysis as analysis_service
 
+_DEFAULT_EXAM_REPORT = object()
+
 
 def _health_record(**overrides: Any) -> SimpleNamespace:
     values = {
@@ -35,16 +37,31 @@ def _health_record(**overrides: Any) -> SimpleNamespace:
         "drinking_amount": "NONE",
         "walking_days_per_week": 5,
         "strength_days_per_week": 2,
-        "hemoglobin": Decimal("11.5"),
-        "egfr": Decimal("35"),
-        "ast": None,
-        "alt": None,
-        "gamma_gtp": None,
-        "creatinine": None,
-        "urine_protein": None,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
+
+
+def test_exam_measurements_to_x2_payload_normalizes_aliases_and_values() -> None:
+    payload = analysis_service.exam_measurements_to_x2_payload(
+        [
+            _measurement("hb", "13.2 g/dL"),
+            _measurement("AST", "30 IU/L"),
+            _measurement("γ-GTP", "44 IU/L"),
+            _measurement("eGFR", "45 mL/min/1.73m2"),
+            _measurement("요단백", "+1"),
+            _measurement("LDL", "132 mg/dL"),
+        ]
+    )
+
+    assert payload == {
+        "hemoglobin": Decimal("13.2"),
+        "ast": 30,
+        "gamma_gtp": 44,
+        "egfr": Decimal("45"),
+        "urine_protein": "plus_1",
+        "ldl_cholesterol": 132,
+    }
 
 
 @pytest.mark.asyncio
@@ -80,6 +97,16 @@ async def test_precision_mode_merges_basic_fallback_and_available_x2_results(
 ) -> None:
     created, snapshots = _patch_analysis_writes(monkeypatch)
     monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("systolic_bp", "145 mmHg"),
+            _measurement("diastolic_bp", "92 mmHg"),
+            _measurement("fasting_glucose", "108 mg/dL"),
+            _measurement("hemoglobin", "11.5 g/dL"),
+            _measurement("egfr", "35 mL/min/1.73m2"),
+        ],
+    )
 
     results = await analysis_service.run_analysis(7, _health_record(), AnalysisMode.PRECISION)
 
@@ -116,6 +143,11 @@ async def test_precision_mode_merges_basic_fallback_and_available_x2_results(
     assert htn_final["x2_stage_code"] == "HTN_STAGE_1"
     assert htn_final["x2_stage_label"] == "고혈압 1단계 범위"
     assert htn_final["x2_missing_fields"] == []
+    assert snapshot_by_type[AnalysisType.HYPERTENSION.value].input_payload["selected_exam_report_id"] == 9001
+    assert snapshot_by_type[AnalysisType.HYPERTENSION.value].input_payload["x2_measurement_source"] == (
+        "exam_measurements"
+    )
+    assert snapshot_by_type[AnalysisType.HYPERTENSION.value].input_payload["x2_input_payload"]["hemoglobin"] == 11.5
 
     dl_final = snapshot_by_type[AnalysisType.DYSLIPIDEMIA.value].output_payload["final_outputs"]
     assert dl_final["result_source"] == "BASIC_FALLBACK"
@@ -136,10 +168,11 @@ async def test_precision_mode_merges_basic_fallback_and_available_x2_results(
 async def test_precision_x2_only_unavailable_diseases_are_not_created(monkeypatch: pytest.MonkeyPatch) -> None:
     created, _snapshots = _patch_analysis_writes(monkeypatch)
     monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(monkeypatch, [])
 
     await analysis_service.run_analysis(
         7,
-        _health_record(hemoglobin=None, egfr=None, ast=None, alt=None, gamma_gtp=None, creatinine=None),
+        _health_record(),
         AnalysisMode.PRECISION,
     )
 
@@ -148,6 +181,67 @@ async def test_precision_x2_only_unavailable_diseases_are_not_created(monkeypatc
     assert AnalysisType.FATTY_LIVER not in {item.analysis_type for item in created}
     assert AnalysisType.LIVER_FUNCTION not in {item.analysis_type for item in created}
     assert AnalysisType.KIDNEY_FUNCTION not in {item.analysis_type for item in created}
+
+
+@pytest.mark.asyncio
+async def test_precision_uses_exam_measurements_for_x2_only_diseases(monkeypatch: pytest.MonkeyPatch) -> None:
+    created, _snapshots = _patch_analysis_writes(monkeypatch)
+    monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("AST", "30 IU/L"),
+            _measurement("ALT", "25 IU/L"),
+        ],
+    )
+
+    await analysis_service.run_analysis(7, _health_record(bmi=Decimal("24.0")), AnalysisMode.PRECISION)
+
+    by_type = {item.analysis_type: item for item in created}
+    assert AnalysisType.FATTY_LIVER in by_type
+    assert by_type[AnalysisType.FATTY_LIVER].model_name == "x2_rule"
+
+
+@pytest.mark.asyncio
+async def test_precision_prefers_confirmed_exam_measurements_over_health_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created, _snapshots = _patch_analysis_writes(monkeypatch)
+    monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("systolic_bp", "161 mmHg"),
+            _measurement("diastolic_bp", "88 mmHg"),
+        ],
+    )
+
+    await analysis_service.run_analysis(
+        7,
+        _health_record(systolic_bp=118, diastolic_bp=76),
+        AnalysisMode.PRECISION,
+    )
+
+    by_type = {item.analysis_type: item for item in created}
+    assert by_type[AnalysisType.HYPERTENSION].risk_level == RiskLevel.HIGH_CAUTION
+
+
+@pytest.mark.asyncio
+async def test_precision_without_exam_measurements_uses_health_record_fallback_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created, snapshots = _patch_analysis_writes(monkeypatch)
+    monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(monkeypatch, [], report=None)
+
+    await analysis_service.run_analysis(7, _health_record(), AnalysisMode.PRECISION)
+
+    assert AnalysisType.ANEMIA not in {item.analysis_type for item in created}
+    snapshot_by_type = {snapshot.input_payload["analysis_type"]: snapshot for snapshot in snapshots}
+    assert snapshot_by_type[AnalysisType.HYPERTENSION.value].input_payload["selected_exam_report_id"] is None
+    assert snapshot_by_type[AnalysisType.HYPERTENSION.value].input_payload["x2_measurement_source"] == (
+        "health_record_fallback"
+    )
 
 
 @pytest.mark.asyncio
@@ -221,6 +315,28 @@ def _patch_analysis_writes(
     monkeypatch.setattr(analysis_service, "_create_challenge_recommendations", _empty_recommendations)
     monkeypatch.setattr(analysis_service, "_analysis_explanation", lambda result, factors: {})
     return created, snapshots
+
+
+def _patch_confirmed_exam_measurements(
+    monkeypatch: pytest.MonkeyPatch,
+    measurements: list[SimpleNamespace],
+    report: SimpleNamespace | None | object = _DEFAULT_EXAM_REPORT,
+) -> None:
+    selected_report = SimpleNamespace(id=9001) if report is _DEFAULT_EXAM_REPORT else report
+
+    async def fake_get_latest_confirmed_exam_measurements_for_analysis(user_id: int):
+        assert user_id == 7
+        return selected_report, measurements
+
+    monkeypatch.setattr(
+        analysis_service.exam_service,
+        "get_latest_confirmed_exam_measurements_for_analysis",
+        fake_get_latest_confirmed_exam_measurements_for_analysis,
+    )
+
+
+def _measurement(key: str, value: object) -> SimpleNamespace:
+    return SimpleNamespace(measurement_key=key, measurement_name=key, value=value)
 
 
 async def _empty_recommendations(user_id: int, result: Any) -> list[int]:

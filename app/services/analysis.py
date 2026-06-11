@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -36,6 +37,7 @@ from app.models.health import HealthRecord
 from app.models.users import User
 from app.repositories import analysis_repository
 from app.services import challenges as challenge_service
+from app.services import exams as exam_service
 from app.services.health import (
     REQUIRED_BASIC_ANALYSIS_FIELDS,
     REQUIRED_USER_ANALYSIS_FIELDS,
@@ -179,7 +181,7 @@ async def run_analysis(
 ) -> list[dict[str, Any]]:
     results = []
     user = await User.get_or_none(id=user_id)
-    plans = _build_analysis_plans(user=user, health_record=health_record, mode=mode)
+    plans = await _build_analysis_plans(user=user, health_record=health_record, mode=mode)
     for plan in plans:
         analysis_type = plan["analysis_type"]
         score = plan["score"]
@@ -188,6 +190,7 @@ async def run_analysis(
         model_version = plan["model_version"]
         screening_dual_stage = plan.get("screening_dual_stage")
         x2_rule = plan.get("x2_rule")
+        precision_input = plan.get("precision_input")
         request = AnalysisResultCreateRequest(
             health_record_id=health_record.id,
             analysis_type=analysis_type,
@@ -218,6 +221,7 @@ async def run_analysis(
                 model_version=model_version,
                 screening_dual_stage=screening_dual_stage,
                 x2_rule=x2_rule,
+                precision_input=precision_input,
             ),
         )
         recommendation_ids = await _create_challenge_recommendations(user_id, result)
@@ -240,14 +244,14 @@ async def run_analysis(
     return results
 
 
-def _build_analysis_plans(
+async def _build_analysis_plans(
     *,
     user: User | None,
     health_record: HealthRecord,
     mode: AnalysisMode,
 ) -> list[dict[str, Any]]:
     if mode == AnalysisMode.PRECISION:
-        return _build_precision_analysis_plans(user=user, health_record=health_record)
+        return await _build_precision_analysis_plans(user=user, health_record=health_record)
     return _build_basic_analysis_plans(user=user, health_record=health_record)
 
 
@@ -276,10 +280,11 @@ def _build_basic_analysis_plans(*, user: User | None, health_record: HealthRecor
     return plans
 
 
-def _build_precision_analysis_plans(*, user: User | None, health_record: HealthRecord) -> list[dict[str, Any]]:
+async def _build_precision_analysis_plans(*, user: User | None, health_record: HealthRecord) -> list[dict[str, Any]]:
     plans: list[dict[str, Any]] = []
     base_plans = {plan["analysis_type"]: plan for plan in _build_basic_analysis_plans(user=user, health_record=health_record)}
-    x2_features = _x2_feature_payload(user=user, health_record=health_record)
+    precision_input = await build_precision_analysis_input_payload(user=user, health_record=health_record)
+    x2_features = precision_input["x2_input_payload"]
 
     for analysis_type in BASIC_ANALYSIS_TYPES:
         base_plan = base_plans[analysis_type]
@@ -295,6 +300,7 @@ def _build_precision_analysis_plans(*, user: User | None, health_record: HealthR
                     "model_name": "x2_rule",
                     "model_version": "x2-rule-v1",
                     "x2_rule": x2_rule,
+                    "precision_input": precision_input,
                 }
             )
             continue
@@ -309,6 +315,7 @@ def _build_precision_analysis_plans(*, user: User | None, health_record: HealthR
                 "model_version": "web-basic-fallback-v1",
                 "screening_dual_stage": base_plan.get("screening_dual_stage"),
                 "x2_rule": x2_rule,
+                "precision_input": precision_input,
             }
         )
 
@@ -325,6 +332,7 @@ def _build_precision_analysis_plans(*, user: User | None, health_record: HealthR
                 "model_name": "x2_rule",
                 "model_version": "x2-rule-v1",
                 "x2_rule": x2_result.to_dict(),
+                "precision_input": precision_input,
             }
         )
 
@@ -604,6 +612,222 @@ def _x2_feature_payload(*, user: User | None, health_record: HealthRecord) -> di
     return payload
 
 
+X2_MEASUREMENT_ALIASES = {
+    "systolicbp": "systolic_bp",
+    "sbp": "systolic_bp",
+    "수축기혈압": "systolic_bp",
+    "수축기": "systolic_bp",
+    "diastolicbp": "diastolic_bp",
+    "dbp": "diastolic_bp",
+    "이완기혈압": "diastolic_bp",
+    "이완기": "diastolic_bp",
+    "fastingglucose": "fasting_glucose",
+    "glucose": "fasting_glucose",
+    "glu": "fasting_glucose",
+    "공복혈당": "fasting_glucose",
+    "혈당": "fasting_glucose",
+    "hba1c": "hba1c",
+    "당화혈색소": "hba1c",
+    "totalcholesterol": "total_cholesterol",
+    "totalchol": "total_cholesterol",
+    "tc": "total_cholesterol",
+    "tcho": "total_cholesterol",
+    "총콜레스테롤": "total_cholesterol",
+    "ldl": "ldl_cholesterol",
+    "ldlcholesterol": "ldl_cholesterol",
+    "저밀도콜레스테롤": "ldl_cholesterol",
+    "hdl": "hdl_cholesterol",
+    "hdlcholesterol": "hdl_cholesterol",
+    "고밀도콜레스테롤": "hdl_cholesterol",
+    "triglyceride": "triglyceride",
+    "tg": "triglyceride",
+    "중성지방": "triglyceride",
+    "height": "height_cm",
+    "heightcm": "height_cm",
+    "신장": "height_cm",
+    "키": "height_cm",
+    "weight": "weight_kg",
+    "weightkg": "weight_kg",
+    "체중": "weight_kg",
+    "몸무게": "weight_kg",
+    "bmi": "bmi",
+    "체질량지수": "bmi",
+    "waist": "waist_cm",
+    "waistcm": "waist_cm",
+    "허리둘레": "waist_cm",
+    "복부둘레": "waist_cm",
+    "hb": "hemoglobin",
+    "hemoglobin": "hemoglobin",
+    "혈색소": "hemoglobin",
+    "헤모글로빈": "hemoglobin",
+    "ast": "ast",
+    "got": "ast",
+    "sgot": "ast",
+    "alt": "alt",
+    "gpt": "alt",
+    "sgpt": "alt",
+    "gammagtp": "gamma_gtp",
+    "gammagt": "gamma_gtp",
+    "ggt": "gamma_gtp",
+    "ggtp": "gamma_gtp",
+    "γgtp": "gamma_gtp",
+    "감마지티피": "gamma_gtp",
+    "감마gtp": "gamma_gtp",
+    "creatinine": "creatinine",
+    "serumcreatinine": "creatinine",
+    "크레아티닌": "creatinine",
+    "혈청크레아티닌": "creatinine",
+    "egfr": "egfr",
+    "신사구체여과율": "egfr",
+    "사구체여과율": "egfr",
+    "urineprotein": "urine_protein",
+    "proteinuria": "urine_protein",
+    "요단백": "urine_protein",
+}
+
+X2_INT_FIELDS = {
+    "systolic_bp",
+    "diastolic_bp",
+    "fasting_glucose",
+    "total_cholesterol",
+    "ldl_cholesterol",
+    "hdl_cholesterol",
+    "triglyceride",
+    "ast",
+    "alt",
+    "gamma_gtp",
+}
+
+
+async def build_precision_analysis_input_payload(
+    *,
+    user: User | None,
+    health_record: HealthRecord,
+) -> dict[str, Any]:
+    x2_payload = _x2_feature_payload(user=user, health_record=health_record)
+    field_sources = {
+        field_name: "health_record_fallback" for field_name, value in x2_payload.items() if value is not None
+    }
+    selected_exam_report_id = None
+    x2_measurement_source = "health_record_fallback"
+
+    user_id = getattr(user, "id", None) or getattr(health_record, "user_id", None)
+    if user_id is not None:
+        exam_report, measurements = await exam_service.get_latest_confirmed_exam_measurements_for_analysis(int(user_id))
+        if exam_report is not None:
+            selected_exam_report_id = int(exam_report.id)
+        measurement_payload, measurement_sources = _exam_measurements_to_x2_payload_with_sources(measurements)
+        if measurement_payload:
+            x2_payload.update(measurement_payload)
+            field_sources.update(measurement_sources)
+            x2_measurement_source = "exam_measurements"
+
+    return {
+        "selected_exam_report_id": selected_exam_report_id,
+        "x1_input_payload": _health_record_input_payload(health_record),
+        "x2_input_payload": x2_payload,
+        "x2_measurement_source": x2_measurement_source,
+        "x2_field_sources": field_sources,
+    }
+
+
+def exam_measurements_to_x2_payload(measurements: list[Any]) -> dict[str, Any]:
+    payload, _sources = _exam_measurements_to_x2_payload_with_sources(measurements)
+    return payload
+
+
+def _exam_measurements_to_x2_payload_with_sources(measurements: list[Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    payload: dict[str, Any] = {}
+    sources: dict[str, str] = {}
+    for measurement in measurements:
+        canonical_key = _canonical_x2_measurement_key(measurement)
+        if canonical_key is None:
+            continue
+        parsed_value = _parse_x2_measurement_value(canonical_key, getattr(measurement, "value", None))
+        if parsed_value is None:
+            continue
+        payload[canonical_key] = parsed_value
+        sources[canonical_key] = "exam_measurements"
+    return payload, sources
+
+
+def _canonical_x2_measurement_key(measurement: Any) -> str | None:
+    candidates = (getattr(measurement, "measurement_key", None), getattr(measurement, "measurement_name", None))
+    for candidate in candidates:
+        normalized = _normalize_measurement_alias(candidate)
+        if not normalized:
+            continue
+        canonical = X2_MEASUREMENT_ALIASES.get(normalized)
+        if canonical is not None:
+            return canonical
+    return None
+
+
+def _normalize_measurement_alias(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    text = text.replace("γ", "γ").replace("–", "-").replace("—", "-")
+    return re.sub(r"[\s_\-./()·:%]+", "", text)
+
+
+def _parse_x2_measurement_value(field_name: str, value: object) -> Any:
+    if value is None or str(value).strip() == "":
+        return None
+    if field_name == "urine_protein":
+        return _normalize_urine_protein(value)
+    parsed = exam_service.parse_exam_measurement_number(value)
+    if parsed is None:
+        return None
+    if field_name in X2_INT_FIELDS:
+        return int(parsed)
+    return parsed
+
+
+def _normalize_urine_protein(value: object) -> str | None:
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    compact = re.sub(r"[\s()]+", "", text)
+    if compact in {"-", "(-)", "negative", "neg", "음성", "정상", "normal"}:
+        return "negative"
+    if compact in {"trace", "±", "+-", "미량", "경계"}:
+        return "trace"
+    plus_match = re.search(r"(?:\+([1-4])|([1-4])\+|plus[_-]?([1-4]))", compact)
+    if plus_match:
+        level = next(group for group in plus_match.groups() if group is not None)
+        return f"plus_{level}"
+    if compact == "+":
+        return "plus_1"
+    return text
+
+
+def _health_record_input_payload(health_record: HealthRecord) -> dict[str, Any]:
+    return {
+        "height_cm": _to_json_value(health_record.height_cm),
+        "weight_kg": _to_json_value(health_record.weight_kg),
+        "bmi": _to_json_value(health_record.bmi),
+        "occupation_code": health_record.occupation_code,
+        "family_htn": health_record.family_htn,
+        "family_dm": health_record.family_dm,
+        "family_dyslipidemia": health_record.family_dyslipidemia,
+        "smoking_status": health_record.smoking_status,
+        "drinking_frequency": health_record.drinking_frequency,
+        "drinking_amount": health_record.drinking_amount,
+        "walking_days_per_week": health_record.walking_days_per_week,
+        "strength_days_per_week": health_record.strength_days_per_week,
+        "waist_cm": _to_json_value(health_record.waist_cm),
+        "systolic_bp": health_record.systolic_bp,
+        "diastolic_bp": health_record.diastolic_bp,
+        "fasting_glucose": health_record.fasting_glucose,
+        "hba1c": _to_json_value(health_record.hba1c),
+        "total_cholesterol": health_record.total_cholesterol,
+        "ldl_cholesterol": health_record.ldl_cholesterol,
+        "hdl_cholesterol": health_record.hdl_cholesterol,
+        "triglyceride": health_record.triglyceride,
+    }
+
+
 def _resolve_final_risk_level(base_risk_level: RiskLevel, screening_dual_stage: dict[str, Any] | None) -> RiskLevel:
     if not screening_dual_stage or screening_dual_stage.get("status") != "applied":
         return base_risk_level
@@ -801,38 +1025,18 @@ def _analysis_snapshot_request(
     model_prediction: dict[str, Any] | None = None,
     screening_dual_stage: dict[str, Any] | None = None,
     x2_rule: dict[str, Any] | None = None,
+    precision_input: dict[str, Any] | None = None,
 ) -> AnalysisSnapshotCreateRequest:
     model_version = model_version or f"web-{analysis_mode.value.lower()}-v1"
-    input_features = {
-        "height_cm": _to_json_value(health_record.height_cm),
-        "weight_kg": _to_json_value(health_record.weight_kg),
-        "bmi": _to_json_value(health_record.bmi),
-        "occupation_code": health_record.occupation_code,
-        "family_htn": health_record.family_htn,
-        "family_dm": health_record.family_dm,
-        "family_dyslipidemia": health_record.family_dyslipidemia,
-        "smoking_status": health_record.smoking_status,
-        "drinking_frequency": health_record.drinking_frequency,
-        "drinking_amount": health_record.drinking_amount,
-        "walking_days_per_week": health_record.walking_days_per_week,
-        "strength_days_per_week": health_record.strength_days_per_week,
-        "waist_cm": _to_json_value(health_record.waist_cm),
-        "systolic_bp": health_record.systolic_bp,
-        "diastolic_bp": health_record.diastolic_bp,
-        "fasting_glucose": health_record.fasting_glucose,
-        "hba1c": _to_json_value(health_record.hba1c),
-        "total_cholesterol": health_record.total_cholesterol,
-        "ldl_cholesterol": health_record.ldl_cholesterol,
-        "hdl_cholesterol": health_record.hdl_cholesterol,
-        "triglyceride": health_record.triglyceride,
-        "hemoglobin": _to_json_value(getattr(health_record, "hemoglobin", None)),
-        "ast": getattr(health_record, "ast", None),
-        "alt": getattr(health_record, "alt", None),
-        "gamma_gtp": getattr(health_record, "gamma_gtp", None),
-        "urine_protein": getattr(health_record, "urine_protein", None),
-        "creatinine": _to_json_value(getattr(health_record, "creatinine", None)),
-        "egfr": _to_json_value(getattr(health_record, "egfr", None)),
-    }
+    input_features = _health_record_input_payload(health_record)
+    selected_exam_report_id = precision_input.get("selected_exam_report_id") if precision_input else None
+    x1_input_payload = precision_input.get("x1_input_payload") if precision_input else input_features
+    x2_input_payload = precision_input.get("x2_input_payload") if precision_input else _x2_feature_payload(
+        user=None,
+        health_record=health_record,
+    )
+    x2_measurement_source = precision_input.get("x2_measurement_source") if precision_input else "health_record_fallback"
+    x2_field_sources = precision_input.get("x2_field_sources") if precision_input else {}
     shap_outputs = [
         {
             "factor_key": factor.factor_key,
@@ -857,6 +1061,11 @@ def _analysis_snapshot_request(
                 "input_features": input_features,
                 "analysis_type": analysis_type,
                 "analysis_mode": analysis_mode,
+                "selected_exam_report_id": selected_exam_report_id,
+                "x1_input_payload": x1_input_payload,
+                "x2_input_payload": x2_input_payload,
+                "x2_measurement_source": x2_measurement_source,
+                "x2_field_sources": x2_field_sources,
             }
         ),
         output_payload=_to_json_value(
