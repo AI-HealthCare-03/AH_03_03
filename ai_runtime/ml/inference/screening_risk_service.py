@@ -11,7 +11,7 @@ from ai_runtime.ml.inference.dual_stage_policy import (
 )
 
 SUPPORTED_SCREENING_RISK_DISEASES = frozenset({"HTN", "DM", "DL"})
-BASE_HIGH_RISK_LEVELS = frozenset({"MEDIUM", "HIGH"})
+BASE_HIGH_RISK_LEVELS = frozenset({"ATTENTION", "CAUTION", "HIGH_CAUTION", "MEDIUM", "HIGH"})
 BASE_LOW_RISK_LEVELS = frozenset({"LOW"})
 
 
@@ -28,10 +28,11 @@ class ScreeningRiskResult:
     disease_code: str
     base_high: bool
     screening_high: bool
+    risk_level: str
     service_band: ServiceBand
     service_band_label: str
     service_band_percent: int
-    legacy_risk_level: str
+    legacy_risk_level: str | None
     screening_missing_features: list[str]
     screening_neutralized_features: list[str]
     screening_model_count: int
@@ -46,9 +47,8 @@ def predict_screening_dual_stage_risk(
 ) -> ScreeningRiskResult:
     """Combine BASIC X1 base risk and screening model signal.
 
-    The returned service band is the intended frontend display value. The
-    legacy LOW/MEDIUM/HIGH risk level is kept only for compatibility with the
-    current DB/API contract.
+    The returned risk level is the intended 4-step frontend display value.
+    service_band is kept as a compatibility alias for older API consumers.
 
     Raw screening probability is intentionally not copied into this service
     result. It may be used for internal validation/debugging, but user-facing
@@ -66,6 +66,7 @@ def predict_screening_dual_stage_risk(
         disease_code=normalized_disease_code,
         base_high=resolved_base_high,
         screening_high=screening_result.screening_high,
+        risk_level=policy_result.risk_level,
         service_band=policy_result.service_band,
         service_band_label=policy_result.service_band_label,
         service_band_percent=policy_result.service_band_percent,

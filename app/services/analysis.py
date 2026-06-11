@@ -48,6 +48,21 @@ BASIC_SCREENING_DISEASE_CODES: dict[AnalysisType, str] = {
     AnalysisType.DYSLIPIDEMIA: "DL",
 }
 
+RISK_LEVEL_LABELS: dict[RiskLevel, str] = {
+    RiskLevel.LOW: "낮음",
+    RiskLevel.ATTENTION: "관심 필요",
+    RiskLevel.CAUTION: "주의",
+    RiskLevel.HIGH_CAUTION: "높은 주의",
+}
+
+# 화면 표시용 관리 필요도 점수입니다. 질병 확률이나 진단 확률로 해석하면 안 됩니다.
+RISK_LEVEL_DISPLAY_PERCENTS: dict[RiskLevel, int] = {
+    RiskLevel.LOW: 25,
+    RiskLevel.ATTENTION: 45,
+    RiskLevel.CAUTION: 65,
+    RiskLevel.HIGH_CAUTION: 80,
+}
+
 
 async def create_analysis_result(user_id: int, request: AnalysisResultCreateRequest) -> AnalysisResult:
     data = request.model_dump(exclude={"health_record_id"})
@@ -154,16 +169,17 @@ async def run_analysis(
     for analysis_type, fallback_score in _calculate_analysis_scores(health_record, mode, user).items():
         prediction = ml_predictions.get(analysis_type)
         score = Decimal(str(round(prediction.probability, 5))) if prediction is not None else fallback_score
-        risk_level = _risk_level(score)
+        base_risk_level = _risk_level(score)
         model_name = prediction.model_name if prediction is not None else "rule_based"
         model_version = prediction.model_version if prediction is not None else f"web-{mode.value.lower()}-v1"
         screening_dual_stage = _predict_basic_screening_dual_stage(
             user=user,
             health_record=health_record,
             analysis_type=analysis_type,
-            base_risk_level=risk_level,
+            base_risk_level=base_risk_level,
             analysis_mode=mode,
         )
+        risk_level = _resolve_final_risk_level(base_risk_level, screening_dual_stage)
         request = AnalysisResultCreateRequest(
             health_record_id=health_record.id,
             analysis_type=analysis_type,
@@ -207,7 +223,7 @@ async def run_analysis(
                 "explanation": _analysis_explanation(result, factors),
                 "challenge_recommendation_ids": recommendation_ids,
                 "factor_count": len(factors),
-                **_screening_dual_stage_response_fields(screening_dual_stage),
+                **_risk_level_alias_fields(risk_level),
             }
         )
     return results
@@ -290,10 +306,11 @@ def _predict_basic_screening_dual_stage(
         "base_risk_level": base_risk_level.value,
         "base_high": result.base_high,
         "screening_high": result.screening_high,
+        "risk_level": result.risk_level,
         "service_band": result.service_band.value,
         "service_band_label": result.service_band_label,
         "service_band_percent": result.service_band_percent,
-        "legacy_risk_level": result.legacy_risk_level,
+        "legacy_risk_level": None,
         "screening_missing_features": result.screening_missing_features,
         "screening_neutralized_features": result.screening_neutralized_features,
         "screening_model_count": result.screening_model_count,
@@ -442,10 +459,24 @@ def _hypertension_score(record: HealthRecord) -> Decimal:
 
 def _risk_level(score: Decimal) -> RiskLevel:
     if score >= Decimal("0.70"):
-        return RiskLevel.HIGH
+        return RiskLevel.HIGH_CAUTION
     if score >= Decimal("0.40"):
-        return RiskLevel.MEDIUM
+        return RiskLevel.CAUTION
     return RiskLevel.LOW
+
+
+def _resolve_final_risk_level(base_risk_level: RiskLevel, screening_dual_stage: dict[str, Any] | None) -> RiskLevel:
+    if not screening_dual_stage or screening_dual_stage.get("status") != "applied":
+        return base_risk_level
+    raw_risk_level = screening_dual_stage.get("risk_level") or screening_dual_stage.get("service_band")
+    try:
+        return RiskLevel(str(raw_risk_level))
+    except ValueError:
+        logger.warning(
+            "Invalid screening risk level; keeping base risk level",
+            extra={"risk_level": raw_risk_level, "base_risk_level": base_risk_level.value},
+        )
+        return base_risk_level
 
 
 def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: AnalysisMode = AnalysisMode.BASIC) -> str:
@@ -458,11 +489,15 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
     mode_label = "정밀" if mode == AnalysisMode.PRECISION else "간편"
     # 결과 문구는 위험도 안내에 머물러야 하며 진단/처방처럼 읽히면 안 된다.
     notice = f" 이 결과는 {mode_label} 분석 참고용 판정이며 의료 진단이 아닙니다."
-    if risk_level == RiskLevel.HIGH:
-        return f"{disease_label} 관련 위험도가 높게 나타났습니다. 생활습관 기록과 의료기관 상담을 함께 고려해 주세요.{notice}"
-    if risk_level == RiskLevel.MEDIUM:
-        return f"{disease_label} 관련 관리가 필요한 구간입니다. 식단과 활동량을 꾸준히 기록해 보세요.{notice}"
-    return f"{disease_label} 관련 위험도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
+    if risk_level == RiskLevel.HIGH_CAUTION:
+        return f"{disease_label} 관련 높은 주의 단계입니다. 생활습관 기록과 의료기관 상담을 함께 고려해 주세요.{notice}"
+    if risk_level == RiskLevel.CAUTION:
+        return f"{disease_label} 관련 주의가 필요한 단계입니다. 식단과 활동량을 꾸준히 기록해 보세요.{notice}"
+    if risk_level == RiskLevel.ATTENTION:
+        return (
+            f"{disease_label} 관련 관심이 필요한 단계입니다. 건강정보를 꾸준히 기록하며 변화를 확인해 보세요.{notice}"
+        )
+    return f"{disease_label} 관련 관리 필요도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
 
 
 def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
@@ -626,6 +661,10 @@ def _analysis_snapshot_request(
     final_outputs = {
         "risk_level": risk_level,
         "guide_message": guide_message,
+        "service_band": risk_level,
+        "service_band_label": _risk_level_label(risk_level),
+        "service_band_percent": _risk_level_display_percent(risk_level),
+        "legacy_risk_level": None,
     } | _screening_dual_stage_final_outputs(screening_dual_stage)
     return AnalysisSnapshotCreateRequest(
         input_payload=_to_json_value(
@@ -694,65 +733,44 @@ def _screening_dual_stage_final_outputs(screening_dual_stage: dict[str, Any] | N
 
     return {
         "screening_dual_stage_status": status,
-        "service_band": screening_dual_stage.get("service_band"),
-        "service_band_label": screening_dual_stage.get("service_band_label"),
-        "service_band_percent": screening_dual_stage.get("service_band_percent"),
-        "legacy_risk_level": screening_dual_stage.get("legacy_risk_level"),
-    }
-
-
-def _screening_dual_stage_response_fields(screening_dual_stage: dict[str, Any] | None) -> dict[str, Any]:
-    if not screening_dual_stage or screening_dual_stage.get("status") != "applied":
-        return {}
-    return {
-        "service_band": screening_dual_stage.get("service_band"),
-        "service_band_label": screening_dual_stage.get("service_band_label"),
-        "service_band_percent": screening_dual_stage.get("service_band_percent"),
-        "legacy_risk_level": screening_dual_stage.get("legacy_risk_level"),
     }
 
 
 def _analysis_result_response(result: AnalysisResult, snapshot: AnalysisSnapshot | None = None) -> dict[str, Any]:
     payload = AnalysisResultResponse.model_validate(result).model_dump()
-    payload.update(_service_band_fields_from_snapshot(snapshot))
+    _ = snapshot
+    payload.update(_risk_level_alias_fields(result.risk_level))
     return payload
 
 
-def _service_band_fields_from_snapshot(snapshot: AnalysisSnapshot | None) -> dict[str, Any]:
-    fields = {
-        "service_band": None,
-        "service_band_label": None,
-        "service_band_percent": None,
+def _risk_level_alias_fields(risk_level: RiskLevel | str) -> dict[str, Any]:
+    normalized = _coerce_risk_level(risk_level)
+    return {
+        "service_band": normalized.value,
+        "service_band_label": _risk_level_label(normalized),
+        "service_band_percent": _risk_level_display_percent(normalized),
         "legacy_risk_level": None,
     }
-    if snapshot is None:
-        return fields
-
-    output_payload = snapshot.output_payload if isinstance(snapshot.output_payload, dict) else {}
-    final_outputs = output_payload.get("final_outputs")
-    if not isinstance(final_outputs, dict):
-        return fields
-
-    fields["service_band"] = _optional_str(final_outputs.get("service_band"))
-    fields["service_band_label"] = _optional_str(final_outputs.get("service_band_label"))
-    fields["service_band_percent"] = _optional_int(final_outputs.get("service_band_percent"))
-    fields["legacy_risk_level"] = _optional_str(final_outputs.get("legacy_risk_level"))
-    return fields
 
 
-def _optional_str(value: Any) -> str | None:
-    if value in (None, ""):
-        return None
-    return str(value)
+def _risk_level_label(risk_level: RiskLevel) -> str:
+    return RISK_LEVEL_LABELS[risk_level]
 
 
-def _optional_int(value: Any) -> int | None:
-    if value in (None, ""):
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+def _risk_level_display_percent(risk_level: RiskLevel) -> int:
+    return RISK_LEVEL_DISPLAY_PERCENTS[risk_level]
+
+
+def _coerce_risk_level(risk_level: RiskLevel | str) -> RiskLevel:
+    if isinstance(risk_level, RiskLevel):
+        return risk_level
+    legacy_map = {
+        "LOW": RiskLevel.LOW,
+        "MEDIUM": RiskLevel.CAUTION,
+        "HIGH": RiskLevel.HIGH_CAUTION,
+    }
+    value = str(risk_level)
+    return legacy_map.get(value, RiskLevel(value))
 
 
 def _to_json_value(value: Any) -> Any:

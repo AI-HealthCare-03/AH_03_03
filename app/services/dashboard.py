@@ -39,13 +39,17 @@ def _in_range(value: date, date_from: date | None, date_to: date) -> bool:
 
 
 def _overall_risk_level(results: list[Any]) -> str | None:
-    levels = [result.risk_level for result in results]
-    if any(level == RiskLevel.HIGH or getattr(level, "value", None) == "HIGH" for level in levels):
-        return "HIGH"
-    if any(level == RiskLevel.MEDIUM or getattr(level, "value", None) == "MEDIUM" for level in levels):
-        return "MEDIUM"
+    priority = {
+        RiskLevel.LOW.value: 0,
+        RiskLevel.ATTENTION.value: 1,
+        RiskLevel.CAUTION.value: 2,
+        RiskLevel.HIGH_CAUTION.value: 3,
+        "MEDIUM": 2,
+        "HIGH": 3,
+    }
+    levels = [getattr(result.risk_level, "value", result.risk_level) for result in results]
     if levels:
-        return "LOW"
+        return max(levels, key=lambda level: priority.get(str(level), 0))
     return None
 
 
@@ -76,6 +80,7 @@ async def get_dashboard_summary(user_id: int) -> dict[str, Any]:
                 "analyzed_at": result.analyzed_at.isoformat(),
                 "created_at": result.created_at.isoformat(),
             }
+            | analysis_service._risk_level_alias_fields(result.risk_level)
             for result in latest_analysis_results
         ],
         "top_risk_factors": top_risk_factors,
@@ -185,6 +190,7 @@ async def get_dashboard_risk_trend(user_id: int, period: str = "all") -> dict[st
                 "risk_score": float(result.risk_score),
                 "risk_level": result.risk_level,
             }
+            | analysis_service._risk_level_alias_fields(result.risk_level)
         )
 
     return {

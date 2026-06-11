@@ -25,22 +25,14 @@ SERVICE_BAND_PERCENTS: dict[ServiceBand, int] = {
     ServiceBand.HIGH_CAUTION: 80,
 }
 
-# Compatibility mapping for the existing LOW/MEDIUM/HIGH DB/API contract.
-# Do not use this value as the primary frontend display band.
-LEGACY_RISK_LEVELS: dict[ServiceBand, str] = {
-    ServiceBand.LOW: "LOW",
-    ServiceBand.ATTENTION: "MEDIUM",
-    ServiceBand.CAUTION: "MEDIUM",
-    ServiceBand.HIGH_CAUTION: "HIGH",
-}
-
 
 @dataclass(frozen=True)
 class DualStagePolicyResult:
+    risk_level: str
     service_band: ServiceBand
     service_band_label: str
     service_band_percent: int
-    legacy_risk_level: str
+    legacy_risk_level: str | None = None
 
 
 def resolve_dual_stage_band(base_high: bool, screening_high: bool) -> ServiceBand:
@@ -64,6 +56,7 @@ def resolve_dual_stage_band(base_high: bool, screening_high: bool) -> ServiceBan
 def resolve_dual_stage_result(base_high: bool, screening_high: bool) -> DualStagePolicyResult:
     service_band = resolve_dual_stage_band(base_high=base_high, screening_high=screening_high)
     return DualStagePolicyResult(
+        risk_level=service_band.value,
         service_band=service_band,
         service_band_label=get_service_band_label(service_band),
         service_band_percent=get_service_band_percent(service_band),
@@ -80,5 +73,9 @@ def get_service_band_percent(service_band: ServiceBand) -> int:
 
 
 def to_legacy_risk_level(service_band: ServiceBand) -> str:
-    """Return existing LOW/MEDIUM/HIGH risk level for DB/API compatibility only."""
-    return LEGACY_RISK_LEVELS[service_band]
+    """Return the canonical 4-step risk level value.
+
+    The function name is kept temporarily for older call sites/tests. The
+    official runtime risk level is now LOW/ATTENTION/CAUTION/HIGH_CAUTION.
+    """
+    return service_band.value

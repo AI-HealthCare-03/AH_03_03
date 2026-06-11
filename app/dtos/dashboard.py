@@ -14,6 +14,10 @@ class DashboardAnalysisResultResponse(BaseModel):
     analysis_mode: AnalysisMode = AnalysisMode.BASIC
     risk_level: RiskLevel
     risk_score: float
+    service_band: str | None = None
+    service_band_label: str | None = None
+    service_band_percent: int | None = None
+    legacy_risk_level: str | None = None
     summary: str | None = None
     model_name: str | None = None
     model_version: str | None = None
@@ -77,6 +81,10 @@ class DashboardRiskTrendPointResponse(BaseModel):
     analyzed_at: str
     risk_score: float
     risk_level: RiskLevel
+    service_band: str | None = None
+    service_band_label: str | None = None
+    service_band_percent: int | None = None
+    legacy_risk_level: str | None = None
 
 
 class DashboardRiskTrendSeriesResponse(BaseModel):

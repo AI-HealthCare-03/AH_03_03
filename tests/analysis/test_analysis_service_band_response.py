@@ -22,7 +22,7 @@ def _analysis_result(**overrides: Any) -> SimpleNamespace:
         "analysis_type": AnalysisType.HYPERTENSION,
         "analysis_mode": AnalysisMode.BASIC,
         "risk_score": Decimal("0.52000"),
-        "risk_level": RiskLevel.MEDIUM,
+        "risk_level": RiskLevel.CAUTION,
         "summary": "간편 분석 참고용입니다.",
         "model_name": "rule_based",
         "model_version": "web-basic-v1",
@@ -39,11 +39,11 @@ def test_analysis_result_response_extracts_service_band_from_snapshot() -> None:
     snapshot = SimpleNamespace(
         output_payload={
             "final_outputs": {
-                "risk_level": "MEDIUM",
-                "service_band": "CAUTION",
-                "service_band_label": "주의",
-                "service_band_percent": 65,
-                "legacy_risk_level": "MEDIUM",
+                "risk_level": "CAUTION",
+                "service_band": "HIGH_CAUTION",
+                "service_band_label": "높은 주의",
+                "service_band_percent": 80,
+                "legacy_risk_level": "HIGH_CAUTION",
                 "screening_probability": 0.91,
             }
         }
@@ -51,11 +51,11 @@ def test_analysis_result_response_extracts_service_band_from_snapshot() -> None:
 
     payload = analysis_service._analysis_result_response(result, snapshot)
 
-    assert payload["risk_level"] == RiskLevel.MEDIUM
+    assert payload["risk_level"] == RiskLevel.CAUTION
     assert payload["service_band"] == "CAUTION"
     assert payload["service_band_label"] == "주의"
     assert payload["service_band_percent"] == 65
-    assert payload["legacy_risk_level"] == "MEDIUM"
+    assert payload["legacy_risk_level"] is None
     assert "screening_probability" not in payload
     AnalysisResultResponse.model_validate(payload)
 
@@ -63,16 +63,18 @@ def test_analysis_result_response_extracts_service_band_from_snapshot() -> None:
 def test_analysis_result_response_allows_legacy_result_without_service_band() -> None:
     payload = analysis_service._analysis_result_response(_analysis_result(), None)
 
-    assert payload["risk_level"] == RiskLevel.MEDIUM
-    assert payload["service_band"] is None
-    assert payload["service_band_label"] is None
-    assert payload["service_band_percent"] is None
+    assert payload["risk_level"] == RiskLevel.CAUTION
+    assert payload["service_band"] == "CAUTION"
+    assert payload["service_band_label"] == "주의"
+    assert payload["service_band_percent"] == 65
     assert payload["legacy_risk_level"] is None
     AnalysisResultResponse.model_validate(payload)
 
 
 @pytest.mark.asyncio
-async def test_list_analysis_results_router_returns_optional_service_band(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_list_analysis_results_router_returns_risk_level_alias_service_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     user = SimpleNamespace(id=7)
     result = _analysis_result()
     enriched_payload = analysis_service._analysis_result_response(
@@ -83,7 +85,7 @@ async def test_list_analysis_results_router_returns_optional_service_band(monkey
                     "service_band": "ATTENTION",
                     "service_band_label": "관심 필요",
                     "service_band_percent": 45,
-                    "legacy_risk_level": "MEDIUM",
+                    "legacy_risk_level": None,
                 }
             }
         ),
@@ -112,14 +114,16 @@ async def test_list_analysis_results_router_returns_optional_service_band(monkey
 
     response = await analysis_routers.list_analysis_results(SimpleNamespace(), user)
 
-    assert response[0]["service_band"] == "ATTENTION"
-    assert response[0]["service_band_label"] == "관심 필요"
-    assert response[0]["service_band_percent"] == 45
+    assert response[0]["service_band"] == "CAUTION"
+    assert response[0]["service_band_label"] == "주의"
+    assert response[0]["service_band_percent"] == 65
     assert "probability" not in response[0]
 
 
 @pytest.mark.asyncio
-async def test_get_analysis_result_detail_uses_enriched_result_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_get_analysis_result_detail_returns_risk_level_alias_service_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     result = _analysis_result()
 
     async def fake_get_analysis_result(result_id: int) -> Any:
@@ -138,7 +142,7 @@ async def test_get_analysis_result_detail_uses_enriched_result_payload(monkeypat
                     "service_band": "HIGH_CAUTION",
                     "service_band_label": "높은 주의",
                     "service_band_percent": 80,
-                    "legacy_risk_level": "HIGH",
+                    "legacy_risk_level": None,
                 }
             }
         )
@@ -151,7 +155,7 @@ async def test_get_analysis_result_detail_uses_enriched_result_payload(monkeypat
     detail = await analysis_service.get_analysis_result_detail(11)
 
     assert detail is not None
-    assert detail["result"]["service_band"] == "HIGH_CAUTION"
-    assert detail["result"]["service_band_label"] == "높은 주의"
-    assert detail["result"]["service_band_percent"] == 80
+    assert detail["result"]["service_band"] == "CAUTION"
+    assert detail["result"]["service_band_label"] == "주의"
+    assert detail["result"]["service_band_percent"] == 65
     assert "probability" not in detail["result"]

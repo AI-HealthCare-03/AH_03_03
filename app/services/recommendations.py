@@ -87,7 +87,7 @@ def _analysis_based_recommendations(latest_analysis_results: list[Any]) -> list[
     recommendations: list[RuleRecommendation] = []
     for result in latest_analysis_results:
         risk_level = getattr(result, "risk_level", None)
-        if risk_level not in {RiskLevel.HIGH, RiskLevel.MEDIUM}:
+        if _risk_level_priority(risk_level) < _risk_level_priority(RiskLevel.ATTENTION):
             continue
         disease_type = getattr(result, "analysis_type", None)
         recommendation = _disease_recommendation(disease_type, risk_level)
@@ -99,9 +99,9 @@ def _analysis_based_recommendations(latest_analysis_results: list[Any]) -> list[
 def _disease_recommendation(
     disease_type: AnalysisType | str | None, risk_level: RiskLevel | str
 ) -> RuleRecommendation | None:
-    risk_label = "높게" if risk_level == RiskLevel.HIGH else "관리 필요로"
+    risk_label = _risk_level_recommendation_label(risk_level)
     disease = disease_type.value if hasattr(disease_type, "value") else str(disease_type or "GENERAL")
-    priority = 10 if risk_level == RiskLevel.HIGH else 20
+    priority = _risk_level_recommendation_priority(risk_level)
 
     if disease == AnalysisType.DIABETES.value:
         return RuleRecommendation(
@@ -140,6 +140,38 @@ def _disease_recommendation(
             priority=priority,
         )
     return None
+
+
+def _risk_level_priority(risk_level: RiskLevel | str | None) -> int:
+    value = getattr(risk_level, "value", risk_level)
+    return {
+        RiskLevel.LOW.value: 0,
+        RiskLevel.ATTENTION.value: 1,
+        RiskLevel.CAUTION.value: 2,
+        RiskLevel.HIGH_CAUTION.value: 3,
+        "MEDIUM": 2,
+        "HIGH": 3,
+    }.get(str(value), 0)
+
+
+def _risk_level_recommendation_label(risk_level: RiskLevel | str) -> str:
+    value = getattr(risk_level, "value", risk_level)
+    return {
+        RiskLevel.ATTENTION.value: "관심 필요로",
+        RiskLevel.CAUTION.value: "주의 단계로",
+        RiskLevel.HIGH_CAUTION.value: "높은 주의 단계로",
+        "MEDIUM": "주의 단계로",
+        "HIGH": "높은 주의 단계로",
+    }.get(str(value), "관리 필요로")
+
+
+def _risk_level_recommendation_priority(risk_level: RiskLevel | str) -> int:
+    priority = _risk_level_priority(risk_level)
+    if priority >= 3:
+        return 10
+    if priority == 2:
+        return 15
+    return 20
 
 
 def _health_record_recommendations(latest_health_record: Any | None) -> list[RuleRecommendation]:

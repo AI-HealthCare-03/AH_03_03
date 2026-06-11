@@ -23,7 +23,7 @@ const serviceBandPercents: Record<string, number> = {
 const legacyRiskLabels: Record<string, string> = {
   LOW: "낮음",
   MEDIUM: "주의",
-  HIGH: "고위험",
+  HIGH: "높은 주의",
 };
 
 const legacyRiskPercents: Record<string, number> = {
@@ -50,14 +50,23 @@ function clampPercent(value: number): number {
 }
 
 export function getDisplayRiskBand(result: RiskDisplaySource | null | undefined): string {
+  const riskLevel = normalizeKey(result?.risk_level);
+  if (riskLevel in serviceBandLabels || riskLevel in legacyRiskLabels) {
+    return riskLevel;
+  }
   const serviceBand = normalizeKey(result?.service_band);
   if (serviceBand in serviceBandLabels) {
     return serviceBand;
   }
-  return normalizeKey(result?.risk_level);
+  return riskLevel;
 }
 
 export function getDisplayRiskLabel(result: RiskDisplaySource | null | undefined): string {
+  const riskLevel = normalizeKey(result?.risk_level);
+  if (riskLevel in serviceBandLabels || riskLevel in legacyRiskLabels) {
+    return serviceBandLabels[riskLevel] ?? legacyRiskLabels[riskLevel];
+  }
+
   const explicitLabel = String(result?.service_band_label ?? "").trim();
   if (explicitLabel) {
     return explicitLabel;
@@ -68,6 +77,14 @@ export function getDisplayRiskLabel(result: RiskDisplaySource | null | undefined
 }
 
 export function getDisplayRiskPercent(result: RiskDisplaySource | null | undefined): number {
+  const riskLevel = normalizeKey(result?.risk_level);
+  if (riskLevel in serviceBandPercents) {
+    return serviceBandPercents[riskLevel];
+  }
+  if (riskLevel in legacyRiskPercents) {
+    return legacyRiskPercents[riskLevel];
+  }
+
   const explicitPercent = Number(result?.service_band_percent);
   if (Number.isFinite(explicitPercent)) {
     return clampPercent(explicitPercent);

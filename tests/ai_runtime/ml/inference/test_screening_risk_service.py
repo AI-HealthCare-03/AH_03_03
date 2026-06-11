@@ -19,9 +19,9 @@ from ai_runtime.ml.inference.screening_risk_service import (
     ("base_high", "screening_high", "expected_band", "expected_label", "expected_percent", "expected_legacy"),
     [
         (False, False, ServiceBand.LOW, "낮음", 25, "LOW"),
-        (True, False, ServiceBand.ATTENTION, "관심 필요", 45, "MEDIUM"),
-        (False, True, ServiceBand.CAUTION, "주의", 65, "MEDIUM"),
-        (True, True, ServiceBand.HIGH_CAUTION, "높은 주의", 80, "HIGH"),
+        (True, False, ServiceBand.ATTENTION, "관심 필요", 45, "ATTENTION"),
+        (False, True, ServiceBand.CAUTION, "주의", 65, "CAUTION"),
+        (True, True, ServiceBand.HIGH_CAUTION, "높은 주의", 80, "HIGH_CAUTION"),
     ],
 )
 def test_predict_screening_dual_stage_risk_policy_combinations(
@@ -44,6 +44,7 @@ def test_predict_screening_dual_stage_risk_policy_combinations(
     assert result.disease_code == "HTN"
     assert result.base_high is base_high
     assert result.screening_high is screening_high
+    assert result.risk_level == expected_legacy
     assert result.service_band == expected_band
     assert result.service_band_label == expected_label
     assert result.service_band_percent == expected_percent
@@ -55,8 +56,11 @@ def test_predict_screening_dual_stage_risk_policy_combinations(
     ("base_risk_level", "expected_base_high", "expected_legacy"),
     [
         ("LOW", False, "LOW"),
-        ("MEDIUM", True, "MEDIUM"),
-        ("HIGH", True, "MEDIUM"),
+        ("ATTENTION", True, "ATTENTION"),
+        ("CAUTION", True, "ATTENTION"),
+        ("HIGH_CAUTION", True, "ATTENTION"),
+        ("MEDIUM", True, "ATTENTION"),
+        ("HIGH", True, "ATTENTION"),
     ],
 )
 def test_base_risk_level_to_base_high_conversion(
@@ -74,6 +78,7 @@ def test_base_risk_level_to_base_high_conversion(
     )
 
     assert result.base_high is expected_base_high
+    assert result.risk_level == expected_legacy
     assert result.legacy_risk_level == expected_legacy
 
 

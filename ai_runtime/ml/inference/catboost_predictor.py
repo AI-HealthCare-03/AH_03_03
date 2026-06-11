@@ -88,9 +88,9 @@ class CatBoostDiseasePredictor:
 
 def _risk_level(probability: float, threshold: float) -> str:
     if probability >= threshold:
-        return "HIGH"
+        return "HIGH_CAUTION"
     if probability >= max(0.25, threshold * 0.65):
-        return "MEDIUM"
+        return "CAUTION"
     return "LOW"
 
 

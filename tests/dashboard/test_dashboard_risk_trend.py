@@ -46,13 +46,13 @@ async def test_dashboard_risk_trend_groups_analysis_results_by_disease(monkeypat
             analysis_type=AnalysisType.DIABETES,
             analyzed_at=now - timedelta(days=1),
             risk_score=Decimal("0.34000"),
-            risk_level=RiskLevel.MEDIUM,
+            risk_level=RiskLevel.CAUTION,
         ),
         SimpleNamespace(
             analysis_type=AnalysisType.HYPERTENSION,
             analyzed_at=now,
             risk_score=Decimal("0.56000"),
-            risk_level=RiskLevel.HIGH,
+            risk_level=RiskLevel.HIGH_CAUTION,
         ),
     ]
     query = FakeAnalysisResultQuery(rows)
@@ -72,4 +72,5 @@ async def test_dashboard_risk_trend_groups_analysis_results_by_disease(monkeypat
     assert result["series"][0]["disease_type"] == AnalysisType.DIABETES
     assert [point["risk_score"] for point in result["series"][0]["points"]] == [0.12, 0.34]
     assert result["series"][1]["disease_type"] == AnalysisType.HYPERTENSION
-    assert result["series"][1]["points"][0]["risk_level"] == RiskLevel.HIGH
+    assert result["series"][1]["points"][0]["risk_level"] == RiskLevel.HIGH_CAUTION
+    assert result["series"][1]["points"][0]["service_band"] == "HIGH_CAUTION"

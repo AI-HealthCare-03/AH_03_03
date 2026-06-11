@@ -64,19 +64,20 @@ def test_service_band_display_values(
 def test_resolve_dual_stage_result_includes_display_and_legacy_values() -> None:
     result = resolve_dual_stage_result(base_high=False, screening_high=True)
 
+    assert result.risk_level == "CAUTION"
     assert result.service_band == ServiceBand.CAUTION
     assert result.service_band_label == "주의"
     assert result.service_band_percent == 65
-    assert result.legacy_risk_level == "MEDIUM"
+    assert result.legacy_risk_level == "CAUTION"
 
 
 @pytest.mark.parametrize(
     ("service_band", "expected_legacy_risk_level"),
     [
         (ServiceBand.LOW, "LOW"),
-        (ServiceBand.ATTENTION, "MEDIUM"),
-        (ServiceBand.CAUTION, "MEDIUM"),
-        (ServiceBand.HIGH_CAUTION, "HIGH"),
+        (ServiceBand.ATTENTION, "ATTENTION"),
+        (ServiceBand.CAUTION, "CAUTION"),
+        (ServiceBand.HIGH_CAUTION, "HIGH_CAUTION"),
     ],
 )
 def test_to_legacy_risk_level(service_band: ServiceBand, expected_legacy_risk_level: str) -> None:

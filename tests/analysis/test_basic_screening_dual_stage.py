@@ -64,10 +64,11 @@ async def test_basic_analysis_adds_screening_service_band_metadata(monkeypatch: 
             "base_risk_level": kwargs["base_risk_level"].value,
             "base_high": False,
             "screening_high": True,
+            "risk_level": "CAUTION",
             "service_band": "CAUTION",
             "service_band_label": "주의",
             "service_band_percent": 65,
-            "legacy_risk_level": "MEDIUM",
+            "legacy_risk_level": "CAUTION",
             "screening_missing_features": ["성별"],
             "screening_neutralized_features": ["성별"],
             "screening_model_count": 5,
@@ -124,14 +125,15 @@ async def test_basic_analysis_adds_screening_service_band_metadata(monkeypatch: 
     assert all(result["service_band"] == "CAUTION" for result in dual_stage_results)
     assert all(result["service_band_label"] == "주의" for result in dual_stage_results)
     assert all(result["service_band_percent"] == 65 for result in dual_stage_results)
+    assert all(result["risk_level"] == RiskLevel.CAUTION for result in dual_stage_results)
     assert all(result["risk_level"] in RiskLevel for result in results)
 
     dual_stage_snapshots = [
-        snapshot
-        for snapshot in snapshots
-        if snapshot.input_payload["analysis_type"] != AnalysisType.OBESITY.value
+        snapshot for snapshot in snapshots if snapshot.input_payload["analysis_type"] != AnalysisType.OBESITY.value
     ]
-    assert all(snapshot.output_payload["final_outputs"]["service_band"] == "CAUTION" for snapshot in dual_stage_snapshots)
+    assert all(
+        snapshot.output_payload["final_outputs"]["service_band"] == "CAUTION" for snapshot in dual_stage_snapshots
+    )
     assert all(
         snapshot.model_payload["screening_dual_stage"]["screening_neutralized_features"] == ["성별"]
         for snapshot in dual_stage_snapshots
@@ -156,13 +158,13 @@ def test_screening_dual_stage_failure_keeps_basic_result(monkeypatch: pytest.Mon
         user=SimpleNamespace(id=7, birthday=date(1975, 1, 1), gender="MALE"),
         health_record=_health_record(),
         analysis_type=AnalysisType.HYPERTENSION,
-        base_risk_level=RiskLevel.MEDIUM,
+        base_risk_level=RiskLevel.CAUTION,
         analysis_mode=AnalysisMode.BASIC,
     )
 
     assert result is not None
     assert result["status"] == "fallback_basic_only"
-    assert result["base_risk_level"] == RiskLevel.MEDIUM.value
+    assert result["base_risk_level"] == RiskLevel.CAUTION.value
     assert result["fallback_reason"] == "RuntimeError"
 
 
@@ -184,22 +186,24 @@ def test_screening_fallback_snapshot_metadata_does_not_change_risk_level() -> No
         analysis_mode=AnalysisMode.BASIC,
         health_record=_health_record(),
         score=Decimal("0.52"),
-        risk_level=RiskLevel.MEDIUM,
+        risk_level=RiskLevel.CAUTION,
         guide_message="간편 분석 참고용입니다.",
         factors=[],
         screening_dual_stage={
             "status": "fallback_basic_only",
             "disease_code": "HTN",
-            "base_risk_level": "MEDIUM",
+            "base_risk_level": "CAUTION",
             "fallback_reason": "RuntimeError",
         },
     )
 
     final_outputs = snapshot.output_payload["final_outputs"]
-    assert final_outputs["risk_level"] == RiskLevel.MEDIUM.value
+    assert final_outputs["risk_level"] == RiskLevel.CAUTION.value
     assert final_outputs["screening_dual_stage_status"] == "fallback_basic_only"
     assert final_outputs["screening_dual_stage_fallback_reason"] == "RuntimeError"
-    assert "service_band" not in final_outputs
+    assert final_outputs["service_band"] == RiskLevel.CAUTION.value
+    assert final_outputs["service_band_label"] == "주의"
+    assert final_outputs["service_band_percent"] == 65
 
 
 async def _empty_recommendations(user_id: int, result: Any) -> list[int]:

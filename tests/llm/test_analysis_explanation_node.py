@@ -10,7 +10,7 @@ def test_basic_analysis_explanation_node_is_safe_and_non_diagnostic() -> None:
         input_data=AnalysisExplanationInput(
             disease_type="DIABETES",
             risk_score=0.42,
-            risk_level="MEDIUM",
+            risk_level="CAUTION",
             factors=[HealthRiskFactor(name="생활습관", value=None, reason="positive")],
         ),
         analysis_type="basic",
@@ -20,7 +20,7 @@ def test_basic_analysis_explanation_node_is_safe_and_non_diagnostic() -> None:
     explanation = result.explanation
     assert result.analysis_type == "basic"
     assert explanation.source == "rule_based_explanation"
-    assert "관리" in explanation.summary
+    assert "주의" in explanation.summary
     assert "참고" in explanation.caution
     assert "진단이 아니" in explanation.safety_notice
     assert "의료진 상담" in explanation.safety_notice
@@ -36,7 +36,7 @@ def test_precision_analysis_explanation_focuses_risk_factors_and_priorities() ->
         input_data=AnalysisExplanationInput(
             disease_type="HYPERTENSION",
             risk_score=0.73,
-            risk_level="HIGH",
+            risk_level="HIGH_CAUTION",
             model_name="catboost",
             model_version="htn_catboost_final",
             factors=[

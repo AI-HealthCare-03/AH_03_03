@@ -17,8 +17,9 @@ class AnalysisMode(StrEnum):
 
 class RiskLevel(StrEnum):
     LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
+    ATTENTION = "ATTENTION"
+    CAUTION = "CAUTION"
+    HIGH_CAUTION = "HIGH_CAUTION"
 
 
 class FactorDirection(StrEnum):
