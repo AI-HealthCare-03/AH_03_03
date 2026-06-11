@@ -1,4 +1,4 @@
-import { apiBlobRequest, apiRequest, type ApiValue } from "./client";
+import { API_BASE_URL, apiBlobRequest, apiRequest, type ApiValue } from "./client";
 import type { AsyncJob } from "./jobs";
 
 export type DietFoodItem = {
@@ -117,6 +117,28 @@ export async function getDietRecord<T>(dietRecordId: number): Promise<T> {
 
 export async function getDietRecordImage(dietRecordId: number): Promise<Blob> {
   return apiBlobRequest(`/diets/${dietRecordId}/image`);
+}
+
+export async function getDietRecordImageByUrl(imageUrl: string): Promise<Blob> {
+  const path = apiPathFromImageUrl(imageUrl);
+  if (!path) {
+    throw new Error("식단 이미지 URL이 올바르지 않습니다.");
+  }
+  return apiBlobRequest(path);
+}
+
+function apiPathFromImageUrl(imageUrl: string): string {
+  const value = imageUrl.trim();
+  if (value.startsWith("/api/v1/")) {
+    return value.slice("/api/v1".length);
+  }
+  if (value.startsWith("/diets/")) {
+    return value;
+  }
+  if (value.startsWith(API_BASE_URL)) {
+    return value.slice(API_BASE_URL.length) || "/";
+  }
+  return "";
 }
 
 export async function listDietPhotoResults<T>(dietRecordId: number): Promise<T> {

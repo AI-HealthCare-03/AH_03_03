@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { getDietRecord, getDietRecordImage, listDietPhotoResults, type DietCandidateFood } from "../api/diets";
+import { getDietRecord, getDietRecordImageByUrl, listDietPhotoResults, type DietCandidateFood } from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
@@ -118,6 +118,14 @@ function isBrowserAccessibleImageUrl(value: string): boolean {
   );
 }
 
+function shouldLoadImageWithApiClient(value: string): boolean {
+  return value.startsWith("/api/v1/") || value.startsWith("/diets/");
+}
+
+function imageUrlFromPayload(payload: Record<string, unknown> | null | undefined): string {
+  return publicImageUrlFromPayloads(payload);
+}
+
 export default function DietResultPage() {
   const { dietRecordId } = useParams();
   const navigate = useNavigate();
@@ -163,8 +171,12 @@ export default function DietResultPage() {
     candidateFoods.autoConfirmed.length > 0 ||
     candidateFoods.needsConfirmation.length > 0 ||
     candidateFoods.noCandidate.length > 0;
-  const detailImageUrl = publicImageUrlFromPayloads(record, photoResults[0], rawOutput, photoConfidence);
-  const displayImageUrl = detailImageObjectUrl || detailImageUrl;
+  const detailImageUrl =
+    imageUrlFromPayload(record) ||
+    imageUrlFromPayload(photoResults[0]) ||
+    imageUrlFromPayload(rawOutput) ||
+    imageUrlFromPayload(photoConfidence);
+  const displayImageUrl = detailImageObjectUrl || (shouldLoadImageWithApiClient(detailImageUrl) ? "" : detailImageUrl);
 
   useEffect(() => {
     const load = async () => {
@@ -196,13 +208,17 @@ export default function DietResultPage() {
     let isMounted = true;
     setDetailImageObjectUrl("");
 
-    if (!dietRecordId || !detailImageUrl || !detailImageUrl.startsWith("/api/v1/")) {
+    if (!detailImageUrl) {
+      return undefined;
+    }
+
+    if (!shouldLoadImageWithApiClient(detailImageUrl)) {
       return undefined;
     }
 
     const loadImage = async () => {
       try {
-        const blob = await getDietRecordImage(Number(dietRecordId));
+        const blob = await getDietRecordImageByUrl(detailImageUrl);
         if (!isMounted) {
           return;
         }
