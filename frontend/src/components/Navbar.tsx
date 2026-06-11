@@ -50,6 +50,9 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
         <ThemeToggle />
         {isAuthenticated ? (
           <>
+            <NavLink className="icon-button desktop-nav-action" to="/about">
+              서비스 소개
+            </NavLink>
             <NavLink className={({ isActive }) => `icon-button navbar-notification-link desktop-nav-action${isActive ? " active" : ""}`} to="/notifications" aria-label="알림">
               알림
               {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
