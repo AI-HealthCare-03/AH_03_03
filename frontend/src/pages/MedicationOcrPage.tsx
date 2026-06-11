@@ -10,10 +10,16 @@ import {
 } from "../api/medications";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import { isHeicFile } from "../utils/files";
+
+type FeedbackDialog = {
+  message: string;
+  title: string;
+  tone?: "default" | "danger";
+};
 
 export default function MedicationOcrPage() {
   const [items, setItems] = useState<MedicationOcrItem[]>([]);
@@ -25,6 +31,7 @@ export default function MedicationOcrPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,7 +56,7 @@ export default function MedicationOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const { latestJob: latestOcrJob } = useAsyncJobPolling({
+  useAsyncJobPolling({
     jobId: ocrJobId,
     enabled: isRunning && ocrJobId !== null,
     intervalMs: 1500,
@@ -59,30 +66,34 @@ export default function MedicationOcrPage() {
       const nextItems = result?.items ?? [];
       setItems(nextItems);
       setCanRetryOcr(false);
-      setMessage(
-        nextItems.length > 0
-          ? `${getAsyncJobStatusMessage("SUCCESS")} 저장 전 약 이름과 복용 정보를 반드시 확인해주세요.`
-          : `${getAsyncJobStatusMessage("SUCCESS")} 인식된 복약 정보 후보가 없습니다. 파일을 다시 확인해주세요.`,
-      );
+      setFeedbackDialog({
+        title: "복약 정보 인식이 완료되었습니다.",
+        message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요.",
+      });
       setIsRunning(false);
       setOcrJobId(null);
     },
     onFailure: (job) => {
-      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setFeedbackDialog({
+        title: "복약 정보 인식에 실패했습니다.",
+        message: job.status === "CANCELED" ? "복약 정보 인식 작업이 취소되었습니다." : "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        tone: "danger",
+      });
       setCanRetryOcr(true);
       setIsRunning(false);
       setOcrJobId(null);
     },
     onTimeout: () => {
-      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setFeedbackDialog({
+        title: "복약 정보 인식에 실패했습니다.",
+        message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        tone: "danger",
+      });
       setCanRetryOcr(true);
       setIsRunning(false);
       setOcrJobId(null);
     },
   });
-
-  const ocrStatusMessage =
-    isRunning && ocrJobId !== null ? getAsyncJobStatusMessage(latestOcrJob?.status ?? "PENDING") : "";
 
   const runMedicationRecognition = async () => {
     setError("");
@@ -181,8 +192,17 @@ export default function MedicationOcrPage() {
           </button>
         </div>
       ) : null}
-      {ocrStatusMessage && <div className="state-box">{ocrStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
+      {feedbackDialog && (
+        <ConfirmDialog
+          confirmLabel="확인"
+          message={feedbackDialog.message}
+          onConfirm={() => setFeedbackDialog(null)}
+          showCancel={false}
+          title={feedbackDialog.title}
+          tone={feedbackDialog.tone}
+        />
+      )}
       <div className="page-grid">
         <Card title="처방전/약봉투 업로드">
           <div className="upload-box">

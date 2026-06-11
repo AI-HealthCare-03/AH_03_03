@@ -5,10 +5,10 @@ import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAna
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getAsyncJobStatusLabel, getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import {
   getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
@@ -51,6 +51,11 @@ type Readiness = {
   missing_basic_fields?: string[];
   missing_precision_fields?: string[];
   message: string;
+};
+type FeedbackDialog = {
+  message: string;
+  title: string;
+  tone?: "default" | "danger";
 };
 
 const missingFieldLabels: Record<string, string> = {
@@ -178,31 +183,39 @@ export default function AnalysisPage() {
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
 
-  const { latestJob, isPolling, pollingError } = useAsyncJobPolling({
+  const { pollingError } = useAsyncJobPolling({
     jobId: analysisJobId,
     enabled: analysisJobId !== null && runningMode !== null,
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: async () => {
       await load();
-      setNotice("분석이 완료되었습니다.");
+      setFeedbackDialog({
+        title: "분석이 완료되었습니다.",
+        message: "결과 화면에서 건강 관리 단계를 확인해 주세요.",
+      });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onFailure: (job) => {
-      setError(
-        job.status === "CANCELED"
-          ? "분석 작업이 취소되었습니다."
-          : "분석에 실패했습니다. 잠시 후 다시 시도해주세요.",
-      );
+      setFeedbackDialog({
+        title: "분석에 실패했습니다.",
+        message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
-      setNotice("분석 시간이 길어지고 있습니다. 잠시 후 결과를 다시 확인해주세요.");
+      setFeedbackDialog({
+        title: "분석에 실패했습니다.",
+        message: "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
@@ -307,9 +320,6 @@ export default function AnalysisPage() {
       service_band: result.service_band,
       service_band_label: result.service_band_label,
     }));
-  const latestJobStatusLabel = latestJob ? getAsyncJobStatusLabel(latestJob.status) : "";
-  const jobStatusMessage = latestJob ? getAsyncJobStatusMessage(latestJob.status) : analysisJobId ? "분석 대기 중" : "";
-  const showJobStatus = analysisJobId !== null && (isPolling || Boolean(jobStatusMessage));
 
   return (
     <div className="page-stack">
@@ -333,13 +343,15 @@ export default function AnalysisPage() {
       {error && <ErrorMessage message={error} />}
       {pollingError && <ErrorMessage message={pollingError.message} />}
       {notice && <div className="state-box">{notice}</div>}
-      {showJobStatus && (
-        <div className="state-box">
-          {jobStatusMessage}
-          {latestJob?.status && latestJob.status !== "SUCCESS" && latestJob.status !== "FAILED" && (
-            <span className="muted"> 현재 상태: {latestJobStatusLabel}</span>
-          )}
-        </div>
+      {feedbackDialog && (
+        <ConfirmDialog
+          confirmLabel="확인"
+          message={feedbackDialog.message}
+          onConfirm={() => setFeedbackDialog(null)}
+          showCancel={false}
+          title={feedbackDialog.title}
+          tone={feedbackDialog.tone}
+        />
       )}
       {missingFields.length > 0 && (
         <Card title="분석에 필요한 정보가 부족합니다">

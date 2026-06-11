@@ -12,9 +12,9 @@ import {
 } from "../api/diets";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import { isHeicFile } from "../utils/files";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
 
@@ -32,6 +32,11 @@ type NutritionDraft = {
   protein_g: string;
   fat_g: string;
   sodium_mg: string;
+};
+type FeedbackDialog = {
+  message: string;
+  title: string;
+  tone?: "default" | "danger";
 };
 
 const diseaseScoreLabels: Record<string, string> = {
@@ -125,6 +130,7 @@ export default function DietPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryAnalysis, setCanRetryAnalysis] = useState(false);
 
   const load = async () => {
@@ -148,7 +154,7 @@ export default function DietPage() {
     };
   }, [selectedImagePreviewUrl]);
 
-  const { latestJob: latestAnalysisJob } = useAsyncJobPolling({
+  useAsyncJobPolling({
     jobId: analysisJobId,
     enabled: isAnalyzing && analysisJobId !== null,
     intervalMs: 1500,
@@ -161,10 +167,17 @@ export default function DietPage() {
         }
         setAnalysisResult(result as unknown as Record<string, unknown>);
         setCanRetryAnalysis(false);
-        setMessage(`${getAsyncJobStatusMessage("SUCCESS")} 저장된 결과를 확인해주세요.`);
+        setFeedbackDialog({
+          title: "식단 분석이 완료되었습니다.",
+          message: "저장된 식단 분석 결과를 확인해 주세요.",
+        });
         await load();
       } catch {
-        setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
+        setFeedbackDialog({
+          title: "식단 분석에 실패했습니다.",
+          message: "잠시 후 다시 시도해 주세요.",
+          tone: "danger",
+        });
         setCanRetryAnalysis(true);
       } finally {
         setIsAnalyzing(false);
@@ -172,21 +185,26 @@ export default function DietPage() {
       }
     },
     onFailure: (job) => {
-      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setFeedbackDialog({
+        title: "식단 분석에 실패했습니다.",
+        message: job.status === "CANCELED" ? "식단 분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
-      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setFeedbackDialog({
+        title: "식단 분석에 실패했습니다.",
+        message: "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
       setAnalysisJobId(null);
     },
   });
-
-  const analysisStatusMessage =
-    isAnalyzing && analysisJobId !== null ? getAsyncJobStatusMessage(latestAnalysisJob?.status ?? "PENDING") : "";
 
   const handleDietImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -321,8 +339,17 @@ export default function DietPage() {
           </button>
         </div>
       ) : null}
-      {analysisStatusMessage && <div className="state-box">{analysisStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
+      {feedbackDialog && (
+        <ConfirmDialog
+          confirmLabel="확인"
+          message={feedbackDialog.message}
+          onConfirm={() => setFeedbackDialog(null)}
+          showCancel={false}
+          title={feedbackDialog.title}
+          tone={feedbackDialog.tone}
+        />
+      )}
       <Card
         title="식단 이미지 분석"
         actions={
