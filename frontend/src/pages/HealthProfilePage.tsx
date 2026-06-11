@@ -552,8 +552,12 @@ export default function HealthProfilePage() {
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>
-                <strong>{value || "-"}</strong>
-                <em className={value ? "badge badge-saved" : "badge badge-missing"}>{value ? "저장됨" : "미입력"}</em>
+                <div className="value-row">
+                  <strong>{value || "-"}</strong>
+                  <em className={value ? "badge badge-saved" : "badge badge-missing"}>
+                    {value ? "저장됨" : "미입력"}
+                  </em>
+                </div>
               </div>
             ))}
           </div>
