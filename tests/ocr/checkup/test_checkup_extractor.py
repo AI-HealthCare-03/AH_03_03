@@ -34,6 +34,58 @@ def test_get_ocr_engine_uses_monkeypatched_paddleocr(monkeypatch) -> None:
     assert engine.kwargs == {"lang": "korean", "use_textline_orientation": True}
 
 
+def test_normalize_paddle_ocr_result_accepts_v2_and_v3_formats() -> None:
+    v2_result = [
+        [
+            [[[0, 0], [1, 0], [1, 1], [0, 1]], ("공복혈당 101", 0.91)],
+            [[[0, 2], [1, 2], [1, 3], [0, 3]], ("총콜레스테롤 180", 0.88)],
+        ]
+    ]
+    v3_result = [{"rec_texts": ["AST 30", "ALT 25"], "rec_scores": [0.95, 0.96]}]
+
+    assert extractor._normalize_paddle_ocr_result(v2_result) == [
+        ("공복혈당 101", 0.91),
+        ("총콜레스테롤 180", 0.88),
+    ]
+    assert extractor._normalize_paddle_ocr_result(v3_result) == [
+        ("AST 30", 0.95),
+        ("ALT 25", 0.96),
+    ]
+
+
+def test_run_ocr_on_image_calls_paddleocr_without_cls(monkeypatch) -> None:
+    class FakeEngine:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def ocr(self, image, **kwargs):
+            self.calls.append((image, kwargs))
+            assert kwargs == {}
+            return [[[[[0, 0], [1, 0], [1, 1], [0, 1]], ("공복혈당 101", 0.91)]]]
+
+    fake_engine = FakeEngine()
+    monkeypatch.setattr(extractor, "preprocess_for_ocr", lambda image_bytes: "processed-image")
+    monkeypatch.setattr(extractor, "get_ocr_engine", lambda: fake_engine)
+
+    assert extractor.run_ocr_on_image(b"image-bytes") == [("공복혈당 101", 0.91)]
+    assert fake_engine.calls == [("processed-image", {})]
+
+
+def test_run_ocr_on_image_falls_back_to_predict_result_format(monkeypatch) -> None:
+    class FakeEngine:
+        def ocr(self, image, **kwargs):
+            raise TypeError("ocr signature mismatch")
+
+        def predict(self, image):
+            assert image == "processed-image"
+            return [{"rec_texts": ["AST 30", "ALT 25"], "rec_scores": [0.95, 0.96]}]
+
+    monkeypatch.setattr(extractor, "preprocess_for_ocr", lambda image_bytes: "processed-image")
+    monkeypatch.setattr(extractor, "get_ocr_engine", lambda: FakeEngine())
+
+    assert extractor.run_ocr_on_image(b"image-bytes") == [("AST 30", 0.95), ("ALT 25", 0.96)]
+
+
 def test_pdf_to_images_requires_pdf2image_dependency(monkeypatch) -> None:
     monkeypatch.setattr(pdf_handler, "pdf2image", None)
 

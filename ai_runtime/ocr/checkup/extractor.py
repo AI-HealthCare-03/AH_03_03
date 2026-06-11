@@ -366,18 +366,118 @@ def parse_from_text_lines(text_lines):
     return data, low_conf, raw_texts
 
 
+def _float_or_default(value, default: float = 1.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _append_ocr_line(text_lines: list[tuple[str, float]], text, confidence=1.0) -> None:
+    if not isinstance(text, str):
+        return
+    cleaned = text.strip()
+    if cleaned:
+        text_lines.append((cleaned, _float_or_default(confidence)))
+
+
+def _as_mapping(value):
+    if isinstance(value, dict):
+        return value
+
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            mapped = to_dict()
+        except TypeError:
+            mapped = None
+        if isinstance(mapped, dict):
+            return mapped
+
+    json_value = getattr(value, "json", None)
+    if callable(json_value):
+        try:
+            json_value = json_value()
+        except TypeError:
+            json_value = None
+    if isinstance(json_value, dict):
+        return json_value
+
+    return None
+
+
+def _collect_ocr_lines(result, text_lines: list[tuple[str, float]]) -> None:
+    mapping = _as_mapping(result)
+    if mapping is not None:
+        rec_texts = mapping.get("rec_texts") or mapping.get("texts")
+        if isinstance(rec_texts, list):
+            rec_scores = mapping.get("rec_scores") or mapping.get("scores") or []
+            for index, text in enumerate(rec_texts):
+                confidence = rec_scores[index] if index < len(rec_scores) else 1.0
+                _append_ocr_line(text_lines, text, confidence)
+            return
+
+        text = mapping.get("text") or mapping.get("rec_text")
+        if text is not None:
+            confidence = mapping.get("confidence") or mapping.get("score") or mapping.get("rec_score") or 1.0
+            _append_ocr_line(text_lines, text, confidence)
+            return
+
+        for value in mapping.values():
+            if isinstance(value, (dict, list, tuple)) or _as_mapping(value) is not None:
+                _collect_ocr_lines(value, text_lines)
+        return
+
+    if isinstance(result, (list, tuple)):
+        if len(result) >= 2:
+            candidate = result[1]
+            if isinstance(candidate, (list, tuple)) and candidate and isinstance(candidate[0], str):
+                confidence = candidate[1] if len(candidate) > 1 else 1.0
+                _append_ocr_line(text_lines, candidate[0], confidence)
+                return
+            if isinstance(result[0], str):
+                _append_ocr_line(text_lines, result[0], result[1])
+                return
+
+        for item in result:
+            _collect_ocr_lines(item, text_lines)
+
+
+def _normalize_paddle_ocr_result(results) -> list[tuple[str, float]]:
+    text_lines: list[tuple[str, float]] = []
+    _collect_ocr_lines(results, text_lines)
+    return text_lines
+
+
+def _run_paddle_ocr(engine, processed):
+    attempts = [
+        ("ocr", {}),
+        ("predict", {}),
+        ("ocr", {"cls": True}),
+    ]
+    last_type_error: TypeError | None = None
+    for method_name, kwargs in attempts:
+        method = getattr(engine, method_name, None)
+        if not callable(method):
+            continue
+        try:
+            return method(processed, **kwargs)
+        except TypeError as exc:
+            last_type_error = exc
+            logger.debug("PaddleOCR 호출 방식 불일치 | method=%s kwargs=%s error=%s", method_name, kwargs, exc)
+            continue
+
+    if last_type_error is not None:
+        raise last_type_error
+    msg = "PaddleOCR engine does not provide an ocr or predict method."
+    raise RuntimeError(msg)
+
+
 def run_ocr_on_image(image_bytes):
     processed = preprocess_for_ocr(image_bytes)
     engine = get_ocr_engine()
-    results = engine.ocr(processed, cls=True)
-
-    text_lines = []
-    if results and results[0]:
-        for line in results[0]:
-            if line and len(line) >= 2:
-                text = line[1][0].strip()
-                confidence = float(line[1][1])
-                text_lines.append((text, confidence))
+    results = _run_paddle_ocr(engine, processed)
+    text_lines = _normalize_paddle_ocr_result(results)
 
     logger.info("OCR 인식 %d줄", len(text_lines))
     return text_lines
