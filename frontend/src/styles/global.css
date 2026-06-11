@@ -2635,6 +2635,7 @@ pre {
   flex-direction: column;
   gap: 7px;
   min-height: 0;
+  min-width: 0;
   padding: 0;
 }
 
@@ -2699,15 +2700,22 @@ pre {
   border: 1px solid var(--risk-stage-border);
   border-radius: 10px;
   box-shadow: inset 3px 0 0 var(--risk-stage-border);
+  max-height: 148px;
   min-height: 72px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 10px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .risk-stage-chip-list {
   align-content: flex-start;
+  align-items: flex-start;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .risk-stage-chip,
@@ -2724,8 +2732,12 @@ pre {
   background: var(--risk-stage-chip-bg);
   border: 1px solid var(--risk-stage-chip-border);
   color: var(--risk-stage-chip-color);
-  max-width: 100%;
-  overflow-wrap: anywhere;
+  display: inline-block;
+  max-width: min(100%, 180px);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .risk-stage-empty {
@@ -2758,8 +2770,13 @@ pre {
 .risk-stage-board-compact .risk-stage-panel,
 .risk-stage-board-preview .risk-stage-panel {
   border-radius: 9px;
+  max-height: 112px;
   min-height: 56px;
   padding: 8px;
+}
+
+.risk-stage-board-preview .risk-stage-panel {
+  max-height: 96px;
 }
 
 .risk-stage-board-compact .risk-stage-header span,
