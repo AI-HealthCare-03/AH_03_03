@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
+from ai_runtime.cv.food.matcher import FoodDbMatcher
 from ai_runtime.cv.food.providers.base import FoodDetectionProviderResult
 from ai_runtime.cv.food.providers.gpt_vision import GptVisionFoodDetectionProvider
 from ai_runtime.cv.food.providers.rule_based import RuleBasedFoodDetectionProvider
@@ -20,6 +21,7 @@ class FoodAnalysisPipelineConfig:
     openai_api_key: str | None = None
     gpt_vision_model: str = "gpt-4o-mini"
     vision_client_cls: type[Any] = VisionClient
+    food_db_matcher: FoodDbMatcher | None = None
 
 
 @dataclass(frozen=True)
@@ -50,7 +52,7 @@ async def run_food_analysis_pipeline(
         food_candidate = _require_candidate(result.candidate)
         return FoodAnalysisPipelineResult(
             food_candidate=food_candidate,
-            detected_foods=food_candidate.to_scorer_foods(),
+            detected_foods=food_candidate.to_scorer_foods(config.food_db_matcher),
             provider_candidate=None,
             fallback_used=True,
             provider_message="diet GPT Vision disabled",
@@ -75,7 +77,7 @@ async def run_food_analysis_pipeline(
         food_candidate = _require_candidate(fallback_result.candidate)
         return FoodAnalysisPipelineResult(
             food_candidate=food_candidate,
-            detected_foods=food_candidate.to_scorer_foods(),
+            detected_foods=food_candidate.to_scorer_foods(config.food_db_matcher),
             provider_candidate=None,
             fallback_used=True,
             provider_message=provider_result.message or fallback_result.message,
@@ -97,7 +99,7 @@ async def run_food_analysis_pipeline(
 
     return FoodAnalysisPipelineResult(
         food_candidate=food_candidate,
-        detected_foods=food_candidate.to_scorer_foods(),
+        detected_foods=food_candidate.to_scorer_foods(config.food_db_matcher),
         provider_candidate=provider_candidate,
         fallback_used=fallback_used,
         provider_message=provider_message,

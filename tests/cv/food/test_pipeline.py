@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from ai_runtime.cv.food.matcher import FoodMatchResult
 from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_analysis_pipeline
 from ai_runtime.cv.providers.gpt_vision import PROMPTS, AnalysisType
 
@@ -202,3 +203,32 @@ async def test_pipeline_keeps_unmatched_food_name_without_failing_analysis() -> 
     assert result.detected_foods[0]["needs_user_confirmation"] is True
     assert result.provider_result.unmatched_food_names == ["미확인테스트음식"]
     assert result.fallback_used is False
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_injected_food_db_matcher_for_detected_foods() -> None:
+    class FakeMatcher:
+        def match(self, query: str) -> FoodMatchResult:
+            return FoodMatchResult(
+                original_name=query,
+                query_name=query,
+                matched_food_name="비빔국수",
+                matched_food_code="mfds:001",
+                match_source="mfds_matched",
+                match_confidence=0.98,
+                needs_user_confirmation=True,
+            )
+
+    result = await run_food_analysis_pipeline(
+        rule_based_foods=[{"name": "비빔국수", "confidence": 0.9}],
+        image_bytes=None,
+        image_media_type=None,
+        config=FoodAnalysisPipelineConfig(provider="rule_based", gpt_vision_enabled=False, food_db_matcher=FakeMatcher()),
+    )
+
+    assert result.detected_foods[0]["name"] == "비빔국수"
+    assert result.detected_foods[0]["matched_food_name"] == "비빔국수"
+    assert result.detected_foods[0]["matched_food_code"] == "mfds:001"
+    assert result.detected_foods[0]["match_source"] == "mfds_matched"
+    assert result.detected_foods[0]["match_confidence"] == 0.98
+    assert result.detected_foods[0]["needs_user_confirmation"] is True

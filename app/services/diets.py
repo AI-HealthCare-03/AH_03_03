@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from ai_runtime.cv.food.matcher import FoodMatchResult, match_food_name
+from ai_runtime.cv.food.matcher import FoodMatchResult, LocalFallbackFoodDbMatcher, match_food_name
 from ai_runtime.cv.food.normalization import normalize_food_name
+from ai_runtime.cv.food.nutrition.providers import MfdsFoodDbMatcher
 from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
 from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_analysis_pipeline
@@ -142,6 +143,7 @@ async def run_diet_analysis(
             openai_api_key=config.OPENAI_API_KEY,
             gpt_vision_model=config.DIET_GPT_VISION_MODEL,
             vision_client_cls=VisionClient,
+            food_db_matcher=_build_food_db_matcher(),
         ),
     )
     food_candidate = food_analysis.food_candidate
@@ -306,6 +308,23 @@ def _read_diet_analysis_bytes(path_value: str) -> bytes | None:
     if not path.exists() or not path.is_file():
         raise ValueError("diet_analysis_upload_missing")
     return path.read_bytes()
+
+
+def _build_food_db_matcher() -> MfdsFoodDbMatcher | None:
+    if not config.DIET_MFDS_ENABLED:
+        return None
+    service_key = (config.MFDS_SERVICE_KEY or "").strip()
+    encoded_service_key = (config.MFDS_SERVICE_KEY_ENCODED or "").strip()
+    if not service_key and not encoded_service_key:
+        logger.warning("DIET_MFDS_ENABLED=true but MFDS service key is missing; using local food matcher")
+        return None
+    return MfdsFoodDbMatcher(
+        service_key=service_key or encoded_service_key,
+        encoded_service_key=encoded_service_key or None,
+        timeout_seconds=float(config.DIET_MFDS_TIMEOUT_SECONDS),
+        max_candidates=int(config.DIET_MFDS_MAX_CANDIDATES),
+        fallback_matcher=LocalFallbackFoodDbMatcher(),
+    )
 
 
 def _diet_record_image_key(record: DietRecord) -> str | None:

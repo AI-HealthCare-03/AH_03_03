@@ -15,6 +15,7 @@ class FoodMatchResult:
     match_source: str = "local_stub_unmatched"
     match_confidence: float | None = None
     needs_user_confirmation: bool = True
+    metadata: dict[str, object] | None = None
 
 
 class FoodDbMatcher(Protocol):
