@@ -8,7 +8,6 @@ AI HealthCare MVP는 건강정보 입력, 건강검진 OCR, 식단/복약 분석
 
 ```bash
 cp envs/example.local.env .env
-uv sync
 make dev-up
 make dev-migrate
 make dev-seed
@@ -29,10 +28,10 @@ make dev-health
 
 Full Docker dev stack은 프론트엔드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 함께 실행합니다. 웹 시연만 할 때는 Node.js/npm을 직접 실행할 필요가 없습니다. 프론트엔드는 Docker build 단계에서 정적 파일로 빌드되고, frontend 컨테이너 내부 Nginx가 이를 서빙합니다.
 
-로컬 스크립트 실행과 의존성 동기화를 위해 한 번 실행합니다.
+로컬에서 테스트나 스크립트를 직접 실행할 때만 의존성을 동기화합니다.
 
 ```bash
-uv sync
+uv sync --group app --group ai --group dev
 ```
 
 ## 환경변수 준비
@@ -49,6 +48,7 @@ cp envs/example.local.env .env
 - 실제 OpenAI key, SMTP password, Langfuse secret, Firebase service account 값은 README나 PR에 넣지 않습니다.
 - secret 예시는 `<OPENAI_API_KEY>`, `<SMTP_PASSWORD>`처럼 placeholder로만 작성합니다.
 - `docker compose config` 전체 출력은 secret이 펼쳐질 수 있으므로 문서/화면공유에 사용하지 마세요.
+- 운영 배포용 `.env.prod`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
 
 최소 dev 예시:
 
@@ -87,6 +87,12 @@ LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
 
 팀원/시연 표준은 `infra/docker/docker-compose.dev.yml`입니다.
 
+| 용도 | Compose 파일 | 실행 기준 | 비고 |
+|---|---|---|---|
+| 개발/시연 표준 | `infra/docker/docker-compose.dev.yml` | `make dev-up` | frontend, nginx, fastapi, ai-worker, postgres, redis 포함 |
+| 운영 배포 | `infra/docker/docker-compose.prod.yml` | Docker Hub image pull | app, ai-worker, frontend 이미지를 먼저 push해야 함 |
+| legacy/minimal 검증 | `docker-compose.yml` | `make app-*` | backend/AI 빠른 확인용, 표준 dev stack 아님 |
+
 ```bash
 make dev-up
 ```
@@ -105,7 +111,6 @@ make dev-down
 - `docker compose up -d`만 단독 실행하지 마세요. 의도와 다른 루트 compose가 실행될 수 있습니다.
 - `docker rm -f redis postgres fastapi ai-worker nginx` 방식으로 컨테이너를 직접 지우지 마세요.
 - `down -v`는 DB volume을 삭제할 수 있으므로 시연/협업 중 사용하지 마세요.
-- prod compose는 Docker Hub image pull 전용입니다. prod 배포 전에는 app, ai-worker, frontend 이미지가 먼저 registry에 push되어 있어야 합니다.
 
 ## DB Migration / Seed
 
@@ -153,6 +158,30 @@ make dev-ps
 ```bash
 make dev-logs
 ```
+
+## Prod Image / EC2 배포 준비
+
+운영 compose는 EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.env.prod` 같은 배포 환경 파일로 주입합니다. 실제 `.env.prod`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
+
+기본 이미지 tag:
+
+- `kdu0312/ai-health:app-v1.0.0`
+- `kdu0312/ai-health:ai-v1.0.0`
+- `kdu0312/ai-health:frontend-v1.0.0`
+
+배포 전 로컬 build 검증:
+
+```bash
+make image-tags
+make image-build-check
+docker image inspect kdu0312/ai-health:app-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:ai-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
+```
+
+기대값은 `linux/amd64`입니다. Apple Silicon 로컬에서도 EC2 Ubuntu 배포 이미지는 `make image-build-check`의 buildx `linux/amd64` 기준으로 확인합니다.
+
+상세 절차는 `docs/deployment/ec2_prod_env.md`와 `docs/ops/docker_stacks.md`를 참고하세요.
 
 ## 주요 Provider Flag 요약
 
