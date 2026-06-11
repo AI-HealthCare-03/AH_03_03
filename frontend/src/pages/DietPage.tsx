@@ -163,6 +163,7 @@ export default function DietPage() {
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
   const [analysisImagePreviewFailed, setAnalysisImagePreviewFailed] = useState(false);
+  const [detectedFoodsImagePreviewFailed, setDetectedFoodsImagePreviewFailed] = useState(false);
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -250,6 +251,7 @@ export default function DietPage() {
     }
     setImagePreviewMessage("");
     setAnalysisImagePreviewFailed(false);
+    setDetectedFoodsImagePreviewFailed(false);
     if (!file) {
       setSelectedImageFile(null);
       setSelectedImagePreviewUrl("");
@@ -283,6 +285,7 @@ export default function DietPage() {
     setSelectedImageFile(null);
     setSelectedImagePreviewUrl("");
     setAnalysisImagePreviewFailed(false);
+    setDetectedFoodsImagePreviewFailed(false);
     setImagePreviewMessage("");
   };
 
@@ -626,7 +629,16 @@ export default function DietPage() {
               </div>
             )}
             <div className="mini-card">
-              <span className="muted">분석 음식</span>
+              {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
+                <img
+                  alt="업로드한 식단 사진"
+                  className="upload-preview"
+                  onError={() => setDetectedFoodsImagePreviewFailed(true)}
+                  src={selectedImagePreviewUrl}
+                  style={{ maxHeight: 140 }}
+                />
+              )}
+              <span className="muted">감지된 음식</span>
               <strong>
                 {detectedFoods.length > 0 ? detectedFoods.map(foodDisplayName).join(", ") : "음식명 확인 불가"}
               </strong>
