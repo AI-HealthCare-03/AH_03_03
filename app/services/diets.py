@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -17,6 +18,7 @@ from app.dtos.diets import (
     DietAnalyzeResponse,
     DietPhotoResultCreateRequest,
     DietRecordCreateRequest,
+    DietRecordResponse,
     DietRecordUpdateRequest,
 )
 from app.models.diets import DietPhotoResult, DietRecord
@@ -42,6 +44,52 @@ async def create_diet_record(user_id: int, request: DietRecordCreateRequest) -> 
 
 async def get_diet_record(diet_record_id: int) -> DietRecord | None:
     return await diet_repository.get_diet_record_by_id(diet_record_id)
+
+
+def build_diet_record_response(record: DietRecord) -> DietRecordResponse:
+    return DietRecordResponse(
+        id=int(record.id),
+        user_id=int(record.user_id),
+        meal_type=getattr(record, "meal_type", None),
+        meal_time=getattr(record, "meal_time", None),
+        description=getattr(record, "description", None),
+        image_path=getattr(record, "image_path", None),
+        detected_foods=getattr(record, "detected_foods", None),
+        nutrition_summary=getattr(record, "nutrition_summary", None),
+        diet_score=getattr(record, "diet_score", None),
+        diet_feedback=getattr(record, "diet_feedback", None),
+        analysis_method=getattr(record, "analysis_method", None),
+        is_user_corrected=bool(getattr(record, "is_user_corrected", False)),
+        memo=getattr(record, "memo", None),
+        image_url=diet_record_image_url(record),
+        created_at=getattr(record, "created_at", None) or datetime.now(UTC),
+        updated_at=getattr(record, "updated_at", None) or datetime.now(UTC),
+    )
+
+
+def diet_record_image_url(record: DietRecord) -> str | None:
+    image_key = _diet_record_image_key(record)
+    if not image_key:
+        return None
+    try:
+        if not get_storage_service().exists(image_key):
+            return None
+    except (OSError, ValueError):
+        return None
+    return f"/api/v1/diets/{int(record.id)}/image"
+
+
+def read_diet_record_image(record: DietRecord) -> tuple[bytes, str, str] | None:
+    image_key = _diet_record_image_key(record)
+    if not image_key:
+        return None
+    storage = get_storage_service()
+    try:
+        if not storage.exists(image_key):
+            return None
+        return storage.read_bytes(image_key), _media_type_from_upload_path(image_key) or "application/octet-stream", Path(image_key).name
+    except (OSError, ValueError):
+        return None
 
 
 async def list_diet_records(
@@ -161,7 +209,7 @@ async def run_diet_analysis(
     )
     return {
         "message": "식단 분석이 완료되었습니다.",
-        "diet_record": diet_record,
+        "diet_record": build_diet_record_response(diet_record),
         "photo_result": photo_result,
         "detected_foods": detected_foods,
         "nutrition_summary": nutrition_summary,
@@ -217,7 +265,7 @@ async def run_diet_analysis_from_job(job_id: int) -> DietAnalyzeResponse:
         meal_type=str(payload.get("meal_type") or "") or None,
         meal_time=payload.get("meal_time") or None,
         description=str(payload.get("description") or "") or None,
-        image_path=str(payload.get("image_path") or upload_path or "") or None,
+        image_path=str(upload_path or payload.get("image_path") or "") or None,
         memo=str(payload.get("memo") or "") or None,
     )
     response = await run_diet_analysis(
@@ -258,6 +306,21 @@ def _read_diet_analysis_bytes(path_value: str) -> bytes | None:
     if not path.exists() or not path.is_file():
         raise ValueError("diet_analysis_upload_missing")
     return path.read_bytes()
+
+
+def _diet_record_image_key(record: DietRecord) -> str | None:
+    image_path = str(getattr(record, "image_path", "") or "").strip()
+    if not image_path or not _looks_like_diet_analysis_storage_key(image_path):
+        return None
+    try:
+        return normalize_storage_key(image_path)
+    except ValueError:
+        return None
+
+
+def _looks_like_diet_analysis_storage_key(value: str) -> bool:
+    normalized = value.replace("\\", "/").strip("/")
+    return normalized.startswith("diet-analysis/") or "/diet-analysis/" in normalized
 
 
 def _media_type_from_upload_path(path_value: str) -> str | None:

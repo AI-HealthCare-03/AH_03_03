@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { getDietRecord, listDietPhotoResults, type DietCandidateFood } from "../api/diets";
+import { getDietRecord, getDietRecordImage, listDietPhotoResults, type DietCandidateFood } from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
@@ -125,6 +125,7 @@ export default function DietResultPage() {
   const [photoResults, setPhotoResults] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [detailImageFailed, setDetailImageFailed] = useState(false);
+  const [detailImageObjectUrl, setDetailImageObjectUrl] = useState("");
 
   const normalizeFoods = (value: unknown): Item[] => {
     if (Array.isArray(value)) {
@@ -163,6 +164,7 @@ export default function DietResultPage() {
     candidateFoods.needsConfirmation.length > 0 ||
     candidateFoods.noCandidate.length > 0;
   const detailImageUrl = publicImageUrlFromPayloads(record, photoResults[0], rawOutput, photoConfidence);
+  const displayImageUrl = detailImageObjectUrl || detailImageUrl;
 
   useEffect(() => {
     const load = async () => {
@@ -188,6 +190,39 @@ export default function DietResultPage() {
   useEffect(() => {
     setDetailImageFailed(false);
   }, [detailImageUrl]);
+
+  useEffect(() => {
+    let objectUrl = "";
+    let isMounted = true;
+    setDetailImageObjectUrl("");
+
+    if (!dietRecordId || !detailImageUrl || !detailImageUrl.startsWith("/api/v1/")) {
+      return undefined;
+    }
+
+    const loadImage = async () => {
+      try {
+        const blob = await getDietRecordImage(Number(dietRecordId));
+        if (!isMounted) {
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setDetailImageObjectUrl(objectUrl);
+      } catch {
+        if (isMounted) {
+          setDetailImageFailed(true);
+        }
+      }
+    };
+
+    void loadImage();
+    return () => {
+      isMounted = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [detailImageUrl, dietRecordId]);
 
   const isManual = isManualRecord(record);
 
@@ -241,17 +276,6 @@ export default function DietResultPage() {
                 : String(record?.diet_feedback ?? "식단 분석 결과를 확인해보세요.")}
             </p>
           </div>
-          {!isManual && detailImageUrl && !detailImageFailed && (
-            <div className="mini-card">
-              <span className="muted">업로드한 식단 사진</span>
-              <img
-                alt="업로드한 식단 사진"
-                className="upload-preview"
-                onError={() => setDetailImageFailed(true)}
-                src={detailImageUrl}
-              />
-            </div>
-          )}
         </div>
       </Card>
       {isManual ? (
@@ -272,13 +296,26 @@ export default function DietResultPage() {
         </Card>
       ) : (
         <Card title="감지된 음식">
-          <div className="chip-list">
-            {detectedFoods.length === 0 && <div className="state-box">음식명 확인 불가</div>}
-            {detectedFoods.map((food, index) => (
-              <span className="badge badge-reference" key={`${foodDisplayName(food)}-${index}`}>
-                {foodDisplayName(food)} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
-              </span>
-            ))}
+          <div className="card-list">
+            {displayImageUrl && !detailImageFailed && (
+              <div className="mini-card">
+                <span className="muted">분석한 식단 사진</span>
+                <img
+                  alt="분석한 식단 사진"
+                  className="upload-preview"
+                  onError={() => setDetailImageFailed(true)}
+                  src={displayImageUrl}
+                />
+              </div>
+            )}
+            <div className="chip-list">
+              {detectedFoods.length === 0 && <div className="state-box">음식명 확인 불가</div>}
+              {detectedFoods.map((food, index) => (
+                <span className="badge badge-reference" key={`${foodDisplayName(food)}-${index}`}>
+                  {foodDisplayName(food)} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
+                </span>
+              ))}
+            </div>
           </div>
         </Card>
       )}

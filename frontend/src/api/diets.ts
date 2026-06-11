@@ -1,4 +1,4 @@
-import { apiRequest, type ApiValue } from "./client";
+import { apiBlobRequest, apiRequest, type ApiValue } from "./client";
 import type { AsyncJob } from "./jobs";
 
 export type DietFoodItem = {
@@ -113,6 +113,10 @@ export async function listDietRecords<T>(): Promise<T> {
 
 export async function getDietRecord<T>(dietRecordId: number): Promise<T> {
   return apiRequest<T>(`/diets/${dietRecordId}`);
+}
+
+export async function getDietRecordImage(dietRecordId: number): Promise<Blob> {
+  return apiBlobRequest(`/diets/${dietRecordId}/image`);
 }
 
 export async function listDietPhotoResults<T>(dietRecordId: number): Promise<T> {
