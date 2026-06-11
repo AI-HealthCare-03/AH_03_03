@@ -10,7 +10,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
 import { Mail, Phone } from 'lucide-react';
-import { Activity, Heart, Droplets, Moon } from "lucide-react";
+import { Activity, Gauge, Droplet, Moon } from "lucide-react";
 
 type Item = Record<string, unknown>;
 
@@ -464,13 +464,13 @@ export default function MyPage() {
             <div className="metric-grid mypage-metric-grid">
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Activity size={14} /> BMI
+                  <Gauge size={14} /> BMI
                 </span>
                 <strong>{getText(latestHealth, "bmi", "기록 없음")}</strong>
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Heart size={14} /> 혈압
+                  <Activity size={14} /> 혈압
                 </span>
                 <strong>
                   {getText(latestHealth, "systolic_bp", "-")}/{getText(latestHealth, "diastolic_bp", "-")}
@@ -478,7 +478,7 @@ export default function MyPage() {
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Droplets size={14} /> 공복혈당
+                  <Droplet size={14} /> 공복혈당
                 </span>
                 <strong>{getText(latestHealth, "fasting_glucose", "기록 없음")}</strong>
               </div>
