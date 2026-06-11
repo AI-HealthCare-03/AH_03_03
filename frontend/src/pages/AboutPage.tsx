@@ -60,7 +60,7 @@ const aboutPersonas = [
     id: "habit",
     icon: "🚶",
     title: "생활습관을 바꾸고 싶은 사용자",
-    quote: "혈당, 혈압, 체중 관리를 위해 식단과 운동 습관을 만들고 싶어요.",
+    quote: "식단과 운동 습관으로 혈당, 혈압, 체중을 관리하고 싶어요.",
     features: ["식단 분석", "챌린지", "건강 리포트"],
     flow: [
       { icon: "🥗", title: "식단 기록", description: "사진과 기본 정보를 입력합니다." },
@@ -163,8 +163,10 @@ export default function AboutPage() {
               type="button"
               onClick={() => setSelectedPersonaId(persona.id)}
             >
-              <span className="persona-icon">{persona.icon}</span>
-              <strong>{persona.title}</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span className="persona-icon">{persona.icon}</span>
+                <strong>{persona.title}</strong>
+              </div>
               <p>{persona.quote}</p>
               <em>{persona.features.join(" · ")}</em>
             </button>
