@@ -1004,25 +1004,23 @@ pre {
   display: flex;
   gap: 20px;
   justify-content: space-between;
-  padding: 16px 28px;
+  padding: 28px;
 }
 
 .main-dashboard-hero h1 {
-  font-size: 40px;
+  font-size: 30px;
   margin: 0;
-  text-align: center;
 }
 
 .main-dashboard-hero p {
   color: var(--color-muted);
   margin: 8px 0 0;
-  text-align: center;
 }
 
 .home-action-panel {
   display: grid;
   gap: 10px;
-  min-width: min(400px, 100%);
+  min-width: min(440px, 100%);
 }
 
 .home-action-card {
@@ -2237,8 +2235,6 @@ pre {
 .mypage-menu {
   display: grid;
   gap: 10px;
-  position: sticky;
-  top: 80px;
 }
 
 .mypage-menu-item {
@@ -2392,7 +2388,7 @@ pre {
   border-radius: var(--radius-md);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   min-width: 0;
   padding: 14px;
 }
@@ -3181,6 +3177,38 @@ pre {
   display: grid;
   gap: 8px;
   grid-template-columns: 0.8fr 1fr 1fr;
+}
+
+.phone-input-grid input {
+  background-color: var(--color-input-bg, var(--color-surface));
+  color: var(--co                <input
+                  value={loginId}
+                  onChange={(event) => {
+                    setLoginId(event.target.value);
+                    setLoginIdCheck(null);
+                  }}
+                  minLength={6}
+                  maxLength={40}
+                  required
+                />
+                {fieldErrors.login_id && <span className="field-error">{fieldErrors.login_id}</span>}
+              </label>lor-text);
+  border: 1px solid var(--color-border);
+}
+
+input::placeholder {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  font-style: italic;
+  font-size: 14px;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-text) !important;
+  box-shadow: 0 0 0 1000px var(--color-surface) inset !important;
+  transition: background-color 99999s ease-in-out 0s;
 }
 
 .signup-verification-panel {
@@ -4865,4 +4893,9 @@ pre {
 .sidebar:focus-within .sidebar-section-title {
   max-height: 32px;
   opacity: 1;
+}
+
+.login-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
