@@ -3173,6 +3173,38 @@ pre {
   grid-template-columns: 0.8fr 1fr 1fr;
 }
 
+.phone-input-grid input {
+  background-color: var(--color-input-bg, var(--color-surface));
+  color: var(--co                <input
+                  value={loginId}
+                  onChange={(event) => {
+                    setLoginId(event.target.value);
+                    setLoginIdCheck(null);
+                  }}
+                  minLength={6}
+                  maxLength={40}
+                  required
+                />
+                {fieldErrors.login_id && <span className="field-error">{fieldErrors.login_id}</span>}
+              </label>lor-text);
+  border: 1px solid var(--color-border);
+}
+
+input::placeholder {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  font-style: italic;
+  font-size: 14px;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-text) !important;
+  box-shadow: 0 0 0 1000px var(--color-surface) inset !important;
+  transition: background-color 99999s ease-in-out 0s;
+}
+
 .signup-verification-panel {
   background: var(--color-card-subtle);
   border: 1px solid var(--color-border);
@@ -4837,4 +4869,9 @@ pre {
 .sidebar:focus-within .sidebar-section-title {
   max-height: 32px;
   opacity: 1;
+}
+
+.login-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
