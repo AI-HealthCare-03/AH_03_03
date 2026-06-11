@@ -64,14 +64,14 @@ export default function ExamOcrPage() {
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: async () => {
+      setIsRunningOcr(false);
+      setOcrJobId(null);
       if (!exam) {
         setFeedbackDialog({
           title: "검진표 인식에 실패했습니다.",
           message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
           tone: "danger",
         });
-        setIsRunningOcr(false);
-        setOcrJobId(null);
         return;
       }
       try {
@@ -89,9 +89,6 @@ export default function ExamOcrPage() {
           tone: "danger",
         });
         setCanRetryOcr(true);
-      } finally {
-        setIsRunningOcr(false);
-        setOcrJobId(null);
       }
     },
     onFailure: (job) => {
@@ -152,6 +149,7 @@ export default function ExamOcrPage() {
   const startExamOcr = async () => {
     setError("");
     setMessage("");
+    setFeedbackDialog(null);
     setMeasurements([]);
     setCanRetryOcr(false);
     if (!selectedFile) {

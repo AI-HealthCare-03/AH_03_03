@@ -62,6 +62,8 @@ export default function MedicationOcrPage() {
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: (job) => {
+      setIsRunning(false);
+      setOcrJobId(null);
       const result = medicationResultFromPayload(job.result_payload);
       const nextItems = result?.items ?? [];
       setItems(nextItems);
@@ -70,8 +72,6 @@ export default function MedicationOcrPage() {
         title: "복약 정보 인식이 완료되었습니다.",
         message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요.",
       });
-      setIsRunning(false);
-      setOcrJobId(null);
     },
     onFailure: (job) => {
       setFeedbackDialog({
@@ -98,6 +98,7 @@ export default function MedicationOcrPage() {
   const runMedicationRecognition = async () => {
     setError("");
     setMessage("");
+    setFeedbackDialog(null);
     setItems([]);
     setCanRetryOcr(false);
     if (!selectedImageFile) {

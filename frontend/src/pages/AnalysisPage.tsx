@@ -193,13 +193,13 @@ export default function AnalysisPage() {
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: async () => {
+      setRunningMode(null);
+      setAnalysisJobId(null);
       await load();
       setFeedbackDialog({
         title: "분석이 완료되었습니다.",
         message: "결과 화면에서 건강 관리 단계를 확인해 주세요.",
       });
-      setRunningMode(null);
-      setAnalysisJobId(null);
     },
     onFailure: (job) => {
       setFeedbackDialog({
@@ -271,6 +271,7 @@ export default function AnalysisPage() {
   const run = async (mode: AnalysisMode) => {
     setError("");
     setNotice("");
+    setFeedbackDialog(null);
     setAnalysisJobId(null);
     setRunningMode(mode);
     try {
@@ -284,14 +285,17 @@ export default function AnalysisPage() {
       setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
       if (!readiness.latest_health_record_id) {
         setNotice(mode === "PRECISION" ? "건강검진 데이터를 입력해주세요." : "분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
+        setRunningMode(null);
         return;
       }
       if (!currentBasicReady) {
         setNotice("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
+        setRunningMode(null);
         return;
       }
       if (mode === "PRECISION" && !currentPrecisionReady) {
         setNotice("건강검진 데이터를 입력해주세요.");
+        setRunningMode(null);
         return;
       }
       const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);

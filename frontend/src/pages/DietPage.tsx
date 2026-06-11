@@ -160,6 +160,8 @@ export default function DietPage() {
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: async (job) => {
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
       try {
         const result = dietAnalysisResultFromPayload(job.result_payload);
         if (!result) {
@@ -179,9 +181,6 @@ export default function DietPage() {
           tone: "danger",
         });
         setCanRetryAnalysis(true);
-      } finally {
-        setIsAnalyzing(false);
-        setAnalysisJobId(null);
       }
     },
     onFailure: (job) => {
@@ -291,6 +290,7 @@ export default function DietPage() {
   const runDietAnalysis = async () => {
     setError("");
     setMessage("");
+    setFeedbackDialog(null);
     setAnalysisResult(null);
     setCanRetryAnalysis(false);
     setIsAnalyzing(true);
