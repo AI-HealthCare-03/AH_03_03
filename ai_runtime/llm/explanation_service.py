@@ -23,8 +23,18 @@ DISEASE_LABELS = {
     "DL": "이상지질혈증",
     "OBESITY": "비만",
     "OBE": "비만",
+    "ABDOMINAL_OBESITY": "복부비만",
+    "ABO": "복부비만",
+    "FATTY_LIVER": "지방간",
+    "FL": "지방간",
     "ANEMIA": "빈혈",
     "ANEM": "빈혈",
+    "LIVER_FUNCTION": "간기능",
+    "LF": "간기능",
+    "KIDNEY_FUNCTION": "신장기능",
+    "KF": "신장기능",
+    "CHRONIC_KIDNEY_DISEASE": "만성콩팥병",
+    "CKD": "만성콩팥병",
 }
 
 DIET_LOW_SCORE_MESSAGES = {

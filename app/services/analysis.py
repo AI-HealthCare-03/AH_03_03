@@ -482,11 +482,17 @@ def _resolve_final_risk_level(base_risk_level: RiskLevel, screening_dual_stage: 
 
 def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: AnalysisMode = AnalysisMode.BASIC) -> str:
     disease_label = {
-        AnalysisType.DIABETES: "당뇨",
-        AnalysisType.OBESITY: "비만",
-        AnalysisType.DYSLIPIDEMIA: "이상지질혈증",
         AnalysisType.HYPERTENSION: "고혈압",
-    }[analysis_type]
+        AnalysisType.DIABETES: "당뇨",
+        AnalysisType.DYSLIPIDEMIA: "이상지질혈증",
+        AnalysisType.OBESITY: "비만",
+        AnalysisType.ABDOMINAL_OBESITY: "복부비만",
+        AnalysisType.FATTY_LIVER: "지방간",
+        AnalysisType.ANEMIA: "빈혈",
+        AnalysisType.LIVER_FUNCTION: "간기능",
+        AnalysisType.KIDNEY_FUNCTION: "신장기능",
+        AnalysisType.CHRONIC_KIDNEY_DISEASE: "만성콩팥병",
+    }.get(analysis_type, str(analysis_type))
     mode_label = "정밀" if mode == AnalysisMode.PRECISION else "간편"
     # 결과 문구는 위험도 안내에 머물러야 하며 진단/처방처럼 읽히면 안 된다.
     notice = f" 이 결과는 {mode_label} 분석 참고용 판정이며 의료 진단이 아닙니다."
@@ -837,7 +843,9 @@ async def _create_challenge_recommendations(user_id: int, result: AnalysisResult
         AnalysisType.OBESITY: ChallengeCategory.WEIGHT,
         AnalysisType.DYSLIPIDEMIA: ChallengeCategory.DIET,
         AnalysisType.HYPERTENSION: ChallengeCategory.BLOOD_PRESSURE,
-    }[result.analysis_type]
+    }.get(result.analysis_type)
+    if target_category is None:
+        return []
     challenge = next((item for item in active_challenges if item.category == target_category), None)
     if challenge is None and active_challenges:
         challenge = active_challenges[0]
