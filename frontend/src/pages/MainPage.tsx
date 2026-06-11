@@ -738,8 +738,10 @@ export default function MainPage() {
               type="button"
               onClick={() => setSelectedPersonaId(persona.id)}
             >
-              <span className="persona-icon">{persona.icon}</span>
-              <strong>{persona.title}</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span className="persona-icon">{persona.icon}</span>
+                <strong>{persona.title}</strong>
+              </div>
               <p>{persona.quote}</p>
               <em>{persona.features.join(" · ")}</em>
             </button>
