@@ -358,7 +358,7 @@ export default function HealthRecordPage() {
 
   return (
     <div className="dashboard-grid">
-      <Card title="입력 단계">
+      <Card className="sticky-sidebar" title="입력 단계">
         <div className="card-list">
           {steps.map((step, index) => (
             <button
@@ -370,6 +370,32 @@ export default function HealthRecordPage() {
               {step}
             </button>
           ))}
+        </div>
+
+        {/* 분석 준비 상태 인라인으로 이동 */}
+        <div className="analysis-readiness-panel" style={{ marginTop: 58 }}>
+          <div className={`readiness-status ${readiness?.is_ready ? "success-text" : "warning-text"}`}>
+            <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}</strong>
+          </div>
+          <div className="chip-list readiness-chip-list">
+            {missingBasicFields.map((field) => (
+              <span className="badge badge-missing" key={field}>
+                {healthFieldLabels[field] ?? field}
+              </span>
+            ))}
+            {missingBasicFields.length === 0 && <span className="badge badge-saved">부족 항목 없음</span>}
+          </div>
+          <div className="state-box readiness-note">
+            <p>검진/혈액검사 수치를 입력하면 정밀 분석 정확도가 높아집니다.</p>
+            <div className="chip-list readiness-chip-list">
+              {missingPrecisionFields.map((field) => (
+                <span className="badge badge-reference" key={field}>
+                  {healthFieldLabels[field] ?? field}
+                </span>
+              ))}
+              {missingPrecisionFields.length === 0 && <span className="badge badge-saved">정밀 보강값 입력 완료</span>}
+            </div>
+          </div>
         </div>
       </Card>
       <Card title="건강정보 입력">
@@ -428,33 +454,7 @@ export default function HealthRecordPage() {
           </div>
         </form>
       </Card>
-      <Card title="분석 준비 상태">
-        <div className="analysis-readiness-panel">
-          <div className={`readiness-status ${readiness?.is_ready ? "success-text" : "warning-text"}`}>
-            <span aria-hidden="true" />
-            <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "기본 분석에 필요한 정보가 부족합니다."}</strong>
-          </div>
-          <div className="chip-list readiness-chip-list">
-            {missingBasicFields.map((field) => (
-              <span className="badge badge-missing" key={field}>
-                {healthFieldLabels[field] ?? field}
-              </span>
-            ))}
-            {missingBasicFields.length === 0 && <span className="badge badge-saved">기본 분석 부족 항목 없음</span>}
-          </div>
-          <div className="state-box readiness-note">
-            <p>검진/혈액검사 수치를 입력하면 정밀 분석 정확도가 높아집니다.</p>
-            <div className="chip-list readiness-chip-list">
-              {missingPrecisionFields.map((field) => (
-                <span className="badge badge-reference" key={field}>
-                  {healthFieldLabels[field] ?? field}
-                </span>
-              ))}
-              {missingPrecisionFields.length === 0 && <span className="badge badge-saved">정밀 보강값 입력 완료</span>}
-            </div>
-          </div>
-        </div>
-      </Card>
+      <div style={{ gridColumn: "2" }}>
       <Card title="최근 건강정보">
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 건강정보가 없습니다.</div>}
@@ -526,6 +526,7 @@ export default function HealthRecordPage() {
           ))}
         </div>
       </Card>
+      </div>
       {deleteTargetId && (
         <ConfirmDialog
           cancelLabel="취소"
