@@ -2,9 +2,14 @@
 
 ## 1. 현재 상태
 
-식단 이미지 분석 기능은 현재 **실험 검증 완료 / production 연결 전 보류** 상태다.
+식단 이미지 분석 기능은 현재 **기존 production 경로 운영 / 후보확정형 실험 계약 미연결** 상태다.
 
-배포 교육 및 배포 연습이 우선이므로, 식단 분석 production 연결 작업은 잠시 중단한다. 배포 흐름을 먼저 안정화한 뒤 mock API endpoint부터 다시 이어간다.
+현재 production 경로는 `POST /api/v1/diets/analyze` async job이다. 이 경로는 이미지 업로드를 저장하고
+`diet.analyze_image` job을 통해 `DietRecord`와 `DietPhotoResult`를 생성한다.
+
+`experiment/ai/cv/gpt_vision_food_eval`과 `experiment/ai/cv/food_nutrition_api_eval`에 정리된 후보확정형 API
+(`auto_confirmed_foods`, `needs_confirmation_foods`, `no_candidate_foods`, confirm/manual API)는 아직 production runtime에
+연결하지 않았다.
 
 ## 2. 완료된 작업
 
@@ -34,41 +39,45 @@
 
 ## 4. 이후 재개 순서
 
-### 1) Mock API 먼저
+### 1) 프론트 optional UI 준비
 
-- `POST /api/v1/diets/analyze-image`
-- `GET /api/v1/diets/analyses/{analysis_id}`
-- 실제 GPT/MFDS 호출 없이 fixture를 반환한다.
-- 프론트가 UI 흐름을 먼저 붙일 수 있게 한다.
+- 기존 `POST /api/v1/diets/analyze` async job 흐름은 유지한다.
+- 기존 응답에 후보확정형 필드가 없어도 화면이 깨지지 않게 한다.
+- 향후 응답에 아래 optional field가 있을 때만 후보 확인 섹션을 표시한다.
+  - `auto_confirmed_foods`
+  - `needs_confirmation_foods`
+  - `no_candidate_foods`
+  - `nutrition_calculation_status`
+  - `needs_user_confirmation`
 
-### 2) 프론트 UI 연결
+### 2) Service response builder
 
-- 자동 확정 카드
-- 후보 선택 카드
-- 후보 없음 직접 입력
-- partial summary 배지
+- GPT Vision food extraction 결과와 MFDS lookup/reranking 결과를 production DTO로 변환한다.
+- `matched`만 자동 확정한다.
+- `weak_match`, `multiple_candidates`, `fallback_used`는 사용자 확인 대상으로 둔다.
+- `no_candidates`, `no_query`는 직접 검색 또는 직접 입력 대상으로 둔다.
+- 확정된 음식만 nutrition summary에 합산한다.
 
-### 3) Production provider 이식
-
-- GPT Vision food extraction
-- MFDS lookup
-- reranking
-- service response builder
-- `matched`만 자동 확정
-
-### 4) Confirm / Manual API
+### 3) Confirm / Manual API
 
 - 후보 선택 확정
 - 직접 입력 확정
 - summary 재계산
+- serving/portion 보정
 
-### 5) Portion 보정
+### 4) MFDS provider feature flag 연결
+
+- MFDS lookup provider를 production runtime에 feature flag 뒤로 연결한다.
+- API key, raw response, cache, latency, fallback 정책을 운영 기준으로 검증한다.
+- 장애 시 기존 `rule_based_food_detection`과 `nutrition_rule_table` 흐름을 유지할 수 있게 한다.
+
+### 5) Portion 보정 고도화
 
 - `serving_amount`
 - `portion_multiplier`
 - 사용자 수정 여부
 
-### 6) 질환 점수 연결
+### 6) 질환 점수 연결 고도화
 
 - 우선 `energy_kcal`, `carbohydrate_g`, `protein_g`, `fat_g`, `sodium_mg`만 사용한다.
 - 이후 `sugar`, `saturated fat`, `potassium` 등은 고도화 단계에서 확장한다.
@@ -77,5 +86,5 @@
 
 - 배포 교육 및 배포 연습이 우선이다.
 - 식단 이미지 분석 기능은 실험/설계 단계가 충분히 정리되었다.
-- production 연결은 배포 흐름을 먼저 안정화한 뒤 재개한다.
-- 다시 이어갈 때는 mock API endpoint부터 시작한다.
+- 후보확정형 API는 실험 계약과 mock fixture가 있지만 production runtime에는 아직 연결하지 않았다.
+- 다시 이어갈 때는 기존 `/diets/analyze` async job을 깨지 않는 optional UI와 service response builder부터 시작한다.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { getDietRecord, listDietPhotoResults } from "../api/diets";
+import { getDietRecord, listDietPhotoResults, type DietCandidateFood } from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
@@ -60,6 +60,39 @@ function scoringSourceLabel(value: unknown): string {
   return "식단 기준표";
 }
 
+function candidateFoodsFromPayload(...payloads: Array<Record<string, unknown> | null | undefined>): {
+  autoConfirmed: DietCandidateFood[];
+  needsConfirmation: DietCandidateFood[];
+  noCandidate: DietCandidateFood[];
+  nutritionStatus: string;
+} {
+  const source: Record<string, unknown> = payloads.find((item) => hasCandidateFoods(item)) ?? {};
+  return {
+    autoConfirmed: candidateFoodList(source.auto_confirmed_foods),
+    needsConfirmation: candidateFoodList(source.needs_confirmation_foods),
+    noCandidate: candidateFoodList(source.no_candidate_foods),
+    nutritionStatus: String(source.nutrition_calculation_status ?? asRecord(source.summary).nutrition_calculation_status ?? ""),
+  };
+}
+
+function hasCandidateFoods(value: unknown): value is Record<string, unknown> {
+  const record = asRecord(value);
+  return ["auto_confirmed_foods", "needs_confirmation_foods", "no_candidate_foods"].some((key) =>
+    Array.isArray(record[key]),
+  );
+}
+
+function candidateFoodList(value: unknown): DietCandidateFood[] {
+  return Array.isArray(value) ? (value.filter((item) => item && typeof item === "object") as DietCandidateFood[]) : [];
+}
+
+function candidateFoodName(food: DietCandidateFood): string {
+  return (
+    String(food.display_name ?? food.vision_food_name ?? food.raw_food_name ?? food.selected_candidate?.food_name ?? "").trim() ||
+    "음식명 확인 필요"
+  );
+}
+
 export default function DietResultPage() {
   const { dietRecordId } = useParams();
   const navigate = useNavigate();
@@ -98,6 +131,11 @@ export default function DietResultPage() {
     ? (rawOutput.food_score_details as Item[])
     : [];
   const scoringSource = scoringSourceLabel(nutrition.scoring_source ?? rawOutput.scoring_source);
+  const candidateFoods = candidateFoodsFromPayload(rawOutput, record);
+  const hasCandidateSection =
+    candidateFoods.autoConfirmed.length > 0 ||
+    candidateFoods.needsConfirmation.length > 0 ||
+    candidateFoods.noCandidate.length > 0;
 
   useEffect(() => {
     const load = async () => {
@@ -139,6 +177,11 @@ export default function DietResultPage() {
         }
       >
         <div className="card-list">
+          {!isManual && (
+            <div className="state-box">
+              참고용 분석 결과입니다. 음식명과 영양 정보는 사진 상태와 매칭 결과에 따라 달라질 수 있습니다.
+            </div>
+          )}
           <div className="diet-record-meta">
             <span className="muted">{formatDateTime(record?.meal_time ?? record?.created_at)}</span>
             <span className="badge badge-reference">{mealTypeLabel(record?.meal_type)}</span>
@@ -194,6 +237,46 @@ export default function DietResultPage() {
                 {foodDisplayName(food)} {food.confidence ? `${Math.round(Number(food.confidence) * 100)}%` : ""}
               </span>
             ))}
+          </div>
+        </Card>
+      )}
+      {!isManual && hasCandidateSection && (
+        <Card title="음식 후보 확인">
+          <div className="card-list">
+            <div className="mini-card">
+              <strong>후보 확인형 분석 응답</strong>
+              <span className="muted">
+                자동 확정되지 않은 음식은 사용자 확인 전까지 영양 합산에서 제외될 수 있습니다.
+              </span>
+              {candidateFoods.nutritionStatus && (
+                <span className="badge badge-reference">
+                  영양 계산 상태: {candidateFoods.nutritionStatus === "partial" ? "일부 확인 필요" : "확인 완료"}
+                </span>
+              )}
+            </div>
+            <div className="nutrition-grid">
+              <div>
+                <span>자동 확정</span>
+                <strong>{candidateFoods.autoConfirmed.length}개</strong>
+              </div>
+              <div>
+                <span>확인 필요</span>
+                <strong>{candidateFoods.needsConfirmation.length}개</strong>
+              </div>
+              <div>
+                <span>직접 입력 필요</span>
+                <strong>{candidateFoods.noCandidate.length}개</strong>
+              </div>
+            </div>
+            {candidateFoods.needsConfirmation.length > 0 && (
+              <div className="chip-list">
+                {candidateFoods.needsConfirmation.slice(0, 8).map((food, index) => (
+                  <span className="badge badge-reference" key={`${candidateFoodName(food)}-${index}`}>
+                    {candidateFoodName(food)}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </Card>
       )}
