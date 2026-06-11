@@ -191,9 +191,9 @@ def _map_obe(features: Mapping[str, Any]) -> X2StageMappingResult:
     if bmi >= 35:
         return _available("OBESITY", ServiceBand.HIGH_CAUTION, "OBESITY_STAGE_3", "비만 3단계 범위")
     if bmi >= 30:
-        return _available("OBESITY", ServiceBand.CAUTION, "OBESITY_STAGE_2", "비만 2단계 범위")
+        return _available("OBESITY", ServiceBand.HIGH_CAUTION, "OBESITY_STAGE_2", "비만 2단계 범위")
     if bmi >= 25:
-        return _available("OBESITY", ServiceBand.ATTENTION, "OBESITY_STAGE_1", "비만 1단계 범위")
+        return _available("OBESITY", ServiceBand.CAUTION, "OBESITY_STAGE_1", "비만 1단계 범위")
     if bmi >= 23:
         return _available("OBESITY", ServiceBand.ATTENTION, "PRE_OBESITY", "비만 전단계 범위")
     if bmi < Decimal("18.5"):

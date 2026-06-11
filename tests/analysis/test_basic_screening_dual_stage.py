@@ -182,6 +182,34 @@ def test_screening_dual_stage_does_not_apply_to_non_target_disease() -> None:
     assert result is None
 
 
+@pytest.mark.parametrize(
+    ("bmi", "expected_risk_level"),
+    [
+        (Decimal("18.4"), RiskLevel.LOW),
+        (Decimal("22.9"), RiskLevel.LOW),
+        (Decimal("23.0"), RiskLevel.ATTENTION),
+        (Decimal("24.9"), RiskLevel.ATTENTION),
+        (Decimal("25.0"), RiskLevel.CAUTION),
+        (Decimal("29.9"), RiskLevel.CAUTION),
+        (Decimal("30.0"), RiskLevel.HIGH_CAUTION),
+        (Decimal("34.9"), RiskLevel.HIGH_CAUTION),
+        (Decimal("35.0"), RiskLevel.HIGH_CAUTION),
+    ],
+)
+def test_basic_obesity_uses_final_bmi_rule(bmi: Decimal, expected_risk_level: RiskLevel) -> None:
+    record = _health_record(bmi=bmi)
+    score = analysis_service._basic_obesity_score(record, SimpleNamespace(birthday=None))
+
+    assert analysis_service._risk_level_for_analysis_score(AnalysisType.OBESITY, score, record) == expected_risk_level
+
+
+def test_basic_obesity_can_calculate_bmi_from_height_and_weight() -> None:
+    record = _health_record(bmi=None, height_cm=Decimal("170.0"), weight_kg=Decimal("80.0"))
+    score = analysis_service._basic_obesity_score(record, SimpleNamespace(birthday=None))
+
+    assert analysis_service._risk_level_for_analysis_score(AnalysisType.OBESITY, score, record) == RiskLevel.CAUTION
+
+
 def test_caution_base_score_with_screening_high_keeps_caution(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         analysis_service,

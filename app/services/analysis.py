@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Any
 
@@ -258,7 +258,7 @@ async def _build_analysis_plans(
 def _build_basic_analysis_plans(*, user: User | None, health_record: HealthRecord) -> list[dict[str, Any]]:
     plans: list[dict[str, Any]] = []
     for analysis_type, score in _calculate_analysis_scores(health_record, AnalysisMode.BASIC, user).items():
-        base_risk_level = _risk_level(score)
+        base_risk_level = _risk_level_for_analysis_score(analysis_type, score, health_record)
         screening_dual_stage = _predict_basic_screening_dual_stage(
             user=user,
             health_record=health_record,
@@ -464,16 +464,11 @@ def _basic_diabetes_score(record: HealthRecord, user: User | None) -> Decimal:
 
 def _basic_obesity_score(record: HealthRecord, user: User | None) -> Decimal:
     _ = user
+    bmi = _obesity_bmi_value(record)
+    if bmi is not None:
+        return _obesity_score_for_bmi(bmi)
+
     score = Decimal("0.18")
-    if record.bmi is not None:
-        if record.bmi >= Decimal("30"):
-            score = Decimal("0.78")
-        elif record.bmi >= Decimal("25"):
-            score = Decimal("0.64")
-        elif record.bmi >= Decimal("23"):
-            score = Decimal("0.46")
-        else:
-            score = Decimal("0.22")
     score += _lifestyle_adjustment(record)
     return min(score, Decimal("0.90"))
 
@@ -518,19 +513,47 @@ def _diabetes_score(record: HealthRecord) -> Decimal:
 
 
 def _obesity_score(record: HealthRecord) -> Decimal:
-    score = Decimal("0.18")
-    if record.bmi is not None:
-        if record.bmi >= Decimal("30"):
-            score = max(score, Decimal("0.82"))
-        elif record.bmi >= Decimal("25"):
-            score = max(score, Decimal("0.68"))
-        elif record.bmi >= Decimal("23"):
-            score = max(score, Decimal("0.46"))
-        else:
-            score = max(score, Decimal("0.22"))
-    if record.waist_cm is not None and record.waist_cm >= Decimal("90"):
-        score = min(score + Decimal("0.10"), Decimal("0.95"))
-    return score
+    bmi = _obesity_bmi_value(record)
+    if bmi is None:
+        return Decimal("0.18")
+    return _obesity_score_for_bmi(bmi)
+
+
+def _obesity_bmi_value(record: HealthRecord) -> Decimal | None:
+    bmi = _to_decimal_value(getattr(record, "bmi", None))
+    if bmi is not None:
+        return bmi
+
+    height_cm = _to_decimal_value(getattr(record, "height_cm", None))
+    weight_kg = _to_decimal_value(getattr(record, "weight_kg", None))
+    if height_cm is None or weight_kg is None or height_cm <= 0:
+        return None
+
+    height_m = height_cm / Decimal("100")
+    return weight_kg / (height_m * height_m)
+
+
+def _to_decimal_value(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _obesity_score_for_bmi(bmi: Decimal) -> Decimal:
+    return _risk_score_for_level(_obesity_risk_level_for_bmi(bmi))
+
+
+def _obesity_risk_level_for_bmi(bmi: Decimal) -> RiskLevel:
+    if bmi >= Decimal("30"):
+        return RiskLevel.HIGH_CAUTION
+    if bmi >= Decimal("25"):
+        return RiskLevel.CAUTION
+    if bmi >= Decimal("23"):
+        return RiskLevel.ATTENTION
+    return RiskLevel.LOW
 
 
 def _dyslipidemia_score(record: HealthRecord) -> Decimal:
@@ -574,6 +597,14 @@ def _risk_level(score: Decimal) -> RiskLevel:
     if score >= Decimal("0.40"):
         return RiskLevel.CAUTION
     return RiskLevel.LOW
+
+
+def _risk_level_for_analysis_score(analysis_type: AnalysisType, score: Decimal, record: HealthRecord) -> RiskLevel:
+    if analysis_type == AnalysisType.OBESITY:
+        bmi = _obesity_bmi_value(record)
+        if bmi is not None:
+            return _obesity_risk_level_for_bmi(bmi)
+    return _risk_level(score)
 
 
 def _risk_score_for_level(risk_level: RiskLevel) -> Decimal:

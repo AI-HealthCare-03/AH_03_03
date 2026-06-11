@@ -126,7 +126,7 @@ async def test_precision_mode_merges_basic_fallback_and_available_x2_results(
     assert by_type[AnalysisType.HYPERTENSION].risk_level == RiskLevel.CAUTION
     assert by_type[AnalysisType.HYPERTENSION].model_name == "x2_rule"
     assert by_type[AnalysisType.DIABETES].risk_level == RiskLevel.ATTENTION
-    assert by_type[AnalysisType.OBESITY].risk_level == RiskLevel.ATTENTION
+    assert by_type[AnalysisType.OBESITY].risk_level == RiskLevel.CAUTION
     assert by_type[AnalysisType.ANEMIA].risk_level == RiskLevel.ATTENTION
     assert by_type[AnalysisType.KIDNEY_FUNCTION].risk_level == RiskLevel.ATTENTION
     assert by_type[AnalysisType.CHRONIC_KIDNEY_DISEASE].risk_level == RiskLevel.CAUTION
@@ -224,6 +224,47 @@ async def test_precision_prefers_confirmed_exam_measurements_over_health_record(
 
     by_type = {item.analysis_type: item for item in created}
     assert by_type[AnalysisType.HYPERTENSION].risk_level == RiskLevel.HIGH_CAUTION
+
+
+@pytest.mark.asyncio
+async def test_precision_obesity_prefers_confirmed_exam_bmi_over_health_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created, _snapshots = _patch_analysis_writes(monkeypatch)
+    monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(monkeypatch, [_measurement("bmi", "30.0 kg/m2")])
+
+    await analysis_service.run_analysis(
+        7,
+        _health_record(bmi=Decimal("22.0"), height_cm=Decimal("172.0"), weight_kg=Decimal("65.0")),
+        AnalysisMode.PRECISION,
+    )
+
+    by_type = {item.analysis_type: item for item in created}
+    assert by_type[AnalysisType.OBESITY].model_name == "x2_rule"
+    assert by_type[AnalysisType.OBESITY].risk_level == RiskLevel.HIGH_CAUTION
+
+
+@pytest.mark.asyncio
+async def test_precision_keeps_obesity_and_abdominal_obesity_separate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created, _snapshots = _patch_analysis_writes(monkeypatch)
+    monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("bmi", "26.0"),
+            _measurement("waist_cm", "96 cm"),
+        ],
+    )
+
+    await analysis_service.run_analysis(7, _health_record(), AnalysisMode.PRECISION)
+
+    by_type = {item.analysis_type: item for item in created}
+    assert by_type[AnalysisType.OBESITY].risk_level == RiskLevel.CAUTION
+    assert by_type[AnalysisType.ABDOMINAL_OBESITY].risk_level == RiskLevel.CAUTION
+    assert by_type[AnalysisType.OBESITY].analysis_type != by_type[AnalysisType.ABDOMINAL_OBESITY].analysis_type
 
 
 @pytest.mark.asyncio

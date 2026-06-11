@@ -24,7 +24,7 @@ from ai_runtime.ml.inference.x2_stage_mapper import (
         ("DL", {"ldl_cholesterol": 190}, "DYSLIPIDEMIA", "HIGH_CAUTION", "HIGH_RISK_RANGE"),
         ("OBE", {"bmi": 20.1}, "OBESITY", "LOW", "NORMAL"),
         ("OBE", {"bmi": 23.5}, "OBESITY", "ATTENTION", "PRE_OBESITY"),
-        ("OBE", {"bmi": 30.1}, "OBESITY", "CAUTION", "OBESITY_STAGE_2"),
+        ("OBE", {"bmi": 30.1}, "OBESITY", "HIGH_CAUTION", "OBESITY_STAGE_2"),
         ("OBE", {"bmi": 35}, "OBESITY", "HIGH_CAUTION", "OBESITY_STAGE_3"),
         ("ABO", {"waist_cm": 82, "sex": "FEMALE"}, "ABDOMINAL_OBESITY", "LOW", "LOW_RISK_RANGE"),
         ("ABO", {"waist_cm": 88, "sex": "FEMALE"}, "ABDOMINAL_OBESITY", "ATTENTION", "RISK_RANGE"),
@@ -157,8 +157,33 @@ def test_hypertension_normal_requires_sbp_and_dbp_to_be_normal() -> None:
 def test_obesity_can_calculate_bmi_from_height_and_weight() -> None:
     result = map_x2_stage_to_risk_level("OBE", {"height_cm": 170, "weight_kg": 80})
 
-    assert result.risk_level == "ATTENTION"
+    assert result.risk_level == "CAUTION"
     assert result.x2_stage_code == "OBESITY_STAGE_1"
+
+
+@pytest.mark.parametrize(
+    ("bmi", "expected_risk_level", "expected_stage_code"),
+    [
+        (18.4, "LOW", "UNDERWEIGHT"),
+        (22.9, "LOW", "NORMAL"),
+        (23.0, "ATTENTION", "PRE_OBESITY"),
+        (24.9, "ATTENTION", "PRE_OBESITY"),
+        (25.0, "CAUTION", "OBESITY_STAGE_1"),
+        (29.9, "CAUTION", "OBESITY_STAGE_1"),
+        (30.0, "HIGH_CAUTION", "OBESITY_STAGE_2"),
+        (34.9, "HIGH_CAUTION", "OBESITY_STAGE_2"),
+        (35.0, "HIGH_CAUTION", "OBESITY_STAGE_3"),
+    ],
+)
+def test_obesity_bmi_boundaries_follow_final_rule(
+    bmi: float,
+    expected_risk_level: str,
+    expected_stage_code: str,
+) -> None:
+    result = map_x2_stage_to_risk_level("OBESITY", {"bmi": bmi})
+
+    assert result.risk_level == expected_risk_level
+    assert result.x2_stage_code == expected_stage_code
 
 
 def test_source_variable_names_are_supported() -> None:
