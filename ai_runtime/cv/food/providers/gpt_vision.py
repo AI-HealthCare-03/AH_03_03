@@ -81,21 +81,29 @@ class GptVisionFoodDetectionProvider:
                 message="gpt_vision_returned_empty_foods",
             )
 
+        analysis_status = str(raw.get("analysis_status") or "success")
+        fail_reason = raw.get("fail_reason")
+        metadata = {
+            "model": self._model,
+            "analysis_status": analysis_status,
+            "fail_reason": str(fail_reason) if fail_reason else None,
+            "food_count": len(detected_foods),
+        }
         candidate = FoodDetectionCandidateSet(
             provider="gpt_vision",
             detected_foods=detected_foods,
             confidence=_average_confidence_from_provider_foods(foods),
             needs_review=False,
             raw_output=raw,
-            raw_provider_status=str(raw.get("analysis_status") or "success"),
-            metadata={"model": self._model},
+            raw_provider_status=analysis_status,
+            metadata=metadata,
         )
         return build_food_detection_provider_result(
             provider_name="gpt_vision",
             candidate=candidate,
             fallback_used=False,
             message="gpt_vision_food_detection",
-            metadata={"model": self._model},
+            metadata=metadata,
         )
 
 

@@ -3,6 +3,20 @@ from __future__ import annotations
 import pytest
 
 from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_analysis_pipeline
+from ai_runtime.cv.providers.gpt_vision import PROMPTS, AnalysisType
+
+
+def test_runtime_diet_prompt_requests_food_candidates_without_nutrition_estimates() -> None:
+    prompt = PROMPTS[AnalysisType.DIET]
+
+    assert '"foods"' in prompt
+    assert '"name"' in prompt
+    assert '"confidence"' in prompt
+    assert "foods=[]는 음식, 음료, 식재료, 소스, 포장 식품이 전혀 보이지 않는 경우에만 사용" in prompt
+    assert '"nutrition"' not in prompt
+    assert '"nutrient_category"' not in prompt
+    assert '"search_keyword"' not in prompt
+    assert "estimated_amount" not in prompt
 
 
 @pytest.mark.asyncio
@@ -58,6 +72,10 @@ async def test_pipeline_uses_gpt_vision_provider_with_injected_client() -> None:
     assert result.provider_result.provider_name == "gpt_vision"
     assert result.provider_result.raw_food_names == ["쌀떡"]
     assert result.provider_result.matched_food_names == ["가래떡"]
+    assert result.provider_result.metadata["model"] == "test-model"
+    assert result.provider_result.metadata["analysis_status"] == "success"
+    assert result.provider_result.metadata["fail_reason"] is None
+    assert result.provider_result.metadata["food_count"] == 1
     assert result.detected_foods[0]["name"] == "가래떡"
     assert result.detected_foods[0]["original_name"] == "쌀떡"
     assert result.fallback_used is False
