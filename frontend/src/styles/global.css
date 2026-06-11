@@ -3496,13 +3496,21 @@ pre {
   gap: 8px;
   padding: 14px;
 }
-
-.readonly-health-item span {
+.readonly-health-item .item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.readonly-health-item .item-header span {
   color: var(--color-muted);
   font-size: 13px;
   font-weight: 700;
 }
-
+.readonly-health-item .item-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .readonly-health-item strong {
   font-size: 18px;
 }
