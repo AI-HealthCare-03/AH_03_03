@@ -1004,25 +1004,23 @@ pre {
   display: flex;
   gap: 20px;
   justify-content: space-between;
-  padding: 16px 28px;
+  padding: 28px;
 }
 
 .main-dashboard-hero h1 {
-  font-size: 40px;
+  font-size: 30px;
   margin: 0;
-  text-align: center;
 }
 
 .main-dashboard-hero p {
   color: var(--color-muted);
   margin: 8px 0 0;
-  text-align: center;
 }
 
 .home-action-panel {
   display: grid;
   gap: 10px;
-  min-width: min(400px, 100%);
+  min-width: min(440px, 100%);
 }
 
 .home-action-card {
@@ -2231,8 +2229,6 @@ pre {
 .mypage-menu {
   display: grid;
   gap: 10px;
-  position: sticky;
-  top: 80px;
 }
 
 .mypage-menu-item {
@@ -2386,7 +2382,7 @@ pre {
   border-radius: var(--radius-md);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   min-width: 0;
   padding: 14px;
 }

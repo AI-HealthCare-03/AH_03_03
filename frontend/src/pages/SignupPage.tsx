@@ -644,7 +644,7 @@ export default function SignupPage() {
                 </div>
                 <div className="privacy-consent-summary">
                   <p>
-                    AI Health Ladder는 회원가입 및 건강관리 기능 제공을 위해 필요한 개인정보를 수집·이용합니다.
+                    AI HealthCare는 회원가입 및 건강관리 기능 제공을 위해 필요한 개인정보를 수집·이용합니다.
                   </p>
                   <p>
                     건강검진 결과, 복약 정보, 식단 기록, 챌린지 수행 기록 등 건강 관련 정보는 민감할 수 있으므로
