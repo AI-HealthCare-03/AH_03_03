@@ -182,6 +182,14 @@ ocr-compare/results/summary.md
 !ai_runtime/ml/artifacts/*/catboost/metrics.json
 !ai_runtime/ml/artifacts/*/catboost/model_params.json
 !ai_runtime/ml/artifacts/*/catboost/experiment_config.json
+!ai_runtime/ml/artifacts/screening/
+!ai_runtime/ml/artifacts/screening/**/
+!ai_runtime/ml/artifacts/screening/ARTIFACT_MANIFEST.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/*.cbm
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/feature_columns.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/threshold.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/metrics.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/model_params.json
 ai_runtime/ml/artifacts/**/oof_*.npy
 ai_runtime/ml/artifacts/**/threshold_tuning.csv
 

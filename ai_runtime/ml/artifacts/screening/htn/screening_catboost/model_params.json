@@ -1,0 +1,12 @@
+{
+  "iterations": 500,
+  "learning_rate": 0.05,
+  "depth": 6,
+  "loss_function": "Logloss",
+  "eval_metric": "AUC",
+  "early_stopping_rounds": 50,
+  "random_seed": 42,
+  "auto_class_weights": "Balanced",
+  "verbose": false,
+  "allow_writing_files": false
+}
