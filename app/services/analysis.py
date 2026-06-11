@@ -239,6 +239,11 @@ async def run_analysis(
                 "challenge_recommendation_ids": recommendation_ids,
                 "factor_count": len(factors),
                 **_risk_level_alias_fields(risk_level),
+                **_x2_response_fields_from_payloads(
+                    input_payload=precision_input,
+                    final_outputs=_x2_rule_final_outputs(x2_rule),
+                    x2_rule=x2_rule,
+                ),
             }
         )
     return results
@@ -1177,9 +1182,100 @@ def _x2_rule_final_outputs(x2_rule: dict[str, Any] | None) -> dict[str, Any]:
 
 def _analysis_result_response(result: AnalysisResult, snapshot: AnalysisSnapshot | None = None) -> dict[str, Any]:
     payload = AnalysisResultResponse.model_validate(result).model_dump()
-    _ = snapshot
     payload.update(_risk_level_alias_fields(result.risk_level))
+    payload.update(_x2_response_fields_from_snapshot(snapshot))
     return payload
+
+
+def _x2_response_field_defaults() -> dict[str, Any]:
+    return {
+        "result_source": None,
+        "x2_stage_code": None,
+        "x2_stage_label": None,
+        "x2_available": None,
+        "x2_missing_fields": None,
+        "selected_exam_report_id": None,
+        "x2_measurement_source": None,
+    }
+
+
+def _x2_response_fields_from_snapshot(snapshot: AnalysisSnapshot | None) -> dict[str, Any]:
+    if snapshot is None:
+        return _x2_response_field_defaults()
+
+    input_payload = _as_mapping(getattr(snapshot, "input_payload", None))
+    output_payload = _as_mapping(getattr(snapshot, "output_payload", None))
+    model_payload = _as_mapping(getattr(snapshot, "model_payload", None))
+    final_outputs = _as_mapping(output_payload.get("final_outputs"))
+    x2_rule = _as_mapping(model_payload.get("x2_rule"))
+    return _x2_response_fields_from_payloads(
+        input_payload=input_payload,
+        final_outputs=final_outputs,
+        x2_rule=x2_rule,
+    )
+
+
+def _x2_response_fields_from_payloads(
+    *,
+    input_payload: dict[str, Any] | None = None,
+    final_outputs: dict[str, Any] | None = None,
+    x2_rule: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    input_payload = _as_mapping(input_payload)
+    final_outputs = _as_mapping(final_outputs)
+    x2_rule = _as_mapping(x2_rule)
+
+    def pick_x2_value(field_name: str) -> Any:
+        if field_name in final_outputs:
+            return final_outputs.get(field_name)
+        return x2_rule.get(field_name)
+
+    fields = _x2_response_field_defaults()
+    fields.update(
+        {
+            "result_source": _optional_string(pick_x2_value("result_source")),
+            "x2_stage_code": _optional_string(pick_x2_value("x2_stage_code")),
+            "x2_stage_label": _optional_string(pick_x2_value("x2_stage_label")),
+            "x2_available": _optional_bool(pick_x2_value("x2_available")),
+            "x2_missing_fields": _optional_string_list(pick_x2_value("x2_missing_fields")),
+            "selected_exam_report_id": _optional_int(input_payload.get("selected_exam_report_id")),
+            "x2_measurement_source": _optional_string(input_payload.get("x2_measurement_source")),
+        }
+    )
+    return fields
+
+
+def _as_mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _optional_string(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    return str(value)
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    return None
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_string_list(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
 
 
 def _risk_level_alias_fields(risk_level: RiskLevel | str) -> dict[str, Any]:

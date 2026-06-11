@@ -18,6 +18,13 @@ class DashboardAnalysisResultResponse(BaseModel):
     service_band_label: str | None = None
     service_band_percent: int | None = None
     legacy_risk_level: str | None = None
+    result_source: str | None = None
+    x2_stage_code: str | None = None
+    x2_stage_label: str | None = None
+    x2_available: bool | None = None
+    x2_missing_fields: list[str] | None = None
+    selected_exam_report_id: int | None = None
+    x2_measurement_source: str | None = None
     summary: str | None = None
     model_name: str | None = None
     model_version: str | None = None

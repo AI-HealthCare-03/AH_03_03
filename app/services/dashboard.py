@@ -59,6 +59,7 @@ async def get_dashboard_summary(user_id: int) -> dict[str, Any]:
     active_challenge_count = await challenge_service.count_active_user_challenges(user_id)
     active_medications = await medication_service.list_medications(user_id, is_active=True, limit=1000)
     latest_analysis_results = await analysis_service.list_latest_analysis_results(user_id)
+    latest_analysis_result_responses = await analysis_service.list_analysis_result_responses(latest_analysis_results)
     top_risk_factors = await _build_top_risk_factors(latest_analysis_results)
     analysis_scores = [float(result.risk_score) for result in latest_analysis_results if result.risk_score is not None]
 
@@ -68,25 +69,44 @@ async def get_dashboard_summary(user_id: int) -> dict[str, Any]:
         "active_challenge_count": active_challenge_count,
         "active_medication_count": len(active_medications),
         "latest_analysis_results": [
-            {
-                "id": result.id,
-                "analysis_type": result.analysis_type,
-                "analysis_mode": result.analysis_mode,
-                "risk_level": result.risk_level,
-                "risk_score": float(result.risk_score),
-                "summary": result.summary,
-                "model_name": result.model_name,
-                "model_version": result.model_version,
-                "analyzed_at": result.analyzed_at.isoformat(),
-                "created_at": result.created_at.isoformat(),
-            }
-            | analysis_service._risk_level_alias_fields(result.risk_level)
-            for result in latest_analysis_results
+            _dashboard_analysis_result_response(payload) for payload in latest_analysis_result_responses
         ],
         "top_risk_factors": top_risk_factors,
         "overall_risk_level": _overall_risk_level(latest_analysis_results),
         "overall_risk_score": max(analysis_scores) if analysis_scores else None,
     }
+
+
+def _dashboard_analysis_result_response(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": payload["id"],
+        "analysis_type": payload["analysis_type"],
+        "analysis_mode": payload["analysis_mode"],
+        "risk_level": payload["risk_level"],
+        "risk_score": float(payload["risk_score"]),
+        "service_band": payload.get("service_band"),
+        "service_band_label": payload.get("service_band_label"),
+        "service_band_percent": payload.get("service_band_percent"),
+        "legacy_risk_level": payload.get("legacy_risk_level"),
+        "result_source": payload.get("result_source"),
+        "x2_stage_code": payload.get("x2_stage_code"),
+        "x2_stage_label": payload.get("x2_stage_label"),
+        "x2_available": payload.get("x2_available"),
+        "x2_missing_fields": payload.get("x2_missing_fields"),
+        "selected_exam_report_id": payload.get("selected_exam_report_id"),
+        "x2_measurement_source": payload.get("x2_measurement_source"),
+        "summary": payload.get("summary"),
+        "model_name": payload.get("model_name"),
+        "model_version": payload.get("model_version"),
+        "analyzed_at": _isoformat_payload_datetime(payload.get("analyzed_at")),
+        "created_at": _isoformat_payload_datetime(payload.get("created_at")),
+    }
+
+
+def _isoformat_payload_datetime(value: Any) -> str:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
 
 
 async def _build_top_risk_factors(latest_analysis_results: list[Any]) -> list[dict[str, Any]]:

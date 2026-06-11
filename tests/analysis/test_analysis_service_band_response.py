@@ -60,6 +60,76 @@ def test_analysis_result_response_extracts_service_band_from_snapshot() -> None:
     AnalysisResultResponse.model_validate(payload)
 
 
+def test_analysis_result_response_extracts_x2_fields_from_snapshot_final_outputs() -> None:
+    result = _analysis_result(analysis_mode=AnalysisMode.PRECISION, model_name="x2_rule")
+    snapshot = SimpleNamespace(
+        input_payload={
+            "selected_exam_report_id": 9001,
+            "x2_measurement_source": "exam_measurements",
+        },
+        output_payload={
+            "final_outputs": {
+                "result_source": "X2_RULE",
+                "x2_stage_code": "HTN_STAGE_1",
+                "x2_stage_label": "고혈압 1단계 범위",
+                "x2_available": True,
+                "x2_missing_fields": [],
+            }
+        },
+        model_payload={
+            "x2_rule": {
+                "result_source": "BASIC_FALLBACK",
+                "x2_stage_code": "FALLBACK_SHOULD_NOT_WIN",
+                "x2_stage_label": "fallback",
+                "x2_available": False,
+                "x2_missing_fields": ["fallback"],
+            }
+        },
+    )
+
+    payload = analysis_service._analysis_result_response(result, snapshot)
+
+    assert payload["result_source"] == "X2_RULE"
+    assert payload["x2_stage_code"] == "HTN_STAGE_1"
+    assert payload["x2_stage_label"] == "고혈압 1단계 범위"
+    assert payload["x2_available"] is True
+    assert payload["x2_missing_fields"] == []
+    assert payload["selected_exam_report_id"] == 9001
+    assert payload["x2_measurement_source"] == "exam_measurements"
+    AnalysisResultResponse.model_validate(payload)
+
+
+def test_analysis_result_response_falls_back_to_model_payload_x2_rule() -> None:
+    result = _analysis_result(analysis_mode=AnalysisMode.PRECISION)
+    snapshot = SimpleNamespace(
+        input_payload={
+            "selected_exam_report_id": "9002",
+            "x2_measurement_source": "health_record_fallback",
+        },
+        output_payload={"final_outputs": {}},
+        model_payload={
+            "x2_rule": {
+                "result_source": "BASIC_FALLBACK",
+                "x2_stage_code": None,
+                "x2_stage_label": None,
+                "x2_available": False,
+                "x2_missing_fields": ["ldl_cholesterol"],
+            }
+        },
+    )
+
+    payload = analysis_service._analysis_result_response(result, snapshot)
+
+    assert payload["result_source"] == "BASIC_FALLBACK"
+    assert payload["x2_stage_code"] is None
+    assert payload["x2_stage_label"] is None
+    assert payload["x2_available"] is False
+    assert payload["x2_missing_fields"] == ["ldl_cholesterol"]
+    assert payload["selected_exam_report_id"] == 9002
+    assert payload["x2_measurement_source"] == "health_record_fallback"
+    AnalysisResultResponse.model_validate(payload)
+
+
 def test_analysis_result_response_allows_legacy_result_without_service_band() -> None:
     payload = analysis_service._analysis_result_response(_analysis_result(), None)
 
@@ -68,6 +138,13 @@ def test_analysis_result_response_allows_legacy_result_without_service_band() ->
     assert payload["service_band_label"] == "주의"
     assert payload["service_band_percent"] == 65
     assert payload["legacy_risk_level"] is None
+    assert payload["result_source"] is None
+    assert payload["x2_stage_code"] is None
+    assert payload["x2_stage_label"] is None
+    assert payload["x2_available"] is None
+    assert payload["x2_missing_fields"] is None
+    assert payload["selected_exam_report_id"] is None
+    assert payload["x2_measurement_source"] is None
     AnalysisResultResponse.model_validate(payload)
 
 
