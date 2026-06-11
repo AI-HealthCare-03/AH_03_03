@@ -45,10 +45,11 @@ cp envs/example.local.env .env
 주의:
 
 - `.env`와 secret은 절대 commit하지 않습니다.
+- `prod.env`도 절대 commit하지 않습니다.
 - 실제 OpenAI key, SMTP password, Langfuse secret, Firebase service account 값은 README나 PR에 넣지 않습니다.
 - secret 예시는 `<OPENAI_API_KEY>`, `<SMTP_PASSWORD>`처럼 placeholder로만 작성합니다.
 - `docker compose config` 전체 출력은 secret이 펼쳐질 수 있으므로 문서/화면공유에 사용하지 마세요.
-- 운영 배포용 `.env.prod`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
+- 운영 배포용 `prod.env`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
 
 최소 dev 예시:
 
@@ -107,7 +108,7 @@ make dev-down
 
 - 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용입니다.
 - 팀원/시연 표준 실행은 반드시 `infra/docker/docker-compose.dev.yml`을 사용합니다.
-- `make dev-up`은 내부적으로 `docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build`를 실행합니다.
+- Docker Compose 직접 명령 대신 README의 `make dev-*`, `make prod-*` 명령을 사용하세요.
 - `docker compose up -d`만 단독 실행하지 마세요. 의도와 다른 루트 compose가 실행될 수 있습니다.
 - `docker rm -f redis postgres fastapi ai-worker nginx` 방식으로 컨테이너를 직접 지우지 마세요.
 - `down -v`는 DB volume을 삭제할 수 있으므로 시연/협업 중 사용하지 마세요.
@@ -159,9 +160,27 @@ make dev-ps
 make dev-logs
 ```
 
+백엔드/AI Worker 코드나 env를 수정한 뒤 빠르게 반영:
+
+```bash
+make dev-rebuild-api
+```
+
+Nginx 502 또는 upstream 캐시가 꼬였을 때 복구:
+
+```bash
+make dev-restart-nginx
+```
+
+dev compose 설정 검증:
+
+```bash
+make dev-config-check
+```
+
 ## Prod Image / EC2 배포 준비
 
-운영 compose는 EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.env.prod` 같은 배포 환경 파일로 주입합니다. 실제 `.env.prod`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
+운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
 
 기본 이미지 tag:
 
@@ -180,6 +199,17 @@ docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Arch
 ```
 
 기대값은 `linux/amd64`입니다. Apple Silicon 로컬에서도 EC2 Ubuntu 배포 이미지는 `make image-build-check`의 buildx `linux/amd64` 기준으로 확인합니다.
+
+운영 배포 env 준비와 실행:
+
+```bash
+cp envs/example.prod.env prod.env
+# prod.env 실제 운영값 수정
+make prod-pull
+make prod-up
+make prod-ps
+make prod-logs
+```
 
 상세 절차는 `docs/deployment/ec2_prod_env.md`와 `docs/ops/docker_stacks.md`를 참고하세요.
 
@@ -210,7 +240,7 @@ FastAPI 요청
 → ai-worker가 SMTP 발송
 ```
 
-따라서 실제 이메일 발송을 켜려면 SMTP 환경변수가 `fastapi`와 `ai-worker` 양쪽에 전달되어야 합니다. dev stack을 실행할 때는 반드시 아래처럼 `--env-file .env`를 붙이세요.
+따라서 실제 이메일 발송을 켜려면 SMTP 환경변수가 `fastapi`와 `ai-worker` 양쪽에 전달되어야 합니다. 표준 dev stack은 `make dev-up`으로 실행합니다.
 
 ```bash
 make dev-up

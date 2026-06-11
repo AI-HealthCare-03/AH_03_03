@@ -17,6 +17,7 @@ wheels/
 .venv
 .*.env
 .env
+prod.env
 *.env
 .env.local
 *.env.local

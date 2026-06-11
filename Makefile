@@ -1,5 +1,5 @@
 DEV_ENV ?= .env
-PROD_ENV ?= .env.prod
+PROD_ENV ?= prod.env
 DEV_COMPOSE = docker compose --env-file $(DEV_ENV) -f infra/docker/docker-compose.dev.yml
 PROD_COMPOSE = docker compose --env-file $(PROD_ENV) -f infra/docker/docker-compose.prod.yml
 COMPOSE_DEV = $(DEV_COMPOSE)

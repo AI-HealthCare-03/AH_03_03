@@ -22,7 +22,7 @@
 운영 서버에서는 예시 파일을 복사해서 별도 파일로 관리합니다.
 
 ```bash
-cp envs/example.prod.env .env.prod
+cp envs/example.prod.env prod.env
 ```
 
 반드시 운영자가 교체해야 하는 주요 항목:
@@ -166,7 +166,7 @@ S3_PREFIX=ai-health/
 S3_PRESIGNED_URL_EXPIRES_SECONDS=3600
 ```
 
-S3 object는 private 전제로 사용합니다. EC2에는 S3 접근 권한을 가진 IAM Role을 붙이고, AWS access key/secret을 `.env.prod`에 넣지 않는 구성을 우선합니다.
+S3 object는 private 전제로 사용합니다. EC2에는 S3 접근 권한을 가진 IAM Role을 붙이고, AWS access key/secret을 `prod.env`에 넣지 않는 구성을 우선합니다.
 
 ### Local storage
 
@@ -234,13 +234,13 @@ REDIS_PORT=6379
 
 ```bash
 NGINX_CONF=../nginx/prod_http.conf \
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
 ```
 
 certbot webroot 발급 예시:
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml run --rm certbot \
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml run --rm certbot \
   certonly --webroot -w /var/www/certbot \
   -d your-domain.example \
   --email admin@example.com \
@@ -248,12 +248,12 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml run 
   --no-eff-email
 ```
 
-인증서 발급 후 `.env.prod`의 `NGINX_CONF=../nginx/prod_https.conf`를 확인하고 Nginx를 재시작합니다.
+인증서 발급 후 `prod.env`의 `NGINX_CONF=../nginx/prod_https.conf`를 확인하고 Nginx를 재시작합니다.
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d nginx
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec nginx nginx -s reload
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -s reload
 ```
 
 ### Security headers
@@ -278,7 +278,7 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 docker network create ai-health-shared || true
 ```
 
-EC2에서는 `envs/example.prod.env`를 복사한 `.env.prod`를 준비하고, 실제 운영 값은 `.env.prod`에만 채운다. 최초 IP/HTTP 확인 또는 Let's Encrypt 인증서 발급 전에는 HTTPS 설정 대신 HTTP bootstrap 설정을 사용한다.
+EC2에서는 `envs/example.prod.env`를 복사한 `prod.env`를 준비하고, 실제 운영 값은 `prod.env`에만 채운다. 최초 IP/HTTP 확인 또는 Let's Encrypt 인증서 발급 전에는 HTTPS 설정 대신 HTTP bootstrap 설정을 사용한다.
 
 ```env
 NGINX_CONF=../nginx/prod_http.conf
@@ -287,8 +287,8 @@ NGINX_CONF=../nginx/prod_http.conf
 이미지를 pull하고 컨테이너를 실행한다.
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml pull
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
 `REFRESH_TOKEN_COOKIE_SECURE=true` 상태에서는 HTTP/IP 접속 smoke test에서 refresh cookie 기반 로그인 유지가 제한될 수 있다. 이 값은 HTTPS/도메인 운영 기준으로는 true를 유지해야 하며, HTTP 임시 테스트에서만 쿠키 동작 제약을 감안한다.
@@ -296,14 +296,14 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -
 마이그레이션:
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec fastapi \
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec fastapi \
   uv run --no-sync aerich upgrade
 ```
 
 챌린지 seed가 필요한 초기 환경:
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec fastapi \
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec fastapi \
   uv run --no-sync python scripts/seed_mvp_challenges.py
 ```
 
@@ -311,10 +311,10 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 
 ```bash
 curl -fsS http://localhost/api/v1/system/health
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml ps
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml ps
 ```
 
-도메인 DNS, 인증서, Nginx HTTPS 설정이 준비되면 `.env.prod`를 HTTPS 설정으로 전환한다.
+도메인 DNS, 인증서, Nginx HTTPS 설정이 준비되면 `prod.env`를 HTTPS 설정으로 전환한다.
 
 ```env
 NGINX_CONF=../nginx/prod_https.conf
@@ -323,8 +323,8 @@ NGINX_CONF=../nginx/prod_https.conf
 이후 Nginx 설정을 재적용하고 외부 HTTPS health check를 확인한다.
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d nginx
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
 curl -fsS https://your-domain.example/api/v1/system/health
 ```
 
@@ -341,22 +341,22 @@ EC2 내부 postgres 컨테이너를 사용하므로 EC2 인스턴스 종료, EBS
 
 기본값:
 
-- env file: `.env.prod`
+- env file: `prod.env`
 - compose file: `infra/docker/docker-compose.prod.yml`
 - backup dir: `var/backups/postgres/`
 
 다른 경로를 쓰는 경우:
 
 ```bash
-ENV_FILE=/home/ubuntu/app/.env.prod BACKUP_DIR=/home/ubuntu/backups ./scripts/ops/backup_postgres.sh
-ENV_FILE=/home/ubuntu/app/.env.prod ./scripts/ops/restore_postgres.sh /home/ubuntu/backups/backup.sql
+ENV_FILE=/home/ubuntu/app/prod.env BACKUP_DIR=/home/ubuntu/backups ./scripts/ops/backup_postgres.sh
+ENV_FILE=/home/ubuntu/app/prod.env ./scripts/ops/restore_postgres.sh /home/ubuntu/backups/backup.sql
 ```
 
 직접 백업 명령:
 
 ```bash
 mkdir -p var/backups/postgres
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec -T postgres \
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec -T postgres \
   sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   > var/backups/postgres/ai_health_$(date +%Y%m%d_%H%M%S).sql
 ```
@@ -364,7 +364,7 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 직접 복구 명령:
 
 ```bash
-cat var/backups/postgres/backup.sql | docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec -T postgres \
+cat var/backups/postgres/backup.sql | docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec -T postgres \
   sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
@@ -389,11 +389,11 @@ PUBLIC_BASE_URL=https://your-domain.example ./scripts/ops/check_prod_health.sh
 수동 확인:
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml ps
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml ps
 curl -fsS http://localhost/api/v1/system/health
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec postgres \
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec postgres \
   sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec redis redis-cli ping
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec redis redis-cli ping
 ```
 
 외부 도메인을 연결한 뒤에는 다음도 확인합니다.
@@ -407,19 +407,19 @@ curl -fsS https://your-domain.example/api/v1/system/health
 서비스별 로그:
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs --tail=100 fastapi
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs --tail=100 postgres
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs --tail=100 redis
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 fastapi
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 postgres
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 redis
 ```
 
 실시간 추적:
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs -f fastapi
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs -f ai-worker
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs -f nginx
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs -f fastapi
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs -f ai-worker
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs -f nginx
 ```
 
 장애 상황별 첫 확인 위치:
@@ -428,7 +428,7 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml logs
 - 프론트 접속 불가: `nginx` 로그, `frontend` 컨테이너 상태, 80/443 보안 그룹, 인증서 경로
 - OCR/식단/분석 job 멈춤: `ai-worker` 로그, `redis` ping, Redis Stream pending/DLQ 상태
 - Redis Stream 처리 지연: `ai-worker` 로그와 `redis` 로그를 함께 확인
-- DB 연결 실패: `postgres` 로그, `pg_isready`, `.env.prod`의 `DB_HOST=postgres` 확인
+- DB 연결 실패: `postgres` 로그, `pg_isready`, `prod.env`의 `DB_HOST=postgres` 확인
 - S3 업로드 실패: `fastapi` 또는 `ai-worker` 로그, `STORAGE_BACKEND=s3`, `S3_BUCKET_NAME`, EC2 IAM Role 권한 확인
 
 ## EC2 보안 그룹 포트
@@ -461,7 +461,7 @@ cd frontend && npm run build && cd ..
 prod compose config 렌더링도 확인합니다. 출력에 secret 원문이 포함될 수 있으므로 공유하거나 PR에 붙이지 않습니다.
 
 ```bash
-docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml config
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml config
 ```
 
 ## 운영 체크 포인트
