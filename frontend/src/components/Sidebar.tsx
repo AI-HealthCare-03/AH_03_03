@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
+import { HouseHeart, HeartPulse, ChartBar, FileText, Pill, Salad, Trophy, BotMessageSquare, User, Settings, MessageCircleQuestionMark, Shield } from "lucide-react";
 
 import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
 
 export type SidebarLink = {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   to: string;
 };
@@ -18,27 +19,27 @@ export const sidebarSections: SidebarSection[] = [
   {
     title: "핵심 기능",
     links: [
-      { to: "/", icon: "🏠", label: "홈" },
-      { to: "/health", icon: "🧭", label: "건강 분석" },
-      { to: "/dashboard", icon: "📊", label: "건강 리포트" },
+      { to: "/", icon: <HouseHeart size={20} />, label: "홈" },
+      { to: "/health", icon: <HeartPulse size={20} />, label: "건강 분석" },
+      { to: "/dashboard", icon: <ChartBar size={20} />, label: "건강 리포트" },
     ],
   },
   {
     title: "기록/관리",
     links: [
-      { to: "/ocr", icon: "📄", label: "검진·복약 등록" },
-      { to: "/medications", icon: "💊", label: "복약/영양제" },
-      { to: "/diets", icon: "🥗", label: "식단 분석" },
-      { to: "/challenges", icon: "✅", label: "챌린지" },
-      { to: "/chatbot", icon: "🤖", label: "AI 건강 상담" },
+      { to: "/ocr", icon: <FileText size={20} />, label: "검진·복약 등록" },
+      { to: "/medications", icon: <Pill size={20} />, label: "복약/영양제" },
+      { to: "/diets", icon: <Salad size={20} />, label: "식단 분석" },
+      { to: "/challenges", icon: <Trophy size={20} />, label: "챌린지" },
+      { to: "/chatbot", icon: <BotMessageSquare size={20} />, label: "AI 건강 상담" },
     ],
   },
   {
     title: "계정/지원",
     links: [
-      { to: "/mypage", icon: "👤", label: "마이페이지" },
-      { to: "/settings", icon: "⚙️", label: "설정" },
-      { to: "/inquiries", icon: "💬", label: "문의/FAQ" },
+      { to: "/mypage", icon: <User size={20} />, label: "마이페이지" },
+      { to: "/settings", icon: <Settings size={20} />, label: "설정" },
+      { to: "/inquiries", icon: <MessageCircleQuestionMark size={20} />, label: "문의/FAQ" },
     ],
   },
 ];
@@ -68,7 +69,7 @@ export default function Sidebar() {
       {showAdminLink && (
         <NavLink aria-label="관리자 콘솔" className={getLinkClass} title="관리자 콘솔" to="/admin">
           <span aria-hidden="true" className="sidebar-active-indicator" />
-          <span className="sidebar-link-icon">🛡️</span>
+          <span className="sidebar-link-icon"><Shield size={20} /></span>
           <span className="sidebar-link-label">관리자 콘솔</span>
         </NavLink>
       )}

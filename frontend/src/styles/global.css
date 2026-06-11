@@ -438,7 +438,7 @@ pre {
   gap: 0;
   height: 48px;
   justify-content: center;
-  margin: 0 auto;
+  margin: 0 auto 4px;
   min-height: 48px;
   padding: 0;
   position: relative;
@@ -461,7 +461,7 @@ pre {
   align-self: stretch;
   gap: 12px;
   justify-content: flex-start;
-  margin: 0;
+  margin: 0 0 4px;
   padding: 0 14px;
   width: calc(100% - 4px);
 }
