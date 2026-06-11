@@ -3992,7 +3992,7 @@ pre {
   }
 
   .main-dashboard-hero {
-    align-items: flex-start;
+    align-items: center;
     flex-direction: column;
   }
 
