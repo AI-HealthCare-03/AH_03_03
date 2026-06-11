@@ -162,7 +162,6 @@ export default function DietPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
-  const [analysisImagePreviewFailed, setAnalysisImagePreviewFailed] = useState(false);
   const [detectedFoodsImagePreviewFailed, setDetectedFoodsImagePreviewFailed] = useState(false);
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
@@ -250,7 +249,6 @@ export default function DietPage() {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setImagePreviewMessage("");
-    setAnalysisImagePreviewFailed(false);
     setDetectedFoodsImagePreviewFailed(false);
     if (!file) {
       setSelectedImageFile(null);
@@ -284,7 +282,6 @@ export default function DietPage() {
     }
     setSelectedImageFile(null);
     setSelectedImagePreviewUrl("");
-    setAnalysisImagePreviewFailed(false);
     setDetectedFoodsImagePreviewFailed(false);
     setImagePreviewMessage("");
   };
@@ -334,17 +331,18 @@ export default function DietPage() {
     setError("");
     setMessage("");
     setFeedbackDialog(null);
+    if (!selectedImageFile) {
+      setFeedbackDialog({
+        title: "이미지를 선택해 주세요",
+        message: "식단 분석을 진행하려면 먼저 식단 사진을 업로드해 주세요.",
+      });
+      return;
+    }
     setAnalysisResult(null);
     setCanRetryAnalysis(false);
     setIsAnalyzing(true);
     try {
-      const payload = selectedImageFile
-        ? buildDietAnalysisFormData(selectedImageFile, analysisDescription)
-        : {
-            description: analysisDescription || "기록된 식단",
-            meal_time: new Date().toISOString(),
-            image_path: null,
-          };
+      const payload = buildDietAnalysisFormData(selectedImageFile, analysisDescription);
       const job = await analyzeDiet(payload);
       setMessage("");
       setAnalysisJobId(job.id);
@@ -617,17 +615,6 @@ export default function DietPage() {
               <strong>{String(analysisResult.diet_score ?? "-")}</strong>
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
-            {selectedImagePreviewUrl && !analysisImagePreviewFailed && (
-              <div className="mini-card">
-                <span className="muted">업로드한 식단 사진</span>
-                <img
-                  alt="업로드한 식단 사진"
-                  className="upload-preview"
-                  onError={() => setAnalysisImagePreviewFailed(true)}
-                  src={selectedImagePreviewUrl}
-                />
-              </div>
-            )}
             <div className="mini-card">
               {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
                 <img

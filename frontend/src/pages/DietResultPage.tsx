@@ -94,6 +94,7 @@ function candidateFoodName(food: DietCandidateFood): string {
 }
 
 function publicImageUrlFromPayloads(...payloads: Array<Record<string, unknown> | null | undefined>): string {
+  // `image_path` is currently an original filename, not a browser-accessible URL.
   const urlKeys = ["image_url", "file_url", "stored_file_url", "original_image_url"];
   for (const payload of payloads) {
     const record = asRecord(payload);
