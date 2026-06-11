@@ -378,7 +378,7 @@ export default function HealthRecordPage() {
         <div className="state-box">
           직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.
           <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
-          <div className="button-row" style={{ marginTop: 12 }}>
+          <div className="button-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
             <Link className="button secondary" to="/ocr/exam">
               검진표로 입력
             </Link>
@@ -415,7 +415,7 @@ export default function HealthRecordPage() {
               </div>
             </div>
           )}
-          <div className="button-row">
+          <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button className="secondary" onClick={() => navigate(-1)} type="button">
               이전
             </button>
@@ -511,7 +511,7 @@ export default function HealthRecordPage() {
                 </div>
               </div>
               {Boolean(record.id) && (
-                <div className="button-row">
+                <div className="button-row" style={{ justifyContent: "flex-end" }}>
                   <button
                     className="danger-ghost"
                     disabled={isDeleting}
