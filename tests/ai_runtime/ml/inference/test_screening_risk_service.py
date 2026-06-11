@@ -16,17 +16,21 @@ from ai_runtime.ml.inference.screening_risk_service import (
 
 
 @pytest.mark.parametrize(
-    ("base_high", "screening_high", "expected_band", "expected_label", "expected_percent", "expected_legacy"),
+    ("base_risk_level", "screening_high", "expected_band", "expected_label", "expected_percent", "expected_legacy"),
     [
-        (False, False, ServiceBand.LOW, "낮음", 25, "LOW"),
-        (True, False, ServiceBand.ATTENTION, "관심 필요", 45, "ATTENTION"),
-        (False, True, ServiceBand.CAUTION, "주의", 65, "CAUTION"),
-        (True, True, ServiceBand.HIGH_CAUTION, "높은 주의", 80, "HIGH_CAUTION"),
+        ("LOW", False, ServiceBand.LOW, "낮음", 25, "LOW"),
+        ("LOW", True, ServiceBand.CAUTION, "주의", 65, "CAUTION"),
+        ("ATTENTION", False, ServiceBand.ATTENTION, "관심 필요", 45, "ATTENTION"),
+        ("ATTENTION", True, ServiceBand.CAUTION, "주의", 65, "CAUTION"),
+        ("CAUTION", False, ServiceBand.CAUTION, "주의", 65, "CAUTION"),
+        ("CAUTION", True, ServiceBand.CAUTION, "주의", 65, "CAUTION"),
+        ("HIGH_CAUTION", False, ServiceBand.HIGH_CAUTION, "높은 주의", 80, "HIGH_CAUTION"),
+        ("HIGH_CAUTION", True, ServiceBand.HIGH_CAUTION, "높은 주의", 80, "HIGH_CAUTION"),
     ],
 )
 def test_predict_screening_dual_stage_risk_policy_combinations(
     monkeypatch: pytest.MonkeyPatch,
-    base_high: bool,
+    base_risk_level: str,
     screening_high: bool,
     expected_band: ServiceBand,
     expected_label: str,
@@ -38,11 +42,12 @@ def test_predict_screening_dual_stage_risk_policy_combinations(
     result = predict_screening_dual_stage_risk(
         disease_code="HTN",
         features={"나이": 55},
-        base_high=base_high,
+        base_risk_level=base_risk_level,
     )
 
     assert result.disease_code == "HTN"
-    assert result.base_high is base_high
+    assert result.base_risk_level == base_risk_level
+    assert result.base_high is (base_risk_level != "LOW")
     assert result.screening_high is screening_high
     assert result.risk_level == expected_legacy
     assert result.service_band == expected_band
@@ -53,20 +58,21 @@ def test_predict_screening_dual_stage_risk_policy_combinations(
 
 
 @pytest.mark.parametrize(
-    ("base_risk_level", "expected_base_high", "expected_legacy"),
+    ("base_risk_level", "expected_base_high", "expected_base_caution_or_above", "expected_legacy"),
     [
-        ("LOW", False, "LOW"),
-        ("ATTENTION", True, "ATTENTION"),
-        ("CAUTION", True, "ATTENTION"),
-        ("HIGH_CAUTION", True, "ATTENTION"),
-        ("MEDIUM", True, "ATTENTION"),
-        ("HIGH", True, "ATTENTION"),
+        ("LOW", False, False, "LOW"),
+        ("ATTENTION", True, False, "ATTENTION"),
+        ("CAUTION", True, True, "CAUTION"),
+        ("HIGH_CAUTION", True, True, "HIGH_CAUTION"),
+        ("MEDIUM", True, True, "CAUTION"),
+        ("HIGH", True, True, "HIGH_CAUTION"),
     ],
 )
 def test_base_risk_level_to_base_high_conversion(
     monkeypatch: pytest.MonkeyPatch,
     base_risk_level: str,
     expected_base_high: bool,
+    expected_base_caution_or_above: bool,
     expected_legacy: str,
 ) -> None:
     _patch_screening_prediction(monkeypatch, screening_high=False)
@@ -78,8 +84,36 @@ def test_base_risk_level_to_base_high_conversion(
     )
 
     assert result.base_high is expected_base_high
+    assert result.base_caution_or_above is expected_base_caution_or_above
     assert result.risk_level == expected_legacy
     assert result.legacy_risk_level == expected_legacy
+
+
+@pytest.mark.parametrize(
+    ("base_high", "screening_high", "expected_risk_level"),
+    [
+        (False, False, "LOW"),
+        (False, True, "CAUTION"),
+        (True, False, "CAUTION"),
+        (True, True, "CAUTION"),
+    ],
+)
+def test_legacy_base_high_argument_maps_true_to_caution(
+    monkeypatch: pytest.MonkeyPatch,
+    base_high: bool,
+    screening_high: bool,
+    expected_risk_level: str,
+) -> None:
+    _patch_screening_prediction(monkeypatch, screening_high=screening_high)
+
+    result = predict_screening_dual_stage_risk(
+        disease_code="HTN",
+        features={},
+        base_high=base_high,
+    )
+
+    assert result.base_high is base_high
+    assert result.risk_level == expected_risk_level
 
 
 @pytest.mark.parametrize("disease_code", ["HTN", "DM", "DL"])

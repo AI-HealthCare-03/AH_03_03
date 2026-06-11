@@ -7,12 +7,13 @@ from typing import Any
 from ai_runtime.ml.inference import screening_predictor
 from ai_runtime.ml.inference.dual_stage_policy import (
     ServiceBand,
+    coerce_service_band,
     resolve_dual_stage_result,
 )
 
 SUPPORTED_SCREENING_RISK_DISEASES = frozenset({"HTN", "DM", "DL"})
-BASE_HIGH_RISK_LEVELS = frozenset({"ATTENTION", "CAUTION", "HIGH_CAUTION", "MEDIUM", "HIGH"})
-BASE_LOW_RISK_LEVELS = frozenset({"LOW"})
+BASE_NOT_LOW_RISK_LEVELS = frozenset({"ATTENTION", "CAUTION", "HIGH_CAUTION", "MEDIUM", "HIGH"})
+BASE_CAUTION_OR_ABOVE_RISK_LEVELS = frozenset({"CAUTION", "HIGH_CAUTION", "MEDIUM", "HIGH"})
 
 
 class ScreeningRiskServiceError(ValueError):
@@ -26,7 +27,9 @@ class UnsupportedScreeningRiskDiseaseError(ScreeningRiskServiceError):
 @dataclass(frozen=True)
 class ScreeningRiskResult:
     disease_code: str
+    base_risk_level: str
     base_high: bool
+    base_caution_or_above: bool
     screening_high: bool
     risk_level: str
     service_band: ServiceBand
@@ -55,16 +58,20 @@ def predict_screening_dual_stage_risk(
     DTOs should expose the 4-step service band label and percent instead.
     """
     normalized_disease_code = _normalize_disease_code(disease_code)
-    resolved_base_high = _resolve_base_high(base_risk_level=base_risk_level, base_high=base_high)
+    resolved_base_band = _resolve_base_band(base_risk_level=base_risk_level, base_high=base_high)
+    resolved_base_high = _is_base_not_low(resolved_base_band)
+    resolved_base_caution_or_above = _is_base_caution_or_above(resolved_base_band)
     screening_result = screening_predictor.predict_screening_risk(normalized_disease_code, features)
     policy_result = resolve_dual_stage_result(
-        base_high=resolved_base_high,
+        base_risk_level=resolved_base_band,
         screening_high=screening_result.screening_high,
     )
 
     return ScreeningRiskResult(
         disease_code=normalized_disease_code,
+        base_risk_level=resolved_base_band.value,
         base_high=resolved_base_high,
+        base_caution_or_above=resolved_base_caution_or_above,
         screening_high=screening_result.screening_high,
         risk_level=policy_result.risk_level,
         service_band=policy_result.service_band,
@@ -87,15 +94,21 @@ def _normalize_disease_code(disease_code: str) -> str:
     return normalized
 
 
-def _resolve_base_high(*, base_risk_level: str | None, base_high: bool | None) -> bool:
-    if base_high is not None:
-        return base_high
-    if base_risk_level is None:
-        raise ScreeningRiskServiceError("base_high or base_risk_level is required")
+def _resolve_base_band(*, base_risk_level: str | None, base_high: bool | None) -> ServiceBand:
+    if base_risk_level is not None:
+        try:
+            return coerce_service_band(base_risk_level)
+        except ValueError as exc:
+            raise ScreeningRiskServiceError(f"unsupported base_risk_level={base_risk_level!r}") from exc
 
-    normalized_risk_level = base_risk_level.upper()
-    if normalized_risk_level in BASE_HIGH_RISK_LEVELS:
-        return True
-    if normalized_risk_level in BASE_LOW_RISK_LEVELS:
-        return False
-    raise ScreeningRiskServiceError(f"unsupported base_risk_level={base_risk_level!r}")
+    if base_high is not None:
+        return ServiceBand.CAUTION if base_high else ServiceBand.LOW
+    raise ScreeningRiskServiceError("base_high or base_risk_level is required")
+
+
+def _is_base_not_low(base_band: ServiceBand) -> bool:
+    return base_band.value in BASE_NOT_LOW_RISK_LEVELS
+
+
+def _is_base_caution_or_above(base_band: ServiceBand) -> bool:
+    return base_band.value in BASE_CAUTION_OR_ABOVE_RISK_LEVELS

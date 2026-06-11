@@ -35,26 +35,26 @@ class DualStagePolicyResult:
     legacy_risk_level: str | None = None
 
 
-def resolve_dual_stage_band(base_high: bool, screening_high: bool) -> ServiceBand:
-    """Resolve X1 base rule and screening signal into a conservative service band.
+def resolve_dual_stage_band(base_risk_level: ServiceBand | str, screening_high: bool) -> ServiceBand:
+    """Resolve X1 base result and screening signal into a promotion-limited band.
 
-    The screening model is an auxiliary signal, not a gate. A high base result
-    must never be downgraded to LOW just because screening is low. Real-data
-    comparison showed the screening-high group had higher label-positive rates,
-    so screening-high/base-low is promoted to CAUTION while base-high/screening-low
-    remains ATTENTION.
+    The screening model is an auxiliary signal, not a gate. It may promote
+    LOW/ATTENTION up to CAUTION, but it must not promote CAUTION to
+    HIGH_CAUTION by itself. HIGH_CAUTION is reserved for base score/rule results
+    that are already high.
     """
-    if base_high and screening_high:
+    base_band = coerce_service_band(base_risk_level)
+    if base_band == ServiceBand.HIGH_CAUTION:
         return ServiceBand.HIGH_CAUTION
-    if base_high and not screening_high:
-        return ServiceBand.ATTENTION
-    if not base_high and screening_high:
+    if base_band == ServiceBand.CAUTION:
         return ServiceBand.CAUTION
-    return ServiceBand.LOW
+    if screening_high:
+        return ServiceBand.CAUTION
+    return base_band
 
 
-def resolve_dual_stage_result(base_high: bool, screening_high: bool) -> DualStagePolicyResult:
-    service_band = resolve_dual_stage_band(base_high=base_high, screening_high=screening_high)
+def resolve_dual_stage_result(base_risk_level: ServiceBand | str, screening_high: bool) -> DualStagePolicyResult:
+    service_band = resolve_dual_stage_band(base_risk_level=base_risk_level, screening_high=screening_high)
     return DualStagePolicyResult(
         risk_level=service_band.value,
         service_band=service_band,
@@ -62,6 +62,15 @@ def resolve_dual_stage_result(base_high: bool, screening_high: bool) -> DualStag
         service_band_percent=get_service_band_percent(service_band),
         legacy_risk_level=to_legacy_risk_level(service_band),
     )
+
+
+def coerce_service_band(base_risk_level: ServiceBand | str) -> ServiceBand:
+    normalized = str(base_risk_level).upper()
+    if normalized == "MEDIUM":
+        return ServiceBand.CAUTION
+    if normalized == "HIGH":
+        return ServiceBand.HIGH_CAUTION
+    return ServiceBand(normalized)
 
 
 def get_service_band_label(service_band: ServiceBand) -> str:

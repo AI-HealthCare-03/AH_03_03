@@ -303,8 +303,9 @@ def _predict_basic_screening_dual_stage(
     return {
         "status": "applied",
         "disease_code": result.disease_code,
-        "base_risk_level": base_risk_level.value,
+        "base_risk_level": result.base_risk_level,
         "base_high": result.base_high,
+        "base_caution_or_above": result.base_caution_or_above,
         "screening_high": result.screening_high,
         "risk_level": result.risk_level,
         "service_band": result.service_band.value,

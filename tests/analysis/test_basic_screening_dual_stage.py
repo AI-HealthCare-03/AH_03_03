@@ -7,6 +7,8 @@ from typing import Any
 
 import pytest
 
+from ai_runtime.ml.inference import screening_risk_service
+from ai_runtime.ml.inference.screening_predictor import ScreeningPrediction
 from app.models.analysis import AnalysisMode, AnalysisType, RiskLevel
 from app.services import analysis as analysis_service
 
@@ -178,6 +180,55 @@ def test_screening_dual_stage_does_not_apply_to_non_target_disease() -> None:
     )
 
     assert result is None
+
+
+def test_caution_base_score_with_screening_high_keeps_caution(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        analysis_service,
+        "load_screening_artifact",
+        lambda disease_code: SimpleNamespace(feature_columns=["나이", "BMI"]),
+    )
+
+    def fake_predict_screening_risk(disease_code: str, features: dict[str, Any]) -> ScreeningPrediction:
+        assert disease_code == "HTN"
+        assert "나이" in features
+        assert "BMI" in features
+        return ScreeningPrediction(
+            disease_code=disease_code,
+            probability=0.9,
+            threshold=0.45,
+            screening_high=True,
+            missing_features=[],
+            neutralized_features=[],
+            model_count=5,
+        )
+
+    monkeypatch.setattr(
+        screening_risk_service.screening_predictor,
+        "predict_screening_risk",
+        fake_predict_screening_risk,
+    )
+
+    result = analysis_service._predict_basic_screening_dual_stage(
+        user=SimpleNamespace(id=7, birthday=date(1975, 1, 1), gender="MALE"),
+        health_record=_health_record(),
+        analysis_type=AnalysisType.HYPERTENSION,
+        base_risk_level=RiskLevel.CAUTION,
+        analysis_mode=AnalysisMode.BASIC,
+    )
+
+    assert result is not None
+    assert result["status"] == "applied"
+    assert result["base_risk_level"] == RiskLevel.CAUTION.value
+    assert result["base_high"] is True
+    assert result["base_caution_or_above"] is True
+    assert result["screening_high"] is True
+    assert result["risk_level"] == RiskLevel.CAUTION.value
+    assert result["service_band"] == RiskLevel.CAUTION.value
+    assert result["service_band_label"] == "주의"
+    assert result["service_band_percent"] == 65
+    assert "probability" not in result
+    assert "screening_probability" not in result
 
 
 def test_screening_fallback_snapshot_metadata_does_not_change_risk_level() -> None:
