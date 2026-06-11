@@ -43,6 +43,31 @@ export type AnalysisRunResponse = {
   factor_count: number;
 };
 
+export type AnalysisResultResponse = {
+  id: number;
+  analysis_type: string;
+  analysis_mode: AnalysisMode;
+  analyzed_at?: string | null;
+  created_at?: string | null;
+  async_job_id?: number | null;
+  risk_score?: string | number | null;
+  risk_level?: string | null;
+  service_band?: string | null;
+  service_band_label?: string | null;
+  service_band_percent?: number | null;
+  legacy_risk_level?: string | null;
+  result_source?: string | null;
+  x2_stage_code?: string | null;
+  x2_stage_label?: string | null;
+  x2_available?: boolean | null;
+  x2_missing_fields?: string[] | null;
+  selected_exam_report_id?: number | null;
+  x2_measurement_source?: string | null;
+  summary?: string | null;
+  guide_message?: string | null;
+  message?: string | null;
+};
+
 export async function getLatestAnalysisResults<T>(): Promise<T> {
   return apiRequest<T>("/analysis/results/latest");
 }

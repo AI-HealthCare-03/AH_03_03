@@ -13,8 +13,10 @@ import {
   getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
+  getLatestAnalysisMode,
   getLatestResultsByAnalysisType,
   isKnownAnalysisType,
+  mergeResultsWithExpectedAnalysisTypes,
 } from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
@@ -117,6 +119,51 @@ function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId:
     return explanation.summary;
   }
   return "분석 결과는 입력된 건강정보 기준의 참고 신호입니다. 상세 화면에서 주요 요인을 확인해보세요.";
+}
+
+function getResultTimestamp(result: AnalysisResult | null | undefined): number {
+  const candidates = [result?.analyzed_at, result?.created_at, result?.analyzedAt, result?.createdAt];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(String(candidate ?? ""));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+function getResultId(result: AnalysisResult | null | undefined): number {
+  const parsed = Number(result?.id);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getMostRecentAnalysisRunResults(items: AnalysisResult[]): AnalysisResult[] {
+  const latest = items.reduce<AnalysisResult | null>((current, item) => {
+    if (!current) {
+      return item;
+    }
+    const itemTimestamp = getResultTimestamp(item);
+    const currentTimestamp = getResultTimestamp(current);
+    if (itemTimestamp !== currentTimestamp) {
+      return itemTimestamp > currentTimestamp ? item : current;
+    }
+    return getResultId(item) > getResultId(current) ? item : current;
+  }, null);
+  if (!latest) {
+    return [];
+  }
+  const latestJobId = latest.async_job_id;
+  const latestMode = String(latest.analysis_mode ?? "");
+  const latestTimestamp = getResultTimestamp(latest);
+  return items.filter((item) => {
+    if (latestJobId !== undefined && latestJobId !== null && latestJobId !== "") {
+      return String(item.async_job_id ?? "") === String(latestJobId);
+    }
+    if (!latestTimestamp) {
+      return String(item.id ?? "") === String(latest.id ?? "");
+    }
+    return String(item.analysis_mode ?? "") === latestMode && Math.abs(getResultTimestamp(item) - latestTimestamp) <= 120000;
+  });
 }
 
 export default function AnalysisPage() {
@@ -243,8 +290,14 @@ export default function AnalysisPage() {
   };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
-  const latestDiseaseResults = getLatestResultsByAnalysisType(results.filter((result) => isKnownAnalysisType(result.analysis_type)));
-  const diseaseRiskItems: DiseaseRiskItem[] = latestDiseaseResults
+  const latestRunResults = getMostRecentAnalysisRunResults(results.filter((result) => isKnownAnalysisType(result.analysis_type)));
+  const latestDiseaseResults = getLatestResultsByAnalysisType(latestRunResults);
+  const displayMode = getLatestAnalysisMode(latestDiseaseResults);
+  const analysisSlots = latestDiseaseResults.length > 0 ? mergeResultsWithExpectedAnalysisTypes(latestDiseaseResults, displayMode) : [];
+  const availableDiseaseResults = analysisSlots
+    .filter((slot) => !slot.isUnavailable && slot.result)
+    .map((slot) => slot.result as AnalysisResult);
+  const diseaseRiskItems: DiseaseRiskItem[] = availableDiseaseResults
     .map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
@@ -332,13 +385,26 @@ export default function AnalysisPage() {
         <RiskStageBoard items={diseaseRiskItems} />
       </Card>
       <div className="metric-grid">
-        {latestDiseaseResults.map((result) => {
+        {analysisSlots.map((slot) => {
+          if (slot.isUnavailable || !slot.result) {
+            return (
+              <div className="metric-card card" key={slot.analysisType}>
+                <span>{slot.diseaseName} 관리 단계</span>
+                <strong>검진 수치 부족</strong>
+                <div className="button-row">
+                  <span className="badge badge-missing">판정 불가</span>
+                </div>
+                <p>{slot.unavailableReason}</p>
+              </div>
+            );
+          }
+          const result = slot.result;
           const explanation = explanationsByResultId[String(result.id)];
           const referenceSources = explanation?.reference_sources ?? [];
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
-              <span>{getAnalysisTypeLabel(result.analysis_type)} 관리 필요 단계</span>
+              <span>{slot.diseaseName} 관리 필요 단계</span>
               <strong>{getDisplayRiskLabel(result)}</strong>
               <div className="button-row">
                 <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
@@ -358,7 +424,7 @@ export default function AnalysisPage() {
             </div>
           );
         })}
-        {latestDiseaseResults.length === 0 && (
+        {analysisSlots.length === 0 && (
           <div className="metric-card card">
             <span>분석 결과 없음</span>
             <strong>-</strong>

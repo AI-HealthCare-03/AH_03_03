@@ -14,6 +14,7 @@ export type AnalysisSourceDisplaySource = {
 
 export type AnalysisResultLike = {
   analysis_type?: unknown;
+  analysis_mode?: unknown;
   analyzedAt?: unknown;
   analyzed_at?: unknown;
   createdAt?: unknown;
@@ -23,8 +24,22 @@ export type AnalysisResultLike = {
 };
 
 export type RiskStageKey = "LOW" | "ATTENTION" | "CAUTION" | "HIGH_CAUTION";
+export type AnalysisDisplayMode = "BASIC" | "PRECISION";
 
 export const riskStageOrder: RiskStageKey[] = ["LOW", "ATTENTION", "CAUTION", "HIGH_CAUTION"];
+export const basicAnalysisTypes = ["HYPERTENSION", "DIABETES", "DYSLIPIDEMIA", "OBESITY"] as const;
+export const precisionAnalysisTypes = [
+  "HYPERTENSION",
+  "DIABETES",
+  "DYSLIPIDEMIA",
+  "OBESITY",
+  "ABDOMINAL_OBESITY",
+  "FATTY_LIVER",
+  "ANEMIA",
+  "LIVER_FUNCTION",
+  "KIDNEY_FUNCTION",
+  "CHRONIC_KIDNEY_DISEASE",
+] as const;
 
 export const analysisTypeLabels: Record<string, string> = {
   HYPERTENSION: "고혈압",
@@ -77,6 +92,27 @@ const riskColors: Record<string, string> = {
 const analysisSourceLabels: Record<string, string> = {
   X2_RULE: "검진 수치 반영",
   BASIC_FALLBACK: "간편분석 유지",
+};
+
+const x2UnavailableReasons: Record<string, string> = {
+  HYPERTENSION: "혈압 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  DIABETES: "공복혈당 또는 당화혈색소 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  OBESITY: "BMI 또는 키/몸무게 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  ABDOMINAL_OBESITY: "허리둘레 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  FATTY_LIVER: "AST/ALT 등 간 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  ANEMIA: "혈색소 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  LIVER_FUNCTION: "AST/ALT/감마GTP 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  KIDNEY_FUNCTION: "요단백/크레아티닌/eGFR 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  CHRONIC_KIDNEY_DISEASE: "eGFR 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+};
+
+export type AnalysisDisplaySlot<T extends AnalysisResultLike> = {
+  analysisType: string;
+  diseaseName: string;
+  isUnavailable: boolean;
+  result: T | null;
+  unavailableReason: string | null;
 };
 
 function normalizeKey(value: unknown): string {
@@ -144,6 +180,49 @@ export function getLatestResultsByAnalysisType<T extends AnalysisResultLike>(ite
     }
   });
   return Array.from(latestByType.values()).map(({ item }) => item);
+}
+
+export function getExpectedAnalysisTypesByMode(mode: unknown): string[] {
+  return normalizeKey(mode) === "PRECISION" ? [...precisionAnalysisTypes] : [...basicAnalysisTypes];
+}
+
+export function getLatestAnalysisMode<T extends AnalysisResultLike>(
+  items: T[],
+  fallback: AnalysisDisplayMode = "BASIC",
+): AnalysisDisplayMode {
+  const latest = items.reduce<{ index: number; item: T } | null>((current, item, index) => {
+    if (!current || isNewerAnalysisItem(item, index, current.item, current.index)) {
+      return { index, item };
+    }
+    return current;
+  }, null);
+  return normalizeKey(latest?.item.analysis_mode) === "PRECISION" ? "PRECISION" : fallback;
+}
+
+export function getUnavailableAnalysisReason(analysisType: unknown, mode: unknown): string {
+  const key = normalizeKey(analysisType);
+  if (normalizeKey(mode) !== "PRECISION") {
+    return "이번 간편분석 결과에 포함되지 않았습니다.";
+  }
+  return x2UnavailableReasons[key] ?? "필요한 검진 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.";
+}
+
+export function mergeResultsWithExpectedAnalysisTypes<T extends AnalysisResultLike>(
+  items: T[],
+  mode: unknown,
+): AnalysisDisplaySlot<T>[] {
+  const latestResults = getLatestResultsByAnalysisType(items);
+  const latestByType = new Map(latestResults.map((item) => [normalizeKey(item.analysis_type), item]));
+  return getExpectedAnalysisTypesByMode(mode).map((analysisType) => {
+    const result = latestByType.get(analysisType) ?? null;
+    return {
+      analysisType,
+      diseaseName: getAnalysisTypeLabel(analysisType),
+      isUnavailable: result === null,
+      result,
+      unavailableReason: result === null ? getUnavailableAnalysisReason(analysisType, mode) : null,
+    };
+  });
 }
 
 export function getDisplayRiskBand(result: RiskDisplaySource | null | undefined): string {

@@ -9,10 +9,12 @@ import {
   getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
+  getExpectedAnalysisTypesByMode,
   getLatestResultsByAnalysisType,
   getRiskClassName,
   getX2StageSummary,
   isKnownAnalysisType,
+  mergeResultsWithExpectedAnalysisTypes,
 } from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
@@ -77,6 +79,43 @@ function formatBloodPressure(input: Record<string, unknown>): string {
   return `${String(systolic ?? "-")} / ${String(diastolic ?? "-")} mmHg`;
 }
 
+function getResultTimestamp(result: AnalysisResult | null | undefined): number {
+  const candidates = [result?.analyzed_at, result?.created_at, result?.analyzedAt, result?.createdAt];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(String(candidate ?? ""));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+function getRelatedAnalysisRunResults(target: AnalysisResult | null | undefined, allResults: AnalysisResult[]): AnalysisResult[] {
+  if (!target) {
+    return [];
+  }
+  const targetJobId = target.async_job_id;
+  const targetMode = String(target.analysis_mode ?? "");
+  const targetTimestamp = getResultTimestamp(target);
+  const related = [target, ...allResults].filter((result) => {
+    if (!isKnownAnalysisType(result.analysis_type)) {
+      return false;
+    }
+    if (targetJobId !== undefined && targetJobId !== null && targetJobId !== "") {
+      return String(result.async_job_id ?? "") === String(targetJobId);
+    }
+    if (!targetTimestamp) {
+      return String(result.id ?? "") === String(target.id ?? "");
+    }
+    return String(result.analysis_mode ?? "") === targetMode && Math.abs(getResultTimestamp(result) - targetTimestamp) <= 120000;
+  });
+  const deduped = new Map<string, AnalysisResult>();
+  related.forEach((result) => {
+    deduped.set(String(result.id ?? `${String(result.analysis_type)}-${getResultTimestamp(result)}`), result);
+  });
+  return Array.from(deduped.values());
+}
+
 export default function AnalysisHistoryPage() {
   const { analysisId } = useParams();
   const [results, setResults] = useState<AnalysisResult[]>([]);
@@ -127,7 +166,12 @@ export default function AnalysisHistoryPage() {
     const load = async () => {
       setError("");
       if (analysisId) {
-        setDetail(await getAnalysisResultDetail<AnalysisDetail>(Number(analysisId)));
+        const [nextDetail, nextResults] = await Promise.all([
+          getAnalysisResultDetail<AnalysisDetail>(Number(analysisId)),
+          listAnalysisResults<AnalysisResult[]>(),
+        ]);
+        setDetail(nextDetail);
+        setResults(nextResults);
         return;
       }
       setResults(await listAnalysisResults<AnalysisResult[]>());
@@ -144,6 +188,11 @@ export default function AnalysisHistoryPage() {
     const detailRiskClassName = getRiskClassName(result);
     const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
     const x2StageSummary = getX2StageSummary(result);
+    const relatedResults = getRelatedAnalysisRunResults(result, results);
+    const detailSlots = result
+      ? mergeResultsWithExpectedAnalysisTypes(relatedResults, result.analysis_mode)
+      : [];
+    const expectedSlotCount = result ? getExpectedAnalysisTypesByMode(result.analysis_mode).length : 0;
     return (
       <div className="page-grid">
         {error && <ErrorMessage message={error} />}
@@ -166,6 +215,43 @@ export default function AnalysisHistoryPage() {
             {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
         </Card>
+        {detailSlots.length > 0 && (
+          <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 판정" : "간편분석 질환별 판정"}>
+            <div className="card-list">
+              {detailSlots.map((slot) => {
+                if (slot.isUnavailable || !slot.result) {
+                  return (
+                    <div className="mini-card" key={slot.analysisType}>
+                      <strong>{slot.diseaseName} 관리 단계</strong>
+                      <div className="button-row">
+                        <span className="badge badge-missing">검진 수치 부족</span>
+                        <span className="badge badge-reference">판정 불가</span>
+                      </div>
+                      <p className="muted">{slot.unavailableReason}</p>
+                    </div>
+                  );
+                }
+                const slotRiskClassName = getRiskClassName(slot.result);
+                const slotSourceBadgeLabel = getAnalysisSourceBadgeLabel(slot.result);
+                const slotX2StageSummary = getX2StageSummary(slot.result);
+                return (
+                  <div className="mini-card" key={String(slot.result.id ?? slot.analysisType)}>
+                    <strong>{slot.diseaseName} 관리 단계</strong>
+                    <div className="button-row">
+                      <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
+                      <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                      {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
+                    </div>
+                    {slotX2StageSummary && <p className="muted">{slotX2StageSummary}</p>}
+                  </div>
+                );
+              })}
+            </div>
+            {result?.analysis_mode === "PRECISION" && detailSlots.length < expectedSlotCount && (
+              <div className="state-box">정밀분석 표시 항목을 불러오는 중입니다.</div>
+            )}
+          </Card>
+        )}
         {detail?.explanation && (
           <Card title="분석 설명">
             <div className="card-list">
