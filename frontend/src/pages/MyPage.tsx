@@ -9,7 +9,13 @@ import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
-import { getDisplayRiskLabel, getRiskClassName } from "../utils/riskDisplay";
+import {
+  getAnalysisTypeLabel,
+  getDisplayRiskLabel,
+  getLatestResultsByAnalysisType,
+  getRiskClassName,
+  isKnownAnalysisType,
+} from "../utils/riskDisplay";
 
 import { Mail, Phone } from 'lucide-react';
 import { Activity, Gauge, Droplet, Moon } from "lucide-react";
@@ -34,13 +40,6 @@ type PasswordDraft = {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
-};
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  HYPERTENSION: "고혈압",
-  OBESITY: "비만",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
 };
 
 const challengeStatusLabels: Record<string, string> = {
@@ -225,12 +224,14 @@ export default function MyPage() {
 
   const latestHealth = health[0];
   const visibleChallenges = challenges.filter(isVisibleMyChallenge);
-  const diseaseRiskItems: DiseaseRiskItem[] = analysis
-    .filter((result) => Boolean(analysisTypeLabels[String(result.analysis_type)]))
+  const latestDiseaseAnalysis = getLatestResultsByAnalysisType(
+    analysis.filter((result) => isKnownAnalysisType(result.analysis_type)),
+  );
+  const diseaseRiskItems: DiseaseRiskItem[] = latestDiseaseAnalysis
     .map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
-      diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type),
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
       id: result.id,
       risk_level: result.risk_level,
       service_band: result.service_band,
@@ -518,12 +519,12 @@ export default function MyPage() {
             <div className="card-list">
               {analysis.length === 0 && <div className="state-box">최근 분석 결과가 없습니다.</div>}
               {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
-              {analysis.map((result) => {
+              {latestDiseaseAnalysis.map((result) => {
                 const resultId = Number(result.id);
                 return (
                   <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type ?? "-")}</strong>
+                      <strong>{getAnalysisTypeLabel(result.analysis_type, "-")}</strong>
                       {Number.isFinite(resultId) && (
                         <Link className="muted" style={{ fontSize: "13px" }} to={`/analysis/${resultId}`}>
                           상세보기 →

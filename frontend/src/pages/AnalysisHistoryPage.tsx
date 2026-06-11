@@ -5,7 +5,13 @@ import { getAnalysisResultDetail, listAnalysisResults } from "../api/analysis";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
-import { getDisplayRiskLabel, getRiskClassName } from "../utils/riskDisplay";
+import {
+  getAnalysisTypeLabel,
+  getDisplayRiskLabel,
+  getLatestResultsByAnalysisType,
+  getRiskClassName,
+  isKnownAnalysisType,
+} from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type ReferenceSource = {
@@ -30,13 +36,6 @@ type AnalysisDetail = {
   factors?: AnalysisResult[];
   snapshot?: AnalysisResult | null;
   explanation?: AnalysisExplanation | null;
-};
-
-const labels: Record<string, string> = {
-  DIABETES: "당뇨",
-  OBESITY: "비만",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  HYPERTENSION: "고혈압",
 };
 
 const tabs = ["전체", "당뇨", "고혈압", "콜레스테롤·중성지방", "비만"];
@@ -106,12 +105,13 @@ export default function AnalysisHistoryPage() {
     }
     return "상세보기에서 주요 요인을 확인할 수 있습니다.";
   };
-  const diseaseRiskItems: DiseaseRiskItem[] = displayResults
-    .filter((result) => Boolean(labels[String(result.analysis_type)]))
+  const diseaseRiskItems: DiseaseRiskItem[] = getLatestResultsByAnalysisType(
+    displayResults.filter((result) => isKnownAnalysisType(result.analysis_type)),
+  )
     .map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
-      diseaseName: labels[String(result.analysis_type)] ?? String(result.analysis_type),
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
       id: result.id,
       risk_level: result.risk_level,
       service_band: result.service_band,
@@ -152,7 +152,7 @@ export default function AnalysisHistoryPage() {
           }
         >
           <div className={`score-panel risk-detail-panel ${detailRiskClassName}`}>
-            <span>{labels[String(result?.analysis_type)] ?? String(result?.analysis_type ?? "분석")}</span>
+            <span>{getAnalysisTypeLabel(result?.analysis_type, "분석")}</span>
             <strong>{getDisplayRiskLabel(result)}</strong>
             <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
             <p>{String(result?.summary ?? "")}</p>
@@ -236,7 +236,7 @@ export default function AnalysisHistoryPage() {
             <>
               <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
               <div>
-                <strong>{labels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
+                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
                 <p className="muted">{mainFactorLabel(result)}</p>
               </div>
               <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>

@@ -17,7 +17,13 @@ import {
 } from "../api/dashboard";
 import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
-import { getCanonicalRiskStage, getDisplayRiskLabel } from "../utils/riskDisplay";
+import {
+  getAnalysisTypeLabel,
+  getCanonicalRiskStage,
+  getDisplayRiskLabel,
+  getLatestResultsByAnalysisType,
+  isKnownAnalysisType,
+} from "../utils/riskDisplay";
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -61,13 +67,6 @@ const diseaseChartColors: Record<string, string> = {
   DIABETES: "var(--chart-diabetes)",
   DYSLIPIDEMIA: "var(--chart-dyslipidemia)",
   OBESITY: "var(--chart-obesity)",
-};
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  HYPERTENSION: "고혈압",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  OBESITY: "비만",
 };
 
 const riskStageChartValues = {
@@ -212,7 +211,7 @@ function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
 function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
   return items
     .map((item) => {
-      const diseaseLabel = analysisTypeLabels[item.disease_type] ?? item.disease_type;
+      const diseaseLabel = getAnalysisTypeLabel(item.disease_type, "질환");
       const latestByPointKey = new Map<string, { index: number; point: ChartPoint }>();
 
       item.points.forEach((point, index) => {
@@ -605,13 +604,13 @@ export default function DashboardPage() {
   const latestAnalysisResults = Array.isArray(summary.latest_analysis_results)
     ? (summary.latest_analysis_results as DashboardAnalysisResult[])
     : [];
-  const diseaseAnalysisResults = latestAnalysisResults.filter((result) =>
-    Boolean(analysisTypeLabels[String(result.analysis_type)]),
+  const diseaseAnalysisResults = getLatestResultsByAnalysisType(
+    latestAnalysisResults.filter((result) => isKnownAnalysisType(result.analysis_type)),
   );
   const diseaseRiskItems: DiseaseRiskItem[] = diseaseAnalysisResults.map((result) => ({
     analyzed_at: result.analyzed_at,
     created_at: result.created_at,
-    diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type),
+    diseaseName: getAnalysisTypeLabel(result.analysis_type),
     id: result.id,
     risk_level: result.risk_level,
     service_band: result.service_band,
@@ -921,7 +920,7 @@ export default function DashboardPage() {
                     <strong>{item.title}</strong>
                     <p>{item.description}</p>
                   </div>
-                  <span className="badge">{analysisTypeLabels[item.related_disease] ?? "생활습관"}</span>
+                  <span className="badge">{getAnalysisTypeLabel(item.related_disease, "생활습관")}</span>
                 </div>
                 <p className="muted">{item.reason}</p>
               </article>

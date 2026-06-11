@@ -6,9 +6,32 @@ export type RiskDisplaySource = {
   service_band_percent?: unknown;
 };
 
+export type AnalysisResultLike = {
+  analysis_type?: unknown;
+  analyzedAt?: unknown;
+  analyzed_at?: unknown;
+  createdAt?: unknown;
+  created_at?: unknown;
+  date?: unknown;
+  id?: unknown;
+};
+
 export type RiskStageKey = "LOW" | "ATTENTION" | "CAUTION" | "HIGH_CAUTION";
 
 export const riskStageOrder: RiskStageKey[] = ["LOW", "ATTENTION", "CAUTION", "HIGH_CAUTION"];
+
+export const analysisTypeLabels: Record<string, string> = {
+  HYPERTENSION: "고혈압",
+  DIABETES: "당뇨",
+  DYSLIPIDEMIA: "콜레스테롤·중성지방",
+  OBESITY: "비만",
+  ABDOMINAL_OBESITY: "복부비만",
+  FATTY_LIVER: "지방간",
+  ANEMIA: "빈혈",
+  LIVER_FUNCTION: "간기능",
+  KIDNEY_FUNCTION: "신장기능",
+  CHRONIC_KIDNEY_DISEASE: "만성콩팥병",
+};
 
 const serviceBandLabels: Record<string, string> = {
   LOW: "낮음",
@@ -49,8 +72,67 @@ function normalizeKey(value: unknown): string {
   return String(value ?? "").trim().toUpperCase();
 }
 
+function getItemTimestamp(item: AnalysisResultLike): number {
+  const candidates = [item.analyzedAt, item.analyzed_at, item.createdAt, item.created_at, item.date];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(String(candidate ?? ""));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+function getItemId(item: AnalysisResultLike): number {
+  const parsed = Number(item.id);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isNewerAnalysisItem<T extends AnalysisResultLike>(
+  candidate: T,
+  candidateIndex: number,
+  current: T,
+  currentIndex: number,
+): boolean {
+  const candidateTimestamp = getItemTimestamp(candidate);
+  const currentTimestamp = getItemTimestamp(current);
+  if (candidateTimestamp !== currentTimestamp) {
+    return candidateTimestamp > currentTimestamp;
+  }
+  const candidateId = getItemId(candidate);
+  const currentId = getItemId(current);
+  if (candidateId !== currentId) {
+    return candidateId > currentId;
+  }
+  return candidateIndex > currentIndex;
+}
+
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function getAnalysisTypeLabel(value: unknown, fallback = "질환"): string {
+  const key = normalizeKey(value);
+  return analysisTypeLabels[key] ?? fallback;
+}
+
+export function isKnownAnalysisType(value: unknown): boolean {
+  return normalizeKey(value) in analysisTypeLabels;
+}
+
+export function getLatestResultsByAnalysisType<T extends AnalysisResultLike>(items: T[]): T[] {
+  const latestByType = new Map<string, { index: number; item: T }>();
+  items.forEach((item, index) => {
+    const key = normalizeKey(item.analysis_type);
+    if (!key || !(key in analysisTypeLabels)) {
+      return;
+    }
+    const current = latestByType.get(key);
+    if (!current || isNewerAnalysisItem(item, index, current.item, current.index)) {
+      latestByType.set(key, { index, item });
+    }
+  });
+  return Array.from(latestByType.values()).map(({ item }) => item);
 }
 
 export function getDisplayRiskBand(result: RiskDisplaySource | null | undefined): string {

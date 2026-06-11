@@ -8,7 +8,12 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getDisplayRiskLabel } from "../utils/riskDisplay";
+import {
+  getAnalysisTypeLabel,
+  getDisplayRiskLabel,
+  getLatestResultsByAnalysisType,
+  isKnownAnalysisType,
+} from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -42,13 +47,6 @@ type Readiness = {
   missing_basic_fields?: string[];
   missing_precision_fields?: string[];
   message: string;
-};
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  OBESITY: "비만",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  HYPERTENSION: "고혈압",
 };
 
 const asyncJobStatusMessages: Record<string, string> = {
@@ -251,12 +249,12 @@ export default function AnalysisPage() {
   };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
-  const diseaseRiskItems: DiseaseRiskItem[] = results
-    .filter((result) => Boolean(analysisTypeLabels[String(result.analysis_type)]))
+  const latestDiseaseResults = getLatestResultsByAnalysisType(results.filter((result) => isKnownAnalysisType(result.analysis_type)));
+  const diseaseRiskItems: DiseaseRiskItem[] = latestDiseaseResults
     .map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
-      diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type),
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
       id: result.id,
       risk_level: result.risk_level,
       service_band: result.service_band,
@@ -343,12 +341,12 @@ export default function AnalysisPage() {
         <RiskStageBoard items={diseaseRiskItems} />
       </Card>
       <div className="metric-grid">
-        {results.map((result) => {
+        {latestDiseaseResults.map((result) => {
           const explanation = explanationsByResultId[String(result.id)];
           const referenceSources = explanation?.reference_sources ?? [];
           return (
             <div className="metric-card card" key={String(result.id)}>
-              <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 관리 필요 단계</span>
+              <span>{getAnalysisTypeLabel(result.analysis_type)} 관리 필요 단계</span>
               <strong>{getDisplayRiskLabel(result)}</strong>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
@@ -365,7 +363,7 @@ export default function AnalysisPage() {
             </div>
           );
         })}
-        {results.length === 0 && (
+        {latestDiseaseResults.length === 0 && (
           <div className="metric-card card">
             <span>분석 결과 없음</span>
             <strong>-</strong>
@@ -402,11 +400,11 @@ export default function AnalysisPage() {
       </Card>
       <Card title="상세 요인 카드">
         <div className="card-list">
-          {results.map((result) => {
+          {latestDiseaseResults.map((result) => {
             const factors = factorsByResultId[String(result.id)] ?? [];
             return (
               <div className="mini-card" key={String(result.id)}>
-                <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
+                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
                 {factors.length > 0 ? (
                   <div className="chip-list">
                     {factors.slice(0, 4).map((factor) => {

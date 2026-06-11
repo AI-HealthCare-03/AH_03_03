@@ -11,6 +11,7 @@ import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import { getAnalysisTypeLabel, getLatestResultsByAnalysisType, isKnownAnalysisType } from "../utils/riskDisplay";
 
 type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
@@ -145,13 +146,6 @@ const landingPreview = {
   diabetesRiskScore: 58,
   hypertensionRiskScore: 32,
   challengeProgress: 72,
-};
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  HYPERTENSION: "고혈압",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  OBESITY: "비만",
 };
 
 const categoryLabel: Record<string, string> = {
@@ -353,13 +347,15 @@ export default function MainPage() {
     const effectiveAnalysisResults =
       analysisResults.length > 0 ? analysisResults : latestAnalysis.analysis_type ? [latestAnalysis] : [];
     const hasAnalysisResults = effectiveAnalysisResults.length > 0;
-    const displayAnalysisResults = effectiveAnalysisResults.filter((result) =>
-      Boolean(analysisTypeLabels[String(result.analysis_type ?? "")]),
+    const displayAnalysisResults = getLatestResultsByAnalysisType(
+      effectiveAnalysisResults.filter((result) =>
+        isKnownAnalysisType(result.analysis_type),
+      ),
     );
     const diseaseRiskItems: DiseaseRiskItem[] = displayAnalysisResults.map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
-      diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type ?? "질환"),
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
       id: result.id,
       risk_level: result.risk_level,
       service_band: result.service_band,
