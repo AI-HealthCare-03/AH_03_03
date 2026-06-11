@@ -120,8 +120,9 @@ async def test_family_invite_email_body_does_not_include_sensitive_health_values
     )
 
     assert sent is True
-    assert captured["subject"] == "AI HealthCare 가족연동 초대가 도착했습니다."
-    assert "동욱님이 가족연동을 요청했습니다." in captured["body"]
+    assert captured["subject"] == "[Health Ladder] 가족 건강관리 초대 안내"
+    assert "가족 건강관리 기능에 초대되었습니다." in captured["body"]
+    assert "http://localhost:8080/family/invitations/accept?code=invite-token" in captured["body"]
     for sensitive_value in ("120", "혈압", "혈당", "체중", "질병 위험도", "OCR"):
         assert sensitive_value not in captured["body"]
 
