@@ -240,8 +240,7 @@ def export_target(repo_root: Path, output_root: Path, target: Any, folds: int, d
 
     for fold, (train_index, valid_index) in enumerate(skf.split(x, y), start=1):
         print(
-            f"[EXPORT] {target.disease} fold {fold}/{folds} "
-            f"train={len(train_index)} valid={len(valid_index)}",
+            f"[EXPORT] {target.disease} fold {fold}/{folds} train={len(train_index)} valid={len(valid_index)}",
             flush=True,
         )
         x_train = x.iloc[train_index].reset_index(drop=True)

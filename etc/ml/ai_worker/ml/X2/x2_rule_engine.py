@@ -32,20 +32,20 @@ from typing import Any
 # 범위 초과 시 None 처리 (장비 오류 / 입력 오류로 간주)
 # ---------------------------------------------------------------------------
 CLINICAL_BOUNDS: dict[str, tuple[float, float]] = {
-    "sbp":        (60,  300),   # 수축기혈압 mmHg
-    "dbp":        (30,  200),   # 이완기혈압 mmHg
-    "fbs":        (40,  600),   # 공복혈당 mg/dL
-    "hba1c":      (3.0, 20.0),  # 당화혈색소 %
-    "tc":         (50,  700),   # 총콜레스테롤 mg/dL
-    "ldl":        (10,  500),   # LDL mg/dL
-    "hdl":        (10,  200),   # HDL mg/dL
-    "tg":         (20, 3000),   # 중성지방 mg/dL
-    "ast":        (5,  2000),   # AST U/L
-    "alt":        (5,  2000),   # ALT U/L
-    "ggt":        (5,  2000),   # GGT U/L
-    "waist":      (40,  200),   # 허리둘레 cm
-    "bmi":        (10,   70),   # BMI kg/m²
-    "urine_protein": (1,   5),  # 요단백 코드 (정수)
+    "sbp": (60, 300),  # 수축기혈압 mmHg
+    "dbp": (30, 200),  # 이완기혈압 mmHg
+    "fbs": (40, 600),  # 공복혈당 mg/dL
+    "hba1c": (3.0, 20.0),  # 당화혈색소 %
+    "tc": (50, 700),  # 총콜레스테롤 mg/dL
+    "ldl": (10, 500),  # LDL mg/dL
+    "hdl": (10, 200),  # HDL mg/dL
+    "tg": (20, 3000),  # 중성지방 mg/dL
+    "ast": (5, 2000),  # AST U/L
+    "alt": (5, 2000),  # ALT U/L
+    "ggt": (5, 2000),  # GGT U/L
+    "waist": (40, 200),  # 허리둘레 cm
+    "bmi": (10, 70),  # BMI kg/m²
+    "urine_protein": (1, 5),  # 요단백 코드 (정수)
 }
 
 GGT_UPPER: dict[str, float] = {"M": 63.0, "F": 35.0}  # GGT 정상 상한 U/L
@@ -54,6 +54,7 @@ GGT_UPPER: dict[str, float] = {"M": 63.0, "F": 35.0}  # GGT 정상 상한 U/L
 # ---------------------------------------------------------------------------
 # 내부 유틸리티
 # ---------------------------------------------------------------------------
+
 
 def _validate(key: str, value: Any) -> float | None:
     """값이 CLINICAL_BOUNDS 범위 내에 있으면 float 반환, 아니면 None."""
@@ -88,6 +89,7 @@ def _skip(reason: str = "필수 수치 없음") -> dict:
 # ---------------------------------------------------------------------------
 # 타겟별 룰엔진
 # ---------------------------------------------------------------------------
+
 
 def rule_diabetes(fbs: Any = None, hba1c: Any = None) -> dict:
     """
@@ -174,7 +176,7 @@ def rule_dyslipidemia(
     ldl: Any = None,
     hdl: Any = None,
     tg: Any = None,
-    sex: str = "M",       # "M" or "F"
+    sex: str = "M",  # "M" or "F"
 ) -> dict:
     """
     이상지질혈증 — 항목별 개별 판정 후 각각 반환 (종합 단계 없음)
@@ -228,19 +230,14 @@ def rule_dyslipidemia(
     if hdl_v is not None:
         if hdl_v < hdl_normal_cutoff:
             results["HDL"] = _result(
-                "이상", 2, {"HDL": hdl_v},
-                f"HDL < {hdl_normal_cutoff} mg/dL ({'남' if sex == 'M' else '여'})"
+                "이상", 2, {"HDL": hdl_v}, f"HDL < {hdl_normal_cutoff} mg/dL ({'남' if sex == 'M' else '여'})"
             )
         elif hdl_v < hdl_border_cutoff:
             results["HDL"] = _result(
-                "경계", 1, {"HDL": hdl_v},
-                f"{hdl_normal_cutoff} ≤ HDL < {hdl_border_cutoff} mg/dL"
+                "경계", 1, {"HDL": hdl_v}, f"{hdl_normal_cutoff} ≤ HDL < {hdl_border_cutoff} mg/dL"
             )
         else:
-            results["HDL"] = _result(
-                "정상", 0, {"HDL": hdl_v},
-                f"HDL ≥ {hdl_border_cutoff} mg/dL"
-            )
+            results["HDL"] = _result("정상", 0, {"HDL": hdl_v}, f"HDL ≥ {hdl_border_cutoff} mg/dL")
     else:
         results["HDL"] = _skip("HDL콜레스테롤 없음")
 
@@ -303,19 +300,10 @@ def rule_liver(
     ggt_ratio = (ggt_v / ggt_limit) if ggt_v is not None else 0.0
 
     if max_ta > 80 or ggt_ratio > 1.5:
-        return _result(
-            "이상", 2, values,
-            f"AST/ALT > 80 OR GGT > 1.5× 상한({ggt_limit} U/L)"
-        )
+        return _result("이상", 2, values, f"AST/ALT > 80 OR GGT > 1.5× 상한({ggt_limit} U/L)")
     if max_ta > 40 or ggt_ratio > 1.0:
-        return _result(
-            "경도이상", 1, values,
-            f"40 < AST/ALT ≤ 80 OR 1.0× < GGT ≤ 1.5× 상한({ggt_limit} U/L)"
-        )
-    return _result(
-        "정상", 0, values,
-        f"AST/ALT ≤ 40 AND GGT ≤ {ggt_limit} U/L"
-    )
+        return _result("경도이상", 1, values, f"40 < AST/ALT ≤ 80 OR 1.0× < GGT ≤ 1.5× 상한({ggt_limit} U/L)")
+    return _result("정상", 0, values, f"AST/ALT ≤ 40 AND GGT ≤ {ggt_limit} U/L")
 
 
 def rule_proteinuria(urine_protein: Any = None) -> dict:
@@ -381,6 +369,7 @@ def rule_obesity(bmi: Any = None) -> dict:
 # 통합 엔트리포인트
 # ---------------------------------------------------------------------------
 
+
 def run_x2(
     *,
     # 혈압
@@ -403,7 +392,7 @@ def run_x2(
     # 체형
     bmi: Any = None,
     # 공통
-    sex: str = "M",          # "M" or "F"
+    sex: str = "M",  # "M" or "F"
 ) -> dict:
     """
     X2 룰엔진 통합 실행
@@ -426,12 +415,12 @@ def run_x2(
       }
     """
     return {
-        "당뇨위험":     rule_diabetes(fbs=fbs, hba1c=hba1c),
-        "고혈압":       rule_hypertension(sbp=sbp, dbp=dbp),
+        "당뇨위험": rule_diabetes(fbs=fbs, hba1c=hba1c),
+        "고혈압": rule_hypertension(sbp=sbp, dbp=dbp),
         "이상지질혈증": rule_dyslipidemia(tc=tc, ldl=ldl, hdl=hdl, tg=tg, sex=sex),
-        "간기능이상":   rule_liver(ast=ast, alt=alt, ggt=ggt, sex=sex),
-        "신장단백뇨":   rule_proteinuria(urine_protein=urine_protein),
-        "비만":         rule_obesity(bmi=bmi),
+        "간기능이상": rule_liver(ast=ast, alt=alt, ggt=ggt, sex=sex),
+        "신장단백뇨": rule_proteinuria(urine_protein=urine_protein),
+        "비만": rule_obesity(bmi=bmi),
     }
 
 
@@ -442,10 +431,17 @@ if __name__ == "__main__":
     import json
 
     sample = run_x2(
-        sbp=145, dbp=88,
-        fbs=112, hba1c=6.1,
-        tc=235, ldl=148, hdl=45, tg=185,
-        ast=55, alt=72, ggt=90,
+        sbp=145,
+        dbp=88,
+        fbs=112,
+        hba1c=6.1,
+        tc=235,
+        ldl=148,
+        hdl=45,
+        tg=185,
+        ast=55,
+        alt=72,
+        ggt=90,
         urine_protein=3,
         bmi=26.4,
         sex="M",

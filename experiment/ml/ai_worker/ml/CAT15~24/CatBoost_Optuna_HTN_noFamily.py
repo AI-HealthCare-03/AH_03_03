@@ -85,9 +85,9 @@ def apply_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         added += wt_labels
 
     if USE_ALCOHOL_RISK:
-        df["음주위험군"] = pd.cut(df["음주빈도_enc"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True).astype(
-            float
-        )
+        df["음주위험군"] = pd.cut(
+            df["음주빈도_enc"], bins=[-np.inf, 0, 2, np.inf], labels=[0, 1, 2], right=True
+        ).astype(float)
         added += ["음주위험군"]
         print("  [ON] 음주위험군")
 
@@ -281,12 +281,12 @@ def main() -> None:
 
     # ── Optuna 스킵 — 원본 best_params 고정 사용 ──────────────
     best_params = {
-        "iterations":          518,
-        "learning_rate":       0.03431831818092402,
-        "depth":               7,
-        "l2_leaf_reg":         7.089316455406148,
+        "iterations": 518,
+        "learning_rate": 0.03431831818092402,
+        "depth": 7,
+        "l2_leaf_reg": 7.089316455406148,
         "bagging_temperature": 0.5592967069080256,
-        "random_strength":     0.6178071747430876,
+        "random_strength": 0.6178071747430876,
     }
     print(f"\n[3] Optuna 스킵 — 원본 best_params 고정 사용")
     print(f"    params: {best_params}")
@@ -351,7 +351,7 @@ def main() -> None:
     print("[비교] 가족력 유/무 성능 비교")
     print("=" * 60)
     print(f"  {'구분':<30} {'AUC':>7} {'Recall':>8} {'F1':>7}")
-    print(f"  {'-'*55}")
+    print(f"  {'-' * 55}")
     print(f"  {'원본 (가족력 포함, HN 내부검증)':<30} {'0.8152':>7} {'0.8528':>8} {'0.6009':>7}")
     print(f"  {'실험2 (가족력 제거, HN 내부검증)':<30} {test_auc:>7.4f} {test_recall:>8.4f} {test_f1:>7.4f}  ← 금번")
     print(f"\n  ※ AUC 차이: {test_auc - 0.8152:+.4f}")

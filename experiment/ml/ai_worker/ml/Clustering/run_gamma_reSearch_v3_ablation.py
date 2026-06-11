@@ -66,24 +66,19 @@ CONT_COLS_BASE = [
 # CONT_COLS_WITH_HW  = 키+몸무게+BMI 포함 (15개)
 # CONT_COLS_BMI_ONLY = 키/몸무게 제거, BMI만 (13개)
 CONT_COLS_WITH_HW = CONT_COLS_BASE + ["BMI"]
-CONT_COLS_BMI_ONLY = [
-    c for c in CONT_COLS_BASE
-    if c not in ["신장(5cm단위)", "체중(5kg단위)"]
-] + ["BMI"]
+CONT_COLS_BMI_ONLY = [c for c in CONT_COLS_BASE if c not in ["신장(5cm단위)", "체중(5kg단위)"]] + ["BMI"]
 
-CAT_COLS           = ["성별코드", "연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
+CAT_COLS = ["성별코드", "연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
 
 # 이완기혈압 제거 (수축기혈압과 r=0.68, 중복 신호)
-CONT_COLS_NO_DBP = [
-    c for c in CONT_COLS_WITH_HW
-    if c != "이완기혈압"
-]  # 14개
+CONT_COLS_NO_DBP = [c for c in CONT_COLS_WITH_HW if c != "이완기혈압"]  # 14개
 CAT_COLS_NO_GENDER = ["연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]
 
 # N2 베이스 + 파생변수 전체 포함 (19개)
 # 트리글리세라이드: TG/HDL 계산용으로만 사용, CONT_COLS에 미포함
 CONT_COLS_WITH_DERIVED = [
-    c for c in CONT_COLS_WITH_HW
+    c
+    for c in CONT_COLS_WITH_HW
     if c != "이완기혈압"  # 이완기 제거
 ] + ["TG_HDL비율", "비HDL콜레스테롤", "맥압", "AST_ALT비율", "심혈관위험지수"]
 
@@ -103,26 +98,35 @@ LOG_COLS_SELECTIVE = [
 # 임상 기준
 # ────────────────────────────────────────────────
 CLINICAL_BOUNDS = {
-    "수축기혈압":         (60,  250),
-    "이완기혈압":         (30,  150),
-    "식전혈당(공복혈당)": (50,  500),
-    "총콜레스테롤":       (50,  500),
-    "트리글리세라이드":   (10,  500),
-    "HDL콜레스테롤":      (10,  150),
-    "LDL콜레스테롤":      (10,  400),
-    "혈색소":             (5,    22),
-    "혈청크레아티닌":     (0.3,   5),  # 5 초과 = 말기 신부전 수준, 검진 데이터 신뢰도 낮음
-    "혈청지오티(AST)":    (5,   200),
-    "혈청지피티(ALT)":    (5,   200),
-    "감마지티피":         (1,   300),
-    "허리둘레":           (40,  160),
+    "수축기혈압": (60, 250),
+    "이완기혈압": (30, 150),
+    "식전혈당(공복혈당)": (50, 500),
+    "총콜레스테롤": (50, 500),
+    "트리글리세라이드": (10, 500),
+    "HDL콜레스테롤": (10, 150),
+    "LDL콜레스테롤": (10, 400),
+    "혈색소": (5, 22),
+    "혈청크레아티닌": (0.3, 5),  # 5 초과 = 말기 신부전 수준, 검진 데이터 신뢰도 낮음
+    "혈청지오티(AST)": (5, 200),
+    "혈청지피티(ALT)": (5, 200),
+    "감마지티피": (1, 300),
+    "허리둘레": (40, 160),
 }
 
 DROP_COLS = [
-    "치아우식증유무", "결손치 유무", "치아마모증유무",
-    "제3대구치(사랑니) 이상", "치석", "기준년도",
-    "가입자일련번호", "시도코드", "구강검진수검여부",
-    "시력(좌)", "시력(우)", "청력(좌)", "청력(우)",
+    "치아우식증유무",
+    "결손치 유무",
+    "치아마모증유무",
+    "제3대구치(사랑니) 이상",
+    "치석",
+    "기준년도",
+    "가입자일련번호",
+    "시도코드",
+    "구강검진수검여부",
+    "시력(좌)",
+    "시력(우)",
+    "청력(좌)",
+    "청력(우)",
 ]
 
 # ────────────────────────────────────────────────
@@ -142,7 +146,6 @@ EXPERIMENTS = [
     # {"tag": "I_k6_robust",   "cont_cols": CONT_COLS_WITH_HW,  "use_log": False, "k": 6, "scaler": "robust",   "cat_cols": "default"},
     # {"tag": "J_k7_standard", "cont_cols": CONT_COLS_WITH_HW,  "use_log": False, "k": 7, "scaler": "standard", "cat_cols": "default"},
     # {"tag": "K_k7_robust",   "cont_cols": CONT_COLS_WITH_HW,  "use_log": False, "k": 7, "scaler": "robust",   "cat_cols": "default"},
-
     # 신규 실험
     # {"tag": "L_no_gender", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "standard", "cat_cols": "no_gender"},
     # {"tag": "M_k6_standard", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "standard", "cat_cols": "default"},
@@ -150,13 +153,20 @@ EXPERIMENTS = [
     # {"tag": "O_k6_robust_cr5", "cont_cols": CONT_COLS_WITH_HW, "use_log": False, "k": 6, "scaler": "robust", "cat_cols": "default"},
     # {"tag": "P_k7_standard_no_dbp_cr5", "cont_cols": CONT_COLS_NO_DBP, "use_log": False, "k": 7, "scaler": "standard", "cat_cols": "default"},
     # {"tag": "Q_k6_robust_no_dbp_cr5", "cont_cols": CONT_COLS_NO_DBP, "use_log": False, "k": 6, "scaler": "robust", "cat_cols": "default"},
-
     # 신규 — 코치님 피드백 반영
     # selective_log: 대사 지표만 선택적 로그 변환
     # 파생변수: TG/HDL비율, 비HDL콜레스테롤, 트리글리세라이드 포함
     # {"tag": "R_selective_log_derived", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
     # {"tag": "S_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 6, "scaler": "standard", "cat_cols": "default"},
-    {"tag": "T_k7_full_derived_log", "cont_cols": CONT_COLS_WITH_DERIVED, "use_log": False, "selective_log": True, "k": 7, "scaler": "standard", "cat_cols": "default"},
+    {
+        "tag": "T_k7_full_derived_log",
+        "cont_cols": CONT_COLS_WITH_DERIVED,
+        "use_log": False,
+        "selective_log": True,
+        "k": 7,
+        "scaler": "standard",
+        "cat_cols": "default",
+    },
 ]
 
 
@@ -181,20 +191,20 @@ def add_bmi(df):
 def add_derived_features(df):
     """파생변수 생성"""
     df = df.copy()
-    df["TG_HDL비율"]    = df["트리글리세라이드"] / df["HDL콜레스테롤"].replace(0, np.nan)
+    df["TG_HDL비율"] = df["트리글리세라이드"] / df["HDL콜레스테롤"].replace(0, np.nan)
     df["비HDL콜레스테롤"] = df["총콜레스테롤"] - df["HDL콜레스테롤"]
-    df["맥압"]          = df["수축기혈압"] - df["이완기혈압"]
-    df["AST_ALT비율"]   = df["혈청지오티(AST)"] / df["혈청지피티(ALT)"].replace(0, np.nan)
+    df["맥압"] = df["수축기혈압"] - df["이완기혈압"]
+    df["AST_ALT비율"] = df["혈청지오티(AST)"] / df["혈청지피티(ALT)"].replace(0, np.nan)
     df["심혈관위험지수"] = df["총콜레스테롤"] / df["HDL콜레스테롤"].replace(0, np.nan)
     return df
 
 
 def add_clinical_labels(df):
     df = df.copy()
-    df["고혈압_기준"]       = ((df["수축기혈압"] >= 140) | (df["이완기혈압"] >= 90)).astype(int)
-    df["당뇨_기준"]         = (df["식전혈당(공복혈당)"] >= 126).astype(int)
+    df["고혈압_기준"] = ((df["수축기혈압"] >= 140) | (df["이완기혈압"] >= 90)).astype(int)
+    df["당뇨_기준"] = (df["식전혈당(공복혈당)"] >= 126).astype(int)
     df["이상지질혈증_기준"] = (df["총콜레스테롤"] >= 240).astype(int)
-    df["비만_기준"]         = (df["BMI"] >= 25).astype(int)
+    df["비만_기준"] = (df["BMI"] >= 25).astype(int)
     return df
 
 
@@ -205,10 +215,17 @@ def apply_log_transform(df, cont_cols, selective=False):
     원본 df는 건드리지 않음.
     """
     df = df.copy()
-    target_cols = LOG_COLS_SELECTIVE if selective else [
-        "혈청지오티(AST)", "혈청지피티(ALT)", "감마지티피",
-        "혈청크레아티닌", "식전혈당(공복혈당)",
-    ]
+    target_cols = (
+        LOG_COLS_SELECTIVE
+        if selective
+        else [
+            "혈청지오티(AST)",
+            "혈청지피티(ALT)",
+            "감마지티피",
+            "혈청크레아티닌",
+            "식전혈당(공복혈당)",
+        ]
+    )
     for col in target_cols:
         if col in cont_cols and col in df.columns:
             df[col] = np.log1p(df[col].clip(lower=0))
@@ -295,19 +312,21 @@ def detailed_cluster_analysis(df_orig, labels, cont_cols):
 # 단일 실험 실행
 # ────────────────────────────────────────────────
 def run_experiment(df_sampled, exp):
-    tag       = exp["tag"]
+    tag = exp["tag"]
     cont_cols = exp["cont_cols"]
-    use_log   = exp["use_log"]
-    k         = exp["k"]
+    use_log = exp["use_log"]
+    k = exp["k"]
     scaler_nm = exp["scaler"]
-    cat_cols  = CAT_COLS_NO_GENDER if exp.get("cat_cols") == "no_gender" else CAT_COLS
+    cat_cols = CAT_COLS_NO_GENDER if exp.get("cat_cols") == "no_gender" else CAT_COLS
 
     # K-aware threshold: 균형 기준을 K에 맞게 자동 조정
     k_threshold = 1 / (2 * k)
 
     print(f"\n{'=' * 70}")
-    print(f"[실험] {tag} | K={k} | scaler={scaler_nm} | log={use_log} | "
-          f"연속형={len(cont_cols)}개 | 범주형={len(cat_cols)}개 | k_threshold={k_threshold:.3f}")
+    print(
+        f"[실험] {tag} | K={k} | scaler={scaler_nm} | log={use_log} | "
+        f"연속형={len(cont_cols)}개 | 범주형={len(cat_cols)}개 | k_threshold={k_threshold:.3f}"
+    )
     print(f"{'=' * 70}")
 
     df = add_derived_features(df_sampled)
@@ -333,18 +352,20 @@ def run_experiment(df_sampled, exp):
     print(f"\n[gamma 탐색] gamma 범위: {GAMMA_COARSE}")
     search_results = []
     for gamma in GAMMA_COARSE:
-        labels, train_sil, min_ratio, cost = run_clustering(
-            X, X_cont_scaled, cat_indices, k, gamma, N_INIT_SEARCH
-        )
+        labels, train_sil, min_ratio, cost = run_clustering(X, X_cont_scaled, cat_indices, k, gamma, N_INIT_SEARCH)
         counts = np.bincount(labels)
-        search_results.append({
-            "gamma":             gamma,
-            "train_silhouette":  train_sil,
-            "min_cluster_ratio": min_ratio,
-            "cost":              cost,
-        })
-        print(f"  gamma={gamma:.3f} | train_sil={train_sil:.4f} | 최소군집비율={min_ratio:.3f} | "
-              f"Cost={cost:,.0f} | 군집크기={sorted(counts, reverse=True)}")
+        search_results.append(
+            {
+                "gamma": gamma,
+                "train_silhouette": train_sil,
+                "min_cluster_ratio": min_ratio,
+                "cost": cost,
+            }
+        )
+        print(
+            f"  gamma={gamma:.3f} | train_sil={train_sil:.4f} | 최소군집비율={min_ratio:.3f} | "
+            f"Cost={cost:,.0f} | 군집크기={sorted(counts, reverse=True)}"
+        )
 
     results_df = pd.DataFrame(search_results)
 
@@ -355,14 +376,14 @@ def run_experiment(df_sampled, exp):
     else:
         best_row = results_df.loc[results_df["train_silhouette"].idxmax()]
     best_gamma = best_row["gamma"]
-    print(f"\n→ 최적 gamma: {best_gamma} "
-          f"(train_sil={best_row['train_silhouette']:.4f} | 최소군집비율={best_row['min_cluster_ratio']:.3f})")
+    print(
+        f"\n→ 최적 gamma: {best_gamma} "
+        f"(train_sil={best_row['train_silhouette']:.4f} | 최소군집비율={best_row['min_cluster_ratio']:.3f})"
+    )
 
     # 최종 군집화
     print(f"\n[최종 군집화] gamma={best_gamma} | n_init={N_INIT_FINAL}")
-    labels, train_sil, min_ratio, cost = run_clustering(
-        X, X_cont_scaled, cat_indices, k, best_gamma, N_INIT_FINAL
-    )
+    labels, train_sil, min_ratio, cost = run_clustering(X, X_cont_scaled, cat_indices, k, best_gamma, N_INIT_FINAL)
     counts = np.bincount(labels)
 
     # 비교용 Silhouette 재계산 (StandardScaler 공간)
@@ -399,15 +420,15 @@ def run_experiment(df_sampled, exp):
     print(f"\n[저장 완료] → {exp_dir}")
 
     return {
-        "tag":        tag,
-        "k":          k,
-        "scaler":     scaler_nm,
-        "use_log":    use_log,
-        "cat_cols":   exp.get("cat_cols", "default"),
+        "tag": tag,
+        "k": k,
+        "scaler": scaler_nm,
+        "use_log": use_log,
+        "cat_cols": exp.get("cat_cols", "default"),
         "best_gamma": best_gamma,
-        "train_sil":  train_sil,
-        "cmp_sil":    cmp_sil,
-        "min_ratio":  min_ratio,
+        "train_sil": train_sil,
+        "cmp_sil": cmp_sil,
+        "min_ratio": min_ratio,
         "cluster_sizes": sorted(counts, reverse=True),
     }
 

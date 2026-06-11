@@ -137,13 +137,15 @@ def main():
 
         sil = run_clustering(df, curr_cont, curr_cat)
         diff = round(sil - baseline_sil, 4)
-        results.append({
-            "변수": var,
-            "타입": var_type,
-            "제거후_실루엣": sil,
-            "변화량": diff,
-            "중요도": "노이즈 가능" if diff > 0 else "중요",
-        })
+        results.append(
+            {
+                "변수": var,
+                "타입": var_type,
+                "제거후_실루엣": sil,
+                "변화량": diff,
+                "중요도": "노이즈 가능" if diff > 0 else "중요",
+            }
+        )
         print(f"  [{var_type}] {var:20s} | Silhouette: {sil} | 변화: {diff:+.4f}")
 
     results_df = pd.DataFrame(results).sort_values("변화량", ascending=False)

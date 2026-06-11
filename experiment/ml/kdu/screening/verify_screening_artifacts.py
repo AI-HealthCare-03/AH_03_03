@@ -98,16 +98,20 @@ def verify_target(artifact_root: Path, target: Any) -> dict[str, Any]:
         "service_policy_allowed": experiment_config.get("service_policy_allowed"),
     }
     result.update(checks)
-    result["status"] = "pass" if all(
-        [
-            result["required_files_present"],
-            checks["feature_columns_match"],
-            checks["model_name_is_screening_catboost"],
-            checks["threshold_exists"],
-            checks["metrics_required_keys_present"],
-            checks["fold_model_count_is_5"],
-        ]
-    ) else "fail"
+    result["status"] = (
+        "pass"
+        if all(
+            [
+                result["required_files_present"],
+                checks["feature_columns_match"],
+                checks["model_name_is_screening_catboost"],
+                checks["threshold_exists"],
+                checks["metrics_required_keys_present"],
+                checks["fold_model_count_is_5"],
+            ]
+        )
+        else "fail"
+    )
     return result
 
 

@@ -20,8 +20,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[5]
 CLOVA_OCR_DIR = PROJECT_ROOT / "ai_worker" / "ocr" / "providers" / "clova_ocr"
 DEFAULT_IMAGE_PATH = CLOVA_OCR_DIR / "data" / "images" / "1.jpg"
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "ai_worker" / "ocr" / "providers" / "clova_ocr" / "outputs" / "health_exam_ocr.txt"
-DEFAULT_RAW_JSON_PATH = PROJECT_ROOT / "ai_worker" / "ocr" / "providers" / "clova_ocr" / "outputs" / "health_exam_ocr_raw.json"
-DEFAULT_METRICS_PATH = PROJECT_ROOT / "ai_worker" / "ocr" / "providers" / "clova_ocr" / "outputs" / "health_exam_ocr_metrics.json"
+DEFAULT_RAW_JSON_PATH = (
+    PROJECT_ROOT / "ai_worker" / "ocr" / "providers" / "clova_ocr" / "outputs" / "health_exam_ocr_raw.json"
+)
+DEFAULT_METRICS_PATH = (
+    PROJECT_ROOT / "ai_worker" / "ocr" / "providers" / "clova_ocr" / "outputs" / "health_exam_ocr_metrics.json"
+)
 
 
 def main() -> None:

@@ -29,10 +29,10 @@ warnings.filterwarnings("ignore")
 # ────────────────────────────────────────────
 # 0. 경로 설정
 # ────────────────────────────────────────────
-BASE_DIR    = "/Users/admin/PycharmProjects/AH_03_03/etc/ml/ai_worker"
+BASE_DIR = "/Users/admin/PycharmProjects/AH_03_03/etc/ml/ai_worker"
 KNHANES_PATH = os.path.join(BASE_DIR, "data", "hn24_all.sas7bdat")
-MODEL_DIR   = os.path.join(BASE_DIR, "ml", "NHIS", "outputs", "Modeling_X1", "saved_models")
-OUT_DIR     = os.path.join(BASE_DIR, "ml", "KNHANES", "outputs", "Validation_KNHANES")
+MODEL_DIR = os.path.join(BASE_DIR, "ml", "NHIS", "outputs", "Modeling_X1", "saved_models")
+OUT_DIR = os.path.join(BASE_DIR, "ml", "KNHANES", "outputs", "Validation_KNHANES")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 RECALL_TARGET = 0.8
@@ -43,6 +43,7 @@ EXPERIMENT_TAG = "J"  # 검증할 실험 태그 변경 (F, J 등)
 # ────────────────────────────────────────────
 print("KNHANES 2024 로드 중...")
 import pyreadstat
+
 df, meta = pyreadstat.read_sas7bdat(KNHANES_PATH)
 print(f"  완료: {df.shape[0]:,}행 × {df.shape[1]}열")
 print(f"  컬럼 수: {len(df.columns)}")
@@ -51,10 +52,10 @@ print(f"  컬럼 수: {len(df.columns)}")
 # 2. CLINICAL_BOUNDS 이상치 처리 (X1 피처 해당 컬럼)
 # ────────────────────────────────────────────
 CLINICAL_BOUNDS_KN = {
-    "HE_ht":  (100, 250),
-    "HE_wt":  (20,  350),
-    "HE_wc":  (40,  200),
-    "HE_BMI": (10,   80),
+    "HE_ht": (100, 250),
+    "HE_wt": (20, 350),
+    "HE_wc": (40, 200),
+    "HE_BMI": (10, 80),
 }
 
 print("\n[이상치 → NaN 처리]")
@@ -87,8 +88,7 @@ df["체중(5kg단위)"] = df["HE_wt"]
 df["허리둘레"] = df["HE_wc"]
 
 # BMI
-df["bmi"] = df["HE_BMI"].where(df["HE_BMI"].notna(),
-            df["HE_wt"] / ((df["HE_ht"] / 100) ** 2))
+df["bmi"] = df["HE_BMI"].where(df["HE_BMI"].notna(), df["HE_wt"] / ((df["HE_ht"] / 100) ** 2))
 
 # WHtR
 df["waist_height_ratio"] = (df["HE_wc"] / df["HE_ht"]).round(3)
@@ -99,23 +99,21 @@ df["gender_age_str"] = df["성별코드"].astype(str) + "_" + df["age"].fillna(0
 df["gender_age_enc"] = le.fit_transform(df["gender_age_str"])
 
 # obesity_combined
-df["obesity_combined"] = (
-    (df["bmi"] >= 25) & (df["waist_height_ratio"] >= 0.5)
-).astype(float)
+df["obesity_combined"] = ((df["bmi"] >= 25) & (df["waist_height_ratio"] >= 0.5)).astype(float)
 
 # 흡연 (KNHANES: sm_now 또는 연초흡연현재 관련 변수)
 # BS3_1: 현재 흡연 여부 (1=매일, 2=가끔, 3=과거, 4=비흡연)
 if "BS3_1" in df.columns:
     df["smoking_current"] = (df["BS3_1"].isin([1, 2])).astype(float)
-    df["smoking_ever"]    = (df["BS3_1"].isin([1, 2, 3])).astype(float)
+    df["smoking_ever"] = (df["BS3_1"].isin([1, 2, 3])).astype(float)
     print("  흡연: BS3_1 사용")
 elif "sm_now" in df.columns:
     df["smoking_current"] = (df["sm_now"] == 1).astype(float)
-    df["smoking_ever"]    = (df["sm_now"].isin([1, 2])).astype(float)
+    df["smoking_ever"] = (df["sm_now"].isin([1, 2])).astype(float)
     print("  흡연: sm_now 사용")
 else:
     df["smoking_current"] = np.nan
-    df["smoking_ever"]    = np.nan
+    df["smoking_ever"] = np.nan
     print("  흡연: 변수 없음 → NaN")
 
 # 음주 (KNHANES: BD1_11 또는 dr_month)
@@ -151,8 +149,7 @@ if "HE_HP" in df.columns:
     df["target_hypertension"] = np.where(df["HE_HP"] == 1, 1, 0)
     df.loc[df["HE_HP"].isna(), "target_hypertension"] = np.nan
 elif "HE_sbp" in df.columns and "HE_dbp" in df.columns:
-    df["target_hypertension"] = np.where(
-        (df["HE_sbp"] >= 140) | (df["HE_dbp"] >= 90), 1, 0)
+    df["target_hypertension"] = np.where((df["HE_sbp"] >= 140) | (df["HE_dbp"] >= 90), 1, 0)
     df.loc[df["HE_sbp"].isna() & df["HE_dbp"].isna(), "target_hypertension"] = np.nan
 
 # [3] 이상지질혈증 — HE_HCHOL OR HE_HTG
@@ -164,9 +161,10 @@ if "HE_HCHOL" in df.columns and "HE_HTG" in df.columns:
 elif "HE_chol" in df.columns:
     # 수치값으로 직접 계산
     hdl_low = (
-        ((df["성별코드"] == 1) & (df["HE_HDL_st2"] < 40)) |
-        ((df["성별코드"] == 2) & (df["HE_HDL_st2"] < 50))
-    ) if "HE_HDL_st2" in df.columns else pd.Series(False, index=df.index)
+        (((df["성별코드"] == 1) & (df["HE_HDL_st2"] < 40)) | ((df["성별코드"] == 2) & (df["HE_HDL_st2"] < 50)))
+        if "HE_HDL_st2" in df.columns
+        else pd.Series(False, index=df.index)
+    )
     dyslip = (df["HE_chol"] >= 200) | hdl_low
     df["target_dyslipidemia"] = np.where(dyslip, 1, 0)
     df.loc[df["HE_chol"].isna(), "target_dyslipidemia"] = np.nan
@@ -174,20 +172,20 @@ elif "HE_chol" in df.columns:
 # [4] 대사증후군 — 구성항목으로 직접 계산
 #     허리둘레, TG, HDL, 혈압, 혈당 5항목 중 3개 이상
 if all(c in df.columns for c in ["HE_wc", "HE_TG_st2", "HE_HDL_st2", "HE_sbp", "HE_dbp", "HE_glu"]):
-    abdom   = (((df["성별코드"]==1) & (df["HE_wc"]>=90)) |
-               ((df["성별코드"]==2) & (df["HE_wc"]>=85)))
-    tg_hi   = df["HE_TG_st2"] >= 150
-    hdl_low_ms = (
-        ((df["성별코드"]==1) & (df["HE_HDL_st2"] < 40)) |
-        ((df["성별코드"]==2) & (df["HE_HDL_st2"] < 50))
-    )
-    bp_ms   = (df["HE_sbp"] >= 130) | (df["HE_dbp"] >= 85)
+    abdom = ((df["성별코드"] == 1) & (df["HE_wc"] >= 90)) | ((df["성별코드"] == 2) & (df["HE_wc"] >= 85))
+    tg_hi = df["HE_TG_st2"] >= 150
+    hdl_low_ms = ((df["성별코드"] == 1) & (df["HE_HDL_st2"] < 40)) | ((df["성별코드"] == 2) & (df["HE_HDL_st2"] < 50))
+    bp_ms = (df["HE_sbp"] >= 130) | (df["HE_dbp"] >= 85)
     gluc_ms = df["HE_glu"] >= 100
-    ms_score = (abdom.astype(float) + tg_hi.astype(float) +
-                hdl_low_ms.astype(float) + bp_ms.astype(float) +
-                gluc_ms.astype(float))
+    ms_score = (
+        abdom.astype(float)
+        + tg_hi.astype(float)
+        + hdl_low_ms.astype(float)
+        + bp_ms.astype(float)
+        + gluc_ms.astype(float)
+    )
     df["target_metabolic"] = np.where(ms_score >= 3, 1, 0)
-    ms_na = df[["HE_wc","HE_TG_st2","HE_HDL_st2","HE_sbp","HE_glu"]].isna().sum(axis=1)
+    ms_na = df[["HE_wc", "HE_TG_st2", "HE_HDL_st2", "HE_sbp", "HE_glu"]].isna().sum(axis=1)
     df.loc[ms_na >= 3, "target_metabolic"] = np.nan
     print("  대사증후군: 5항목 직접 계산")
 else:
@@ -198,7 +196,7 @@ else:
 if "HE_ast" in df.columns and "HE_alt" in df.columns:
     liver = (df["HE_ast"] > 40) | (df["HE_alt"] > 40)
     df["target_liver"] = np.where(liver, 1, 0)
-    liver_na = df[["HE_ast","HE_alt"]].isna().all(axis=1)
+    liver_na = df[["HE_ast", "HE_alt"]].isna().all(axis=1)
     df.loc[liver_na, "target_liver"] = np.nan
     print("  간기능이상: AST/ALT만 사용 (GGT 없음)")
 else:
@@ -215,22 +213,30 @@ else:
     print("  신장단백뇨: 컬럼 없음 → NaN")
 
 TARGETS = {
-    "당뇨위험":    "target_diabetes",
-    "고혈압":      "target_hypertension",
+    "당뇨위험": "target_diabetes",
+    "고혈압": "target_hypertension",
     "이상지질혈증": "target_dyslipidemia",
-    "대사증후군":   "target_metabolic",
-    "간기능이상":   "target_liver",
-    "신장단백뇨":   "target_proteinuria",
+    "대사증후군": "target_metabolic",
+    "간기능이상": "target_liver",
+    "신장단백뇨": "target_proteinuria",
 }
 
 # ────────────────────────────────────────────
 # 5. 피처 컬럼 정의 (F 실험과 동일 — bmi_category 제외)
 # ────────────────────────────────────────────
 FEATURE_COLS = [
-    "성별코드", "신장(5cm단위)", "체중(5kg단위)", "허리둘레", "음주여부",
-    "bmi", "waist_height_ratio",
-    "age_mid", "gender_age_enc", "obesity_combined",
-    "smoking_current", "smoking_ever",
+    "성별코드",
+    "신장(5cm단위)",
+    "체중(5kg단위)",
+    "허리둘레",
+    "음주여부",
+    "bmi",
+    "waist_height_ratio",
+    "age_mid",
+    "gender_age_enc",
+    "obesity_combined",
+    "smoking_current",
+    "smoking_ever",
 ]
 
 # ────────────────────────────────────────────
@@ -251,9 +257,9 @@ for t_name, t_col in TARGETS.items():
 # ────────────────────────────────────────────
 # 7. 저장된 모델 로드 및 외부 검증
 # ────────────────────────────────────────────
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 print("KNHANES 외부 검증")
-print(f"{'='*60}")
+print(f"{'=' * 60}")
 
 import joblib
 
@@ -264,8 +270,8 @@ for target_name, target_col in TARGETS.items():
         continue
 
     df_use = df[FEATURE_COLS + [target_col]].dropna(subset=[target_col])
-    X_ext  = df_use[FEATURE_COLS]
-    y_ext  = df_use[target_col].astype(int)
+    X_ext = df_use[FEATURE_COLS]
+    y_ext = df_use[target_col].astype(int)
 
     if len(y_ext) == 0 or y_ext.sum() == 0:
         print(f"\n  [{target_name}] 유효 샘플 없음 — 스킵")
@@ -289,56 +295,64 @@ for target_name, target_col in TARGETS.items():
     # 스태킹 모델 vs 단일 모델 분기
     if isinstance(model_data, dict) and "meta_model" in model_data:
         # 스태킹 모델
-        imputer    = model_data["imputer"]
+        imputer = model_data["imputer"]
         base_models = model_data["base_models"]
-        meta_model  = model_data["meta_model"]
+        meta_model = model_data["meta_model"]
 
         X_imp = imputer.transform(X_ext)
-        base_probs = np.column_stack([
-            bm.predict_proba(X_imp)[:, 1]
-            for bm in base_models.values()
-        ])
+        base_probs = np.column_stack([bm.predict_proba(X_imp)[:, 1] for bm in base_models.values()])
         y_prob = meta_model.predict_proba(base_probs)[:, 1]
         print(f"    [스태킹 모델] base: {list(base_models.keys())} → LR 메타")
     else:
         # 단일 모델
-        model   = model_data
+        model = model_data
         imputer = KNNImputer(n_neighbors=5)
-        X_imp   = imputer.fit_transform(X_ext)
-        y_prob  = model.predict_proba(X_imp)[:, 1]
-    auc     = roc_auc_score(y_ext, y_prob)
+        X_imp = imputer.fit_transform(X_ext)
+        y_prob = model.predict_proba(X_imp)[:, 1]
+    auc = roc_auc_score(y_ext, y_prob)
 
     # threshold 탐색
     best_thr = 0.5
-    best_f1  = 0.0
+    best_f1 = 0.0
     for thr in np.arange(0.1, 0.9, 0.01):
-        y_pred  = (y_prob >= thr).astype(int)
-        recall  = recall_score(y_ext, y_pred, zero_division=0)
-        f1      = f1_score(y_ext, y_pred, zero_division=0)
+        y_pred = (y_prob >= thr).astype(int)
+        recall = recall_score(y_ext, y_pred, zero_division=0)
+        f1 = f1_score(y_ext, y_pred, zero_division=0)
         if recall >= RECALL_TARGET and f1 > best_f1:
             best_f1, best_thr = f1, thr
     if best_f1 == 0.0:
         best_thr = 0.5
 
-    y_pred  = (y_prob >= best_thr).astype(int)
-    recall  = recall_score(y_ext, y_pred, zero_division=0)
-    f1      = f1_score(y_ext, y_pred, zero_division=0)
-    prec    = precision_score(y_ext, y_pred, zero_division=0)
+    y_pred = (y_prob >= best_thr).astype(int)
+    recall = recall_score(y_ext, y_pred, zero_division=0)
+    f1 = f1_score(y_ext, y_pred, zero_division=0)
+    prec = precision_score(y_ext, y_pred, zero_division=0)
     tn, fp, fn, tp = confusion_matrix(y_ext, y_pred).ravel()
 
     recall_ok = "✅" if recall >= RECALL_TARGET else "❌"
-    f1_ok     = "✅" if f1 >= 0.6 else "❌"
-    print(f"    AUC: {auc:.4f} | Recall: {recall:.4f} {recall_ok} | "
-          f"F1: {f1:.4f} {f1_ok} | Precision: {prec:.4f} | Threshold: {best_thr:.2f}")
+    f1_ok = "✅" if f1 >= 0.6 else "❌"
+    print(
+        f"    AUC: {auc:.4f} | Recall: {recall:.4f} {recall_ok} | "
+        f"F1: {f1:.4f} {f1_ok} | Precision: {prec:.4f} | Threshold: {best_thr:.2f}"
+    )
 
-    all_results.append({
-        "타겟": target_name, "데이터": "KNHANES_2024",
-        "AUC": round(auc,4), "Recall": round(recall,4),
-        "F1": round(f1,4), "Precision": round(prec,4),
-        "Threshold": best_thr, "샘플수": len(y_ext),
-        "양성률": round(pos_rate,1),
-        "TP": int(tp), "FP": int(fp), "TN": int(tn), "FN": int(fn),
-    })
+    all_results.append(
+        {
+            "타겟": target_name,
+            "데이터": "KNHANES_2024",
+            "AUC": round(auc, 4),
+            "Recall": round(recall, 4),
+            "F1": round(f1, 4),
+            "Precision": round(prec, 4),
+            "Threshold": best_thr,
+            "샘플수": len(y_ext),
+            "양성률": round(pos_rate, 1),
+            "TP": int(tp),
+            "FP": int(fp),
+            "TN": int(tn),
+            "FN": int(fn),
+        }
+    )
 
 # ────────────────────────────────────────────
 # 8. 결과 저장
@@ -358,16 +372,16 @@ if all_results:
         prev_df = pd.read_csv(all_path, encoding="utf-8-sig")
         # 같은 태그 결과는 덮어쓰기
         prev_df = prev_df[prev_df["실험"] != EXPERIMENT_TAG]
-        all_df  = pd.concat([prev_df, results_df], ignore_index=True)
+        all_df = pd.concat([prev_df, results_df], ignore_index=True)
     else:
         all_df = results_df
     all_df.to_csv(all_path, index=False, encoding="utf-8-sig")
     print(f"누적 저장: {all_path}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"외부 검증 결과 요약 [{EXPERIMENT_TAG}]")
-    print(f"{'='*60}")
-    print(results_df[["타겟","AUC","Recall","F1","Precision","샘플수","양성률"]].to_string(index=False))
+    print(f"{'=' * 60}")
+    print(results_df[["타겟", "AUC", "Recall", "F1", "Precision", "샘플수", "양성률"]].to_string(index=False))
 else:
     print("\n⚠️  검증 결과 없음 — 모델 파일을 saved_models 디렉토리에 저장해주세요")
     print(f"   경로: {MODEL_DIR}")

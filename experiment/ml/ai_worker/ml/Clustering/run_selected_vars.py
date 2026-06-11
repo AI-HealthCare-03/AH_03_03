@@ -136,7 +136,14 @@ def main():
     print(f"\n[군집 분석]")
     print(summary.to_string())
     print("\n[성별 분포]")
-    print(df.assign(cluster=labels).groupby("cluster")["성별코드"].value_counts(normalize=True).unstack().round(3).to_string())
+    print(
+        df.assign(cluster=labels)
+        .groupby("cluster")["성별코드"]
+        .value_counts(normalize=True)
+        .unstack()
+        .round(3)
+        .to_string()
+    )
     print("\n[연령대 분포]")
     print(df.assign(cluster=labels).groupby("cluster")["연령대코드(5세단위)"].mean().round(1).to_string())
 

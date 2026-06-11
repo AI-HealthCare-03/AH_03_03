@@ -55,11 +55,11 @@ CONT_COLS = [
     "감마지티피",
     "BMI",
     # 트리글리세라이드는 TG_HDL비율 계산 후 제거 — CONT_COLS에 미포함
-    "TG_HDL비율",       # 파생변수: 인슐린저항성 대리지표
-    "비HDL콜레스테롤",   # 파생변수: 이상지질혈증 분류 지표
-    "맥압",              # 파생변수: 수축기-이완기 (동맥경직도)
-    "AST_ALT비율",       # 파생변수: 간경변 의심 지표
-    "심혈관위험지수",     # 파생변수: 총콜레스테롤/HDL
+    "TG_HDL비율",  # 파생변수: 인슐린저항성 대리지표
+    "비HDL콜레스테롤",  # 파생변수: 이상지질혈증 분류 지표
+    "맥압",  # 파생변수: 수축기-이완기 (동맥경직도)
+    "AST_ALT비율",  # 파생변수: 간경변 의심 지표
+    "심혈관위험지수",  # 파생변수: 총콜레스테롤/HDL
 ]
 CAT_COLS = ["연령대코드(5세단위)", "흡연상태", "음주여부", "요단백"]  # 성별코드 제거
 
@@ -78,26 +78,35 @@ LOG_COLS_SELECTIVE = [
 # 임상 기준
 # ────────────────────────────────────────────────
 CLINICAL_BOUNDS = {
-    "수축기혈압":         (60,  250),
-    "이완기혈압":         (30,  150),
-    "식전혈당(공복혈당)": (50,  500),
-    "총콜레스테롤":       (50,  500),
-    "트리글리세라이드":   (10,  500),
-    "HDL콜레스테롤":      (10,  150),
-    "LDL콜레스테롤":      (10,  400),
-    "혈색소":             (5,    22),
-    "혈청크레아티닌":     (0.3,   5),
-    "혈청지오티(AST)":    (5,   200),
-    "혈청지피티(ALT)":    (5,   200),
-    "감마지티피":         (1,   300),
-    "허리둘레":           (40,  160),
+    "수축기혈압": (60, 250),
+    "이완기혈압": (30, 150),
+    "식전혈당(공복혈당)": (50, 500),
+    "총콜레스테롤": (50, 500),
+    "트리글리세라이드": (10, 500),
+    "HDL콜레스테롤": (10, 150),
+    "LDL콜레스테롤": (10, 400),
+    "혈색소": (5, 22),
+    "혈청크레아티닌": (0.3, 5),
+    "혈청지오티(AST)": (5, 200),
+    "혈청지피티(ALT)": (5, 200),
+    "감마지티피": (1, 300),
+    "허리둘레": (40, 160),
 }
 
 DROP_COLS = [
-    "치아우식증유무", "결손치 유무", "치아마모증유무",
-    "제3대구치(사랑니) 이상", "치석", "기준년도",
-    "가입자일련번호", "시도코드", "구강검진수검여부",
-    "시력(좌)", "시력(우)", "청력(좌)", "청력(우)",
+    "치아우식증유무",
+    "결손치 유무",
+    "치아마모증유무",
+    "제3대구치(사랑니) 이상",
+    "치석",
+    "기준년도",
+    "가입자일련번호",
+    "시도코드",
+    "구강검진수검여부",
+    "시력(좌)",
+    "시력(우)",
+    "청력(좌)",
+    "청력(우)",
 ]
 
 
@@ -132,10 +141,10 @@ def add_derived_features(df):
 
 def add_clinical_labels(df):
     df = df.copy()
-    df["고혈압_기준"]       = ((df["수축기혈압"] >= 140) | (df["이완기혈압"] >= 90)).astype(int)
-    df["당뇨_기준"]         = (df["식전혈당(공복혈당)"] >= 126).astype(int)
+    df["고혈압_기준"] = ((df["수축기혈압"] >= 140) | (df["이완기혈압"] >= 90)).astype(int)
+    df["당뇨_기준"] = (df["식전혈당(공복혈당)"] >= 126).astype(int)
     df["이상지질혈증_기준"] = (df["총콜레스테롤"] >= 240).astype(int)
-    df["비만_기준"]         = (df["BMI"] >= 25).astype(int)
+    df["비만_기준"] = (df["BMI"] >= 25).astype(int)
     return df
 
 
@@ -203,18 +212,20 @@ def run_one_gender(df_gender, gender_label):
     print(f"\n[gamma 탐색]")
     search_results = []
     for gamma in BEST_GAMMA_SEARCH:
-        labels, train_sil, min_ratio, cost = run_clustering(
-            X, X_cont_scaled, cat_indices, K, gamma, N_INIT_SEARCH
-        )
+        labels, train_sil, min_ratio, cost = run_clustering(X, X_cont_scaled, cat_indices, K, gamma, N_INIT_SEARCH)
         counts = np.bincount(labels)
-        search_results.append({
-            "gamma": gamma,
-            "train_silhouette": train_sil,
-            "min_cluster_ratio": min_ratio,
-            "cost": cost,
-        })
-        print(f"  gamma={gamma:.3f} | train_sil={train_sil:.4f} | 최소군집비율={min_ratio:.3f} | "
-              f"군집크기={sorted(counts, reverse=True)}")
+        search_results.append(
+            {
+                "gamma": gamma,
+                "train_silhouette": train_sil,
+                "min_cluster_ratio": min_ratio,
+                "cost": cost,
+            }
+        )
+        print(
+            f"  gamma={gamma:.3f} | train_sil={train_sil:.4f} | 최소군집비율={min_ratio:.3f} | "
+            f"군집크기={sorted(counts, reverse=True)}"
+        )
 
     results_df = pd.DataFrame(search_results)
     balanced = results_df[results_df["min_cluster_ratio"] > k_threshold]
@@ -223,14 +234,14 @@ def run_one_gender(df_gender, gender_label):
     else:
         best_row = results_df.loc[results_df["train_silhouette"].idxmax()]
     best_gamma = best_row["gamma"]
-    print(f"\n→ 최적 gamma: {best_gamma} "
-          f"(train_sil={best_row['train_silhouette']:.4f} | 최소군집비율={best_row['min_cluster_ratio']:.3f})")
+    print(
+        f"\n→ 최적 gamma: {best_gamma} "
+        f"(train_sil={best_row['train_silhouette']:.4f} | 최소군집비율={best_row['min_cluster_ratio']:.3f})"
+    )
 
     # 최종 군집화
     print(f"\n[최종 군집화] gamma={best_gamma} | n_init={N_INIT_FINAL}")
-    labels, train_sil, min_ratio, cost = run_clustering(
-        X, X_cont_scaled, cat_indices, K, best_gamma, N_INIT_FINAL
-    )
+    labels, train_sil, min_ratio, cost = run_clustering(X, X_cont_scaled, cat_indices, K, best_gamma, N_INIT_FINAL)
     counts = np.bincount(labels)
     cmp_sil = calc_compare_silhouette(X_cont_orig, labels)
 
@@ -241,8 +252,10 @@ def run_one_gender(df_gender, gender_label):
 
     # 분석
     df_orig["cluster"] = labels
-    df_orig["당뇨_고위험"]  = (df_orig["식전혈당(공복혈당)"] >= 126).astype(int)
-    df_orig["당뇨_전단계"]  = ((df_orig["식전혈당(공복혈당)"] >= 100) & (df_orig["식전혈당(공복혈당)"] < 126)).astype(int)
+    df_orig["당뇨_고위험"] = (df_orig["식전혈당(공복혈당)"] >= 126).astype(int)
+    df_orig["당뇨_전단계"] = ((df_orig["식전혈당(공복혈당)"] >= 100) & (df_orig["식전혈당(공복혈당)"] < 126)).astype(
+        int
+    )
     df_orig["고혈압_고위험"] = ((df_orig["수축기혈압"] >= 140) | (df_orig["이완기혈압"] >= 90)).astype(int)
     df_orig["고혈압_전단계"] = ((df_orig["수축기혈압"] >= 130) | (df_orig["이완기혈압"] >= 80)).astype(int)
 
@@ -279,12 +292,12 @@ def run_one_gender(df_gender, gender_label):
     print(f"\n[저장 완료] → {out_dir}")
 
     return {
-        "gender":     gender_label,
-        "n":          len(df_orig),
+        "gender": gender_label,
+        "n": len(df_orig),
         "best_gamma": best_gamma,
-        "train_sil":  train_sil,
-        "cmp_sil":    cmp_sil,
-        "min_ratio":  min_ratio,
+        "train_sil": train_sil,
+        "cmp_sil": cmp_sil,
+        "min_ratio": min_ratio,
         "cluster_sizes": sorted(counts, reverse=True),
     }
 
@@ -301,12 +314,12 @@ def main():
     df = add_derived_features(df)
     df = df.dropna(subset=CONT_COLS + CAT_COLS + ["성별코드", "이완기혈압"])
     print(f"  전처리 후 전체: {len(df):,}명")
-    df_male   = df[df["성별코드"] == 1].reset_index(drop=True)
+    df_male = df[df["성별코드"] == 1].reset_index(drop=True)
     df_female = df[df["성별코드"] == 2].reset_index(drop=True)
     print(f"  남성: {len(df_male):,}명 | 여성: {len(df_female):,}명")
 
     # 테스트용 샘플링 — 전체 실행 시 아래 4줄 주석 처리
-    df_male   = df_male.sample(n=SAMPLE_N, random_state=SAMPLE_SEED).reset_index(drop=True)
+    df_male = df_male.sample(n=SAMPLE_N, random_state=SAMPLE_SEED).reset_index(drop=True)
     df_female = df_female.sample(n=SAMPLE_N, random_state=SAMPLE_SEED).reset_index(drop=True)
     print(f"  샘플링 후 — 남성: {len(df_male):,}명 | 여성: {len(df_female):,}명 (seed={SAMPLE_SEED})")
 

@@ -164,13 +164,7 @@ def main() -> int:
 
     summary = pd.DataFrame(rows)
     summary_path = (
-        repo_root
-        / "experiment"
-        / "ml"
-        / "kdu"
-        / "outputs"
-        / "summary"
-        / "screening_dataset_build_summary.csv"
+        repo_root / "experiment" / "ml" / "kdu" / "outputs" / "summary" / "screening_dataset_build_summary.csv"
     )
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(summary_path, index=False)
