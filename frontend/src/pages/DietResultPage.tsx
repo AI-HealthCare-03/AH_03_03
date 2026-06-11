@@ -93,12 +93,37 @@ function candidateFoodName(food: DietCandidateFood): string {
   );
 }
 
+function publicImageUrlFromPayloads(...payloads: Array<Record<string, unknown> | null | undefined>): string {
+  const urlKeys = ["image_url", "file_url", "stored_file_url", "original_image_url"];
+  for (const payload of payloads) {
+    const record = asRecord(payload);
+    for (const key of urlKeys) {
+      const value = String(record[key] ?? "").trim();
+      if (isBrowserAccessibleImageUrl(value)) {
+        return value;
+      }
+    }
+  }
+  return "";
+}
+
+function isBrowserAccessibleImageUrl(value: string): boolean {
+  return (
+    value.startsWith("https://") ||
+    value.startsWith("http://") ||
+    value.startsWith("/") ||
+    value.startsWith("blob:") ||
+    value.startsWith("data:image/")
+  );
+}
+
 export default function DietResultPage() {
   const { dietRecordId } = useParams();
   const navigate = useNavigate();
   const [record, setRecord] = useState<Item | null>(null);
   const [photoResults, setPhotoResults] = useState<Item[]>([]);
   const [error, setError] = useState("");
+  const [detailImageFailed, setDetailImageFailed] = useState(false);
 
   const normalizeFoods = (value: unknown): Item[] => {
     if (Array.isArray(value)) {
@@ -136,6 +161,7 @@ export default function DietResultPage() {
     candidateFoods.autoConfirmed.length > 0 ||
     candidateFoods.needsConfirmation.length > 0 ||
     candidateFoods.noCandidate.length > 0;
+  const detailImageUrl = publicImageUrlFromPayloads(record, photoResults[0], rawOutput, photoConfidence);
 
   useEffect(() => {
     const load = async () => {
@@ -157,6 +183,10 @@ export default function DietResultPage() {
     };
     void load();
   }, [dietRecordId]);
+
+  useEffect(() => {
+    setDetailImageFailed(false);
+  }, [detailImageUrl]);
 
   const isManual = isManualRecord(record);
 
@@ -210,6 +240,17 @@ export default function DietResultPage() {
                 : String(record?.diet_feedback ?? "식단 분석 결과를 확인해보세요.")}
             </p>
           </div>
+          {!isManual && detailImageUrl && !detailImageFailed && (
+            <div className="mini-card">
+              <span className="muted">업로드한 식단 사진</span>
+              <img
+                alt="업로드한 식단 사진"
+                className="upload-preview"
+                onError={() => setDetailImageFailed(true)}
+                src={detailImageUrl}
+              />
+            </div>
+          )}
         </div>
       </Card>
       {isManual ? (

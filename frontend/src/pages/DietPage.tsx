@@ -162,6 +162,7 @@ export default function DietPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
+  const [analysisImagePreviewFailed, setAnalysisImagePreviewFailed] = useState(false);
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -248,6 +249,7 @@ export default function DietPage() {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setImagePreviewMessage("");
+    setAnalysisImagePreviewFailed(false);
     if (!file) {
       setSelectedImageFile(null);
       setSelectedImagePreviewUrl("");
@@ -280,6 +282,7 @@ export default function DietPage() {
     }
     setSelectedImageFile(null);
     setSelectedImagePreviewUrl("");
+    setAnalysisImagePreviewFailed(false);
     setImagePreviewMessage("");
   };
 
@@ -611,6 +614,17 @@ export default function DietPage() {
               <strong>{String(analysisResult.diet_score ?? "-")}</strong>
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
+            {selectedImagePreviewUrl && !analysisImagePreviewFailed && (
+              <div className="mini-card">
+                <span className="muted">업로드한 식단 사진</span>
+                <img
+                  alt="업로드한 식단 사진"
+                  className="upload-preview"
+                  onError={() => setAnalysisImagePreviewFailed(true)}
+                  src={selectedImagePreviewUrl}
+                />
+              </div>
+            )}
             <div className="mini-card">
               <span className="muted">분석 음식</span>
               <strong>
