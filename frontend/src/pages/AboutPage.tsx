@@ -176,10 +176,20 @@ export default function AboutPage() {
 
       {/* 추천 흐름 */}
       <section className="persona-flow-panel">
-        <div>
-          <span className="eyebrow">추천 흐름</span>
-          <h2>{selectedPersona.title}</h2>
-          <p>{selectedPersona.quote}</p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <span className="eyebrow">추천 흐름</span>
+            <h2>{selectedPersona.title}</h2>
+            <p>{selectedPersona.quote}</p>
+          </div>
+          <div className="button-row">
+            <Link className="button" to={selectedPersona.to}>
+              {selectedPersona.buttonLabel}
+            </Link>
+            <Link className="button secondary" to="/">
+              홈으로 돌아가기
+            </Link>
+          </div>
         </div>
         <div className="persona-timeline">
           {selectedPersona.flow.map((step, index) => (
@@ -193,14 +203,7 @@ export default function AboutPage() {
             </div>
           ))}
         </div>
-        <div className="button-row">
-          <Link className="button" to={selectedPersona.to}>
-            {selectedPersona.buttonLabel}
-          </Link>
-          <Link className="button secondary" to="/">
-            홈으로 돌아가기
-          </Link>
-        </div>
+
       </section>
 
       {/* 하단 CTA */}
