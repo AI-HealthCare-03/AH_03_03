@@ -9,6 +9,7 @@ import { getMainSummary } from "../api/main";
 import { listMedications } from "../api/medications";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
+import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
 
 type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
@@ -95,6 +96,33 @@ const landingPersonas = [
     ],
   },
 ];
+
+const featureIcons: Record<string, React.ReactNode> = {
+  "🧭": <HeartPulse size={24} />,
+  "📄": <FileText size={24} />,
+  "🥗": <Salad size={24} />,
+  "🚶": <Dumbbell size={24} />,
+  "💊": <Pill size={24} />,
+  "💬": <BotMessageSquare size={24} />,
+};
+
+const flowIcons: Record<string, React.ReactNode> = {
+  "📄": <FileText size={24} />,
+  "📊": <ChartBar size={24} />,
+  "✅": <Trophy size={24} />,
+  "🥗": <Salad size={24} />,
+  "📈": <TrendingUp size={24} />,
+  "🚶": <Dumbbell size={24} />,
+  "💊": <Pill size={24} />,
+  "🔔": <Bell size={24} />,
+  "🤖": <BotMessageSquare size={24} />,
+};
+
+const personaIcons: Record<string, React.ReactNode> = {
+  exam: <ClipboardList size={24} />,
+  habit: <Dumbbell size={24} />,
+  record: <Pill size={24} />,
+};
 
 const serviceFlow = [
   { icon: "📄", label: "검진표 등록" },
@@ -422,14 +450,14 @@ export default function MainPage() {
           </div>
           <div className="home-action-panel">
             <Link className="home-action-card" to="/analysis">
-              <span className="home-action-card__icon">🧭</span>
+              <span className="home-action-card__icon"><HeartPulse size={24} /></span>
               <span>
                 <strong className="home-action-card__title">건강위험도 분석하기</strong>
                 <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 질환별 결과를 확인합니다.</em>
               </span>
             </Link>
             <Link className="home-action-card" to="/diets">
-              <span className="home-action-card__icon">🥗</span>
+              <span className="home-action-card__icon"><Salad size={24} /></span>
               <span>
                 <strong className="home-action-card__title">식단 이미지 분석하기</strong>
                 <em className="home-action-card__description">식단 이미지를 추가하면 식단 분석 결과를 확인할 수 있습니다.</em>
@@ -739,7 +767,9 @@ export default function MainPage() {
               onClick={() => setSelectedPersonaId(persona.id)}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span className="persona-icon">{persona.icon}</span>
+                <span className="persona-icon">
+                  {personaIcons[persona.id]}
+                </span>
                 <strong>{persona.title}</strong>
               </div>
               <p>{persona.quote}</p>
@@ -758,7 +788,7 @@ export default function MainPage() {
         <div className="persona-timeline">
           {selectedPersona.flow.map((step, index) => (
             <div className="persona-timeline-item" key={step.title}>
-              <span className="timeline-icon">{step.icon}</span>
+              <span className="timeline-icon">{flowIcons[step.icon] ?? step.icon}</span>
               <div>
                 <strong>{step.title}</strong>
                 <p>{step.description}</p>
@@ -790,7 +820,7 @@ export default function MainPage() {
               key={feature.title}
               to={`/login?redirect=${encodeURIComponent(feature.redirect)}`}
             >
-              <span className="landing-feature-icon">{feature.icon}</span>
+              <span className="landing-feature-icon">{featureIcons[feature.icon] ?? feature.icon}</span>
               <strong>{feature.title}</strong>
               <p>{feature.description}</p>
               <em className="badge badge-reference">로그인 후 이용</em>
