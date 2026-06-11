@@ -166,6 +166,18 @@ make dev-logs
 make dev-rebuild-api
 ```
 
+프론트엔드 UI/정적 빌드 변경만 Docker에 반영:
+
+```bash
+make dev-rebuild-frontend
+```
+
+프론트엔드, 백엔드, worker 변경이 섞였을 때 전체 dev stack 재빌드:
+
+```bash
+make dev-rebuild-all
+```
+
 Nginx 502 또는 upstream 캐시가 꼬였을 때 복구:
 
 ```bash

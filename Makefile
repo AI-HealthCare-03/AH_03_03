@@ -62,7 +62,7 @@ app-worker-logs:
 
 # Standard dev/demo stack
 # Full stack via infra/docker/docker-compose.dev.yml: postgres, redis, fastapi, ai-worker, frontend, nginx.
-.PHONY: dev-network dev-up dev-down dev-ps dev-logs dev-migrate dev-seed dev-health dev-rebuild-api dev-restart-nginx dev-config-check
+.PHONY: dev-network dev-up dev-down dev-ps dev-logs dev-migrate dev-seed dev-health dev-rebuild-api dev-rebuild-frontend dev-rebuild-all dev-restart-nginx dev-config-check
 dev-network:
 	docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared >/dev/null
 
@@ -89,6 +89,18 @@ dev-health:
 
 dev-rebuild-api:
 	$(DEV_COMPOSE) up -d --build fastapi ai-worker
+	$(DEV_COMPOSE) up -d --force-recreate nginx
+	sleep 5
+	curl -fsS http://localhost:8080/api/v1/system/health
+
+dev-rebuild-frontend:
+	$(DEV_COMPOSE) up -d --build frontend
+	$(DEV_COMPOSE) up -d --force-recreate nginx
+	sleep 3
+	curl -fsS http://localhost:8080/api/v1/system/health
+
+dev-rebuild-all:
+	$(DEV_COMPOSE) up -d --build
 	$(DEV_COMPOSE) up -d --force-recreate nginx
 	sleep 5
 	curl -fsS http://localhost:8080/api/v1/system/health
