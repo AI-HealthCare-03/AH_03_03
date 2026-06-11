@@ -1,8 +1,10 @@
-import os
 import sys
 from typing import Any
 
 from dotenv import load_dotenv
+
+from app.core import config
+from app.core.providers import has_langfuse_config, has_openai_config
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_CONNECT_TIMEOUT_SECONDS = 3.0
@@ -11,7 +13,6 @@ OPENAI_WRITE_TIMEOUT_SECONDS = 15.0
 OPENAI_POOL_TIMEOUT_SECONDS = 3.0
 OPENAI_TOTAL_TIMEOUT_SECONDS = 20.0
 OPENAI_MAX_RETRIES = 2
-LANGFUSE_ENV_KEYS = ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL")
 REWRITE_RESPONSE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -174,8 +175,7 @@ def record_langfuse_event(
 
 
 def build_openai_client():
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    if not has_openai_config(config):
         raise RuntimeError("OPENAI_API_KEY is not set. Set the environment variable before using real LLM mode.")
 
     try:
@@ -196,7 +196,7 @@ def build_openai_client():
     except ImportError:
         timeout = OPENAI_TOTAL_TIMEOUT_SECONDS
 
-    return OpenAI(api_key=api_key, timeout=timeout, max_retries=OPENAI_MAX_RETRIES)
+    return OpenAI(api_key=config.OPENAI_API_KEY, timeout=timeout, max_retries=OPENAI_MAX_RETRIES)
 
 
 def build_langfuse_client():
@@ -210,23 +210,16 @@ def build_langfuse_client():
 
     try:
         return Langfuse(
-            public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-            secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-            host=os.getenv("LANGFUSE_BASE_URL"),
+            public_key=config.LANGFUSE_PUBLIC_KEY,
+            secret_key=config.LANGFUSE_SECRET_KEY,
+            host=config.LANGFUSE_BASE_URL,
         )
     except Exception:
         return None
 
 
-def has_langfuse_config() -> bool:
-    return all(os.getenv(key) for key in LANGFUSE_ENV_KEYS)
-
-
 def is_langfuse_enabled() -> bool:
-    enabled_value = os.getenv("LANGFUSE_ENABLED")
-    if enabled_value is not None and enabled_value.strip().lower() in {"0", "false", "no", "off"}:
-        return False
-    return has_langfuse_config()
+    return config.LANGFUSE_ENABLED and has_langfuse_config(config)
 
 
 def build_langfuse_observation_name(metadata: dict | None) -> str:
@@ -243,7 +236,7 @@ def build_langfuse_observation_name(metadata: dict | None) -> str:
 
 
 def get_openai_model() -> str:
-    return os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
+    return config.OPENAI_MODEL or DEFAULT_OPENAI_MODEL
 
 
 def extract_response_text(response) -> str:

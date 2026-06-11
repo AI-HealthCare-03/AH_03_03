@@ -4,6 +4,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 
 from app.core import config
+from app.core.providers import has_smtp_config
 
 
 class EmailDeliveryError(Exception):
@@ -100,4 +101,4 @@ class EmailService:
             smtp.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
 
     def _is_configured(self) -> bool:
-        return bool(config.SMTP_HOST and config.SMTP_PORT and config.SMTP_FROM_EMAIL)
+        return has_smtp_config(config)

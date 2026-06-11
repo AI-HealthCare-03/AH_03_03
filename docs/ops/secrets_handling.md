@@ -144,9 +144,12 @@ git log -S "sk-proj" --oneline -- . ':!uv.lock'
 ## 4.2 Auth delivery provider notes
 
 - Brevo SMTP는 이메일 인증/비밀번호 재설정 live 발송 경로로 사용할 수 있다.
+- 같은 SMTP 기반 `EmailService`가 가족 초대/비회원 가족 초대 이메일에도 사용된다.
+- SMTP provider는 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`이 모두 준비된 경우에만 available로 본다.
 - MVP/시연 회원가입 인증은 이메일 인증만 필수로 사용한다.
 - 휴대폰 인증은 현재 보류 상태이며, `phone_number`는 DB/프로필 호환성용 선택값으로만 유지한다.
 - prod/production에서는 `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`를 유지한다.
+- prod/production에서 SMTP 설정이 불완전하면 조용히 no-op 처리하지 않고 configuration error로 드러나야 한다.
 - 운영 전 SMS 인증이 필요하면 별도 SMS provider와 rate limit, 실패 처리, 비용 정책을 새로 설계한다.
 - `uv run python scripts/verify_auth_delivery_config.py`는 SMTP 설정 상태만 출력하며 secret 원문은 출력하지 않는다.
 

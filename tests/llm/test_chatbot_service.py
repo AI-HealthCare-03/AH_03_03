@@ -56,6 +56,7 @@ async def test_chatbot_can_return_rag_llm_source_without_api_contract_change(mon
 @pytest.mark.asyncio
 async def test_chatbot_real_llm_flag_without_openai_key_falls_back_to_rule_engine(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", True)
+    monkeypatch.setattr("app.services.chatbot.config.OPENAI_API_KEY", None)
     monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -70,6 +71,7 @@ async def test_chatbot_real_llm_flag_without_openai_key_falls_back_to_rule_engin
 @pytest.mark.asyncio
 async def test_chatbot_real_llm_flag_uses_openai_rewrite_when_configured(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", True)
+    monkeypatch.setattr("app.services.chatbot.config.OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setattr(
@@ -88,6 +90,7 @@ async def test_chatbot_real_llm_flag_uses_openai_rewrite_when_configured(monkeyp
 @pytest.mark.asyncio
 async def test_chatbot_crisis_keyword_prioritizes_immediate_support(monkeypatch) -> None:
     monkeypatch.setattr("app.services.chatbot.config.CHATBOT_USE_REAL_LLM", True)
+    monkeypatch.setattr("app.services.chatbot.config.OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
     def fail_if_called(*args, **kwargs):
