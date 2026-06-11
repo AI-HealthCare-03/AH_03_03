@@ -9,6 +9,9 @@ import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
+import { Mail, Phone } from 'lucide-react';
+import { Activity, Gauge, Droplet, Moon } from "lucide-react";
+
 type Item = Record<string, unknown>;
 
 type ProfileDraft = {
@@ -301,30 +304,17 @@ export default function MyPage() {
               return (
                 <Link className="mypage-menu-item" key={item.label} to={item.to}>
                   <span>{item.label}</span>
-                  {item.badge && <span className="badge badge-reference">{item.badge}</span>}
                 </Link>
               );
             }
 
             return (
               <button
-                className={[
-                  "mypage-menu-item",
-                  item.status === "active" ? "active" : "",
-                  item.danger ? "danger-ghost" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className="mypage-menu-item"
                 key={item.label}
                 type="button"
-                onClick={() => {
-                  if (item.action === "deactivate") {
-                    void deactivateAccount();
-                  }
-                }}
               >
                 <span>{item.label}</span>
-                {item.badge && <span className="badge badge-reference">{item.badge}</span>}
               </button>
             );
           })}
@@ -368,13 +358,16 @@ export default function MyPage() {
                 </div>
               ) : (
                 <>
-                  <strong>{displayName}</strong>
-                  <p className="muted">{backendUser?.email ?? "이메일 정보 없음"}</p>
-                  <p className="muted">{backendUser?.phone_number ?? "휴대폰 미등록"}</p>
-                  <div className="chip-list">
-                    <span className="badge badge-saved">{backendUser?.role ?? "USER"}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <strong style={{ fontSize: "40px" }}>{displayName}</strong>
                     <span className="badge badge-reference">{backendUser?.login_id ?? "로그인 ID 미등록"}</span>
                   </div>
+                  <p className="muted" style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Mail size={14} /> {backendUser?.email ?? "이메일 정보 없음"}
+                  </p>
+                  <p className="muted" style={{ margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Phone size={14} /> {backendUser?.phone_number ?? "미등록"}
+                  </p>
                 </>
               )}
             </div>
@@ -470,21 +463,29 @@ export default function MyPage() {
         <Card title="현재 상태">
             <div className="metric-grid mypage-metric-grid">
               <div>
-                <span>BMI</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Gauge size={14} /> BMI
+                </span>
                 <strong>{getText(latestHealth, "bmi", "기록 없음")}</strong>
               </div>
               <div>
-                <span>혈압</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Activity size={14} /> 혈압
+                </span>
                 <strong>
                   {getText(latestHealth, "systolic_bp", "-")}/{getText(latestHealth, "diastolic_bp", "-")}
                 </strong>
               </div>
               <div>
-                <span>공복혈당</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Droplet size={14} /> 공복혈당
+                </span>
                 <strong>{getText(latestHealth, "fasting_glucose", "기록 없음")}</strong>
               </div>
               <div>
-                <span>수면</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Moon size={14} /> 수면
+                </span>
                 <strong>{getText(latestHealth, "sleep_hours", "기록 없음")}</strong>
               </div>
             </div>

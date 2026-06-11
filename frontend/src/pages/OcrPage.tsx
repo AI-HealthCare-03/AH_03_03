@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 
 import Card from "../components/Card";
 
+import { FileText, Pill } from "lucide-react";
+
 export default function OcrPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
@@ -34,14 +36,14 @@ export default function OcrPage() {
       </div>
       <div className="page-grid">
         <Card title="검진표 등록">
-          <div className="ocr-card-icon">📄</div>
+          <div className="ocr-card-icon"><FileText size={48} /></div>
           <p>혈압, 혈당, 콜레스테롤, 중성지방, HDL, LDL, HbA1c 등을 추출합니다.</p>
           <Link className="button" to="/ocr/exam">
             검진표 등록하기
           </Link>
         </Card>
         <Card title="복약 정보 등록">
-          <div className="ocr-card-icon">💊</div>
+          <div className="ocr-card-icon"><Pill size={48} /></div>
           <p>약 이름, 복용 시간, 복용 횟수, 복용 기간을 추출합니다.</p>
           <Link className="button" to="/ocr/medication">
             복약 정보 등록하기

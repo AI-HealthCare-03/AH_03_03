@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -15,6 +15,16 @@ import {
   getDashboardTrends,
 } from "../api/dashboard";
 import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
+import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";
+
+function getChallengeIcon(category: unknown): ReactNode {
+  const key = String(category ?? "").toUpperCase();
+  if (key.includes("DIET") || key.includes("식")) return <Salad size={20} />;
+  if (key.includes("MEDICATION") || key.includes("복약")) return <Pill size={20} />;
+  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return <Dumbbell size={20} />;
+  if (key.includes("WATER") || key.includes("수분")) return <Droplets size={20} />;
+  return <Trophy size={20} />;
+}
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -444,15 +454,6 @@ function formatDate(value: unknown): string {
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}.${mo}.${day}`;
-}
-
-function getChallengeIcon(category: unknown): string {
-  const key = String(category ?? "").toUpperCase();
-  if (key.includes("DIET") || key.includes("식")) return "🥗";
-  if (key.includes("MEDICATION") || key.includes("복약")) return "💊";
-  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return "🚶";
-  if (key.includes("WATER") || key.includes("수분")) return "💧";
-  return "✅";
 }
 
 function getChallengeTitle(challenge: AnyRecord): string {

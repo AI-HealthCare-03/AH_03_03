@@ -552,8 +552,12 @@ export default function HealthProfilePage() {
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>
-                <strong>{value || "-"}</strong>
-                <em className={value ? "badge badge-saved" : "badge badge-missing"}>{value ? "저장됨" : "미입력"}</em>
+                <div className="value-row">
+                  <strong>{value || "-"}</strong>
+                  <em className={value ? "badge badge-saved" : "badge badge-missing"}>
+                    {value ? "저장됨" : "미입력"}
+                  </em>
+                </div>
               </div>
             ))}
           </div>
@@ -628,17 +632,19 @@ export default function HealthProfilePage() {
                     const value = getReadOnlyValue(form, item.key, bmi);
                     return (
                       <div className="readonly-health-item" key={`${section.title}-${item.key}`}>
-                        <span>{item.label}</span>
-                        <strong>
-                          {value || "-"}
-                          {value && item.unit ? ` ${item.unit}` : ""}
-                        </strong>
-                        <div className="chip-list">
+                        <div className="item-header">
+                          <span>{item.label}</span>
                           {item.referenceOnly ? (
-                            <em className="badge badge-reference">참고</em>
+                            <em className="badge badge-reference">선택</em>
                           ) : (
                             <em className="badge badge-required">필수</em>
                           )}
+                        </div>
+                        <div className="item-value-row">
+                          <strong>
+                            {value || "-"}
+                            {value && item.unit ? ` ${item.unit}` : ""}
+                          </strong>
                           <em className={value ? "badge badge-saved" : "badge badge-missing"}>
                             {value ? "저장됨" : "미입력"}
                           </em>
