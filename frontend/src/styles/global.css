@@ -2576,7 +2576,22 @@ pre {
   color: var(--color-yellow);
 }
 
+.risk-attention {
+  background: var(--color-blue-soft);
+  color: var(--color-blue);
+}
+
+.risk-caution {
+  background: var(--color-yellow-soft);
+  color: var(--color-yellow);
+}
+
 .risk-high {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-dark);
+}
+
+.risk-high-caution {
   background: var(--color-danger-soft);
   color: var(--color-danger-dark);
 }

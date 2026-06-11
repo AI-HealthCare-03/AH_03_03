@@ -9,6 +9,10 @@ export type AnalysisRunResponse = {
   analysis_mode: AnalysisMode;
   risk_score: string | number;
   risk_level: string;
+  service_band?: string | null;
+  service_band_label?: string | null;
+  service_band_percent?: number | null;
+  legacy_risk_level?: string | null;
   model_name?: string | null;
   model_version?: string | null;
   guide_message: string;

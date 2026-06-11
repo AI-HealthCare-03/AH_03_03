@@ -8,6 +8,7 @@ import { listHealthRecords } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { getDisplayRiskLabel, getDisplayRiskScoreLabel, getRiskClassName } from "../utils/riskDisplay";
 
 import { Mail, Phone } from 'lucide-react';
 import { Activity, Gauge, Droplet, Moon } from "lucide-react";
@@ -39,12 +40,6 @@ const analysisTypeLabels: Record<string, string> = {
   HYPERTENSION: "고혈압",
   OBESITY: "비만",
   DYSLIPIDEMIA: "콜레스테롤·중성지방",
-};
-
-const riskFallbackScores: Record<string, number> = {
-  HIGH: 80,
-  MEDIUM: 55,
-  LOW: 25,
 };
 
 const challengeStatusLabels: Record<string, string> = {
@@ -84,18 +79,6 @@ function getDateLabel(value: unknown): string {
     return String(value);
   }
   return date.toLocaleDateString("ko-KR");
-}
-
-function getRiskLevel(result: Item): string {
-  return String(result.risk_level ?? "").toUpperCase();
-}
-
-function getRiskScore(result: Item): number {
-  const score = Number(result.risk_score);
-  if (Number.isFinite(score) && score > 0) {
-    return Math.round(score <= 1 ? score * 100 : score);
-  }
-  return riskFallbackScores[getRiskLevel(result)] ?? 0;
 }
 
 function normalizeStatus(value: unknown): string {
@@ -523,8 +506,6 @@ export default function MyPage() {
             <div className="card-list">
               {analysis.length === 0 && <div className="state-box">최근 분석 결과가 없습니다.</div>}
               {analysis.map((result) => {
-                const level = getRiskLevel(result);
-                const score = getRiskScore(result);
                 const resultId = Number(result.id);
                 return (
                   <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
@@ -537,8 +518,8 @@ export default function MyPage() {
                       )}
                     </div>
                     <div className="button-row" style={{ marginTop: "6px" }}>
-                      <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
-                      <span className="badge badge-reference">{score}/100</span>
+                      <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                      <span className="badge badge-reference">{getDisplayRiskScoreLabel(result)}</span>
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
                   </div>

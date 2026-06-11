@@ -16,6 +16,7 @@ import {
 } from "../api/dashboard";
 import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
 import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";
+import { getDisplayRiskLabel, getDisplayRiskPercent, getRiskClassName } from "../utils/riskDisplay";
 
 function getChallengeIcon(category: unknown): ReactNode {
   const key = String(category ?? "").toUpperCase();
@@ -68,12 +69,6 @@ const analysisTypeLabels: Record<string, string> = {
   HYPERTENSION: "고혈압",
   DYSLIPIDEMIA: "콜레스테롤·중성지방",
   OBESITY: "비만",
-};
-
-const riskLevelLabels: Record<string, string> = {
-  LOW: "낮음",
-  MEDIUM: "관리 필요",
-  HIGH: "높음",
 };
 
 const periodOptions = [
@@ -173,16 +168,15 @@ function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSer
       color: diseaseChartColors[item.disease_type] ?? "var(--chart-overall)",
       points: item.points
         .reduce<ChartPoint[]>((points, point) => {
-          const value = Number(point.risk_score);
-          if (!Number.isFinite(value)) {
+          const percent = getDisplayRiskPercent(point);
+          if (!Number.isFinite(percent)) {
             return points;
           }
-          const normalizedValue = value <= 1 ? value * 100 : value;
           points.push({
             date: point.analyzed_at,
             label: formatDate(point.analyzed_at),
-            value: normalizedValue,
-            displayValue: `${Math.round(normalizedValue * 10) / 10}/100 · ${formatRiskLevel(point.risk_level)}`,
+            value: percent,
+            displayValue: getDisplayRiskLabel(point),
           });
           return points;
         }, [])
@@ -312,19 +306,6 @@ function formatCompactValue(value: unknown, fallback = "아직 기록 없음"): 
     return fallback;
   }
   return String(value);
-}
-
-function formatRiskLevel(value: unknown): string {
-  const key = String(value ?? "").toUpperCase();
-  return riskLevelLabels[key] ?? (key || "-");
-}
-
-function formatRiskScore(value: unknown): string {
-  const score = Number(value);
-  if (!Number.isFinite(score)) {
-    return "";
-  }
-  return `${Math.round(score <= 1 ? score * 100 : score)}/100`;
 }
 
 function getSeriesDelta(series: ChartSeries[]): number | null {
@@ -900,11 +881,8 @@ export default function DashboardPage() {
                       <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
                       <p className="muted">{result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}</p>
                     </div>
-                    <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
-                      {formatRiskLevel(result.risk_level)}
-                    </span>
+                    <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
                   </div>
-                  <span className="badge badge-reference">{formatRiskScore(result.risk_score)}</span>
                 </div>
               ))}
             </div>

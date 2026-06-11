@@ -10,6 +10,7 @@ import { listMedications } from "../api/medications";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
+import { getDisplayRiskLabel, getDisplayRiskPercent, getRiskColor } from "../utils/riskDisplay";
 
 type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
@@ -146,12 +147,6 @@ const landingPreview = {
   challengeProgress: 72,
 };
 
-const riskLabelMap: Record<string, string> = {
-  LOW: "낮음",
-  MEDIUM: "관리 필요",
-  HIGH: "높음",
-};
-
 const analysisTypeLabels: Record<string, string> = {
   DIABETES: "당뇨",
   HYPERTENSION: "고혈압",
@@ -175,11 +170,6 @@ const categoryLabel: Record<string, string> = {
 
 function asRecord(value: unknown): AnyRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as AnyRecord) : {};
-}
-
-function formatRisk(value: unknown): string {
-  const raw = String(value ?? "").toUpperCase();
-  return riskLabelMap[raw] ?? (raw || "-");
 }
 
 function formatDate(value: unknown): string {
@@ -504,22 +494,16 @@ export default function MainPage() {
               {displayAnalysisResults.length > 0 ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   {displayAnalysisResults.map((result) => {
-                    const level = String(result.risk_level ?? "").toUpperCase();
-                    const score = typeof result.risk_score === "number" ? result.risk_score : parseFloat(String(result.risk_score ?? "0"));
-                    const pct = Math.round(score * 100);
-                    const circumference = 2 * Math.PI * 28;
-                    const dashFilled = (score * circumference).toFixed(1);
-                    const dashEmpty = (circumference - score * circumference).toFixed(1);
-                    const color = level === "HIGH" ? "#EF4444" : level === "MEDIUM" ? "#F59E0B" : "#1D9E75";
-                    const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
-                    const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
+                    const label = getDisplayRiskLabel(result);
+                    const scoreRatio = getDisplayRiskPercent(result) / 100;
+                    const color = getRiskColor(result);
                     return (
                       <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
                         <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
-                        <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
+                        <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${label}`}>
                           <circle cx="65" cy="65" r="52" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                          <circle cx="65" cy="65" r="52" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 52).toFixed(1)} ${(2 * Math.PI * 52 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 65 65)"/>
-                          <text x="65" y="71" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(scoreRatio * 2 * Math.PI * 52).toFixed(1)} ${(2 * Math.PI * 52 * (1 - scoreRatio)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 65 65)"/>
+                          <text x="65" y="71" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{label}</text>
                         </svg>
                       </div>
                     );

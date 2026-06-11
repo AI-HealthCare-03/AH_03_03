@@ -7,6 +7,7 @@ import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import { getDisplayRiskLabel, getDisplayRiskScoreLabel, getRiskClassName } from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -47,12 +48,6 @@ const analysisTypeLabels: Record<string, string> = {
   OBESITY: "비만",
   DYSLIPIDEMIA: "콜레스테롤·중성지방",
   HYPERTENSION: "고혈압",
-};
-
-const riskFallbackScores: Record<string, number> = {
-  HIGH: 80,
-  MEDIUM: 55,
-  LOW: 25,
 };
 
 const asyncJobStatusMessages: Record<string, string> = {
@@ -114,18 +109,6 @@ function displayFactorValue(factor: AnalysisFactor): string {
   }
   const value = String(rawValue);
   return factorValueLabels[key]?.[value] ?? value;
-}
-
-function getRiskLevel(result: AnalysisResult): string {
-  return String(result.risk_level ?? "").toUpperCase();
-}
-
-function getRiskScore(result: AnalysisResult): number {
-  const raw = Number(result.risk_score);
-  if (Number.isFinite(raw) && raw > 0) {
-    return Math.round(raw <= 1 ? raw * 100 : raw);
-  }
-  return riskFallbackScores[getRiskLevel(result)] ?? 0;
 }
 
 function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId: Record<string, AnalysisExplanation>): string {
@@ -346,15 +329,13 @@ export default function AnalysisPage() {
       </div>
       <div className="metric-grid">
         {results.map((result) => {
-          const level = getRiskLevel(result);
-          const score = getRiskScore(result);
           const explanation = explanationsByResultId[String(result.id)];
           const referenceSources = explanation?.reference_sources ?? [];
           return (
             <div className="metric-card card" key={String(result.id)}>
-              <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 위험도</span>
-              <strong>{score}/100</strong>
-              <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
+              <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 관리 필요 단계</span>
+              <strong>{getDisplayRiskScoreLabel(result)}</strong>
+              <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}

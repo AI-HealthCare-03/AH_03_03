@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { getAnalysisResultDetail, listAnalysisResults } from "../api/analysis";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import { getDisplayRiskLabel, getDisplayRiskScoreLabel, getRiskClassName } from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type ReferenceSource = {
@@ -97,14 +98,6 @@ export default function AnalysisHistoryPage() {
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ko-KR");
   };
 
-  const scoreLabel = (value: unknown) => {
-    const score = Number(value);
-    if (!Number.isFinite(score)) {
-      return "-";
-    }
-    return `${Math.round(score <= 1 ? score * 100 : score)}/100`;
-  };
-
   const displayResults = useMemo(() => {
     const selectedType = tabToType[activeTab];
     if (!selectedType) {
@@ -125,10 +118,6 @@ export default function AnalysisHistoryPage() {
     detail?.snapshot?.input_payload && typeof detail.snapshot.input_payload === "object"
       ? (detail.snapshot.input_payload as Record<string, unknown>)
       : {};
-    const snapshotOutput =
-      detail?.snapshot?.output_payload && typeof detail.snapshot.output_payload === "object"
-        ? (detail.snapshot.output_payload as Record<string, unknown>)
-        : {};
   const referenceSources = detail?.explanation?.reference_sources ?? [];
 
   useEffect(() => {
@@ -162,8 +151,8 @@ export default function AnalysisHistoryPage() {
         >
           <div className="score-panel">
             <span>{labels[String(result?.analysis_type)] ?? String(result?.analysis_type ?? "분석")}</span>
-            <strong>{String(result?.risk_level ?? "-")}</strong>
-            <span className="badge badge-reference">{scoreLabel(result?.risk_score)}</span>
+            <strong>{getDisplayRiskLabel(result)}</strong>
+            <span className="badge badge-reference">{getDisplayRiskScoreLabel(result)}</span>
             <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
             <p>{String(result?.summary ?? "")}</p>
           </div>
@@ -221,7 +210,7 @@ export default function AnalysisHistoryPage() {
               ["BMI", snapshotInput.bmi],
               ["혈압", `${String(snapshotInput.systolic_bp ?? "-")} / ${String(snapshotInput.diastolic_bp ?? "-")}`],
               ["공복혈당", snapshotInput.fasting_glucose],
-              ["위험도", snapshotOutput.risk_level ?? result?.risk_level],
+              ["관리 필요 단계", getDisplayRiskLabel(result)],
             ].map(([label, value]) => (
               <div className="record-table-row" key={String(label)}>
                 <span>{String(label)}</span>
@@ -261,14 +250,12 @@ export default function AnalysisHistoryPage() {
         {displayResults.map((result) => {
           const content = (
             <>
-              <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
-                {String(result.risk_level ?? "-")}
-              </span>
+              <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
               <div>
                 <strong>{labels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
                 <p className="muted">{mainFactorLabel(result)}</p>
               </div>
-              <span>{scoreLabel(result.risk_score)}</span>
+              <span>{getDisplayRiskScoreLabel(result)}</span>
               <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               <span className="badge badge-reference">상세보기</span>
