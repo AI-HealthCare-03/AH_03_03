@@ -48,6 +48,10 @@ class AnalysisResultResponse(BaseSerializerModel):
     analyzed_at: datetime
     created_at: datetime
     updated_at: datetime
+    service_band: str | None = None
+    service_band_label: str | None = None
+    service_band_percent: int | None = None
+    legacy_risk_level: str | None = None
 
 
 class AnalysisResultFactorCreateRequest(BaseModel):
@@ -107,3 +111,7 @@ class AnalysisRunResultResponse(BaseModel):
     explanation: dict[str, Any] | None = None
     challenge_recommendation_ids: list[int]
     factor_count: int = 0
+    service_band: str | None = None
+    service_band_label: str | None = None
+    service_band_percent: int | None = None
+    legacy_risk_level: str | None = None

@@ -17,6 +17,7 @@ from app.core import config
 from app.dtos.analysis import (
     AnalysisResultCreateRequest,
     AnalysisResultFactorCreateRequest,
+    AnalysisResultResponse,
     AnalysisSnapshotCreateRequest,
 )
 from app.dtos.challenges import ChallengeRecommendationCreateRequest
@@ -70,6 +71,15 @@ async def list_latest_analysis_results(user_id: int) -> list[AnalysisResult]:
     return await analysis_repository.list_analysis_results_by_user(user_id, limit=4, offset=0)
 
 
+async def get_analysis_result_response(result: AnalysisResult) -> dict[str, Any]:
+    snapshot = await get_analysis_snapshot(int(result.id))
+    return _analysis_result_response(result, snapshot)
+
+
+async def list_analysis_result_responses(results: list[AnalysisResult]) -> list[dict[str, Any]]:
+    return [await get_analysis_result_response(result) for result in results]
+
+
 async def create_analysis_factor(
     analysis_result_id: int, request: AnalysisResultFactorCreateRequest
 ) -> AnalysisResultFactor:
@@ -107,7 +117,7 @@ async def get_analysis_result_detail(result_id: int) -> dict[str, Any] | None:
     factors = await list_analysis_factors(result_id)
     snapshot = await get_analysis_snapshot(result_id)
     return {
-        "result": result,
+        "result": _analysis_result_response(result, snapshot),
         "factors": factors,
         "snapshot": snapshot,
         "explanation": _analysis_explanation(result, factors),
@@ -700,6 +710,49 @@ def _screening_dual_stage_response_fields(screening_dual_stage: dict[str, Any] |
         "service_band_percent": screening_dual_stage.get("service_band_percent"),
         "legacy_risk_level": screening_dual_stage.get("legacy_risk_level"),
     }
+
+
+def _analysis_result_response(result: AnalysisResult, snapshot: AnalysisSnapshot | None = None) -> dict[str, Any]:
+    payload = AnalysisResultResponse.model_validate(result).model_dump()
+    payload.update(_service_band_fields_from_snapshot(snapshot))
+    return payload
+
+
+def _service_band_fields_from_snapshot(snapshot: AnalysisSnapshot | None) -> dict[str, Any]:
+    fields = {
+        "service_band": None,
+        "service_band_label": None,
+        "service_band_percent": None,
+        "legacy_risk_level": None,
+    }
+    if snapshot is None:
+        return fields
+
+    output_payload = snapshot.output_payload if isinstance(snapshot.output_payload, dict) else {}
+    final_outputs = output_payload.get("final_outputs")
+    if not isinstance(final_outputs, dict):
+        return fields
+
+    fields["service_band"] = _optional_str(final_outputs.get("service_band"))
+    fields["service_band_label"] = _optional_str(final_outputs.get("service_band_label"))
+    fields["service_band_percent"] = _optional_int(final_outputs.get("service_band_percent"))
+    fields["legacy_risk_level"] = _optional_str(final_outputs.get("legacy_risk_level"))
+    return fields
+
+
+def _optional_str(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    return str(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _to_json_value(value: Any) -> Any:
