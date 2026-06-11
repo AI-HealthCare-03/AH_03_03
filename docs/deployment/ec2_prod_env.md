@@ -48,6 +48,112 @@ cp envs/example.prod.env .env.prod
 - SMTP password 원문을 문서/README/예시 파일에 직접 작성한 값
 - OpenAI, Langfuse, Clova secret 원문
 
+## 배포 이미지 빌드 기준
+
+`infra/docker/docker-compose.prod.yml`은 app, ai-worker, frontend 이미지를 EC2에서 build하지 않고 registry에서 pull한다. 따라서 배포 전 로컬 또는 CI에서 아래 3개 이미지를 같은 tag 규칙으로 build/push해야 한다.
+
+| 이미지 | prod compose tag | Dockerfile | build context |
+| --- | --- | --- | --- |
+| FastAPI app | `${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}` | `app/Dockerfile` | repo root |
+| AI Worker | `${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}` | `ai_runtime/Dockerfile` | repo root |
+| Frontend | `${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}` | `frontend/Dockerfile` | repo root |
+
+로컬 build 검증:
+
+```bash
+make image-tags
+make image-build-check
+```
+
+`make image-build-check`는 배포 검증용 alias이며 기본적으로 `make image-buildx-amd64-check`를 실행한다. EC2 Ubuntu t3 계열 배포 대상은 `linux/amd64`이므로 배포 전 검증은 amd64 buildx 기준으로 맞춘다.
+
+Apple Silicon에서 Docker Desktop 기본 native build를 실행하면 `linux/arm64/aarch64`로 빌드될 수 있다. `paddlepaddle`은 Linux aarch64 wheel이 제공되지 않는 버전이 있어 ai-worker 이미지 native build가 실패할 수 있다. 이 실패는 EC2 amd64 배포 이미지 실패와 다르므로, 배포 검증에는 아래 buildx target을 사용한다.
+
+```bash
+make image-buildx-amd64-check
+```
+
+로컬 아키텍처 자체를 확인하고 싶을 때만 native build target을 사용한다.
+
+```bash
+make image-build-native-check
+```
+
+필요하면 platform을 명시적으로 바꿀 수 있다. EC2 amd64 배포에서는 기본값을 유지한다.
+
+```bash
+DOCKER_PLATFORM=linux/amd64 make image-buildx-amd64-check
+```
+
+Docker Hub push 전에는 로컬 이미지 architecture가 `amd64`인지 확인한다.
+
+```bash
+docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION} \
+  --format '{{.Os}}/{{.Architecture}}'
+docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION} \
+  --format '{{.Os}}/{{.Architecture}}'
+docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION} \
+  --format '{{.Os}}/{{.Architecture}}'
+```
+
+각 출력이 `linux/amd64`인지 확인한 뒤 push한다.
+
+Docker Hub push는 build 검증과 tag 확인 후 별도로 실행한다. push 전에는 Docker Hub 계정/레포/tag가 prod compose와 일치하는지 확인한다.
+
+```bash
+docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}
+docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}
+docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
+```
+
+### Frontend build args
+
+`frontend/Dockerfile`은 Vite 정적 번들을 build한다. `VITE_*` 값은 runtime 환경변수가 아니라 build-time 값이며, 빌드 결과 JS bundle에 포함된다.
+
+사용하는 build arg:
+
+- `VITE_API_BASE_URL`
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_MEASUREMENT_ID`
+- `VITE_FIREBASE_VAPID_KEY`
+
+`VITE_*`에는 브라우저 public config만 넣는다. `OPENAI_API_KEY`, `SMTP_PASSWORD`, `LANGFUSE_SECRET_KEY`, `CLOVA_OCR_SECRET_KEY`, Firebase service account private key 같은 server secret은 절대 build arg로 넘기지 않는다.
+
+### Secret bake-in 점검
+
+backend Dockerfile은 `.env`를 copy하지 않고, root `.dockerignore`는 `.env`, private env 파일, service account JSON, node_modules, cache/output 계열 파일을 제외한다. 그래도 배포 전 아래 명령으로 image metadata와 파일 포함 여부를 확인한다.
+
+```bash
+docker history --no-trunc ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}
+docker history --no-trunc ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}
+docker history --no-trunc ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
+
+docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}
+docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}
+docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
+```
+
+이미지 내부에 `.env`나 service account JSON이 들어가지 않았는지 확인한다.
+
+```bash
+docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION} \
+  sh -lc 'find /app -name ".env" -o -name "*service-account*.json" -o -name "*firebase-adminsdk*.json"'
+docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION} \
+  sh -lc 'find /app -name ".env" -o -name "*service-account*.json" -o -name "*firebase-adminsdk*.json"'
+```
+
+frontend bundle에 server secret 키워드가 섞이지 않았는지도 확인한다. public Firebase config key 이름은 정상적으로 나타날 수 있지만, server secret 값이나 server secret 변수명은 없어야 한다.
+
+```bash
+docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION} \
+  sh -lc 'grep -R "OPENAI_API_KEY\\|SMTP_PASSWORD\\|LANGFUSE_SECRET_KEY\\|CLOVA_OCR_SECRET_KEY\\|PRIVATE_KEY" -n /usr/share/nginx/html || true'
+```
+
 ## Storage 기준
 
 운영에서는 `STORAGE_BACKEND=s3`를 기본으로 사용합니다. 업로드 파일은 DB backup에 포함되지 않고 S3 bucket에 별도로 보존됩니다.
@@ -164,7 +270,7 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 
 ## 실행 순서
 
-이미지를 먼저 push한 뒤 EC2에서 실행합니다.
+이미지를 먼저 push한 뒤 EC2에서 실행합니다. prod compose는 pull-only 구조이므로 EC2에서 app/frontend/worker 이미지를 build하지 않는다.
 
 `docker-compose.prod.yml`은 외부 Docker network `ai-health-shared`를 사용합니다. EC2 최초 배포 전 한 번 생성합니다.
 
@@ -172,10 +278,20 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 docker network create ai-health-shared || true
 ```
 
+EC2에서는 `envs/example.prod.env`를 복사한 `.env.prod`를 준비하고, 실제 운영 값은 `.env.prod`에만 채운다. 최초 IP/HTTP 확인 또는 Let's Encrypt 인증서 발급 전에는 HTTPS 설정 대신 HTTP bootstrap 설정을 사용한다.
+
+```env
+NGINX_CONF=../nginx/prod_http.conf
+```
+
+이미지를 pull하고 컨테이너를 실행한다.
+
 ```bash
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
 ```
+
+`REFRESH_TOKEN_COOKIE_SECURE=true` 상태에서는 HTTP/IP 접속 smoke test에서 refresh cookie 기반 로그인 유지가 제한될 수 있다. 이 값은 HTTPS/도메인 운영 기준으로는 true를 유지해야 하며, HTTP 임시 테스트에서만 쿠키 동작 제약을 감안한다.
 
 마이그레이션:
 
@@ -189,6 +305,27 @@ docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec
 ```bash
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec fastapi \
   uv run --no-sync python scripts/seed_mvp_challenges.py
+```
+
+기본 health check:
+
+```bash
+curl -fsS http://localhost/api/v1/system/health
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml ps
+```
+
+도메인 DNS, 인증서, Nginx HTTPS 설정이 준비되면 `.env.prod`를 HTTPS 설정으로 전환한다.
+
+```env
+NGINX_CONF=../nginx/prod_https.conf
+```
+
+이후 Nginx 설정을 재적용하고 외부 HTTPS health check를 확인한다.
+
+```bash
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
+curl -fsS https://your-domain.example/api/v1/system/health
 ```
 
 ## PostgreSQL 백업/복구

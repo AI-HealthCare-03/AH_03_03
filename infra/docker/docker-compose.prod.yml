@@ -40,7 +40,7 @@ services:
 
   fastapi:
     container_name: fastapi
-    image: ${DOCKER_USER:-ozcodingschool}/${DOCKER_REPOSITORY:-ai-health}:app-${APP_VERSION:-v1.0.0}
+    image: ${DOCKER_USER:-kdu0312}/${DOCKER_REPOSITORY:-ai-health}:app-${APP_VERSION:-v1.0.0}
     environment:
       ENV: ${ENV:-prod}
       SECRET_KEY: ${SECRET_KEY:-PLEASE_CHANGE_ME}
@@ -134,7 +134,7 @@ services:
 
   ai-worker:
     container_name: ai-worker
-    image: ${DOCKER_USER:-ozcodingschool}/${DOCKER_REPOSITORY:-ai-health}:ai-${AI_WORKER_VERSION:-v1.0.0}
+    image: ${DOCKER_USER:-kdu0312}/${DOCKER_REPOSITORY:-ai-health}:ai-${AI_WORKER_VERSION:-v1.0.0}
     environment:
       ENV: ${ENV:-prod}
       SECRET_KEY: ${SECRET_KEY:-PLEASE_CHANGE_ME}
@@ -205,7 +205,7 @@ services:
 
   frontend:
     container_name: frontend
-    image: ${DOCKER_USER:-ozcodingschool}/${DOCKER_REPOSITORY:-ai-health}:frontend-${FRONTEND_VERSION:-v1.0.0}
+    image: ${DOCKER_USER:-kdu0312}/${DOCKER_REPOSITORY:-ai-health}:frontend-${FRONTEND_VERSION:-v1.0.0}
     restart: always
     expose:
       - "80"

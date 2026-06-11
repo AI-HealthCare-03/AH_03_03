@@ -36,6 +36,11 @@ checkpoints
 !ai_runtime/ml/artifacts/**/model_params.json
 !ai_runtime/ml/artifacts/**/experiment_config.json
 
+# Challenge seed master data is copied by app/Dockerfile.
+!docs/data/
+!docs/data/challenges/
+!docs/data/challenges/**
+
 # Clova OCR raw/reference/output files are local PoC assets and must not be
 # packaged into Docker images.
 ai_runtime/ocr/providers/clova_ocr/ground_truth/**

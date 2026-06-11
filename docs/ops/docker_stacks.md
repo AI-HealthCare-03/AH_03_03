@@ -102,7 +102,7 @@ make app-clean-image # 알려진 로컬 app/test 이미지를 삭제
 
 `make app-clean-image`는 아래 이미지를 대상으로 한다.
 
-- `ozcodingschool/ai-health:app-v1.0.0`
+- `kdu0312/ai-health:app-v1.0.0`
 - `test-ai-health:latest`
 
 이미지가 없으면 건너뛴다. 실행 중인 컨테이너가 이미지를 사용 중이면 Docker가 삭제를 거부할 수 있으므로 먼저 `make app-down`으로 컨테이너를 내린 뒤 다시 실행한다.
@@ -181,6 +181,35 @@ make langfuse-down
 
 운영/EC2 표준 스택은 `infra/docker/docker-compose.prod.yml` 기준이다. 로컬 시연용 기본 명령에 포함하지 않는다. prod compose는 app, ai-worker, frontend service image를 registry에서 pull하는 구조이며, EC2에서 직접 build하지 않는다.
 
+prod compose가 pull하는 이미지 tag는 Makefile의 build check target과 같은 규칙을 사용한다.
+
+| 서비스 | 이미지 tag 규칙 | Dockerfile |
+| --- | --- | --- |
+| `fastapi` | `${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}` | `app/Dockerfile` |
+| `ai-worker` | `${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}` | `ai_runtime/Dockerfile` |
+| `frontend` | `${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}` | `frontend/Dockerfile` |
+
+배포 전 로컬 build 검증:
+
+```bash
+make image-tags
+make image-build-check
+```
+
+`make image-build-check`는 배포 검증용 alias로 `linux/amd64` buildx target을 실행한다. Apple Silicon native build는 ai-worker의 `paddlepaddle` Linux arm64 wheel 부재로 실패할 수 있으므로 배포 이미지는 amd64로 확인한다.
+
+```bash
+make image-buildx-amd64-check
+```
+
+현재 로컬 아키텍처 build를 별도로 확인할 때만 아래 target을 사용한다.
+
+```bash
+make image-build-native-check
+```
+
+`frontend/Dockerfile`의 `VITE_*` 값은 build-time에 정적 bundle로 들어간다. 브라우저 public config만 넣고 server secret은 절대 build arg로 전달하지 않는다.
+
 ```bash
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
 docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
@@ -212,6 +241,12 @@ docker compose logs --tail=100 fastapi
 `docker compose up` 또는 `docker compose build`는 원격 registry에 이미지를 올리지 않는다. 원격 저장소에 이미지를 올리는 작업은 `docker push`를 실행할 때만 발생한다.
 
 다만 `docker compose up` 또는 `docker compose build` 과정에서 로컬에 없는 base image나 service image는 Docker Hub 등 registry에서 pull될 수 있다.
+
+### Docker build context / .dockerignore
+
+현재 app, ai-worker, frontend 이미지 build context는 모두 repository root다. 따라서 Docker가 실제로 적용하는 ignore 파일은 root `.dockerignore` 하나다. 하위 `app/.dockerignore`, `ai_runtime/.dockerignore`는 이 빌드 경로에서는 적용되지 않아 혼동을 줄 수 있으므로 사용하지 않는다.
+
+root `.dockerignore`는 `.env`, private env 파일, `.venv`, `.git`, cache/output, `node_modules`, 로컬 데이터와 대용량 실험 산출물을 제외한다. 단, `app/Dockerfile`이 copy하는 challenge seed master data와 runtime CatBoost artifact는 명시적으로 예외 처리한다.
 
 ### volume 삭제 주의
 
