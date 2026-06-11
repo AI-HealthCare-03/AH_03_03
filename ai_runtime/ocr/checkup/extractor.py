@@ -59,11 +59,18 @@ FIELD_KEYWORDS = {
     "systolic_bp": ["수축기", "고혈압", "혈압", "mmHg", "SBP"],
     "diastolic_bp": ["이완기", "DBP"],
     "fasting_glucose": ["공복혈당", "혈당", "공복", "GLU", "Glucose"],
+    "hba1c": ["당화혈색소", "HbA1c", "A1c"],
     "hb": ["혈색소", "헤모글로빈"],  # Hb 단독 키워드는 HbA1c와 혼동 위험으로 제외
+    "hemoglobin": ["혈색소", "헤모글로빈"],
     "total_cholesterol": ["총콜레스테롤", "콜레스테롤", "TC", "T-CHO", "CHOL"],
     "triglyceride": ["중성지방", "TG", "Triglyceride"],
     "hdl": ["고밀도", "HDL"],
     "ldl": ["저밀도", "LDL"],
+    "ast": ["AST", "GOT", "SGOT"],
+    "alt": ["ALT", "GPT", "SGPT"],
+    "gamma_gtp": ["감마GTP", "감마지티피", "γ-GTP", "r-GTP", "GGT", "GGTP"],
+    "creatinine": ["크레아티닌", "Creatinine", "Cr", "혈청크레아티닌"],
+    "egfr": ["eGFR", "사구체여과율", "신사구체여과율"],
     "height_cm": ["신장", "키(cm)", "키", "Height", "HT"],
     "weight_kg": ["체중", "몸무게(kg)", "몸무게", "Weight", "WT"],
     "bmi": ["BMI", "체질량", "비만도", "체질량지수"],
@@ -134,11 +141,18 @@ def validate_value(field, value):
         "systolic_bp": (60, 250),
         "diastolic_bp": (40, 150),
         "fasting_glucose": (40, 600),
+        "hba1c": (3.0, 20.0),
         "hb": (5.0, 25.0),
+        "hemoglobin": (5.0, 25.0),
         "total_cholesterol": (50, 600),
         "triglyceride": (20, 2000),
         "hdl": (10, 200),
         "ldl": (20, 500),
+        "ast": (1, 1000),
+        "alt": (1, 1000),
+        "gamma_gtp": (1, 2000),
+        "creatinine": (0.1, 20),
+        "egfr": (1, 200),
         "height_cm": (100, 250),
         "weight_kg": (20, 300),
         "bmi": (10, 70),
@@ -253,12 +267,12 @@ def parse_bmi(text_lines) -> float | None:
     return None
 
 
-def _extract_value_from_context(text_lines, i, text):
-    value = extract_first_number(text)
+def _extract_value_from_context(field, text_lines, i, text):
+    value = next((number for number in extract_numbers(text) if validate_value(field, number)), None)
     confidence = text_lines[i][1]
     if value is None:
         for j in range(i + 1, min(i + 3, len(text_lines))):
-            value = extract_first_number(text_lines[j][0])
+            value = next((number for number in extract_numbers(text_lines[j][0]) if validate_value(field, number)), None)
             if value is not None:
                 confidence = text_lines[j][1]
                 break
@@ -283,7 +297,7 @@ def _parse_general_fields(text_lines, extracted, skip_fields, low_conf):
                 if any(is_not_applicable(line) for line in check_lines):
                     continue
 
-            value, confidence = _extract_value_from_context(text_lines, i, text)
+            value, confidence = _extract_value_from_context(field, text_lines, i, text)
             if value is not None and validate_value(field, value):
                 extracted[field] = value
                 if confidence < CONFIDENCE_THRESHOLD:
@@ -317,7 +331,7 @@ def parse_from_text_lines(text_lines):
         if hb_confidence is not None and hb_confidence < CONFIDENCE_THRESHOLD:
             low_conf.append("hb")
 
-    skip_fields = {"systolic_bp", "diastolic_bp", "height_cm", "weight_kg", "hb", "bmi"}
+    skip_fields = {"systolic_bp", "diastolic_bp", "height_cm", "weight_kg", "hb", "hemoglobin", "bmi"}
     _parse_general_fields(text_lines, extracted, skip_fields, low_conf)
 
     # BMI 전용 파서 — 범위 표현 제거 후 실측값만 추출

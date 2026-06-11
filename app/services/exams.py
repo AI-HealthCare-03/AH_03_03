@@ -32,12 +32,21 @@ EXAM_MEASUREMENT_METADATA = {
     "diastolic_bp": ("이완기혈압", "mmHg"),
     "fasting_glucose": ("공복혈당", "mg/dL"),
     "hba1c": ("당화혈색소", "%"),
+    "hb": ("혈색소", "g/dL"),
+    "hemoglobin": ("혈색소", "g/dL"),
     "total_cholesterol": ("총콜레스테롤", "mg/dL"),
     "ldl": ("LDL 콜레스테롤", "mg/dL"),
     "ldl_cholesterol": ("LDL 콜레스테롤", "mg/dL"),
     "hdl": ("HDL 콜레스테롤", "mg/dL"),
     "hdl_cholesterol": ("HDL 콜레스테롤", "mg/dL"),
     "triglyceride": ("중성지방", "mg/dL"),
+    "ast": ("AST", "U/L"),
+    "alt": ("ALT", "U/L"),
+    "gamma_gtp": ("감마GTP", "U/L"),
+    "ggt": ("감마GTP", "U/L"),
+    "creatinine": ("크레아티닌", "mg/dL"),
+    "egfr": ("eGFR", "mL/min/1.73m2"),
+    "urine_protein": ("요단백", None),
 }
 
 EXAM_MEASUREMENT_TO_HEALTH_FIELD = {
@@ -379,18 +388,20 @@ def _media_type_from_storage_key(key: str, filename: str | None = None) -> str:
 
 def _measurement_tuples_from_mapping(values: dict[str, Any]) -> list[tuple[str, str, str, str | None]]:
     measurements = []
-    for key, health_key in EXAM_MEASUREMENT_TO_HEALTH_FIELD.items():
+    for key, (measurement_name, unit) in EXAM_MEASUREMENT_METADATA.items():
         if key not in values:
             continue
         value = values.get(key)
         if value is None or value == "":
             continue
+        if key == "urine_protein":
+            normalized_value = str(value).strip()
+            if not normalized_value or normalized_value in NON_NUMERIC_EXAM_VALUE_MARKERS:
+                continue
+            measurements.append((key, measurement_name, normalized_value, unit))
+            continue
         if parse_exam_measurement_number(value) is None:
             continue
         measurement_key = key
-        measurement_name, unit = EXAM_MEASUREMENT_METADATA.get(
-            measurement_key,
-            EXAM_MEASUREMENT_METADATA.get(health_key, (measurement_key, None)),
-        )
         measurements.append((measurement_key, measurement_name, str(value), unit))
     return measurements

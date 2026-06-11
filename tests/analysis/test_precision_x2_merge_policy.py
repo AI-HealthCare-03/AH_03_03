@@ -47,21 +47,59 @@ def test_exam_measurements_to_x2_payload_normalizes_aliases_and_values() -> None
         [
             _measurement("hb", "13.2 g/dL"),
             _measurement("AST", "30 IU/L"),
+            _measurement("ALT", "25 IU/L"),
             _measurement("γ-GTP", "44 IU/L"),
+            _measurement("creatinine", "0.9 mg/dL"),
             _measurement("eGFR", "45 mL/min/1.73m2"),
             _measurement("요단백", "+1"),
             _measurement("LDL", "132 mg/dL"),
+            _measurement("HbA1c", "5.8 %"),
         ]
     )
 
     assert payload == {
         "hemoglobin": Decimal("13.2"),
         "ast": 30,
+        "alt": 25,
         "gamma_gtp": 44,
+        "creatinine": Decimal("0.9"),
         "egfr": Decimal("45"),
         "urine_protein": "plus_1",
         "ldl_cholesterol": 132,
+        "hba1c": Decimal("5.8"),
     }
+
+
+@pytest.mark.asyncio
+async def test_precision_input_payload_includes_confirmed_x2_only_exam_measurements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("hemoglobin", "13.2 g/dL"),
+            _measurement("ast", "30 U/L"),
+            _measurement("alt", "25 U/L"),
+            _measurement("gamma_gtp", "44 U/L"),
+            _measurement("creatinine", "0.9 mg/dL"),
+            _measurement("egfr", "82 mL/min/1.73m2"),
+        ],
+    )
+
+    payload = await analysis_service.build_precision_analysis_input_payload(
+        user=SimpleNamespace(id=7, gender="MALE"),
+        health_record=_health_record(),
+    )
+
+    assert payload["selected_exam_report_id"] == 9001
+    assert payload["x2_measurement_source"] == "exam_measurements"
+    assert payload["x2_input_payload"]["hemoglobin"] == Decimal("13.2")
+    assert payload["x2_input_payload"]["ast"] == 30
+    assert payload["x2_input_payload"]["alt"] == 25
+    assert payload["x2_input_payload"]["gamma_gtp"] == 44
+    assert payload["x2_input_payload"]["creatinine"] == Decimal("0.9")
+    assert payload["x2_input_payload"]["egfr"] == Decimal("82")
+    assert payload["x2_field_sources"]["hemoglobin"] == "exam_measurements"
 
 
 @pytest.mark.asyncio

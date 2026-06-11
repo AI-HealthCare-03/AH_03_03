@@ -68,11 +68,18 @@ class CheckupOcrData(BaseModel):
     systolic_bp: str | float | None = None
     diastolic_bp: str | float | None = None
     fasting_glucose: str | float | None = None
+    hba1c: str | float | None = Field(None, description="당화혈색소(HbA1c) %")
     hb: str | float | None = Field(None, description="혈색소(Hemoglobin) g/dL")
+    hemoglobin: str | float | None = Field(None, description="혈색소(Hemoglobin) g/dL")
     total_cholesterol: str | float | None = None
     triglyceride: str | float | None = None
     hdl: str | float | None = None
     ldl: str | float | None = None
+    ast: str | float | None = Field(None, description="AST/GOT U/L")
+    alt: str | float | None = Field(None, description="ALT/GPT U/L")
+    gamma_gtp: str | float | None = Field(None, description="감마GTP U/L")
+    creatinine: str | float | None = Field(None, description="혈청 크레아티닌 mg/dL")
+    egfr: str | float | None = Field(None, description="eGFR mL/min/1.73m2")
     height_cm: str | float | None = None
     weight_kg: str | float | None = None
     bmi: str | float | None = Field(None, description="검진표 수치 또는 키·몸무게 자체 계산값")
