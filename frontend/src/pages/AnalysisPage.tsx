@@ -8,6 +8,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import { getAsyncJobStatusLabel, getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import {
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
@@ -47,14 +48,6 @@ type Readiness = {
   missing_basic_fields?: string[];
   missing_precision_fields?: string[];
   message: string;
-};
-
-const asyncJobStatusMessages: Record<string, string> = {
-  PENDING: "분석 작업 대기 중입니다.",
-  PROCESSING: "분석 중입니다.",
-  SUCCESS: "분석이 완료되었습니다.",
-  FAILED: "분석에 실패했습니다.",
-  CANCELED: "분석 작업이 취소되었습니다.",
 };
 
 const missingFieldLabels: Record<string, string> = {
@@ -260,11 +253,8 @@ export default function AnalysisPage() {
       service_band: result.service_band,
       service_band_label: result.service_band_label,
     }));
-  const jobStatusMessage = latestJob
-    ? asyncJobStatusMessages[latestJob.status] ?? "분석 작업 상태를 확인하고 있습니다."
-    : analysisJobId
-      ? "분석 작업 대기 중입니다."
-      : "";
+  const latestJobStatusLabel = latestJob ? getAsyncJobStatusLabel(latestJob.status) : "";
+  const jobStatusMessage = latestJob ? getAsyncJobStatusMessage(latestJob.status) : analysisJobId ? "분석 대기 중" : "";
   const showJobStatus = analysisJobId !== null && (isPolling || Boolean(jobStatusMessage));
 
   return (
@@ -293,7 +283,7 @@ export default function AnalysisPage() {
         <div className="state-box">
           {jobStatusMessage}
           {latestJob?.status && latestJob.status !== "SUCCESS" && latestJob.status !== "FAILED" && (
-            <span className="muted"> 현재 상태: {latestJob.status}</span>
+            <span className="muted"> 현재 상태: {latestJobStatusLabel}</span>
           )}
         </div>
       )}

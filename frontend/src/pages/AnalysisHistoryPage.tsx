@@ -175,7 +175,6 @@ export default function AnalysisHistoryPage() {
                     {referenceSources.map((source) => (
                       <span className="badge badge-reference" key={String(source.id ?? source.title)}>
                         {String(source.source_org ?? source.title ?? "참고 출처")}
-                        {source.status ? ` · ${String(source.status)}` : ""}
                       </span>
                     ))}
                   </div>

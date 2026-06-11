@@ -552,7 +552,7 @@ function getChallengeDisplayStatus(challenge: AnyRecord): string {
   if (Boolean(challenge.has_met_completion_condition)) {
     return "완료 조건 충족";
   }
-  return challengeStatusLabels[status] ?? (status ? status : "참여 가능");
+  return challengeStatusLabels[status] ?? (status ? "상태 확인 중" : "참여 가능");
 }
 
 export default function DashboardPage() {
