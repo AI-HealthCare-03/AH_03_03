@@ -6,8 +6,9 @@ import { listChallengeRecommendations, listChallenges } from "../api/challenges"
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getDisplayRiskLabel, getDisplayRiskScoreLabel, getRiskClassName } from "../utils/riskDisplay";
+import { getDisplayRiskLabel } from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -250,6 +251,17 @@ export default function AnalysisPage() {
   };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
+  const diseaseRiskItems: DiseaseRiskItem[] = results
+    .filter((result) => Boolean(analysisTypeLabels[String(result.analysis_type)]))
+    .map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
   const jobStatusMessage = latestJob
     ? asyncJobStatusMessages[latestJob.status] ?? "분석 작업 상태를 확인하고 있습니다."
     : analysisJobId
@@ -327,6 +339,9 @@ export default function AnalysisPage() {
           <p>{analysisComment}</p>
         </Card>
       </div>
+      <Card title="질환별 위험도">
+        <RiskStageBoard items={diseaseRiskItems} />
+      </Card>
       <div className="metric-grid">
         {results.map((result) => {
           const explanation = explanationsByResultId[String(result.id)];
@@ -334,8 +349,7 @@ export default function AnalysisPage() {
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 관리 필요 단계</span>
-              <strong>{getDisplayRiskScoreLabel(result)}</strong>
-              <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+              <strong>{getDisplayRiskLabel(result)}</strong>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}

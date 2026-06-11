@@ -6,6 +6,10 @@ export type RiskDisplaySource = {
   service_band_percent?: unknown;
 };
 
+export type RiskStageKey = "LOW" | "ATTENTION" | "CAUTION" | "HIGH_CAUTION";
+
+export const riskStageOrder: RiskStageKey[] = ["LOW", "ATTENTION", "CAUTION", "HIGH_CAUTION"];
+
 const serviceBandLabels: Record<string, string> = {
   LOW: "낮음",
   ATTENTION: "관심 필요",
@@ -34,10 +38,10 @@ const legacyRiskPercents: Record<string, number> = {
 
 const riskColors: Record<string, string> = {
   LOW: "#1D9E75",
-  ATTENTION: "#2563EB",
-  CAUTION: "#F59E0B",
+  ATTENTION: "#D99A3D",
+  CAUTION: "#EA580C",
   HIGH_CAUTION: "#EF4444",
-  MEDIUM: "#F59E0B",
+  MEDIUM: "#EA580C",
   HIGH: "#EF4444",
 };
 
@@ -59,6 +63,38 @@ export function getDisplayRiskBand(result: RiskDisplaySource | null | undefined)
     return serviceBand;
   }
   return riskLevel;
+}
+
+export function getCanonicalRiskStage(result: RiskDisplaySource | null | undefined): RiskStageKey {
+  const band = getDisplayRiskBand(result);
+  if (band === "ATTENTION" || band === "CAUTION" || band === "HIGH_CAUTION") {
+    return band;
+  }
+  if (band === "MEDIUM") {
+    return "CAUTION";
+  }
+  if (band === "HIGH") {
+    return "HIGH_CAUTION";
+  }
+  const explicitPercent = Number(result?.service_band_percent);
+  const score = Number(result?.risk_score);
+  const percent = Number.isFinite(explicitPercent) ? explicitPercent : score <= 1 ? score * 100 : score;
+  if (Number.isFinite(percent)) {
+    if (percent >= 75) {
+      return "HIGH_CAUTION";
+    }
+    if (percent >= 60) {
+      return "CAUTION";
+    }
+    if (percent >= 40) {
+      return "ATTENTION";
+    }
+  }
+  return "LOW";
+}
+
+export function getRiskStageLabel(stage: RiskStageKey): string {
+  return serviceBandLabels[stage];
 }
 
 export function getDisplayRiskLabel(result: RiskDisplaySource | null | undefined): string {
@@ -110,8 +146,4 @@ export function getRiskClassName(result: RiskDisplaySource | null | undefined): 
 
 export function getRiskColor(result: RiskDisplaySource | null | undefined): string {
   return riskColors[getDisplayRiskBand(result)] ?? riskColors.LOW;
-}
-
-export function getDisplayRiskScoreLabel(result: RiskDisplaySource | null | undefined): string {
-  return `${getDisplayRiskPercent(result)}/100`;
 }

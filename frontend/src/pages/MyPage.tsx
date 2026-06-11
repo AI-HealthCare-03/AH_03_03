@@ -8,7 +8,8 @@ import { listHealthRecords } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
-import { getDisplayRiskLabel, getDisplayRiskScoreLabel, getRiskClassName } from "../utils/riskDisplay";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import { getDisplayRiskLabel, getRiskClassName } from "../utils/riskDisplay";
 
 import { Mail, Phone } from 'lucide-react';
 import { Activity, Gauge, Droplet, Moon } from "lucide-react";
@@ -224,6 +225,17 @@ export default function MyPage() {
 
   const latestHealth = health[0];
   const visibleChallenges = challenges.filter(isVisibleMyChallenge);
+  const diseaseRiskItems: DiseaseRiskItem[] = analysis
+    .filter((result) => Boolean(analysisTypeLabels[String(result.analysis_type)]))
+    .map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
   const displayName = backendUser?.nickname ?? backendUser?.name ?? backendUser?.login_id ?? "사용자";
   const profileInitial = displayName.slice(0, 1).toUpperCase();
 
@@ -505,6 +517,7 @@ export default function MyPage() {
           <Card title="최근 분석 결과">
             <div className="card-list">
               {analysis.length === 0 && <div className="state-box">최근 분석 결과가 없습니다.</div>}
+              {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
               {analysis.map((result) => {
                 const resultId = Number(result.id);
                 return (
@@ -519,7 +532,6 @@ export default function MyPage() {
                     </div>
                     <div className="button-row" style={{ marginTop: "6px" }}>
                       <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
-                      <span className="badge badge-reference">{getDisplayRiskScoreLabel(result)}</span>
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
                   </div>

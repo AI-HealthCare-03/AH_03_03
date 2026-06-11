@@ -1,9 +1,10 @@
-import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
   DashboardAnalysisResult,
   DashboardRiskTrend,
+  DashboardRiskTrendPoint,
   DashboardRiskTrendSeries,
   DashboardSummary,
   getDashboardChallenges,
@@ -15,17 +16,8 @@ import {
   getDashboardTrends,
 } from "../api/dashboard";
 import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
-import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";
-import { getDisplayRiskLabel, getDisplayRiskPercent, getRiskClassName } from "../utils/riskDisplay";
-
-function getChallengeIcon(category: unknown): ReactNode {
-  const key = String(category ?? "").toUpperCase();
-  if (key.includes("DIET") || key.includes("식")) return <Salad size={20} />;
-  if (key.includes("MEDICATION") || key.includes("복약")) return <Pill size={20} />;
-  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return <Dumbbell size={20} />;
-  if (key.includes("WATER") || key.includes("수분")) return <Droplets size={20} />;
-  return <Trophy size={20} />;
-}
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import { getCanonicalRiskStage, getDisplayRiskLabel } from "../utils/riskDisplay";
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -35,6 +27,8 @@ type AnyRecord = Record<string, unknown>;
 type ChartPoint = {
   date: string;
   label: string;
+  sortTime?: number;
+  tooltipLines?: string[];
   value: number;
   displayValue?: string;
 };
@@ -44,6 +38,11 @@ type ChartSeries = {
   label: string;
   color: string;
   points: ChartPoint[];
+};
+
+type ChartAxisTick = {
+  value: number;
+  label: string;
 };
 
 const challengeStatusLabels: Record<string, string> = {
@@ -70,6 +69,56 @@ const analysisTypeLabels: Record<string, string> = {
   DYSLIPIDEMIA: "콜레스테롤·중성지방",
   OBESITY: "비만",
 };
+
+const riskStageChartValues = {
+  LOW: 1,
+  ATTENTION: 2,
+  CAUTION: 3,
+  HIGH_CAUTION: 4,
+} as const;
+
+const riskStageAxisTicks: ChartAxisTick[] = [
+  { value: riskStageChartValues.HIGH_CAUTION, label: "높은 주의" },
+  { value: riskStageChartValues.CAUTION, label: "주의" },
+  { value: riskStageChartValues.ATTENTION, label: "관심 필요" },
+  { value: riskStageChartValues.LOW, label: "낮음" },
+];
+
+function getRiskStageChartValue(point: DashboardRiskTrendPoint): number {
+  return riskStageChartValues[getCanonicalRiskStage(point)];
+}
+
+function getRiskTrendPointKey(point: DashboardRiskTrendPoint, fallbackIndex: number): string {
+  const timestamp = String(point.analyzed_at ?? point.created_at ?? "").trim();
+  if (timestamp) {
+    return timestamp;
+  }
+  const id = String(point.id ?? "").trim();
+  return id ? `id:${id}` : `index:${fallbackIndex}`;
+}
+
+function getRiskTrendSortTime(point: DashboardRiskTrendPoint, fallbackIndex: number): number {
+  const parsed = Date.parse(String(point.analyzed_at ?? point.created_at ?? ""));
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  const id = Number(point.id);
+  return Number.isFinite(id) ? id : fallbackIndex;
+}
+
+function isNewerRiskTrendPoint(
+  candidate: ChartPoint,
+  candidateIndex: number,
+  current: ChartPoint,
+  currentIndex: number,
+): boolean {
+  const candidateTime = candidate.sortTime ?? 0;
+  const currentTime = current.sortTime ?? 0;
+  if (candidateTime !== currentTime) {
+    return candidateTime > currentTime;
+  }
+  return candidateIndex > currentIndex;
+}
 
 const periodOptions = [
   { label: "1주일", value: "week" },
@@ -162,27 +211,52 @@ function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
 
 function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
   return items
-    .map((item) => ({
-      key: item.disease_type,
-      label: analysisTypeLabels[item.disease_type] ?? item.disease_type,
-      color: diseaseChartColors[item.disease_type] ?? "var(--chart-overall)",
-      points: item.points
-        .reduce<ChartPoint[]>((points, point) => {
-          const percent = getDisplayRiskPercent(point);
-          if (!Number.isFinite(percent)) {
-            return points;
-          }
-          points.push({
-            date: point.analyzed_at,
-            label: formatDate(point.analyzed_at),
-            value: percent,
-            displayValue: getDisplayRiskLabel(point),
-          });
-          return points;
-        }, [])
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    }))
+    .map((item) => {
+      const diseaseLabel = analysisTypeLabels[item.disease_type] ?? item.disease_type;
+      const latestByPointKey = new Map<string, { index: number; point: ChartPoint }>();
+
+      item.points.forEach((point, index) => {
+        const stageValue = getRiskStageChartValue(point);
+        if (!Number.isFinite(stageValue)) {
+          return;
+        }
+        const pointKey = getRiskTrendPointKey(point, index);
+        const labelSource = String(point.analyzed_at ?? point.created_at ?? pointKey);
+        const stageLabel = getDisplayRiskLabel(point);
+        const chartPoint: ChartPoint = {
+          date: pointKey,
+          label: formatDateTime(labelSource),
+          sortTime: getRiskTrendSortTime(point, index),
+          value: stageValue,
+          displayValue: stageLabel,
+          tooltipLines: [diseaseLabel, stageLabel, formatDateTime(labelSource), "분석 참고용", "의료 진단이 아닙니다"],
+        };
+        const current = latestByPointKey.get(pointKey);
+        if (!current || isNewerRiskTrendPoint(chartPoint, index, current.point, current.index)) {
+          latestByPointKey.set(pointKey, { index, point: chartPoint });
+        }
+      });
+
+      return {
+        key: item.disease_type,
+        label: diseaseLabel,
+        color: diseaseChartColors[item.disease_type] ?? "var(--chart-overall)",
+        points: Array.from(latestByPointKey.values())
+          .map(({ point }) => point)
+          .sort((a, b) => (a.sortTime ?? 0) - (b.sortTime ?? 0) || a.date.localeCompare(b.date)),
+      };
+    })
     .filter((item) => item.points.length > 0);
+}
+function formatDateTime(value: unknown): string {
+  if (!value) return "-";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return formatDate(value);
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hour = String(d.getHours()).padStart(2, "0");
+  const minute = String(d.getMinutes()).padStart(2, "0");
+  return `${mo}.${day} ${hour}:${minute}`;
 }
 
 function EmptyChartState() {
@@ -202,7 +276,7 @@ function EmptyChartState() {
   );
 }
 
-function LineChart({ series }: { series: ChartSeries[] }) {
+function LineChart({ axisTicks, series }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[] }) {
   const visibleSeries = series
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
@@ -214,7 +288,7 @@ function LineChart({ series }: { series: ChartSeries[] }) {
     return <EmptyChartState />;
   }
 
-  const values = allPoints.map((point) => point.value);
+  const values = axisTicks?.length ? axisTicks.map((tick) => tick.value) : allPoints.map((point) => point.value);
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const rangePadding = rawMin === rawMax ? Math.max(rawMax * 0.1, 1) : (rawMax - rawMin) * 0.12;
@@ -222,7 +296,7 @@ function LineChart({ series }: { series: ChartSeries[] }) {
   const max = rawMax + rangePadding;
   const width = 640;
   const height = 240;
-  const padding = { top: 20, right: 24, bottom: 34, left: 44 };
+  const padding = { top: 20, right: 24, bottom: 34, left: axisTicks?.length ? 76 : 44 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
   const xFor = (date: string, fallbackIndex: number) => {
@@ -231,7 +305,8 @@ function LineChart({ series }: { series: ChartSeries[] }) {
     return padding.left + (uniqueDates.length <= 1 ? innerWidth / 2 : (safeIndex / (uniqueDates.length - 1)) * innerWidth);
   };
   const yFor = (value: number) => padding.top + (1 - (value - min) / Math.max(max - min, 1)) * innerHeight;
-  const gridValues = [max, (max + min) / 2, min];
+  const gridValues = axisTicks?.length ? axisTicks.map((tick) => tick.value) : [max, (max + min) / 2, min];
+  const axisLabelFor = (value: number) => axisTicks?.find((tick) => tick.value === value)?.label ?? String(Math.round(value));
 
   return (
     <div className="line-chart-card">
@@ -243,7 +318,7 @@ function LineChart({ series }: { series: ChartSeries[] }) {
               <g key={value}>
                 <line className="line-chart-grid" x1={padding.left} x2={width - padding.right} y1={y} y2={y} />
                 <text className="line-chart-axis" x={8} y={y + 4}>
-                  {Math.round(value)}
+                  {axisLabelFor(value)}
                 </text>
               </g>
             );
@@ -274,9 +349,7 @@ function LineChart({ series }: { series: ChartSeries[] }) {
                     r="3.5"
                     style={{ "--series-color": item.color } as CSSProperties}
                   >
-                    <title>
-                      {item.label} · {point.label} · {point.displayValue ?? Math.round(point.value)}
-                    </title>
+                    <title>{point.tooltipLines?.join("\n") ?? `${item.label} · ${point.label} · ${point.displayValue ?? Math.round(point.value)}`}</title>
                   </circle>
                 ))}
               </g>
@@ -437,6 +510,15 @@ function formatDate(value: unknown): string {
   return `${y}.${mo}.${day}`;
 }
 
+function getChallengeIcon(category: unknown): string {
+  const key = String(category ?? "").toUpperCase();
+  if (key.includes("DIET") || key.includes("식")) return "🥗";
+  if (key.includes("MEDICATION") || key.includes("복약")) return "💊";
+  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return "🚶";
+  if (key.includes("WATER") || key.includes("수분")) return "💧";
+  return "✅";
+}
+
 function getChallengeTitle(challenge: AnyRecord): string {
   const nested = challenge.challenge as AnyRecord | undefined;
   return String(nested?.title ?? challenge.title ?? "추천 챌린지");
@@ -526,6 +608,15 @@ export default function DashboardPage() {
   const diseaseAnalysisResults = latestAnalysisResults.filter((result) =>
     Boolean(analysisTypeLabels[String(result.analysis_type)]),
   );
+  const diseaseRiskItems: DiseaseRiskItem[] = diseaseAnalysisResults.map((result) => ({
+    analyzed_at: result.analyzed_at,
+    created_at: result.created_at,
+    diseaseName: analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type),
+    id: result.id,
+    risk_level: result.risk_level,
+    service_band: result.service_band,
+    service_band_label: result.service_band_label,
+  }));
   const dashboardDiets = Array.isArray(dietSection.recent_diet_records)
     ? (dietSection.recent_diet_records as AnyRecord[])
     : [];
@@ -847,19 +938,19 @@ export default function DashboardPage() {
       <section className="card dashboard-risk-trend-card">
         <div className="card-header">
           <div>
-            <h2>질환별 예측 위험도 변화</h2>
-            <p>분석 기록을 기준으로 질환별 예측 점수 변화 흐름을 확인합니다.</p>
+            <h2>질환별 관리 단계 변화</h2>
+            <p>분석 기록을 기준으로 질환별 관리 단계 변화 흐름을 확인합니다.</p>
           </div>
           <Link className="button secondary compact-button" to="/analysis/history">
             분석 기록 보기
           </Link>
         </div>
         {hasRiskTrendEnoughData ? (
-          <LineChart series={riskTrendSeries} />
+          <LineChart axisTicks={riskStageAxisTicks} series={riskTrendSeries} />
         ) : (
           <div className="empty-state">
             <strong>아직 추이를 계산할 분석 기록이 부족합니다.</strong>
-            <p>질환별 분석을 2회 이상 실행하면 위험도 변화 그래프가 표시됩니다.</p>
+            <p>질환별 분석을 2회 이상 실행하면 관리 단계 변화 그래프가 표시됩니다.</p>
             <Link className="button secondary compact-button" to="/analysis">
               분석 실행하기
             </Link>
@@ -873,19 +964,7 @@ export default function DashboardPage() {
             <h2>최근 분석 결과</h2>
           </div>
           {diseaseAnalysisResults.length > 0 ? (
-            <div className="card-list">
-              {diseaseAnalysisResults.map((result) => (
-                <div className="mini-card" key={result.id}>
-                  <div className="record-row">
-                    <div>
-                      <strong>{analysisTypeLabels[String(result.analysis_type)]}</strong>
-                      <p className="muted">{result.analysis_mode === "PRECISION" ? "정밀 분석" : "간편 분석"}</p>
-                    </div>
-                    <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <RiskStageBoard items={diseaseRiskItems} />
           ) : (
             <div className="empty-state">
               <strong>최근 분석 결과가 없습니다.</strong>

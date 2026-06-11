@@ -41,6 +41,8 @@ export type DashboardSummary = {
 
 export type DashboardRiskTrendPoint = {
   analyzed_at: string;
+  created_at?: string | null;
+  id?: number | string | null;
   risk_score: number;
   risk_level: string;
   service_band?: string | null;

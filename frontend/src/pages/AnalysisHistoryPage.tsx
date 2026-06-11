@@ -4,7 +4,8 @@ import { Link, useParams } from "react-router-dom";
 import { getAnalysisResultDetail, listAnalysisResults } from "../api/analysis";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
-import { getDisplayRiskLabel, getDisplayRiskScoreLabel, getRiskClassName } from "../utils/riskDisplay";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import { getDisplayRiskLabel, getRiskClassName } from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type ReferenceSource = {
@@ -47,40 +48,32 @@ const tabToType: Record<string, string | null> = {
   비만: "OBESITY",
 };
 
-const factorValueLabels: Record<string, Record<string, string>> = {
-  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
-  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
-  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
-  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
-  drinking_frequency: {
-    RARE: "월 1회 미만",
-    MONTHLY_2_4: "월 2-4회",
-    WEEKLY_2_3: "주 2-3회",
-    WEEKLY_4_PLUS: "주 4회 이상",
-  },
-  drinking_amount: {
-    NONE: "마시지 않음",
-    ONE_TO_TWO: "1-2잔",
-    THREE_TO_FOUR: "3-4잔",
-    FIVE_TO_SIX: "5-6잔",
-    SEVEN_PLUS: "7잔 이상",
-  },
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-const factorDirectionLabels: Record<string, string> = {
-  POSITIVE: "위험 증가",
-  NEGATIVE: "위험 감소",
-  NEUTRAL: "중립",
-};
-
-function displayFactorValue(factor: AnalysisResult): string {
-  const key = String(factor.factor_key ?? "");
-  const rawValue = factor.factor_value;
-  if (rawValue === undefined || rawValue === null || rawValue === "") {
-    return "값 정보 없음";
+function getSnapshotInputFeatures(snapshot: AnalysisResult | null | undefined): Record<string, unknown> {
+  if (!isRecord(snapshot?.input_payload)) {
+    return {};
   }
-  const value = String(rawValue);
-  return factorValueLabels[key]?.[value] ?? value;
+  const inputPayload = snapshot.input_payload;
+  return isRecord(inputPayload.input_features) ? inputPayload.input_features : inputPayload;
+}
+
+function formatSummaryValue(value: unknown, unit = ""): string {
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  return `${String(value)}${unit}`;
+}
+
+function formatBloodPressure(input: Record<string, unknown>): string {
+  const systolic = input.systolic_bp;
+  const diastolic = input.diastolic_bp;
+  if ((systolic === undefined || systolic === null || systolic === "") && (diastolic === undefined || diastolic === null || diastolic === "")) {
+    return "-";
+  }
+  return `${String(systolic ?? "-")} / ${String(diastolic ?? "-")} mmHg`;
 }
 
 export default function AnalysisHistoryPage() {
@@ -113,11 +106,19 @@ export default function AnalysisHistoryPage() {
     }
     return "상세보기에서 주요 요인을 확인할 수 있습니다.";
   };
+  const diseaseRiskItems: DiseaseRiskItem[] = displayResults
+    .filter((result) => Boolean(labels[String(result.analysis_type)]))
+    .map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: labels[String(result.analysis_type)] ?? String(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
 
-  const snapshotInput =
-    detail?.snapshot?.input_payload && typeof detail.snapshot.input_payload === "object"
-      ? (detail.snapshot.input_payload as Record<string, unknown>)
-      : {};
+  const snapshotInput = getSnapshotInputFeatures(detail?.snapshot);
   const referenceSources = detail?.explanation?.reference_sources ?? [];
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function AnalysisHistoryPage() {
 
   if (analysisId) {
     const result = detail?.result;
+    const detailRiskClassName = getRiskClassName(result);
     return (
       <div className="page-grid">
         {error && <ErrorMessage message={error} />}
@@ -149,31 +151,11 @@ export default function AnalysisHistoryPage() {
             </Link>
           }
         >
-          <div className="score-panel">
+          <div className={`score-panel risk-detail-panel ${detailRiskClassName}`}>
             <span>{labels[String(result?.analysis_type)] ?? String(result?.analysis_type ?? "분석")}</span>
             <strong>{getDisplayRiskLabel(result)}</strong>
-            <span className="badge badge-reference">{getDisplayRiskScoreLabel(result)}</span>
-            <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+            <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
             <p>{String(result?.summary ?? "")}</p>
-          </div>
-        </Card>
-        <Card title="주요 위험 요인">
-          <div className="card-list">
-            {(detail?.factors ?? []).length === 0 && <div className="state-box">표시할 주요 요인이 없습니다.</div>}
-            {(detail?.factors ?? []).map((factor) => (
-              <div className="mini-card" key={String(factor.id ?? factor.factor_key)}>
-                <div className="record-row">
-                  <div>
-                    <strong>{String(factor.factor_name ?? factor.factor_key ?? "요인")}</strong>
-                    <p className="muted">{displayFactorValue(factor)}</p>
-                  </div>
-                  <span className="badge badge-reference">
-                    {factorDirectionLabels[String(factor.direction ?? "NEUTRAL")] ?? String(factor.direction ?? "중립")}
-                  </span>
-                </div>
-                <span className="badge risk-medium">기여도 {String(factor.contribution_score ?? "-")}</span>
-              </div>
-            ))}
           </div>
         </Card>
         {detail?.explanation && (
@@ -205,11 +187,12 @@ export default function AnalysisHistoryPage() {
         <Card title="분석 입력 요약">
           <div className="record-table">
             {[
-              ["키", snapshotInput.height_cm],
-              ["몸무게", snapshotInput.weight_kg],
-              ["BMI", snapshotInput.bmi],
-              ["혈압", `${String(snapshotInput.systolic_bp ?? "-")} / ${String(snapshotInput.diastolic_bp ?? "-")}`],
-              ["공복혈당", snapshotInput.fasting_glucose],
+              ["키", formatSummaryValue(snapshotInput.height_cm, "cm")],
+              ["몸무게", formatSummaryValue(snapshotInput.weight_kg, "kg")],
+              ["BMI", formatSummaryValue(snapshotInput.bmi)],
+              ["혈압", formatBloodPressure(snapshotInput)],
+              ["공복혈당", formatSummaryValue(snapshotInput.fasting_glucose, "mg/dL")],
+              ["분석일", formatDate(result?.analyzed_at ?? result?.created_at)],
               ["관리 필요 단계", getDisplayRiskLabel(result)],
             ].map(([label, value]) => (
               <div className="record-table-row" key={String(label)}>
@@ -246,6 +229,7 @@ export default function AnalysisHistoryPage() {
           </button>
         ))}
       </div>
+      {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
       <div className="table-list">
         {displayResults.map((result) => {
           const content = (
@@ -255,7 +239,6 @@ export default function AnalysisHistoryPage() {
                 <strong>{labels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
                 <p className="muted">{mainFactorLabel(result)}</p>
               </div>
-              <span>{getDisplayRiskScoreLabel(result)}</span>
               <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               <span className="badge badge-reference">상세보기</span>
