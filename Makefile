@@ -1,4 +1,8 @@
-COMPOSE_DEV = docker compose --env-file .env -f infra/docker/docker-compose.dev.yml
+DEV_ENV ?= .env
+PROD_ENV ?= .env.prod
+DEV_COMPOSE = docker compose --env-file $(DEV_ENV) -f infra/docker/docker-compose.dev.yml
+PROD_COMPOSE = docker compose --env-file $(PROD_ENV) -f infra/docker/docker-compose.prod.yml
+COMPOSE_DEV = $(DEV_COMPOSE)
 DOCKER_USER ?= kdu0312
 DOCKER_REPOSITORY ?= ai-health
 APP_VERSION ?= v1.0.0
@@ -58,30 +62,44 @@ app-worker-logs:
 
 # Standard dev/demo stack
 # Full stack via infra/docker/docker-compose.dev.yml: postgres, redis, fastapi, ai-worker, frontend, nginx.
-.PHONY: dev-network dev-up dev-down dev-ps dev-logs dev-migrate dev-seed dev-health
+.PHONY: dev-network dev-up dev-down dev-ps dev-logs dev-migrate dev-seed dev-health dev-rebuild-api dev-restart-nginx dev-config-check
 dev-network:
 	docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared >/dev/null
 
 dev-up: dev-network
-	$(COMPOSE_DEV) up -d --build
+	$(DEV_COMPOSE) up -d --build
 
 dev-down:
-	$(COMPOSE_DEV) down --remove-orphans
+	$(DEV_COMPOSE) down --remove-orphans
 
 dev-ps:
-	$(COMPOSE_DEV) ps
+	$(DEV_COMPOSE) ps
 
 dev-logs:
-	$(COMPOSE_DEV) logs --tail=100 fastapi ai-worker frontend nginx
+	$(DEV_COMPOSE) logs --tail=100 fastapi ai-worker frontend nginx
 
 dev-migrate:
-	$(COMPOSE_DEV) exec fastapi uv run --no-sync aerich upgrade
+	$(DEV_COMPOSE) exec fastapi uv run --no-sync aerich upgrade
 
 dev-seed:
-	$(COMPOSE_DEV) exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
+	$(DEV_COMPOSE) exec fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
 
 dev-health:
 	curl -fsS http://localhost:8080/api/v1/system/health
+
+dev-rebuild-api:
+	$(DEV_COMPOSE) up -d --build fastapi ai-worker
+	$(DEV_COMPOSE) up -d --force-recreate nginx
+	sleep 5
+	curl -fsS http://localhost:8080/api/v1/system/health
+
+dev-restart-nginx:
+	$(DEV_COMPOSE) up -d --force-recreate nginx
+	sleep 3
+	curl -fsS http://localhost:8080/api/v1/system/health
+
+dev-config-check:
+	$(DEV_COMPOSE) config --quiet
 
 .PHONY: demo-up demo-down demo-ps demo-logs demo-health
 demo-up: dev-up
@@ -108,6 +126,21 @@ langfuse-ps:
 
 langfuse-logs:
 	./scripts/docker_stack.sh langfuse logs
+
+# Prod compose convenience
+# Uses infra/docker/docker-compose.prod.yml and pulls prebuilt registry images.
+.PHONY: prod-pull prod-up prod-ps prod-logs
+prod-pull:
+	$(PROD_COMPOSE) pull
+
+prod-up:
+	$(PROD_COMPOSE) up -d
+
+prod-ps:
+	$(PROD_COMPOSE) ps
+
+prod-logs:
+	$(PROD_COMPOSE) logs -f
 
 # Release image build
 # prod compose is pull-only; these targets verify the images that will be pushed separately.
