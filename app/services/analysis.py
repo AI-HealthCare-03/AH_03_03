@@ -10,6 +10,9 @@ from ai_runtime.llm.explanation_service import (
     retrieve_health_context,
 )
 from ai_runtime.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
+from ai_runtime.ml.inference.feature_mapper import map_service_features
+from ai_runtime.ml.inference.screening_predictor import load_screening_artifact
+from ai_runtime.ml.inference.screening_risk_service import predict_screening_dual_stage_risk
 from app.core import config
 from app.dtos.analysis import (
     AnalysisResultCreateRequest,
@@ -38,6 +41,11 @@ from app.services.health import (
 )
 
 logger = logging.getLogger(__name__)
+BASIC_SCREENING_DISEASE_CODES: dict[AnalysisType, str] = {
+    AnalysisType.HYPERTENSION: "HTN",
+    AnalysisType.DIABETES: "DM",
+    AnalysisType.DYSLIPIDEMIA: "DL",
+}
 
 
 async def create_analysis_result(user_id: int, request: AnalysisResultCreateRequest) -> AnalysisResult:
@@ -139,6 +147,13 @@ async def run_analysis(
         risk_level = _risk_level(score)
         model_name = prediction.model_name if prediction is not None else "rule_based"
         model_version = prediction.model_version if prediction is not None else f"web-{mode.value.lower()}-v1"
+        screening_dual_stage = _predict_basic_screening_dual_stage(
+            user=user,
+            health_record=health_record,
+            analysis_type=analysis_type,
+            base_risk_level=risk_level,
+            analysis_mode=mode,
+        )
         request = AnalysisResultCreateRequest(
             health_record_id=health_record.id,
             analysis_type=analysis_type,
@@ -165,6 +180,7 @@ async def run_analysis(
                 model_name=model_name,
                 model_version=model_version,
                 model_prediction=prediction.to_dict() if prediction is not None else None,
+                screening_dual_stage=screening_dual_stage,
             ),
         )
         recommendation_ids = await _create_challenge_recommendations(user_id, result)
@@ -181,6 +197,7 @@ async def run_analysis(
                 "explanation": _analysis_explanation(result, factors),
                 "challenge_recommendation_ids": recommendation_ids,
                 "factor_count": len(factors),
+                **_screening_dual_stage_response_fields(screening_dual_stage),
             }
         )
     return results
@@ -214,6 +231,66 @@ def _predict_ml_outputs(user: User | None, health_record: HealthRecord) -> dict[
     }
     return {
         disease_map[disease]: prediction for disease, prediction in raw_predictions.items() if disease in disease_map
+    }
+
+
+def _predict_basic_screening_dual_stage(
+    *,
+    user: User | None,
+    health_record: HealthRecord,
+    analysis_type: AnalysisType,
+    base_risk_level: RiskLevel,
+    analysis_mode: AnalysisMode,
+) -> dict[str, Any] | None:
+    if analysis_mode != AnalysisMode.BASIC or user is None:
+        return None
+
+    disease_code = BASIC_SCREENING_DISEASE_CODES.get(analysis_type)
+    if disease_code is None:
+        return None
+
+    try:
+        artifact = load_screening_artifact(disease_code)
+        mapping = map_service_features(user, health_record, artifact.feature_columns, strict=False)
+        result = predict_screening_dual_stage_risk(
+            disease_code=disease_code,
+            features=mapping.features,
+            base_risk_level=base_risk_level.value,
+        )
+    except Exception as exc:
+        logger.exception(
+            "BASIC screening dual-stage prediction failed; keeping rule-based result",
+            extra={
+                "analysis_type": analysis_type.value,
+                "disease_code": disease_code,
+                "health_record_id": health_record.id,
+            },
+        )
+        return {
+            "status": "fallback_basic_only",
+            "disease_code": disease_code,
+            "base_risk_level": base_risk_level.value,
+            "fallback_reason": exc.__class__.__name__,
+            "note": "screening dual-stage 실패로 기존 BASIC rule 결과를 유지합니다.",
+        }
+
+    return {
+        "status": "applied",
+        "disease_code": result.disease_code,
+        "base_risk_level": base_risk_level.value,
+        "base_high": result.base_high,
+        "screening_high": result.screening_high,
+        "service_band": result.service_band.value,
+        "service_band_label": result.service_band_label,
+        "service_band_percent": result.service_band_percent,
+        "legacy_risk_level": result.legacy_risk_level,
+        "screening_missing_features": result.screening_missing_features,
+        "screening_neutralized_features": result.screening_neutralized_features,
+        "screening_model_count": result.screening_model_count,
+        "feature_mapping_missing_sources": mapping.missing_required_sources,
+        "feature_mapping_defaulted_features": mapping.defaulted_features,
+        "feature_mapping_warnings": mapping.warnings,
+        "note": "raw screening probability는 사용자 응답에 직접 노출하지 않습니다.",
     }
 
 
@@ -500,6 +577,7 @@ def _analysis_snapshot_request(
     model_name: str = "rule_based",
     model_version: str | None = None,
     model_prediction: dict[str, Any] | None = None,
+    screening_dual_stage: dict[str, Any] | None = None,
 ) -> AnalysisSnapshotCreateRequest:
     model_version = model_version or f"web-{analysis_mode.value.lower()}-v1"
     input_features = {
@@ -535,6 +613,10 @@ def _analysis_snapshot_request(
         }
         for factor in factors
     ]
+    final_outputs = {
+        "risk_level": risk_level,
+        "guide_message": guide_message,
+    } | _screening_dual_stage_final_outputs(screening_dual_stage)
     return AnalysisSnapshotCreateRequest(
         input_payload=_to_json_value(
             {
@@ -564,10 +646,7 @@ def _analysis_snapshot_request(
                     if analysis_type == AnalysisType.HYPERTENSION
                     else None,
                 },
-                "final_outputs": {
-                    "risk_level": risk_level,
-                    "guide_message": guide_message,
-                },
+                "final_outputs": final_outputs,
                 "model_version_info": {
                     "model_name": model_name,
                     "model_version": model_version,
@@ -586,9 +665,41 @@ def _analysis_snapshot_request(
                 "model_version": model_version,
                 "analysis_mode": analysis_mode,
                 "prediction": model_prediction,
+                "screening_dual_stage": screening_dual_stage,
             }
         ),
     )
+
+
+def _screening_dual_stage_final_outputs(screening_dual_stage: dict[str, Any] | None) -> dict[str, Any]:
+    if not screening_dual_stage:
+        return {}
+
+    status = screening_dual_stage.get("status")
+    if status != "applied":
+        return {
+            "screening_dual_stage_status": status,
+            "screening_dual_stage_fallback_reason": screening_dual_stage.get("fallback_reason"),
+        }
+
+    return {
+        "screening_dual_stage_status": status,
+        "service_band": screening_dual_stage.get("service_band"),
+        "service_band_label": screening_dual_stage.get("service_band_label"),
+        "service_band_percent": screening_dual_stage.get("service_band_percent"),
+        "legacy_risk_level": screening_dual_stage.get("legacy_risk_level"),
+    }
+
+
+def _screening_dual_stage_response_fields(screening_dual_stage: dict[str, Any] | None) -> dict[str, Any]:
+    if not screening_dual_stage or screening_dual_stage.get("status") != "applied":
+        return {}
+    return {
+        "service_band": screening_dual_stage.get("service_band"),
+        "service_band_label": screening_dual_stage.get("service_band_label"),
+        "service_band_percent": screening_dual_stage.get("service_band_percent"),
+        "legacy_risk_level": screening_dual_stage.get("legacy_risk_level"),
+    }
 
 
 def _to_json_value(value: Any) -> Any:
