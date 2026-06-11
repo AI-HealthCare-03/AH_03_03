@@ -34,6 +34,7 @@ export default function ExamOcrPage() {
   const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunningOcr, setIsRunningOcr] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isAppliedToHealth, setIsAppliedToHealth] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
@@ -57,6 +58,12 @@ export default function ExamOcrPage() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (exam?.is_confirmed) {
+      setIsAppliedToHealth(true);
+    }
+  }, [exam?.is_confirmed]);
 
   useAsyncJobPolling({
     jobId: ocrJobId,
@@ -119,7 +126,14 @@ export default function ExamOcrPage() {
     }
     setSelectedPreviewUrl("");
     setPreviewMessage("");
+    setIsAppliedToHealth(false);
+    setExam(null);
+    setMeasurements([]);
+    setMessage("");
+    setError("");
     if (!file) {
+      setSelectedFile(null);
+      setSelectedFileName("");
       return;
     }
     setSelectedFile(file);
@@ -152,6 +166,7 @@ export default function ExamOcrPage() {
     setFeedbackDialog(null);
     setMeasurements([]);
     setCanRetryOcr(false);
+    setIsAppliedToHealth(false);
     if (!selectedFile) {
       setError("검진표 이미지 또는 PDF 파일을 먼저 선택해주세요.");
       return;
@@ -177,6 +192,8 @@ export default function ExamOcrPage() {
   };
 
   const updateLocalMeasurement = (measurementId: number, value: string) => {
+    setIsAppliedToHealth(false);
+    setMessage("");
     setMeasurements((prev) =>
       prev.map((measurement) => (measurement.id === measurementId ? { ...measurement, value } : measurement)),
     );
@@ -199,10 +216,22 @@ export default function ExamOcrPage() {
           }),
         ),
       );
-      await confirmExam(exam.id);
+      const confirmedExam = await confirmExam(exam.id);
+      setExam(confirmedExam);
       setMeasurements(await listMeasurements(exam.id));
-      setMessage("건강정보에 반영되었습니다.");
+      setIsAppliedToHealth(true);
+      setMessage("");
+      setFeedbackDialog({
+        title: "건강정보에 반영되었습니다.",
+        message: "이제 정밀분석에서 최신 검진 수치를 사용할 수 있습니다.",
+      });
     } catch (err) {
+      setIsAppliedToHealth(false);
+      setFeedbackDialog({
+        title: "건강정보 반영에 실패했습니다.",
+        message: "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setError(err instanceof Error ? err.message : "건강정보 반영에 실패했습니다.");
     } finally {
       setIsConfirming(false);
@@ -326,8 +355,16 @@ export default function ExamOcrPage() {
             {measurements.length === 0 ? (
               <p className="muted">측정값 후보가 생성되면 건강정보 반영 버튼을 사용할 수 있습니다.</p>
             ) : null}
-            <button disabled={measurements.length === 0 || isConfirming} onClick={saveAndConfirm} type="button">
-              {isConfirming ? "건강정보에 반영 중..." : "선택한 후보값을 건강정보에 반영"}
+            <button
+              disabled={measurements.length === 0 || isConfirming || isAppliedToHealth}
+              onClick={saveAndConfirm}
+              type="button"
+            >
+              {isConfirming
+                ? "건강정보 반영 중..."
+                : isAppliedToHealth
+                  ? "건강정보 반영 완료"
+                  : "선택한 후보값을 건강정보에 반영"}
             </button>
           </div>
         </div>
