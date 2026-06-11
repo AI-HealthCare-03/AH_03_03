@@ -208,7 +208,62 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs 
 curl -fsS http://localhost/api/v1/system/health
 ```
 
-## 7. 자주 나는 문제
+## 7. Worker / 알림 확인
+
+현재 MVP 배포에서는 별도 `notification-worker`, `email-worker`, `scheduler-worker`를 실행하지 않습니다. `ai-worker` 하나가 Redis Stream consumer를 실행하며 AI/OCR/ML job과 service job을 함께 처리합니다.
+
+현재 `ai-worker`가 처리하는 service job:
+
+- `email.verification.send`
+- `password_reset.email.send`
+- `family.invite.email.send`
+- `fcm.push.send`
+- `family.notification.create`
+
+`SCHEDULER_ENABLED=true`이면 notification scheduler도 `ai-worker` 안에서 실행됩니다.
+
+### 현재 기준 체크
+
+- [ ] `ai-worker` running 확인
+
+```bash
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml ps ai-worker
+```
+
+- [ ] `ai-worker` logs 확인
+
+```bash
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
+```
+
+- [ ] 이메일 인증 job 처리 확인
+  - 회원가입 이메일 인증 코드 발송을 요청한다.
+  - `ai-worker` 로그에서 service job 처리 실패가 없는지 확인한다.
+
+- [ ] FCM push job 처리 확인
+  - FCM token 등록 후 push 대상 기능을 실행한다.
+  - `notification_logs` 또는 `/api/v1/notifications/logs`에서 결과를 확인한다.
+
+- [ ] `SCHEDULER_ENABLED` 값 확인
+  - 예약 알림/리마인더를 운영에서 사용할 때만 `true`로 둔다.
+  - 현재 구조에서는 scheduler가 `ai-worker` 내부에서 함께 실행된다.
+
+- [ ] Firebase Admin credential 확인
+  - `GOOGLE_APPLICATION_CREDENTIALS` 또는 런타임 ADC 설정이 준비되어 있는지 확인한다.
+  - service account 원문 값은 문서, 로그, PR에 남기지 않는다.
+
+### 향후 worker 분리 후 체크
+
+worker를 분리한 뒤에는 아래 항목을 별도로 확인합니다. 현재 compose에는 아직 해당 service가 없습니다.
+
+- [ ] `email-worker` running 확인
+- [ ] `notification-worker` running 확인
+- [ ] `scheduler-worker` running 확인
+- [ ] 각 worker별 Redis Stream consumer group 확인
+- [ ] 각 worker별 logs 확인
+- [ ] email/FCM/scheduler job이 AI/OCR job 적체와 독립적으로 처리되는지 확인
+
+## 8. 자주 나는 문제
 
 ### Mac에서 prod-pull 시 linux/arm64 관련 오류
 

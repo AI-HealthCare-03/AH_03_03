@@ -33,6 +33,42 @@ P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영
 
 > 현재 MVP는 긴 OCR/식단/분석/외부 발송 작업을 Redis Stream async job으로 넘기고, `/api/v1/jobs/{job_id}` polling으로 상태를 확인합니다. 긴 작업의 기존 동기 분석 API는 410 Gone으로 막고 async 전용 경로를 사용합니다.
 
+## 현재 worker 구조와 분리 계획
+
+현재 MVP 배포에서는 `notification-worker`, `email-worker`, `scheduler-worker` 같은 별도 Compose service를 두지 않고 `ai-worker` 통합 구조를 유지한다. dev/prod/root compose 모두 `ai-worker` 하나가 Redis Stream consumer를 실행하며, AI/OCR/ML job뿐 아니라 service job도 함께 처리한다.
+
+현재 `ai-worker`가 처리하는 service job:
+
+- `email.verification.send`
+- `password_reset.email.send`
+- `family.invite.email.send`
+- `fcm.push.send`
+- `family.notification.create`
+
+또한 `SCHEDULER_ENABLED=true`일 때 notification scheduler도 `ai-worker` 프로세스 안에서 함께 실행된다.
+
+현재 구조의 리스크:
+
+- `ai-worker`가 무거운 OCR/GPT Vision/ML 작업으로 밀리면 인증 이메일, 비밀번호 재설정 이메일, FCM push, 가족 알림도 함께 지연될 수 있다.
+- 이메일 인증은 회원가입 UX와 직접 연결되므로 AI/OCR job 장애와 분리하는 편이 운영 안정성에 유리하다.
+- scheduler loop와 Redis Stream consumer가 같은 프로세스에 있으므로, 장기적으로 장애 격리와 스케일링 단위가 거칠다.
+
+향후 목표 구조:
+
+| worker | 담당 |
+| --- | --- |
+| `ai-worker` | OCR, GPT Vision, ML inference, analysis job |
+| `email-worker` 또는 `service-worker` | 이메일 인증 코드, 비밀번호 재설정 이메일, 가족 초대 이메일 |
+| `notification-worker` | FCM push 발송, 가족 알림 생성, `notification_logs` 기록 |
+| `scheduler-worker` | 예약 알림, 리마인더 스케줄링, `SCHEDULER_ENABLED` 기반 주기 작업 |
+
+장기 TODO:
+
+- Redis Stream job type별 consumer group 또는 worker command 분리 정책을 정한다.
+- Compose prod/dev에 worker별 service를 추가하되, 최초 전환 시에는 기존 `ai-worker` 통합 모드와 병행 가능한 migration path를 둔다.
+- 이메일/FCM worker는 AI model dependency 없이 가벼운 image 또는 command로 분리할 수 있는지 검토한다.
+- worker별 로그, health check, queue 지표, DLQ 확인 절차를 배포 체크리스트에 반영한다.
+
 ## Provider Availability 정리 방향
 
 장기적으로 앱 `.env`는 secret, key, URL, password, host, port 같은 실행 환경값 중심으로 유지한다. provider 사용 가능 여부는 코드의 availability helper가 판단하고, key나 runtime dependency가 없으면 fallback 또는 no-op으로 처리한다.
