@@ -18,6 +18,7 @@ import {
 import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import {
+  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getCanonicalRiskStage,
   getDisplayRiskLabel,
@@ -963,7 +964,22 @@ export default function DashboardPage() {
             <h2>최근 분석 결과</h2>
           </div>
           {diseaseAnalysisResults.length > 0 ? (
-            <RiskStageBoard items={diseaseRiskItems} />
+            <>
+              <RiskStageBoard items={diseaseRiskItems} />
+              <div className="chip-list">
+                {diseaseAnalysisResults.map((result) => {
+                  const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
+                  if (!sourceBadgeLabel) {
+                    return null;
+                  }
+                  return (
+                    <span className="badge badge-reference" key={String(result.id ?? result.analysis_type)}>
+                      {getAnalysisTypeLabel(result.analysis_type)} · {sourceBadgeLabel}
+                    </span>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <div className="empty-state">
               <strong>최근 분석 결과가 없습니다.</strong>

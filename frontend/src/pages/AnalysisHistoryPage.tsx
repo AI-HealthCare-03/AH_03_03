@@ -6,10 +6,12 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import {
+  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
   getLatestResultsByAnalysisType,
   getRiskClassName,
+  getX2StageSummary,
   isKnownAnalysisType,
 } from "../utils/riskDisplay";
 
@@ -140,6 +142,8 @@ export default function AnalysisHistoryPage() {
   if (analysisId) {
     const result = detail?.result;
     const detailRiskClassName = getRiskClassName(result);
+    const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
+    const x2StageSummary = getX2StageSummary(result);
     return (
       <div className="page-grid">
         {error && <ErrorMessage message={error} />}
@@ -154,8 +158,12 @@ export default function AnalysisHistoryPage() {
           <div className={`score-panel risk-detail-panel ${detailRiskClassName}`}>
             <span>{getAnalysisTypeLabel(result?.analysis_type, "분석")}</span>
             <strong>{getDisplayRiskLabel(result)}</strong>
-            <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+            <div className="button-row">
+              <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+            </div>
             <p>{String(result?.summary ?? "")}</p>
+            {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
         </Card>
         {detail?.explanation && (
@@ -231,6 +239,7 @@ export default function AnalysisHistoryPage() {
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
       <div className="table-list">
         {displayResults.map((result) => {
+          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
               <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
@@ -240,6 +249,7 @@ export default function AnalysisHistoryPage() {
               </div>
               <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
               <span className="badge badge-reference">상세보기</span>
             </>
           );

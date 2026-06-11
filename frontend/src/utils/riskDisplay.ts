@@ -6,6 +6,12 @@ export type RiskDisplaySource = {
   service_band_percent?: unknown;
 };
 
+export type AnalysisSourceDisplaySource = {
+  result_source?: unknown;
+  x2_available?: unknown;
+  x2_stage_label?: unknown;
+};
+
 export type AnalysisResultLike = {
   analysis_type?: unknown;
   analyzedAt?: unknown;
@@ -66,6 +72,11 @@ const riskColors: Record<string, string> = {
   HIGH_CAUTION: "#EF4444",
   MEDIUM: "#EA580C",
   HIGH: "#EF4444",
+};
+
+const analysisSourceLabels: Record<string, string> = {
+  X2_RULE: "검진 수치 반영",
+  BASIC_FALLBACK: "간편분석 유지",
 };
 
 function normalizeKey(value: unknown): string {
@@ -228,4 +239,21 @@ export function getRiskClassName(result: RiskDisplaySource | null | undefined): 
 
 export function getRiskColor(result: RiskDisplaySource | null | undefined): string {
   return riskColors[getDisplayRiskBand(result)] ?? riskColors.LOW;
+}
+
+export function getAnalysisSourceBadgeLabel(result: AnalysisSourceDisplaySource | null | undefined): string | null {
+  const source = normalizeKey(result?.result_source);
+  return analysisSourceLabels[source] ?? null;
+}
+
+export function getX2StageSummary(result: AnalysisSourceDisplaySource | null | undefined): string | null {
+  const source = normalizeKey(result?.result_source);
+  const stageLabel = String(result?.x2_stage_label ?? "").trim();
+  if (source === "X2_RULE" && stageLabel) {
+    return `검진 수치 기준: ${stageLabel}`;
+  }
+  if (source === "BASIC_FALLBACK" && result?.x2_available === false) {
+    return "검진 수치가 부족해 간편분석 결과를 유지했습니다.";
+  }
+  return null;
 }

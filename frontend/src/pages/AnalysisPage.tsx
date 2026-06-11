@@ -10,6 +10,7 @@ import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoa
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import { getAsyncJobStatusLabel, getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import {
+  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
   getLatestResultsByAnalysisType,
@@ -334,11 +335,15 @@ export default function AnalysisPage() {
         {latestDiseaseResults.map((result) => {
           const explanation = explanationsByResultId[String(result.id)];
           const referenceSources = explanation?.reference_sources ?? [];
+          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{getAnalysisTypeLabel(result.analysis_type)} 관리 필요 단계</span>
               <strong>{getDisplayRiskLabel(result)}</strong>
-              <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              <div className="button-row">
+                <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+              </div>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (

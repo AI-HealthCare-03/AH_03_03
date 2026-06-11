@@ -10,6 +10,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import {
+  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
   getLatestResultsByAnalysisType,
@@ -521,6 +522,7 @@ export default function MyPage() {
               {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
               {latestDiseaseAnalysis.map((result) => {
                 const resultId = Number(result.id);
+                const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
                 return (
                   <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -533,6 +535,7 @@ export default function MyPage() {
                     </div>
                     <div className="button-row" style={{ marginTop: "6px" }}>
                       <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                      {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
                   </div>
