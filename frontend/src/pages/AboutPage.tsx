@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import Card from "../components/Card";
+import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
 
 const aboutFeatures = [
   {
@@ -86,6 +87,33 @@ const aboutPersonas = [
   },
 ];
 
+const featureIcons: Record<string, React.ReactNode> = {
+  "🧭": <HeartPulse size={24} />,
+  "📄": <FileText size={24} />,
+  "🥗": <Salad size={24} />,
+  "🚶": <Dumbbell size={24} />,
+  "💊": <Pill size={24} />,
+  "💬": <BotMessageSquare size={24} />,
+};
+
+const flowIcons: Record<string, React.ReactNode> = {
+  "📄": <FileText size={24} />,
+  "📊": <ChartBar size={24} />,
+  "✅": <Trophy size={24} />,
+  "🥗": <Salad size={24} />,
+  "📈": <TrendingUp size={24} />,
+  "🚶": <Dumbbell size={24} />,
+  "💊": <Pill size={24} />,
+  "🔔": <Bell size={24} />,
+  "🤖": <BotMessageSquare size={24} />,
+};
+
+const personaIcons: Record<string, React.ReactNode> = {
+  exam: <ClipboardList size={24} />,
+  habit: <Dumbbell size={24} />,
+  record: <Pill size={24} />,
+};
+
 export default function AboutPage() {
   const [selectedPersonaId, setSelectedPersonaId] = useState("exam");
   const selectedPersona = aboutPersonas.find((p) => p.id === selectedPersonaId) ?? aboutPersonas[0];
@@ -141,7 +169,7 @@ export default function AboutPage() {
               <em className="badge badge-saved" style={{ position: "absolute", top: "12px", right: "12px" }}>
                 바로 이용
               </em>
-              <span className="landing-feature-icon">{feature.icon}</span>
+              <span className="landing-feature-icon">{featureIcons[feature.icon] ?? feature.icon}</span>
               <strong>{feature.title}</strong>
               <p>{feature.description}</p>
             </Link>
@@ -164,7 +192,7 @@ export default function AboutPage() {
               onClick={() => setSelectedPersonaId(persona.id)}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span className="persona-icon">{persona.icon}</span>
+                <span className="persona-icon">{personaIcons[persona.id]}</span>
                 <strong>{persona.title}</strong>
               </div>
               <p>{persona.quote}</p>
@@ -194,7 +222,7 @@ export default function AboutPage() {
         <div className="persona-timeline">
           {selectedPersona.flow.map((step, index) => (
             <div className="persona-timeline-item" key={step.title}>
-              <span className="timeline-icon">{step.icon}</span>
+              <span className="timeline-icon">{flowIcons[step.icon] ?? step.icon}</span>
               <div>
                 <strong>{step.title}</strong>
                 <p>{step.description}</p>
