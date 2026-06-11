@@ -9,6 +9,7 @@ import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
 import Loading from "./components/Loading";
 
+const AboutPage = lazy(() => import("./pages/AboutPage"));
 const AnalysisHistoryPage = lazy(() => import("./pages/AnalysisHistoryPage"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 const ChallengeDetailPage = lazy(() => import("./pages/ChallengeDetailPage"));
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/faqs" element={<FAQPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route element={<ProtectedRoute />}>
+              <Route path="/about" element={<AboutPage />} />
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/health" element={<HealthRecordPage />} />
               <Route path="/health/profile" element={<HealthProfilePage />} />
