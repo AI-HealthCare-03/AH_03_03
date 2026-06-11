@@ -13,6 +13,7 @@ from ai_runtime.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
 from ai_runtime.ml.inference.feature_mapper import map_service_features
 from ai_runtime.ml.inference.screening_predictor import load_screening_artifact
 from ai_runtime.ml.inference.screening_risk_service import predict_screening_dual_stage_risk
+from ai_runtime.ml.inference.x2_stage_mapper import X2ResultSource, map_x2_stage_to_risk_level
 from app.core import config
 from app.dtos.analysis import (
     AnalysisResultCreateRequest,
@@ -37,7 +38,6 @@ from app.repositories import analysis_repository
 from app.services import challenges as challenge_service
 from app.services.health import (
     REQUIRED_BASIC_ANALYSIS_FIELDS,
-    REQUIRED_PRECISION_ANALYSIS_FIELDS,
     REQUIRED_USER_ANALYSIS_FIELDS,
 )
 
@@ -47,6 +47,27 @@ BASIC_SCREENING_DISEASE_CODES: dict[AnalysisType, str] = {
     AnalysisType.DIABETES: "DM",
     AnalysisType.DYSLIPIDEMIA: "DL",
 }
+BASIC_ANALYSIS_TYPES = (
+    AnalysisType.DIABETES,
+    AnalysisType.OBESITY,
+    AnalysisType.DYSLIPIDEMIA,
+    AnalysisType.HYPERTENSION,
+)
+X2_ONLY_ANALYSIS_TYPES = (
+    AnalysisType.ABDOMINAL_OBESITY,
+    AnalysisType.FATTY_LIVER,
+    AnalysisType.ANEMIA,
+    AnalysisType.LIVER_FUNCTION,
+    AnalysisType.KIDNEY_FUNCTION,
+    AnalysisType.CHRONIC_KIDNEY_DISEASE,
+)
+X2_ANALYSIS_TYPES = (
+    AnalysisType.HYPERTENSION,
+    AnalysisType.DIABETES,
+    AnalysisType.DYSLIPIDEMIA,
+    AnalysisType.OBESITY,
+    *X2_ONLY_ANALYSIS_TYPES,
+)
 
 RISK_LEVEL_LABELS: dict[RiskLevel, str] = {
     RiskLevel.LOW: "낮음",
@@ -83,7 +104,7 @@ async def list_analysis_results(user_id: int, limit: int = 20, offset: int = 0) 
 
 
 async def list_latest_analysis_results(user_id: int) -> list[AnalysisResult]:
-    return await analysis_repository.list_analysis_results_by_user(user_id, limit=4, offset=0)
+    return await analysis_repository.list_analysis_results_by_user(user_id, limit=len(AnalysisType), offset=0)
 
 
 async def get_analysis_result_response(result: AnalysisResult) -> dict[str, Any]:
@@ -150,12 +171,6 @@ async def get_missing_fields_for_mode(user: User, health_record: HealthRecord, m
         for field_name, label in REQUIRED_BASIC_ANALYSIS_FIELDS.items()
         if _is_missing_health_record_field(health_record, field_name)
     )
-    if mode == AnalysisMode.PRECISION:
-        missing_fields.extend(
-            label
-            for field_name, label in REQUIRED_PRECISION_ANALYSIS_FIELDS.items()
-            if _is_missing_value(getattr(health_record, field_name))
-        )
     return missing_fields
 
 
@@ -164,22 +179,15 @@ async def run_analysis(
 ) -> list[dict[str, Any]]:
     results = []
     user = await User.get_or_none(id=user_id)
-    # PRECISION에서만 CatBoost를 시도하고, 실패하면 아래 룰 기반 점수로 자연스럽게 이어진다.
-    ml_predictions = _predict_ml_outputs(user, health_record) if mode == AnalysisMode.PRECISION else {}
-    for analysis_type, fallback_score in _calculate_analysis_scores(health_record, mode, user).items():
-        prediction = ml_predictions.get(analysis_type)
-        score = Decimal(str(round(prediction.probability, 5))) if prediction is not None else fallback_score
-        base_risk_level = _risk_level(score)
-        model_name = prediction.model_name if prediction is not None else "rule_based"
-        model_version = prediction.model_version if prediction is not None else f"web-{mode.value.lower()}-v1"
-        screening_dual_stage = _predict_basic_screening_dual_stage(
-            user=user,
-            health_record=health_record,
-            analysis_type=analysis_type,
-            base_risk_level=base_risk_level,
-            analysis_mode=mode,
-        )
-        risk_level = _resolve_final_risk_level(base_risk_level, screening_dual_stage)
+    plans = _build_analysis_plans(user=user, health_record=health_record, mode=mode)
+    for plan in plans:
+        analysis_type = plan["analysis_type"]
+        score = plan["score"]
+        risk_level = plan["risk_level"]
+        model_name = plan["model_name"]
+        model_version = plan["model_version"]
+        screening_dual_stage = plan.get("screening_dual_stage")
+        x2_rule = plan.get("x2_rule")
         request = AnalysisResultCreateRequest(
             health_record_id=health_record.id,
             analysis_type=analysis_type,
@@ -192,7 +200,10 @@ async def run_analysis(
             analyzed_at=datetime.now(config.TIMEZONE),
         )
         result = await create_analysis_result(user_id, request)
-        factors = await create_analysis_factors(result.id, _analysis_factors(analysis_type, health_record, score, mode))
+        factors = await create_analysis_factors(
+            result.id,
+            _analysis_factors(analysis_type, health_record, score, mode, x2_rule=x2_rule),
+        )
         await create_analysis_snapshot(
             result.id,
             _analysis_snapshot_request(
@@ -205,8 +216,8 @@ async def run_analysis(
                 factors=factors,
                 model_name=model_name,
                 model_version=model_version,
-                model_prediction=prediction.to_dict() if prediction is not None else None,
                 screening_dual_stage=screening_dual_stage,
+                x2_rule=x2_rule,
             ),
         )
         recommendation_ids = await _create_challenge_recommendations(user_id, result)
@@ -227,6 +238,97 @@ async def run_analysis(
             }
         )
     return results
+
+
+def _build_analysis_plans(
+    *,
+    user: User | None,
+    health_record: HealthRecord,
+    mode: AnalysisMode,
+) -> list[dict[str, Any]]:
+    if mode == AnalysisMode.PRECISION:
+        return _build_precision_analysis_plans(user=user, health_record=health_record)
+    return _build_basic_analysis_plans(user=user, health_record=health_record)
+
+
+def _build_basic_analysis_plans(*, user: User | None, health_record: HealthRecord) -> list[dict[str, Any]]:
+    plans: list[dict[str, Any]] = []
+    for analysis_type, score in _calculate_analysis_scores(health_record, AnalysisMode.BASIC, user).items():
+        base_risk_level = _risk_level(score)
+        screening_dual_stage = _predict_basic_screening_dual_stage(
+            user=user,
+            health_record=health_record,
+            analysis_type=analysis_type,
+            base_risk_level=base_risk_level,
+            analysis_mode=AnalysisMode.BASIC,
+        )
+        risk_level = _resolve_final_risk_level(base_risk_level, screening_dual_stage)
+        plans.append(
+            {
+                "analysis_type": analysis_type,
+                "score": score,
+                "risk_level": risk_level,
+                "model_name": "rule_based",
+                "model_version": "web-basic-v1",
+                "screening_dual_stage": screening_dual_stage,
+            }
+        )
+    return plans
+
+
+def _build_precision_analysis_plans(*, user: User | None, health_record: HealthRecord) -> list[dict[str, Any]]:
+    plans: list[dict[str, Any]] = []
+    base_plans = {plan["analysis_type"]: plan for plan in _build_basic_analysis_plans(user=user, health_record=health_record)}
+    x2_features = _x2_feature_payload(user=user, health_record=health_record)
+
+    for analysis_type in BASIC_ANALYSIS_TYPES:
+        base_plan = base_plans[analysis_type]
+        x2_result = map_x2_stage_to_risk_level(analysis_type.value, x2_features)
+        x2_rule = x2_result.to_dict()
+        if x2_result.result_source == X2ResultSource.X2_RULE.value and x2_result.risk_level is not None:
+            risk_level = RiskLevel(x2_result.risk_level)
+            plans.append(
+                {
+                    "analysis_type": analysis_type,
+                    "score": _risk_score_for_level(risk_level),
+                    "risk_level": risk_level,
+                    "model_name": "x2_rule",
+                    "model_version": "x2-rule-v1",
+                    "x2_rule": x2_rule,
+                }
+            )
+            continue
+
+        x2_rule["result_source"] = "BASIC_FALLBACK"
+        plans.append(
+            {
+                "analysis_type": analysis_type,
+                "score": base_plan["score"],
+                "risk_level": base_plan["risk_level"],
+                "model_name": "rule_based",
+                "model_version": "web-basic-fallback-v1",
+                "screening_dual_stage": base_plan.get("screening_dual_stage"),
+                "x2_rule": x2_rule,
+            }
+        )
+
+    for analysis_type in X2_ONLY_ANALYSIS_TYPES:
+        x2_result = map_x2_stage_to_risk_level(analysis_type.value, x2_features)
+        if x2_result.result_source != X2ResultSource.X2_RULE.value or x2_result.risk_level is None:
+            continue
+        risk_level = RiskLevel(x2_result.risk_level)
+        plans.append(
+            {
+                "analysis_type": analysis_type,
+                "score": _risk_score_for_level(risk_level),
+                "risk_level": risk_level,
+                "model_name": "x2_rule",
+                "model_version": "x2-rule-v1",
+                "x2_rule": x2_result.to_dict(),
+            }
+        )
+
+    return plans
 
 
 def _predict_ml_outputs(user: User | None, health_record: HealthRecord) -> dict[AnalysisType, Any]:
@@ -466,6 +568,42 @@ def _risk_level(score: Decimal) -> RiskLevel:
     return RiskLevel.LOW
 
 
+def _risk_score_for_level(risk_level: RiskLevel) -> Decimal:
+    return {
+        RiskLevel.LOW: Decimal("0.25000"),
+        RiskLevel.ATTENTION: Decimal("0.45000"),
+        RiskLevel.CAUTION: Decimal("0.65000"),
+        RiskLevel.HIGH_CAUTION: Decimal("0.80000"),
+    }[risk_level]
+
+
+def _x2_feature_payload(*, user: User | None, health_record: HealthRecord) -> dict[str, Any]:
+    field_names = (
+        "systolic_bp",
+        "diastolic_bp",
+        "fasting_glucose",
+        "hba1c",
+        "total_cholesterol",
+        "ldl_cholesterol",
+        "hdl_cholesterol",
+        "triglyceride",
+        "height_cm",
+        "weight_kg",
+        "bmi",
+        "waist_cm",
+        "ast",
+        "alt",
+        "gamma_gtp",
+        "creatinine",
+        "egfr",
+        "urine_protein",
+        "hemoglobin",
+    )
+    payload = {field_name: getattr(health_record, field_name, None) for field_name in field_names}
+    payload["sex"] = getattr(user, "gender", None) or getattr(health_record, "sex", None) or getattr(health_record, "gender", None)
+    return payload
+
+
 def _resolve_final_risk_level(base_risk_level: RiskLevel, screening_dual_stage: dict[str, Any] | None) -> RiskLevel:
     if not screening_dual_stage or screening_dual_stage.get("status") != "applied":
         return base_risk_level
@@ -549,7 +687,12 @@ def _analysis_reference_query(input_data: AnalysisExplanationInput) -> str:
 
 
 def _analysis_factors(
-    analysis_type: AnalysisType, record: HealthRecord, score: Decimal, mode: AnalysisMode = AnalysisMode.BASIC
+    analysis_type: AnalysisType,
+    record: HealthRecord,
+    score: Decimal,
+    mode: AnalysisMode = AnalysisMode.BASIC,
+    *,
+    x2_rule: dict[str, Any] | None = None,
 ) -> list[AnalysisResultFactorCreateRequest]:
     common_factor = AnalysisResultFactorCreateRequest(
         factor_key="risk_score",
@@ -559,8 +702,12 @@ def _analysis_factors(
         direction=FactorDirection.NEUTRAL,
         display_order=0,
     )
+    x2_factor = _x2_factor(x2_rule)
+    if analysis_type not in BASIC_ANALYSIS_TYPES:
+        return [factor for factor in [common_factor, x2_factor] if factor is not None]
+
     basic_factor = _basic_factor(analysis_type, record)
-    precision_factor = {
+    precision_factor_by_type = {
         AnalysisType.DIABETES: AnalysisResultFactorCreateRequest(
             factor_key="fasting_glucose",
             factor_name="공복혈당",
@@ -595,9 +742,10 @@ def _analysis_factors(
             direction=FactorDirection.POSITIVE,
             display_order=1,
         ),
-    }[analysis_type]
+    }
+    precision_factor = precision_factor_by_type[analysis_type]
     if mode == AnalysisMode.PRECISION:
-        return [common_factor, precision_factor, basic_factor]
+        return [factor for factor in [common_factor, x2_factor, precision_factor, basic_factor] if factor is not None]
     return [common_factor, basic_factor]
 
 
@@ -618,6 +766,28 @@ def _basic_factor(analysis_type: AnalysisType, record: HealthRecord) -> Analysis
     )
 
 
+def _x2_factor(x2_rule: dict[str, Any] | None) -> AnalysisResultFactorCreateRequest | None:
+    if not x2_rule:
+        return None
+    stage_label = x2_rule.get("x2_stage_label")
+    source = x2_rule.get("result_source")
+    missing_fields = x2_rule.get("x2_missing_fields") or []
+    if stage_label:
+        factor_value = str(stage_label)
+    elif missing_fields:
+        factor_value = f"부족 항목: {', '.join(str(field) for field in missing_fields)}"
+    else:
+        factor_value = str(source or "")
+    return AnalysisResultFactorCreateRequest(
+        factor_key="x2_rule_stage",
+        factor_name="검진 수치 기반 단계",
+        factor_value=factor_value,
+        contribution_score=None,
+        direction=FactorDirection.NEUTRAL,
+        display_order=1,
+    )
+
+
 def _analysis_snapshot_request(
     analysis_type: AnalysisType,
     analysis_mode: AnalysisMode,
@@ -630,6 +800,7 @@ def _analysis_snapshot_request(
     model_version: str | None = None,
     model_prediction: dict[str, Any] | None = None,
     screening_dual_stage: dict[str, Any] | None = None,
+    x2_rule: dict[str, Any] | None = None,
 ) -> AnalysisSnapshotCreateRequest:
     model_version = model_version or f"web-{analysis_mode.value.lower()}-v1"
     input_features = {
@@ -654,6 +825,13 @@ def _analysis_snapshot_request(
         "ldl_cholesterol": health_record.ldl_cholesterol,
         "hdl_cholesterol": health_record.hdl_cholesterol,
         "triglyceride": health_record.triglyceride,
+        "hemoglobin": _to_json_value(getattr(health_record, "hemoglobin", None)),
+        "ast": getattr(health_record, "ast", None),
+        "alt": getattr(health_record, "alt", None),
+        "gamma_gtp": getattr(health_record, "gamma_gtp", None),
+        "urine_protein": getattr(health_record, "urine_protein", None),
+        "creatinine": _to_json_value(getattr(health_record, "creatinine", None)),
+        "egfr": _to_json_value(getattr(health_record, "egfr", None)),
     }
     shap_outputs = [
         {
@@ -672,7 +850,7 @@ def _analysis_snapshot_request(
         "service_band_label": _risk_level_label(risk_level),
         "service_band_percent": _risk_level_display_percent(risk_level),
         "legacy_risk_level": None,
-    } | _screening_dual_stage_final_outputs(screening_dual_stage)
+    } | _screening_dual_stage_final_outputs(screening_dual_stage) | _x2_rule_final_outputs(x2_rule)
     return AnalysisSnapshotCreateRequest(
         input_payload=_to_json_value(
             {
@@ -692,6 +870,7 @@ def _analysis_snapshot_request(
                     "low_threshold": 0.40,
                     "high_threshold": 0.70,
                     "rule_engine": "rule_based",
+                    "result_source": x2_rule.get("result_source") if x2_rule else "BASIC",
                     "analysis_mode": analysis_mode,
                     "note": "참고용 룰 기반 분석이며 실제 의료 진단 또는 처방이 아닙니다.",
                     "hypertension_rule": {
@@ -722,6 +901,7 @@ def _analysis_snapshot_request(
                 "analysis_mode": analysis_mode,
                 "prediction": model_prediction,
                 "screening_dual_stage": screening_dual_stage,
+                "x2_rule": x2_rule,
             }
         ),
     )
@@ -740,6 +920,18 @@ def _screening_dual_stage_final_outputs(screening_dual_stage: dict[str, Any] | N
 
     return {
         "screening_dual_stage_status": status,
+    }
+
+
+def _x2_rule_final_outputs(x2_rule: dict[str, Any] | None) -> dict[str, Any]:
+    if not x2_rule:
+        return {"result_source": "BASIC"}
+    return {
+        "result_source": x2_rule.get("result_source"),
+        "x2_stage_code": x2_rule.get("x2_stage_code"),
+        "x2_stage_label": x2_rule.get("x2_stage_label"),
+        "x2_available": x2_rule.get("x2_available"),
+        "x2_missing_fields": x2_rule.get("x2_missing_fields") or [],
     }
 
 
