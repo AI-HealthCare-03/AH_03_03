@@ -138,10 +138,12 @@ export default function AboutPage() {
               key={feature.title}
               to={feature.to}
             >
+              <em className="badge badge-saved" style={{ position: "absolute", top: "12px", right: "12px" }}>
+                바로 이용
+              </em>
               <span className="landing-feature-icon">{feature.icon}</span>
               <strong>{feature.title}</strong>
               <p>{feature.description}</p>
-              <em className="badge badge-saved">바로 이용</em>
             </Link>
           ))}
         </div>
