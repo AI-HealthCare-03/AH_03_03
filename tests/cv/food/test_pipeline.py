@@ -232,3 +232,50 @@ async def test_pipeline_uses_injected_food_db_matcher_for_detected_foods() -> No
     assert result.detected_foods[0]["match_source"] == "mfds_matched"
     assert result.detected_foods[0]["match_confidence"] == 0.98
     assert result.detected_foods[0]["needs_user_confirmation"] is True
+
+
+@pytest.mark.asyncio
+async def test_pipeline_preserves_gpt_vision_per_food_confidence() -> None:
+    class TwoFoodVisionClient:
+        def __init__(self, api_key: str, model: str):
+            pass
+
+        async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
+            return {
+                "analysis_status": "success",
+                "foods": [
+                    {"name": "비빔국수", "confidence": 0.91},
+                    {"name": "핫초코", "confidence": 0.42},
+                ],
+            }
+
+    class EchoMatcher:
+        def match(self, query: str) -> FoodMatchResult:
+            return FoodMatchResult(
+                original_name=query,
+                query_name=query,
+                matched_food_name=query,
+                matched_food_code=f"test:{query}",
+                match_source="test_matched",
+                match_confidence=0.99,
+                needs_user_confirmation=True,
+            )
+
+    result = await run_food_analysis_pipeline(
+        rule_based_foods=[],
+        image_bytes=b"image",
+        image_media_type="image/png",
+        config=FoodAnalysisPipelineConfig(
+            provider="gpt_vision",
+            gpt_vision_enabled=True,
+            openai_api_key="test-key",
+            vision_client_cls=TwoFoodVisionClient,
+            food_db_matcher=EchoMatcher(),
+        ),
+    )
+
+    assert result.food_candidate.confidence == 0.665
+    assert result.detected_foods[0]["name"] == "비빔국수"
+    assert result.detected_foods[0]["confidence"] == 0.91
+    assert result.detected_foods[1]["name"] == "핫초코"
+    assert result.detected_foods[1]["confidence"] == 0.42

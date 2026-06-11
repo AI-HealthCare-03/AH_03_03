@@ -68,11 +68,15 @@ class GptVisionFoodDetectionProvider:
                 message="gpt_vision_returned_no_foods",
             )
 
-        detected_foods = [
-            str(food.get("name") or food.get("food_name") or "").strip()
+        detected_food_items = [
+            (
+                str(food.get("name") or food.get("food_name") or "").strip(),
+                _confidence_from_provider_food(food),
+            )
             for food in foods
             if isinstance(food, dict) and str(food.get("name") or food.get("food_name") or "").strip()
         ]
+        detected_foods = [name for name, _ in detected_food_items]
         if not detected_foods:
             return build_food_detection_provider_result(
                 provider_name="gpt_vision",
@@ -92,6 +96,7 @@ class GptVisionFoodDetectionProvider:
         candidate = FoodDetectionCandidateSet(
             provider="gpt_vision",
             detected_foods=detected_foods,
+            detected_food_confidences=[confidence for _, confidence in detected_food_items],
             confidence=_average_confidence_from_provider_foods(foods),
             needs_review=False,
             raw_output=raw,
@@ -112,6 +117,13 @@ def _average_confidence_from_provider_foods(foods: list[Any]) -> float | None:
     if not values:
         return None
     return round(sum(values) / len(values), 4)
+
+
+def _confidence_from_provider_food(food: dict[str, Any]) -> float | None:
+    value = food.get("confidence")
+    if not _is_number(value):
+        return None
+    return round(float(value), 4)
 
 
 def _is_number(value: Any) -> bool:

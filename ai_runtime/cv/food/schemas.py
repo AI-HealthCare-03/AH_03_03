@@ -20,6 +20,7 @@ FOOD_DETECTION_PROVIDER_PRIORITY: tuple[FoodDetectionProvider, ...] = (
 class FoodDetectionCandidateSet:
     provider: FoodDetectionProvider
     detected_foods: list[str]
+    detected_food_confidences: list[float | None] = field(default_factory=list)
     confidence: float | None = None
     needs_review: bool = False
     fallback_reason: str | None = None
@@ -32,11 +33,12 @@ class FoodDetectionCandidateSet:
 
     def to_scorer_foods(self, matcher: FoodDbMatcher | None = None) -> list[dict[str, Any]]:
         foods: list[dict[str, Any]] = []
-        for food_name in self.detected_foods:
+        for index, food_name in enumerate(self.detected_foods):
             match = match_food_name(food_name, matcher=matcher)
             display_name = match.matched_food_name or match.query_name
             if not display_name:
                 continue
+            food_confidence = self.detected_food_confidences[index] if index < len(self.detected_food_confidences) else None
 
             food = {
                 "name": display_name,
@@ -47,7 +49,7 @@ class FoodDetectionCandidateSet:
                 "match_source": match.match_source,
                 "match_confidence": match.match_confidence,
                 "needs_user_confirmation": match.needs_user_confirmation,
-                "confidence": self.confidence,
+                "confidence": food_confidence if food_confidence is not None else self.confidence,
                 "provider": self.provider,
             }
             if match.metadata:

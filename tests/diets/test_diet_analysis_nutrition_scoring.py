@@ -178,6 +178,7 @@ async def test_run_diet_analysis_uses_gpt_vision_foods_when_enabled(monkeypatch)
     monkeypatch.setattr(diet_service, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(diet_service.config, "DIET_VISION_PROVIDER", "gpt_vision")
     monkeypatch.setattr(diet_service.config, "DIET_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(diet_service.config, "DIET_MFDS_ENABLED", False)
     monkeypatch.setattr(diet_service.config, "OPENAI_API_KEY", "test-key")
 
     response = await diet_service.run_diet_analysis(
@@ -221,6 +222,7 @@ async def test_run_diet_analysis_returns_stable_food_names_from_gpt_aliases(monk
     monkeypatch.setattr(diet_service, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(diet_service.config, "DIET_VISION_PROVIDER", "gpt_vision")
     monkeypatch.setattr(diet_service.config, "DIET_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(diet_service.config, "DIET_MFDS_ENABLED", False)
     monkeypatch.setattr(diet_service.config, "OPENAI_API_KEY", "test-key")
 
     response = await diet_service.run_diet_analysis(

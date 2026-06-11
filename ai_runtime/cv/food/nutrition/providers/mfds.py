@@ -15,6 +15,9 @@ from ai_runtime.cv.food.normalization import cleanup_food_query, normalize_food_
 
 MFDS_ENDPOINT = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02"
 REQUEST_USER_AGENT = "AH_03_03-diet-runtime/0.1"
+REQUEST_RETRY_COUNT = 2
+REQUEST_RETRY_BACKOFF_SECONDS = (0.3, 0.6)
+TOP_CANDIDATE_METADATA_LIMIT = 5
 
 
 class MfdsMatchStatus(StrEnum):
@@ -56,6 +59,8 @@ class MfdsFoodDbMatcher:
         max_candidates: int = 5,
         fallback_matcher: FoodDbMatcher | None = None,
         fetch_payload: FetchPayload | None = None,
+        retry_count: int = REQUEST_RETRY_COUNT,
+        retry_backoff_seconds: tuple[float, ...] = REQUEST_RETRY_BACKOFF_SECONDS,
     ) -> None:
         self.service_key = service_key.strip()
         self.encoded_service_key = (encoded_service_key or "").strip() or None
@@ -63,6 +68,8 @@ class MfdsFoodDbMatcher:
         self.max_candidates = max(1, max_candidates)
         self.fallback_matcher = fallback_matcher
         self._fetch_payload = fetch_payload
+        self.retry_count = max(0, retry_count)
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def match(self, query: str) -> FoodMatchResult:
         query_name = cleanup_food_query(query)
@@ -104,6 +111,7 @@ class MfdsFoodDbMatcher:
                 "used_query": top.source_query,
                 "rank_score": top.rank_score,
                 "rank_reason": top.rank_reason,
+                "top_candidates": _serialize_top_candidates(top_candidates[:TOP_CANDIDATE_METADATA_LIMIT]),
                 "latency_ms": latency_ms,
             },
         )
@@ -123,14 +131,39 @@ class MfdsFoodDbMatcher:
     def _lookup_candidates(self, query: str) -> list[MfdsCandidate]:
         candidates: list[MfdsCandidate] = []
         for query_variant in _query_variants(query):
-            payload = self._fetch_payload(query_variant) if self._fetch_payload else self._request_payload(query_variant)
+            payload = self._fetch_query_payload(query_variant)
+            variant_candidates: list[MfdsCandidate] = []
             for item in _extract_items(payload)[: self.max_candidates]:
                 candidate = _candidate_from_item(item=item, source_query=query_variant, original_query=query)
                 if candidate is not None:
-                    candidates.append(candidate)
-            if candidates:
+                    variant_candidates.append(candidate)
+            candidates.extend(variant_candidates)
+            if variant_candidates and not _should_try_next_query_variant(variant_candidates):
                 break
         return candidates
+
+    def _fetch_query_payload(self, query: str) -> dict[str, Any]:
+        last_error: Exception | None = None
+        for attempt_index in range(self.retry_count + 1):
+            try:
+                return self._fetch_payload(query) if self._fetch_payload else self._request_payload(query)
+            except MfdsParseError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                if attempt_index >= self.retry_count:
+                    break
+                backoff = (
+                    self.retry_backoff_seconds[min(attempt_index, len(self.retry_backoff_seconds) - 1)]
+                    if self.retry_backoff_seconds
+                    else 0
+                )
+                if backoff > 0:
+                    time.sleep(backoff)
+        if last_error is not None:
+            raise last_error
+        msg = "MFDS request failed"
+        raise RuntimeError(msg)
 
     def _request_payload(self, query: str) -> dict[str, Any]:
         attempts = [(self.service_key, False)]
@@ -198,15 +231,20 @@ def _query_variants(query: str) -> list[str]:
     variants = [query]
     normalized = normalize_food_name(query)
     fallback_rules = {
+        "blt샌드위치": ["BLT 샌드위치", "샌드위치"],
         "고등어구이": ["고등어"],
+        "비빔냉면": ["냉면"],
         "달걀볶음밥": ["볶음밥"],
         "육회비빔밥": ["비빔밥"],
+        "핫초코": ["코코아", "핫초코"],
         "노랑파프리카": ["파프리카"],
         "녹색피망": ["피망"],
         "국물면요리": ["면요리", "국수"],
         "중식면요리": ["중식면", "면요리"],
     }
     variants.extend(fallback_rules.get(normalized, []))
+    if query.strip().lower().startswith("blt") and " " not in query.strip():
+        variants.append(query.strip()[:3].upper() + " " + query.strip()[3:])
     return _dedupe_preserve_order([variant for variant in variants if variant.strip()])
 
 
@@ -271,6 +309,26 @@ def _resolve_match_status(top: MfdsCandidate, ranked: list[MfdsCandidate]) -> Mf
     if top.rank_score >= 25:
         return MfdsMatchStatus.WEAK_MATCH
     return MfdsMatchStatus.WEAK_MATCH
+
+
+def _should_try_next_query_variant(candidates: list[MfdsCandidate]) -> bool:
+    ranked = sorted(candidates, key=lambda candidate: candidate.rank_score, reverse=True)
+    if not ranked:
+        return True
+    status = _resolve_match_status(ranked[0], ranked)
+    return status == MfdsMatchStatus.WEAK_MATCH
+
+
+def _serialize_top_candidates(candidates: list[MfdsCandidate]) -> list[dict[str, Any]]:
+    return [
+        {
+            "food_name": candidate.food_name,
+            "food_code": candidate.food_code,
+            "rank_score": candidate.rank_score,
+            "rank_reason": candidate.rank_reason,
+        }
+        for candidate in candidates
+    ]
 
 
 def _processed_food_penalty(*, food_name: str, query: str) -> float:
@@ -344,7 +402,7 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
     for value in values:
-        normalized = normalize_food_name(value)
+        normalized = cleanup_food_query(value).lower()
         if normalized in seen:
             continue
         seen.add(normalized)

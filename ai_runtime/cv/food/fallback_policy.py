@@ -45,6 +45,7 @@ def select_food_detection_candidate(
     return FoodDetectionCandidateSet(
         provider=cv_result.provider,
         detected_foods=cv_result.detected_foods,
+        detected_food_confidences=cv_result.detected_food_confidences,
         confidence=cv_result.confidence,
         needs_review=needs_review,
         fallback_reason=fallback_reason,
@@ -59,6 +60,7 @@ def _rule_based_candidate(rule_based_foods: list[dict[str, Any]]) -> FoodDetecti
     return FoodDetectionCandidateSet(
         provider="rule_based_food_detection",
         detected_foods=food_names,
+        detected_food_confidences=_food_confidences(rule_based_foods),
         confidence=_average_confidence(rule_based_foods),
         needs_review=False,
         raw_output={
@@ -80,6 +82,10 @@ def _average_confidence(foods: list[dict[str, Any]]) -> float | None:
     if not values:
         return None
     return round(sum(values) / len(values), 4)
+
+
+def _food_confidences(foods: list[dict[str, Any]]) -> list[float | None]:
+    return [round(float(value), 4) if _is_number(value := food.get("confidence")) else None for food in foods if _food_name(food)]
 
 
 def _is_number(value: Any) -> bool:
