@@ -117,6 +117,7 @@ async def _send_family_invite_email(
     return await EmailService().send_family_invite_email(
         recipient_email,
         inviter_display_name=_display_name(inviter),
+        invite_code=invite_code,
         invite_url=_family_invite_accept_url(invite_code),
         expires_at_text=_format_invite_expiration(expires_at),
     )
@@ -354,6 +355,7 @@ async def create_family_invite(
         await service_jobs.enqueue_family_invite_email_send(
             recipient_email=invitee_email,
             inviter_display_name=_display_name(user),
+            invite_code=invite_code,
             invite_url=_family_invite_accept_url(invite_code),
             expires_at_text=_format_invite_expiration(expires_at),
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import urllib.parse
 from typing import Any
 
 from ai_runtime.jobs.redis_stream import SERVICE_JOB_STREAM
@@ -46,6 +47,7 @@ async def enqueue_family_invite_email_send(
     *,
     recipient_email: str,
     inviter_display_name: str,
+    invite_code: str,
     invite_url: str,
     expires_at_text: str,
 ) -> None:
@@ -54,6 +56,7 @@ async def enqueue_family_invite_email_send(
         request_payload={
             "recipient_email": recipient_email,
             "inviter_display_name": inviter_display_name,
+            "invite_code": invite_code,
             "invite_url": invite_url,
             "expires_at_text": expires_at_text,
             "resource_type": "family_invite_email",
@@ -139,6 +142,7 @@ async def handle_family_invite_email_send(job_id: int) -> dict[str, Any]:
         sent = await EmailService().send_family_invite_email(
             recipient_email,
             inviter_display_name=_required_str(payload, "inviter_display_name"),
+            invite_code=_family_invite_code_from_payload(payload),
             invite_url=_required_str(payload, "invite_url"),
             expires_at_text=_required_str(payload, "expires_at_text"),
         )
@@ -248,6 +252,20 @@ def _required_str(payload: dict[str, Any], key: str) -> str:
     if value in (None, ""):
         raise ServiceJobNonRetryableError(f"missing_{key}")
     return str(value)
+
+
+def _family_invite_code_from_payload(payload: dict[str, Any]) -> str:
+    value = payload.get("invite_code")
+    if value not in (None, ""):
+        return str(value)
+
+    invite_url = _required_str(payload, "invite_url")
+    parsed_url = urllib.parse.urlparse(invite_url)
+    parsed_query = urllib.parse.parse_qs(parsed_url.query)
+    codes = parsed_query.get("code")
+    if codes and codes[0]:
+        return codes[0]
+    raise ServiceJobNonRetryableError("missing_invite_code")
 
 
 def _required_int(payload: dict[str, Any], key: str) -> int:
