@@ -354,7 +354,9 @@ export default function HealthRecordPage() {
   };
 
   const missingBasicFields = readiness?.missing_basic_fields ?? readiness?.missing_fields ?? [];
-  const missingPrecisionFields = readiness?.missing_precision_fields ?? [];
+  const missingPrecisionFields = (readiness?.missing_precision_fields ?? []).filter(
+    (field) => field !== "hba1c" && field !== "당화혈색소",
+  );
 
   return (
     <div className="dashboard-grid">

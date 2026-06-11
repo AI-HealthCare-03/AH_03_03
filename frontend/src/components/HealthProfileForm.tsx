@@ -56,7 +56,6 @@ export const healthProfileSectionTitles = [
   "가족력/생활정보",
   "신체계측",
   "혈액/검진 정보",
-  "선택/검토 항목",
 ] as const;
 
 const dayOptions = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -169,20 +168,12 @@ const sections: Array<{
       { key: "systolic_bp", label: "수축기 혈압", type: "number", placeholder: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", type: "number", placeholder: "mmHg" },
       { key: "fasting_glucose", label: "공복혈당", type: "number", placeholder: "mg/dL" },
-      { key: "hba1c", label: "당화혈색소", type: "number", placeholder: "%" },
+      { key: "hba1c", label: "당화혈색소 (선택)", type: "number", placeholder: "%" },
       { key: "total_cholesterol", label: "총콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "triglyceride", label: "중성지방", type: "number", placeholder: "mg/dL" },
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm" },
-    ],
-  },
-  {
-    title: "선택/검토 항목",
-    description: "교육수준과 소득수준은 편향 및 입력 신뢰도 이슈가 있어 현재 기본 분석 필수 항목에서 제외했습니다.",
-    fields: [
-      { key: "education_level", label: "교육수준", placeholder: "선택 입력" },
-      { key: "income_level", label: "소득수준", placeholder: "선택 입력" },
     ],
   },
 ];
