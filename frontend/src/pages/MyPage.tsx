@@ -9,6 +9,9 @@ import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
+import { Mail, Phone } from 'lucide-react';
+import { Activity, Heart, Droplets, Moon } from "lucide-react";
+
 type Item = Record<string, unknown>;
 
 type ProfileDraft = {
@@ -359,8 +362,12 @@ export default function MyPage() {
                     <strong style={{ fontSize: "40px" }}>{displayName}</strong>
                     <span className="badge badge-reference">{backendUser?.login_id ?? "로그인 ID 미등록"}</span>
                   </div>
-                  <p className="muted" style={{ marginBottom: "4px" }}>이메일: {backendUser?.email ?? "이메일 정보 없음"}</p>
-                  <p className="muted" style={{ margin: 0 }}>휴대폰: {backendUser?.phone_number ?? "미등록"}</p>
+                  <p className="muted" style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Mail size={14} /> {backendUser?.email ?? "이메일 정보 없음"}
+                  </p>
+                  <p className="muted" style={{ margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Phone size={14} /> {backendUser?.phone_number ?? "미등록"}
+                  </p>
                 </>
               )}
             </div>
@@ -456,21 +463,29 @@ export default function MyPage() {
         <Card title="현재 상태">
             <div className="metric-grid mypage-metric-grid">
               <div>
-                <span>BMI</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Activity size={14} /> BMI
+                </span>
                 <strong>{getText(latestHealth, "bmi", "기록 없음")}</strong>
               </div>
               <div>
-                <span>혈압</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Heart size={14} /> 혈압
+                </span>
                 <strong>
                   {getText(latestHealth, "systolic_bp", "-")}/{getText(latestHealth, "diastolic_bp", "-")}
                 </strong>
               </div>
               <div>
-                <span>공복혈당</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Droplets size={14} /> 공복혈당
+                </span>
                 <strong>{getText(latestHealth, "fasting_glucose", "기록 없음")}</strong>
               </div>
               <div>
-                <span>수면</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Moon size={14} /> 수면
+                </span>
                 <strong>{getText(latestHealth, "sleep_hours", "기록 없음")}</strong>
               </div>
             </div>
