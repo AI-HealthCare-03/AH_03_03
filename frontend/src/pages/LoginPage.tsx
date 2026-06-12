@@ -67,13 +67,14 @@ export default function LoginPage() {
         <form className="form" onSubmit={submit}>
           <label>
             아이디 또는 이메일
-            <input value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input value={email} onChange={(event) => setEmail(event.target.value)} onFocus={() => setError("")} required />
           </label>
           <label>
             비밀번호
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              onFocus={() => setError("")}
               type="password"
               minLength={8}
               required
