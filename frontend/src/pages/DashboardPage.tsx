@@ -342,19 +342,28 @@ function LineChart({ axisTicks, series, clampTo100 }: { axisTicks?: ChartAxisTic
             return (
               <g key={item.key}>
                 <path className="line-chart-path" d={d} style={{ "--series-color": item.color } as CSSProperties} />
-                {item.points.map((point, index) => (
-                  <circle
-                    className="line-chart-point"
-                    cx={xFor(point.date || point.label, index)}
-                    cy={yFor(point.value)}
-                    key={`${item.key}-${point.date}-${index}`}
-                    r="3.5"
-                    style={{ "--series-color": item.color } as CSSProperties}
-                  >
-                    <title>{point.tooltipLines?.join("\n") ?? `${item.label} · ${point.label} · ${point.displayValue ?? Math.round(point.value)}`}</title>
-                  </circle>
-                ))}
-              </g>
+                {item.points.map((point, index) => {
+                  const isLast = index === item.points.length - 1;
+                  const cx = xFor(point.date || point.label, index);
+                  const cy = yFor(point.value);
+                  return (
+                    <g key={`${item.key}-${point.date}-${index}`}>
+                      <circle
+                        className="line-chart-point"
+                        cx={cx}
+                        cy={cy}
+                        r={isLast ? 6 : 3.5}
+                        style={{
+                          "--series-color": item.color,
+                          ...(isLast ? { fill: item.color } : {})
+                        } as CSSProperties}
+                      >
+                        <title>{point.tooltipLines?.join("\n") ?? `${item.label} · ${point.label} · ${point.displayValue ?? Math.round(point.value)}`}</title>
+                      </circle>
+                    </g>
+                  );
+                })}
+                </g>
             );
           })}
         </svg>
