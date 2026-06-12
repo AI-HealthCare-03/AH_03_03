@@ -5,6 +5,12 @@ from typing import Any
 from dotenv import load_dotenv
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_CONNECT_TIMEOUT_SECONDS = 3.0
+OPENAI_READ_TIMEOUT_SECONDS = 15.0
+OPENAI_WRITE_TIMEOUT_SECONDS = 15.0
+OPENAI_POOL_TIMEOUT_SECONDS = 3.0
+OPENAI_TOTAL_TIMEOUT_SECONDS = 20.0
+OPENAI_MAX_RETRIES = 2
 LANGFUSE_ENV_KEYS = ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL")
 REWRITE_RESPONSE_SCHEMA = {
     "type": "object",
@@ -177,7 +183,20 @@ def build_openai_client():
     except ImportError as exc:
         raise RuntimeError("The openai package is not installed. Install it before using real LLM mode.") from exc
 
-    return OpenAI(api_key=api_key)
+    try:
+        import httpx
+
+        timeout = httpx.Timeout(
+            OPENAI_TOTAL_TIMEOUT_SECONDS,
+            connect=OPENAI_CONNECT_TIMEOUT_SECONDS,
+            read=OPENAI_READ_TIMEOUT_SECONDS,
+            write=OPENAI_WRITE_TIMEOUT_SECONDS,
+            pool=OPENAI_POOL_TIMEOUT_SECONDS,
+        )
+    except ImportError:
+        timeout = OPENAI_TOTAL_TIMEOUT_SECONDS
+
+    return OpenAI(api_key=api_key, timeout=timeout, max_retries=OPENAI_MAX_RETRIES)
 
 
 def build_langfuse_client():

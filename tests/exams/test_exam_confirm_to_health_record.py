@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ai_runtime.jobs import exam_ocr_handler
 from app.services import exams as exam_service
 from app.services.exams import (
     build_health_record_update_from_exam_measurements,
@@ -56,14 +57,14 @@ def test_non_numeric_exam_values_are_not_measurement_candidates() -> None:
 def test_numeric_exam_value_takes_priority_over_later_non_numeric_value() -> None:
     merged: dict[str, object] = {}
 
-    exam_service._merge_exam_extracted_data(merged, {"ldl": "67", "hdl": "비해당"})
-    exam_service._merge_exam_extracted_data(merged, {"ldl": "비해당", "hdl": "49"})
+    exam_ocr_handler._merge_exam_extracted_data(merged, {"ldl": "67", "hdl": "비해당"})
+    exam_ocr_handler._merge_exam_extracted_data(merged, {"ldl": "비해당", "hdl": "49"})
 
     assert merged == {"ldl": "67", "hdl": "49"}
 
 
 def test_exam_pdf_measurement_page_scoring_selects_table_page() -> None:
-    page_indices = exam_service._select_exam_measurement_page_indices(
+    page_indices = exam_ocr_handler._select_exam_measurement_page_indices(
         [
             "종합소견 결과 안내 HDL",
             "검사항목 결과 참고치 공복혈당 총콜레스테롤 HDL LDL 중성지방 AST ALT 혈색소",
@@ -75,11 +76,11 @@ def test_exam_pdf_measurement_page_scoring_selects_table_page() -> None:
 
 
 def test_auto_exam_ocr_provider_order_uses_file_type_policy() -> None:
-    assert exam_service._select_exam_ocr_provider_order("auto", "application/pdf", "checkup.pdf") == [
+    assert exam_ocr_handler._select_exam_ocr_provider_order("auto", "application/pdf", "checkup.pdf") == [
         "paddleocr",
         "gpt_vision",
     ]
-    assert exam_service._select_exam_ocr_provider_order("auto", "image/png", "checkup.png") == [
+    assert exam_ocr_handler._select_exam_ocr_provider_order("auto", "image/png", "checkup.png") == [
         "gpt_vision",
         "paddleocr",
     ]
@@ -210,9 +211,9 @@ async def test_run_exam_ocr_from_report_reads_upload_via_storage(monkeypatch, tm
 
     monkeypatch.setattr(exam_service, "get_exam_report", fake_get_exam_report)
     monkeypatch.setattr(exam_service, "update_exam_report", fake_update_exam_report)
-    monkeypatch.setattr(exam_service, "run_exam_ocr", fake_run_exam_ocr)
+    monkeypatch.setattr(exam_ocr_handler, "run_exam_ocr", fake_run_exam_ocr)
 
-    response = await exam_service.run_exam_ocr_from_report(7)
+    response = await exam_ocr_handler.run_exam_ocr_from_report(7)
 
     assert response == "ocr-response"
     assert captured["image_bytes"] == b"stored-image"
@@ -242,12 +243,12 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
                 },
             }
 
-    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
 
-    result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
+    result = await exam_ocr_handler._extract_exam_measurements_with_provider(b"image", "image/png")
 
     assert result["provider"] == "gpt_vision"
     assert result["fallback_used"] is False
@@ -263,7 +264,7 @@ def test_convert_exam_pdf_to_png_images_with_pymupdf() -> None:
     pdf_bytes = document.tobytes()
     document.close()
 
-    result = exam_service._convert_exam_pdf_to_png_images(pdf_bytes)
+    result = exam_ocr_handler._convert_exam_pdf_to_png_images(pdf_bytes)
 
     assert result.page_count == 1
     assert len(result.images) == 1
@@ -301,16 +302,16 @@ async def test_exam_ocr_converts_pdf_before_gpt_vision(monkeypatch) -> None:
     def fake_convert(pdf_bytes: bytes):
         assert pdf_bytes == b"%PDF-test"
         converted["called"] = True
-        return exam_service.ExamPdfImageConversionResult(page_count=2, images=[b"page-1-png", b"page-2-png"])
+        return exam_ocr_handler.ExamPdfImageConversionResult(page_count=2, images=[b"page-1-png", b"page-2-png"])
 
-    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
-    monkeypatch.setattr(exam_service, "_convert_exam_pdf_to_png_images", fake_convert)
+    monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_ocr_handler, "_convert_exam_pdf_to_png_images", fake_convert)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
 
-    result = await exam_service._extract_exam_measurements_with_provider(
+    result = await exam_ocr_handler._extract_exam_measurements_with_provider(
         b"%PDF-test",
         "application/pdf",
         "checkup.pdf",
@@ -346,17 +347,17 @@ async def test_exam_ocr_pdf_gpt_vision_prioritizes_measurement_page(monkeypatch)
                 },
             }
 
-    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(
-        exam_service,
+        exam_ocr_handler,
         "_convert_exam_pdf_to_png_images",
-        lambda _: exam_service.ExamPdfImageConversionResult(
+        lambda _: exam_ocr_handler.ExamPdfImageConversionResult(
             page_count=3,
             images=[b"page-1-png", b"page-2-png", b"page-3-png"],
         ),
     )
     monkeypatch.setattr(
-        exam_service,
+        exam_ocr_handler,
         "_extract_exam_pdf_page_texts",
         lambda _: [
             "종합소견 결과 안내",
@@ -369,7 +370,7 @@ async def test_exam_ocr_pdf_gpt_vision_prioritizes_measurement_page(monkeypatch)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
 
-    result = await exam_service._extract_exam_measurements_with_provider(
+    result = await exam_ocr_handler._extract_exam_measurements_with_provider(
         b"%PDF-test",
         "application/pdf",
         "checkup.pdf",
@@ -399,17 +400,17 @@ async def test_exam_ocr_pdf_gpt_vision_falls_back_to_all_pages_when_selected_pag
                 return {"extracted_data": {"fasting_glucose": "101"}}
             return {"extracted_data": {}}
 
-    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(
-        exam_service,
+        exam_ocr_handler,
         "_convert_exam_pdf_to_png_images",
-        lambda _: exam_service.ExamPdfImageConversionResult(
+        lambda _: exam_ocr_handler.ExamPdfImageConversionResult(
             page_count=3,
             images=[b"page-1-png", b"page-2-png", b"page-3-png"],
         ),
     )
     monkeypatch.setattr(
-        exam_service,
+        exam_ocr_handler,
         "_extract_exam_pdf_page_texts",
         lambda _: [
             "종합소견 결과 안내",
@@ -420,7 +421,7 @@ async def test_exam_ocr_pdf_gpt_vision_falls_back_to_all_pages_when_selected_pag
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
 
-    result = await exam_service._extract_exam_measurements_with_gpt_vision(
+    result = await exam_ocr_handler._extract_exam_measurements_with_gpt_vision(
         b"%PDF-test",
         "application/pdf",
         "checkup.pdf",
@@ -438,7 +439,7 @@ async def test_exam_ocr_returns_empty_measurements_when_provider_unavailable(mon
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", None)
 
-    result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
+    result = await exam_ocr_handler._extract_exam_measurements_with_provider(b"image", "image/png")
 
     assert result["provider"] == "none"
     assert result["fallback_used"] is False
@@ -455,13 +456,13 @@ async def test_exam_ocr_returns_empty_measurements_when_parser_extracts_no_value
         async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
             return {"analysis_status": "success", "extracted_data": {}}
 
-    monkeypatch.setattr(exam_service, "VisionClient", FakeVisionClient)
+    monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
 
-    result = await exam_service._extract_exam_measurements_with_provider(b"image", "image/png")
+    result = await exam_ocr_handler._extract_exam_measurements_with_provider(b"image", "image/png")
 
     assert result["provider"] == "none"
     assert result["fallback_used"] is False

@@ -4,6 +4,8 @@ from typing import Any
 from uuid import uuid4
 
 from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
+from ai_runtime.cv.food.matcher import FoodMatchResult, match_food_name
+from ai_runtime.cv.food.normalization import normalize_food_name
 from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
 from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
@@ -346,7 +348,7 @@ def build_nutrition_scoring_result(
     details = [_build_food_score_detail(food, runtime_scores) for food in detected_foods]
     matched_scores = [detail["scores"] for detail in details if detail["scores"] is not None]
     return {
-        "detected_foods": [_food_name(food) for food in detected_foods],
+        "detected_foods": [str(detail["food_name"]) for detail in details if detail["food_name"]],
         "disease_scores": _average_disease_scores(matched_scores),
         "food_score_details": details,
         "scoring_source": SCORING_SOURCE,
@@ -365,7 +367,13 @@ def _safe_build_nutrition_scoring_result(detected_foods: list[dict[str, Any]]) -
             "food_score_details": [
                 {
                     "food_name": _food_name(food),
+                    "original_name": _food_match(food).original_name,
+                    "query_name": _food_match(food).query_name,
                     "matched_food_name": None,
+                    "matched_food_code": _food_match(food).matched_food_code,
+                    "match_source": _food_match(food).match_source,
+                    "match_confidence": _food_match(food).match_confidence,
+                    "needs_user_confirmation": _food_match(food).needs_user_confirmation,
                     "scores": None,
                     "match_status": "scoring_unavailable",
                 }
@@ -393,25 +401,58 @@ def _safe_generate_diet_explanation(disease_scores: dict[str, float | int | None
 
 
 def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseFoodScoreRecord]) -> dict[str, Any]:
-    food_name = _food_name(food)
-    matched = _match_food_score(food_name, runtime_scores)
+    match = _food_match(food)
+    lookup_name = match.matched_food_name or match.query_name
+    matched = _match_food_score(lookup_name, runtime_scores) if lookup_name else None
+    matched_food_name = match.matched_food_name or (matched.food_name if matched is not None else None)
+    needs_user_confirmation = match.needs_user_confirmation and matched is None
+    match_source = (
+        match.match_source if match.matched_food_name else SCORING_SOURCE if matched is not None else match.match_source
+    )
+    match_confidence = match.match_confidence if match.matched_food_name else 0.7 if matched is not None else None
+    base_detail = {
+        "food_name": matched_food_name or match.query_name,
+        "original_name": match.original_name,
+        "query_name": match.query_name,
+        "matched_food_name": matched_food_name,
+        "matched_food_code": match.matched_food_code,
+        "match_source": match_source,
+        "match_confidence": match_confidence,
+        "needs_user_confirmation": needs_user_confirmation,
+    }
     if matched is None:
         return {
-            "food_name": food_name,
-            "matched_food_name": None,
+            **base_detail,
             "scores": None,
-            "match_status": "unmatched",
+            "match_status": "needs_user_confirmation" if needs_user_confirmation else "unmatched",
         }
     return {
-        "food_name": food_name,
-        "matched_food_name": matched.food_name,
+        **base_detail,
         "scores": _record_disease_scores(matched),
         "match_status": "matched",
     }
 
 
 def _food_name(food: dict[str, Any]) -> str:
-    return str(food.get("name") or food.get("food_name") or "").strip()
+    match = _food_match(food)
+    return str(match.matched_food_name or match.query_name)
+
+
+def _food_match(food: dict[str, Any]) -> FoodMatchResult:
+    original_name = str(food.get("original_name") or food.get("name") or food.get("food_name") or "").strip()
+    matched_food_name = _optional_string(food.get("matched_food_name"))
+    query_name = _optional_string(food.get("query_name")) or original_name
+    if any(key in food for key in ("query_name", "matched_food_name", "matched_food_code", "match_source")):
+        return FoodMatchResult(
+            original_name=original_name,
+            query_name=query_name,
+            matched_food_name=matched_food_name,
+            matched_food_code=_optional_string(food.get("matched_food_code")),
+            match_source=_optional_string(food.get("match_source")) or "provided_payload",
+            match_confidence=_optional_float(food.get("match_confidence")),
+            needs_user_confirmation=bool(food.get("needs_user_confirmation", matched_food_name is None)),
+        )
+    return match_food_name(original_name)
 
 
 def _match_food_score(food_name: str, runtime_scores: list[DiseaseFoodScoreRecord]) -> DiseaseFoodScoreRecord | None:
@@ -421,6 +462,8 @@ def _match_food_score(food_name: str, runtime_scores: list[DiseaseFoodScoreRecor
     for record in runtime_scores:
         if _normalize_food_name(record.food_name) == normalized_name:
             return record
+    if len(normalized_name) < 3:
+        return None
     for record in runtime_scores:
         record_name = _normalize_food_name(record.food_name)
         if normalized_name in record_name or record_name in normalized_name:
@@ -429,7 +472,19 @@ def _match_food_score(food_name: str, runtime_scores: list[DiseaseFoodScoreRecor
 
 
 def _normalize_food_name(value: str) -> str:
-    return value.replace(" ", "").lower()
+    return normalize_food_name(value)
+
+
+def _optional_string(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _record_disease_scores(record: DiseaseFoodScoreRecord) -> dict[str, float]:

@@ -92,7 +92,7 @@ export default function SignupPage() {
     };
   };
 
-  const passwordPolicyMessage = "8자 이상, 영문자 1개 이상, 숫자 1개 이상, 특수문자 1개 이상 포함해야 합니다.";
+  const passwordPolicyMessage = "비밀번호는 영문자, 숫자, 특수문자를 포함하여 8자 이상으로 설정해주세요.";
 
   const isPasswordValid = (value: string) =>
     value.length >= 8 && /[A-Za-z]/.test(value) && /[0-9]/.test(value) && /[^A-Za-z0-9]/.test(value);
@@ -112,16 +112,20 @@ export default function SignupPage() {
   const validateCurrentStep = (targetStep = step): boolean => {
     const nextErrors: Record<string, string> = {};
     const normalizedLoginId = loginId.trim();
+    const loginIdRegex = /^[A-Za-z0-9]{6,}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (targetStep === 0) {
-      if (normalizedLoginId.length < 6) {
-        nextErrors.login_id = "아이디는 6자 이상 입력해주세요.";
+    if (!loginIdRegex.test(normalizedLoginId)) {
+     nextErrors.login_id = "아이디는 영문 대소문자와 숫자만 사용 가능하며, 6자 이상 입력해주세요.";
       }
       if (!loginIdCheck || loginIdCheck.checkedValue !== normalizedLoginId || !loginIdCheck.available) {
         nextErrors.login_id_check = "아이디 중복확인을 완료해주세요.";
       }
       if (!email.trim()) {
         nextErrors.email = "이메일을 입력해주세요.";
+      } else if (!emailRegex.test(email.trim())) {
+  nextErrors.email = "올바른 이메일 형식으로 입력해주세요.";
       }
       if (!emailCheck || emailCheck.checkedValue !== email.trim().toLowerCase() || !emailCheck.available) {
         nextErrors.email_check = "이메일 중복확인을 완료해주세요.";
@@ -211,12 +215,18 @@ export default function SignupPage() {
   };
 
   const handleCheckLoginId = async () => {
-    setError("");
-    const normalizedLoginId = loginId.trim();
-    if (normalizedLoginId.length < 6) {
-      setFieldErrors((prev) => ({ ...prev, login_id: "아이디는 6자 이상 입력해주세요." }));
-      return;
-    }
+  setError("");
+
+  const normalizedLoginId = loginId.trim();
+  const loginIdRegex = /^[A-Za-z0-9]{6,}$/;
+
+  if (!loginIdRegex.test(normalizedLoginId)) {
+    setFieldErrors((prev) => ({
+      ...prev,
+      login_id: "아이디는 영문 대소문자와 숫자만 사용 가능하며, 6자 이상 입력해주세요.",
+    }));
+    return;
+  }
     try {
       setCheckingField("login_id");
       const result = await checkLoginId(normalizedLoginId);
@@ -239,8 +249,23 @@ export default function SignupPage() {
   const handleCheckEmail = async () => {
     setError("");
     const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!normalizedEmail) {
       setFieldErrors((prev) => ({ ...prev, email: "이메일을 입력해주세요." }));
+      return;
+    }
+    if (!emailRegex.test(normalizedEmail)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        email: "올바른 이메일 형식으로 입력해주세요.",
+      }));
+      return;
+    }
+    if (!emailRegex.test(normalizedEmail)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        email: "올바른 이메일 형식으로 입력해주세요.",
+      }));
       return;
     }
     try {
@@ -259,7 +284,11 @@ export default function SignupPage() {
         return rest;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "이메일 중복확인에 실패했습니다.");
+      setError(
+          err instanceof Error
+              ? err.message
+              : "이메일 중복확인에 실패했습니다."
+      );
     } finally {
       setCheckingField(null);
     }
@@ -364,18 +393,30 @@ export default function SignupPage() {
     }
   };
 
+  const scrollToFirstError = () => {
+    setTimeout(() => {
+      const firstError = document.querySelector(".field-error");
+      firstError?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 0);
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
     setNotice("");
     if (step < steps.length - 1) {
       if (!validateCurrentStep(step)) {
+        scrollToFirstError();
         return;
       }
       setStep((prev) => prev + 1);
       return;
     }
     if (!validateAllSteps()) {
+      scrollToFirstError();
       return;
     }
 
@@ -474,19 +515,26 @@ export default function SignupPage() {
             </button>
           ))}
         </div>
-        <form className="form" onSubmit={submit}>
+        <form className="form" onSubmit={submit} noValidate>
           {step === 0 && (
             <>
               <label>
                 아이디
                 <input
                   value={loginId}
+                  placeholder="영문 대소문자와 숫자만 사용 가능합니다. 6~20자로 입력해주세요."
+                  onFocus={() => {
+                    setFieldErrors((prev) => {
+                      const { login_id, login_id_check, ...rest } = prev;
+                      return rest;
+                    });
+                  }}
                   onChange={(event) => {
                     setLoginId(event.target.value);
                     setLoginIdCheck(null);
                   }}
                   minLength={6}
-                  maxLength={40}
+                  maxLength={20}
                   required
                 />
                 {fieldErrors.login_id && <span className="field-error">{fieldErrors.login_id}</span>}
@@ -507,6 +555,13 @@ export default function SignupPage() {
                 이메일
                 <input
                   value={email}
+                  placeholder="example@email.com"
+                    onFocus={() => {
+                      setFieldErrors((prev) => {
+                        const { email, email_check, email_verification, ...rest } = prev;
+                        return rest;
+                      });
+                    }}
                   onChange={(event) => {
                     setEmail(event.target.value);
                     setEmailCheck(null);
@@ -589,6 +644,7 @@ export default function SignupPage() {
                     onChange={(event) => setOnlyDigitsPhonePart("second", event.target.value, 4)}
                   />
                   <input
+                    autoComplete="tel-local-suffix"
                     inputMode="numeric"
                     maxLength={4}
                     value={phoneParts.third}
@@ -611,6 +667,12 @@ export default function SignupPage() {
                 비밀번호
                 <input
                   value={password}
+                  onFocus={() => {
+                    setFieldErrors((prev) => {
+                      const { password, password_confirm, ...rest } = prev;
+                      return rest;
+                    });
+                  }}
                   onChange={(event) => setPassword(event.target.value)}
                   type="password"
                   minLength={8}
@@ -623,6 +685,12 @@ export default function SignupPage() {
                 비밀번호 확인
                 <input
                   value={passwordConfirm}
+                  onFocus={() => {
+                    setFieldErrors((prev) => {
+                      const { password_confirm, ...rest } = prev;
+                      return rest;
+                    });
+                  }}
                   onChange={(event) => setPasswordConfirm(event.target.value)}
                   type="password"
                   minLength={8}
@@ -644,7 +712,7 @@ export default function SignupPage() {
                 </div>
                 <div className="privacy-consent-summary">
                   <p>
-                    AI HealthCare는 회원가입 및 건강관리 기능 제공을 위해 필요한 개인정보를 수집·이용합니다.
+                    Health Ladder는 회원가입 및 건강관리 기능 제공을 위해 필요한 개인정보를 수집·이용합니다.
                   </p>
                   <p>
                     건강검진 결과, 복약 정보, 식단 기록, 챌린지 수행 기록 등 건강 관련 정보는 민감할 수 있으므로
@@ -784,7 +852,9 @@ export default function SignupPage() {
                   value={lifestyle.drinking_frequency}
                   onChange={(event) => setLifestyle((prev) => ({ ...prev, drinking_frequency: event.target.value }))}
                 >
+                  <option value="NONE">마시지 않음</option>
                   <option value="RARE">월 1회 미만</option>
+                  <option value="MONTHLY_1">월 1회</option>
                   <option value="MONTHLY_2_4">월 2-4회</option>
                   <option value="WEEKLY_2_3">주 2-3회</option>
                   <option value="WEEKLY_4_PLUS">주 4회 이상</option>
@@ -800,7 +870,8 @@ export default function SignupPage() {
                   <option value="ONE_TO_TWO">1-2잔</option>
                   <option value="THREE_TO_FOUR">3-4잔</option>
                   <option value="FIVE_TO_SIX">5-6잔</option>
-                  <option value="SEVEN_PLUS">7잔 이상</option>
+                  <option value="SEVEN_TO_NINE">7-9잔</option>
+                  <option value="TEN_PLUS">10잔 이상</option>
                 </select>
               </label>
               <label>
@@ -933,7 +1004,10 @@ export default function SignupPage() {
           </div>
         </form>
         <p className="muted">
-          이미 계정이 있다면 <Link to="/login">로그인</Link>
+          이미 계정이 있다면{" "}
+          <Link className="login-link" to="/login">
+            로그인
+          </Link>
         </p>
       </Card>
       {isOccupationHelpOpen && <OccupationHelpModal onClose={() => setIsOccupationHelpOpen(false)} />}
@@ -943,17 +1017,17 @@ export default function SignupPage() {
 
 function DaySelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <div className="day-button-grid" role="group" aria-label="요일 선택">
-      {[0, 1, 2, 3, 4, 5, 6, 7].map((day) => (
-        <button
-          className={value === String(day) ? "day-button active" : "day-button"}
-          key={day}
-          onClick={() => onChange(String(day))}
-          type="button"
-        >
-          {day}일
-        </button>
-      ))}
-    </div>
+      <div className="day-button-grid" role="group" aria-label="요일 선택">
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((day) => (
+            <button
+                className={value === String(day) ? "day-button active" : "day-button"}
+                key={day}
+                onClick={() => onChange(String(day))}
+                type="button"
+            >
+              {day}일
+            </button>
+        ))}
+      </div>
   );
 }

@@ -8,7 +8,7 @@
 - Aerich migration scan path: `app/core/db/migrations`
 - Tortoise 설정: `app.core.db.databases.TORTOISE_ORM`
 - 신규 PostgreSQL baseline migration: `app/core/db/migrations/models/0_20260525004115_init.py`
-- legacy migration archive: `etc/db/aerich_legacy_20260525/models/`
+- legacy migration archive: `experiment/db/aerich_legacy_20260525/models/`
 
 ## Clean Baseline 정책
 
@@ -31,7 +31,7 @@ DB_HOST=localhost DB_NAME=<new_database_name> uv run python scripts/seed_current
 기존 `0~18` migration은 삭제하지 않고 Aerich scan path 밖으로 이동했다.
 
 ```text
-etc/db/aerich_legacy_20260525/models/
+experiment/db/aerich_legacy_20260525/models/
 ```
 
 이 archive는 과거 개발 이력과 문제 원인 추적용이다. Aerich가 읽는 위치가 아니므로 신규 DB 초기화에는 사용하지 않는다.

@@ -9,12 +9,13 @@ import { getMainSummary } from "../api/main";
 import { listMedications } from "../api/medications";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
+import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
 
 type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
-  service_title: "HealthCare",
+  service_title: "Health Ladder",
   service_description: "AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
 };
 
@@ -74,8 +75,8 @@ const landingPersonas = [
     id: "habit",
     icon: "🚶",
     title: "생활습관을 바꾸고 싶은 사용자",
-    quote: "혈당, 혈압, 체중 관리를 위해 식단과 운동 습관을 만들고 싶어요.",
-    features: ["식단 분석", "챌린지", "추적 대시보드"],
+    quote: "식단과 운동으로 혈당, 혈압, 체중을 관리하고 싶어요.",
+    features: ["식단 분석", "챌린지", "건강 리포트"],
     flow: [
       { icon: "🥗", title: "식단 기록", description: "사진과 기본 정보를 입력합니다." },
       { icon: "📈", title: "변화 추적", description: "건강 점수와 추이를 봅니다." },
@@ -95,6 +96,33 @@ const landingPersonas = [
     ],
   },
 ];
+
+const featureIcons: Record<string, React.ReactNode> = {
+  "🧭": <HeartPulse size={24} />,
+  "📄": <FileText size={24} />,
+  "🥗": <Salad size={24} />,
+  "🚶": <Dumbbell size={24} />,
+  "💊": <Pill size={24} />,
+  "💬": <BotMessageSquare size={24} />,
+};
+
+const flowIcons: Record<string, React.ReactNode> = {
+  "📄": <FileText size={24} />,
+  "📊": <ChartBar size={24} />,
+  "✅": <Trophy size={24} />,
+  "🥗": <Salad size={24} />,
+  "📈": <TrendingUp size={24} />,
+  "🚶": <Dumbbell size={24} />,
+  "💊": <Pill size={24} />,
+  "🔔": <Bell size={24} />,
+  "🤖": <BotMessageSquare size={24} />,
+};
+
+const personaIcons: Record<string, React.ReactNode> = {
+  exam: <ClipboardList size={24} />,
+  habit: <Dumbbell size={24} />,
+  record: <Pill size={24} />,
+};
 
 const serviceFlow = [
   { icon: "📄", label: "검진표 등록" },
@@ -411,20 +439,25 @@ export default function MainPage() {
     return (
       <div className="page-stack">
         <div className="main-dashboard-hero">
+          <img
+            src="/images/hero-main.png"
+            alt="헬스케어 서비스"
+            style={{ width: "auto", height: "100%", maxHeight: "280px", objectFit: "contain" }}
+          />
           <div>
             <h1>안녕하세요, {backendUser?.nickname ?? backendUser?.name ?? "회원"}님</h1>
             <p>오늘의 건강 관리 상태를 확인해보세요.</p>
           </div>
           <div className="home-action-panel">
             <Link className="home-action-card" to="/analysis">
-              <span className="home-action-card__icon">🧭</span>
+              <span className="home-action-card__icon"><HeartPulse size={24} /></span>
               <span>
                 <strong className="home-action-card__title">건강위험도 분석하기</strong>
                 <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 질환별 결과를 확인합니다.</em>
               </span>
             </Link>
             <Link className="home-action-card" to="/diets">
-              <span className="home-action-card__icon">🥗</span>
+              <span className="home-action-card__icon"><Salad size={24} /></span>
               <span>
                 <strong className="home-action-card__title">식단 이미지 분석하기</strong>
                 <em className="home-action-card__description">식단 이미지를 추가하면 식단 분석 결과를 확인할 수 있습니다.</em>
@@ -446,7 +479,6 @@ export default function MainPage() {
           <div className="todo-card-grid">
             {todayCards.map((task) => (
               <Link className="todo-card" key={task.title} to={task.to}>
-                <span className="badge badge-reference">오늘</span>
                 <strong>{task.title}</strong>
                 <p>{task.description}</p>
                 <em>{task.buttonLabel}</em>
@@ -460,276 +492,179 @@ export default function MainPage() {
             <h2>건강 추적 요약</h2>
             <p>최근 기록된 건강 지표를 시각적으로 확인합니다.</p>
           </div>
-          <div className="viz-card-grid">
-            {/* 혈당 / 혈압 card */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+            {/* 왼쪽: 질환별 위험도 - main-dashboard-grid에서 이동 */}
             <div className="viz-card">
               <div className="viz-card-row">
-                <span className="viz-card-label">혈당 / 혈압</span>
-                <Link className="muted" style={{ fontSize: 12 }} to="/ocr/exam">입력하기 →</Link>
+                <span className="viz-card-label">질환별 위험도</span>
+                <span style={{ color: "var(--color-muted)", fontSize: "12px" }}>
+                  {displayAnalysisResults.length > 0 ? formatDate(displayAnalysisResults[0]?.analyzed_at ?? displayAnalysisResults[0]?.created_at) : ""}
+                </span>
               </div>
-              {glucoseVal != null || systolicVal != null ? (
-                <>
-                  {glucoseVal != null && (
-                    <div>
-                      <div className="viz-card-value">{glucoseVal} <span className="viz-card-sub">mg/dL</span></div>
-                      <div className="viz-card-sub">공복혈당</div>
-                      <div style={{ marginTop: 8 }}>
-                        <div className="viz-progress-label">
-                          <span style={{ fontSize: 12, color: "var(--color-muted)" }}>0</span>
-                          <span style={{ fontSize: 12, color: "var(--color-muted)" }}>200</span>
-                        </div>
-                        <div className="viz-progress-bar">
-                          <div
-                            className="viz-progress-fill"
-                            style={{
-                              width: `${Math.min(100, (glucoseVal / 200) * 100)}%`,
-                              background: glucoseVal >= 126 ? "var(--color-danger)" : glucoseVal >= 100 ? "var(--chart-gold)" : "var(--chart-green)",
-                            }}
-                          />
-                        </div>
+              {displayAnalysisResults.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  {displayAnalysisResults.map((result) => {
+                    const level = String(result.risk_level ?? "").toUpperCase();
+                    const score = typeof result.risk_score === "number" ? result.risk_score : parseFloat(String(result.risk_score ?? "0"));
+                    const pct = Math.round(score * 100);
+                    const circumference = 2 * Math.PI * 28;
+                    const dashFilled = (score * circumference).toFixed(1);
+                    const dashEmpty = (circumference - score * circumference).toFixed(1);
+                    const color = level === "HIGH" ? "#EF4444" : level === "MEDIUM" ? "#F59E0B" : "#1D9E75";
+                    const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
+                    const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
+                    return (
+                      <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
+                        <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                          <circle cx="65" cy="65" r="52" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 52).toFixed(1)} ${(2 * Math.PI * 52 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 65 65)"/>
+                          <text x="65" y="71" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
+                        </svg>
                       </div>
-                    </div>
-                  )}
-                  {systolicVal != null && (
-                    <div className="viz-stat-row">
-                      <span>혈압</span>
-                      <strong>{systolicVal}/{diastolicVal ?? "-"} <span className="viz-card-sub">mmHg</span></strong>
-                    </div>
-                  )}
-                  {weightVal != null && (
-                    <div className="viz-stat-row">
-                      <span>체중 / BMI</span>
-                      <strong>{weightVal}kg {bmiVal != null ? `/ ${bmiVal}` : ""}</strong>
-                    </div>
-                  )}
-                </>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="viz-empty">
-                  아직 건강 기록이 없습니다.<br />
-                  <Link to="/health" style={{ color: "var(--color-primary)", fontWeight: 900 }}>건강정보 입력하기</Link>
+                  아직 분석 결과가 없습니다.<br />
+                  <Link to="/analysis" style={{ color: "var(--color-primary)", fontWeight: 900 }}>간편 분석 실행하기</Link>
                 </div>
               )}
             </div>
 
-            {/* 식단 점수 card */}
-            <div className="viz-card">
+            {/* 오른쪽 큰 카드 */}
+            <div className="viz-card" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {/* 최근 검진표 */}
               <div className="viz-card-row">
-                <span className="viz-card-label">식단 점수</span>
-                <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
+                <span className="viz-card-label">최근 검진표 <span style={{ fontSize: "12px", color: "var(--color-muted)", fontWeight: 400 }}>{latestExam ? formatDate(latestExam.exam_date ?? latestExam.uploaded_at) : ""}</span></span>
+                <Link className="muted" style={{ fontSize: 12 }} to="/ocr/exam">검진표 입력 →</Link>
               </div>
-              {latestDietScore != null ? (
+              {latestExam ? (
                 <>
-                  <div>
-                    <div className="viz-card-value">{String(latestDietScore)}<span className="viz-card-sub">점</span></div>
-                    <div className="viz-card-sub">최근 식단 분석 결과</div>
-                  </div>
-                  {dietScoreBars.length > 0 ? (
-                    <div className="viz-mini-bars">
-                      {dietScoreBars.map((score, i) => (
-                        <div
-                          className={`viz-mini-bar${score >= 80 ? "" : score >= 60 ? " warn" : " danger"}`}
-                          key={i}
-                          style={{ height: `${Math.max(8, score)}%` }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="viz-empty">추세 데이터가 부족합니다.</div>
-                  )}
+                  {(() => {
+                    const glucose = getExamMeasurement(examMeasurements, "fasting_glucose");
+                    return (
+                      <div className="viz-stat-row">
+                        <span>공복혈당</span>
+                        <strong>{glucose?.value ? `${String(glucose.value)} mg/dL` : "-"}</strong>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const sys = getExamMeasurement(examMeasurements, "systolic_bp");
+                    const dia = getExamMeasurement(examMeasurements, "diastolic_bp");
+                    return (
+                      <div className="viz-stat-row">
+                        <span>혈압</span>
+                        <strong>{sys?.value ? `${String(sys.value)}/${dia?.value ? String(dia.value) : "-"} mmHg` : "-"}</strong>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const chol = getExamMeasurement(examMeasurements, "total_cholesterol");
+                    return (
+                      <div className="viz-stat-row">
+                        <span>총콜레스테롤</span>
+                        <strong>{chol?.value ? `${String(chol.value)} mg/dL` : "-"}</strong>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const bmi = getExamMeasurement(examMeasurements, "bmi");
+                    return (
+                      <div className="viz-stat-row">
+                        <span>BMI</span>
+                        <strong>{bmi?.value ? String(bmi.value) : "-"}</strong>
+                      </div>
+                    );
+                  })()}
                 </>
               ) : (
                 <div className="viz-empty">
-                  아직 식단 분석 기록이 없습니다.<br />
-                  <Link to="/diets" style={{ color: "var(--color-primary)", fontWeight: 900 }}>식단 분석하기</Link>
+                  등록된 검진표가 없습니다.<br />
+                  <Link to="/ocr/exam" style={{ color: "var(--color-primary)", fontWeight: 900 }}>검진표 등록하기</Link>
                 </div>
               )}
+
+              {/* 식단 점수 작은 카드 */}
+              <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "12px" }}>
+                <div className="viz-card-row">
+                  <span className="viz-card-label">식단 점수</span>
+                  <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
+                </div>
+                <div className="viz-stat-row">
+                  <span>{latestDietScore != null ? `${String(latestDietScore)}점` : "최근 기록 없음"}</span>
+                  <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 900 }}>식단 분석하기</Link>
+                </div>
+              </div>
+
+              {/* 복약/영양제 작은 카드 */}
+              <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "12px" }}>
+                <div className="viz-card-row">
+                  <span className="viz-card-label">복약/영양제</span>
+                  <Link className="muted" style={{ fontSize: 12 }} to="/medications">관리하기 →</Link>
+                </div>
+                <div className="viz-stat-row">
+                  <span>{medications.length > 0 ? "복용 중" : "등록된 약 없음"}</span>
+                  <strong>
+                    {medications.length > 0 ? `${medicationActiveCount}/${medications.length}개` : (
+                      <Link to="/medications" style={{ color: "var(--color-primary)", fontSize: 13 }}>등록하기</Link>
+                    )}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
+          <div className="viz-card" style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "16px", alignItems: "start" }}>
+            {/* 챌린지 현황 작은 카드 */}
+            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", width: "220px", flexShrink: 0 }}>
+              <span className="viz-card-label">챌린지 현황</span>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
+                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="#e0e0e0" strokeWidth="10"/>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="#1D9E75" strokeWidth="10"
+                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
+                    strokeLinecap="round" transform="rotate(-90 55 55)"/>
+                </svg>
+                <div style={{ paddingBottom: "4px" }}>
+                  <div className="viz-ring-value">{challengeCount}개</div>
+                  <div className="viz-ring-label">참여 중</div>
+                </div>
+              </div>
+              <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: "1.6", borderTop: "0.5px solid var(--color-border)", paddingTop: "10px", wordBreak: "keep-all" }}>
+                {challengeCount === 0
+                  ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
+                  : challengeCount < 3
+                  ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
+                  : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
+              </div>
             </div>
 
-            {/* 챌린지 / 복약 card */}
-            <div className="viz-card">
-              <span className="viz-card-label">챌린지 / 복약</span>
-              <div className="viz-ring-container">
-                <svg className="viz-ring-svg" viewBox="0 0 64 64">
-                  <circle className="viz-ring-track" cx="32" cy="32" r={RING_R} />
-                  <circle
-                    className="viz-ring-fill"
-                    cx="32"
-                    cy="32"
-                    r={RING_R}
-                    strokeDasharray={RING_C}
-                    strokeDashoffset={ringOffset}
-                  />
-                </svg>
-                <div>
-                  <div className="viz-ring-value">{challengeCount}개</div>
-                  <div className="viz-ring-label">참여 중인 챌린지</div>
-                  {challengeCount === 0 && (
-                    <Link to="/challenges" style={{ fontSize: 13, color: "var(--color-primary)", fontWeight: 900 }}>챌린지 보기</Link>
-                  )}
-                </div>
+            {/* 추천 챌린지 */}
+            <div>
+              <span className="viz-card-label">추천 챌린지</span>
+              <div className="compact-list" style={{ marginTop: "8px" }}>
+                {recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => (
+                  <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
+                    <div>
+                      <strong>{getChallengeTitle(challenge)}</strong>
+                      <p>{getCategoryLabel(challenge.category)} · {getChallengeDuration(challenge)}</p>
+                    </div>
+                    <Link className="button secondary" to="/challenges">참여하기</Link>
+                  </div>
+                )) : (
+                  <div className="viz-empty">
+                    <Link to="/challenges" style={{ color: "var(--color-primary)", fontWeight: 900 }}>챌린지 보기</Link>
+                  </div>
+                )}
               </div>
-              <div className="viz-stat-row">
-                <span>복약/영양제</span>
-                <strong>
-                  {medications.length > 0 ? `${medicationActiveCount}/${medications.length}개 복용 중` : (
-                    <Link to="/medications" style={{ color: "var(--color-primary)", fontSize: 13 }}>등록하기</Link>
-                  )}
-                </strong>
-              </div>
-              {medications.length > 0 && (
-                <div className="progress-bar">
-                  <div className="progress-fill" style={toPercentStyle(medicationRate)} />
-                </div>
-              )}
-              {latestExam && (
-                <div className="viz-stat-row">
-                  <span>최근 검진표</span>
-                  <strong>{formatDate(latestExam.exam_date ?? latestExam.uploaded_at)}</strong>
-                </div>
-              )}
             </div>
           </div>
         </section>
 
-        <div className="main-dashboard-grid">
-          <Card title="추천 챌린지">
-            {recommendedChallenges.length > 0 ? (
-              <div className="compact-list">
-                {recommendedChallenges.map((challenge) => (
-                  <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
-                    <div>
-                      <strong>{getChallengeTitle(challenge)}</strong>
-                      <p>
-                        {getCategoryLabel(challenge.category)} · {getChallengeDuration(challenge)}
-                      </p>
-                    </div>
-                    <Link className="button secondary" to="/challenges">
-                      참여하기
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <p>추천 챌린지가 없습니다. 전체 챌린지를 확인해보세요.</p>
-                <Link className="button secondary" to="/challenges">
-                  챌린지 보기
-                </Link>
-              </div>
-            )}
-          </Card>
-
-          <Card title="AI 코멘트">
-            <p>
-              {String(
-                data.ai_comment ??
-                  "최근 입력된 건강정보를 바탕으로 생활습관을 꾸준히 기록해보세요.",
-              )}
-            </p>
-            <div className="button-row">
-              <Link className="button" to="/chatbot">
-                AI에게 질문하기
-              </Link>
-              <Link className="button secondary" to="/analysis/history">
-                분석 이력 보기
-              </Link>
-            </div>
-          </Card>
-        </div>
-
-        <Card title={hasAnalysisResults ? "최근 분석 결과" : "간편 분석 시작"}>
-          {hasAnalysisResults ? (
-            <>
-              {displayAnalysisResults.length > 0 ? (
-                <div className="metric-grid">
-                  {displayAnalysisResults.map((result) => (
-                    <div key={String(result.id ?? result.analysis_type)}>
-                      <span>{analysisTypeLabels[String(result.analysis_type)]}</span>
-                      <strong>{formatRisk(result.risk_level)}</strong>
-                    </div>
-                  ))}
-                  <div>
-                    <span>최근 분석일</span>
-                    <strong>{formatDate(displayAnalysisResults[0]?.analyzed_at ?? displayAnalysisResults[0]?.created_at)}</strong>
-                  </div>
-                </div>
-              ) : (
-                <div className="empty-state analysis-empty-state">
-                  <strong>최근 분석 결과가 없습니다.</strong>
-                  <p>질환별 분석을 실행하면 당뇨, 고혈압, 콜레스테롤·중성지방, 비만 결과가 표시됩니다.</p>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="empty-state analysis-empty-state">
-              <strong>아직 분석 결과가 없습니다.</strong>
-              <p>건강정보를 입력하고 간편 분석을 실행하면 현재 건강정보 기반 질환별 분석 결과를 볼 수 있습니다.</p>
-              <p>검진표를 추가하면 정밀 분석에 활용할 수 있습니다.</p>
-              <div className="button-row">
-                <Link className="button" to="/analysis">
-                  간편 분석 실행하기
-                </Link>
-                <Link className="button secondary" to="/health">
-                  건강정보 입력하기
-                </Link>
-                <Link className="button secondary" to="/ocr/exam">
-                  검진표 등록
-                </Link>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card
-          title="최근 검진표"
-          actions={
-            <Link className="button secondary" to="/ocr/exam">
-              검진표 입력
-            </Link>
-          }
-        >
-          {latestExam ? (
-            <div className="metric-grid">
-              <div>
-                <span>검진일</span>
-                <strong>{formatDate(latestExam.exam_date ?? latestExam.uploaded_at)}</strong>
-              </div>
-              <div>
-                <span>혈압</span>
-                <strong>
-                  {(() => {
-                    const sys = getExamMeasurement(examMeasurements, "systolic_bp");
-                    const dia = getExamMeasurement(examMeasurements, "diastolic_bp");
-                    if (sys?.value && dia?.value) return `${String(sys.value)}/${String(dia.value)} mmHg`;
-                    return "-";
-                  })()}
-                </strong>
-              </div>
-              <div>
-                <span>공복혈당</span>
-                <strong>
-                  {(() => {
-                    const m = getExamMeasurement(examMeasurements, "fasting_glucose");
-                    return m?.value ? `${String(m.value)} mg/dL` : "-";
-                  })()}
-                </strong>
-              </div>
-              <div>
-                <span>총콜레스테롤</span>
-                <strong>
-                  {(() => {
-                    const m = getExamMeasurement(examMeasurements, "total_cholesterol");
-                    return m?.value ? `${String(m.value)} mg/dL` : "-";
-                  })()}
-                </strong>
-              </div>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <p>등록된 검진표가 없습니다. 검진표를 업로드하면 주요 수치를 자동으로 정리합니다.</p>
-            </div>
-          )}
-        </Card>
       </div>
     );
   }
@@ -740,7 +675,7 @@ export default function MainPage() {
     <div className="landing-page">
       <section className="hero-panel">
         <div>
-          <span className="eyebrow">HealthCare</span>
+          <span className="eyebrow">Health Ladder</span>
           <h1>건강검진표부터 생활습관까지, 내 건강 위험도를 쉽게 확인하세요</h1>
           <p>{String(data.service_description)}</p>
           <div className="button-row">
@@ -752,50 +687,70 @@ export default function MainPage() {
             </Link>
           </div>
         </div>
-        <div className="mobile-health-card">
-          <div className="hero-card-topline">
-            <span className="badge badge-reference">예시 화면</span>
-            <div className="mini-gauge" style={toGaugeStyle(landingPreview.healthScore)}>
-              <span>{landingPreview.healthScore}</span>
-            </div>
-          </div>
-          <div className="sparkline-row">
-            <div>
-              <span>혈당</span>
-              <strong>108 mg/dL</strong>
-            </div>
-            <div className="sparkline sparkline-glucose" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div className="sparkline-row">
-            <div>
-              <span>혈압</span>
-              <strong>132/84</strong>
-            </div>
-            <div className="sparkline sparkline-pressure" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div>
-            <div className="progress-label">
-              <span>챌린지 수행률</span>
-              <strong>{landingPreview.challengeProgress}%</strong>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
-            </div>
-          </div>
-          <p className="muted">건강 점수와 주요 지표를 한눈에 확인합니다.</p>
+        <div className="hero-image-area">
+          <img
+            src="/images/hero-preview.png"
+            alt="서비스 미리보기"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              borderRadius: "var(--border-radius-lg)",
+              display: "block",
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
         </div>
+      </section>
+
+      <section className="landing-section">
+        <Card title="예시 대시보드 미리보기">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <span className="viz-card-label">질환별 위험도</span>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: "0px", marginTop: "2px" }}>
+                {[
+                  { label: "고혈압", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
+                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#F59E0B", text: "관리필요" },
+                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#F59E0B", text: "관리필요" },
+                  { label: "콜레스테롤", score: 0.22, color: "#1D9E75", text: "낮음" },
+                ].map(({ label, score, color, text }) => (
+                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{label}</span>
+                    <svg width="110" height="110" viewBox="0 0 110 110">
+                      <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                      <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10"
+                        strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`}
+                        strokeLinecap="round" transform="rotate(-90 55 55)"/>
+                      <text x="55" y="61" textAnchor="middle" fontSize="14" fontWeight="500" fill={color}>{text}</text>
+                    </svg>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <span className="viz-card-label">최근 검진표</span>
+                <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>132 mg/dL</strong></div>
+                <div className="viz-stat-row"><span>혈압</span><strong>132/84 mmHg</strong></div>
+                <div className="viz-stat-row"><span>총콜레스테롤</span><strong>198 mg/dL</strong></div>
+                <div className="viz-stat-row"><span>BMI</span><strong>24.3</strong></div>
+              </div>
+              <div style={{ marginTop: "32px" }}>
+                <span className="viz-card-label">챌린지 진행률</span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>참여 중</span>
+                  <strong style={{ fontSize: "13px", color: "#1D9E75" }}>{landingPreview.challengeProgress}%</strong>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
       </section>
 
       <section className="landing-section">
@@ -811,8 +766,12 @@ export default function MainPage() {
               type="button"
               onClick={() => setSelectedPersonaId(persona.id)}
             >
-              <span className="persona-icon">{persona.icon}</span>
-              <strong>{persona.title}</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span className="persona-icon">
+                  {personaIcons[persona.id]}
+                </span>
+                <strong>{persona.title}</strong>
+              </div>
               <p>{persona.quote}</p>
               <em>{persona.features.join(" · ")}</em>
             </button>
@@ -829,7 +788,7 @@ export default function MainPage() {
         <div className="persona-timeline">
           {selectedPersona.flow.map((step, index) => (
             <div className="persona-timeline-item" key={step.title}>
-              <span className="timeline-icon">{step.icon}</span>
+              <span className="timeline-icon">{flowIcons[step.icon] ?? step.icon}</span>
               <div>
                 <strong>{step.title}</strong>
                 <p>{step.description}</p>
@@ -853,15 +812,7 @@ export default function MainPage() {
           <h2>기능 미리보기</h2>
           <p>아이콘을 눌러 관심 기능을 확인하고 로그인 후 바로 이어갈 수 있습니다.</p>
         </div>
-        <div className="service-flow-strip">
-          {serviceFlow.map((item, index) => (
-            <div className="service-flow-item" key={item.label}>
-              <span>{item.icon}</span>
-              <strong>{item.label}</strong>
-              {index < serviceFlow.length - 1 ? <em aria-hidden="true">→</em> : null}
-            </div>
-          ))}
-        </div>
+
         <div className="landing-feature-grid">
           {landingFeatures.map((feature) => (
             <Link
@@ -869,54 +820,13 @@ export default function MainPage() {
               key={feature.title}
               to={`/login?redirect=${encodeURIComponent(feature.redirect)}`}
             >
-              <span className="landing-feature-icon">{feature.icon}</span>
+              <span className="landing-feature-icon">{featureIcons[feature.icon] ?? feature.icon}</span>
               <strong>{feature.title}</strong>
               <p>{feature.description}</p>
               <em className="badge badge-reference">로그인 후 이용</em>
             </Link>
           ))}
         </div>
-      </section>
-      <section className="landing-section">
-        <Card title="예시 대시보드 미리보기">
-          <div className="preview-dashboard-grid">
-            <div className="preview-score-card">
-              <div className="score-gauge" style={toGaugeStyle(landingPreview.healthScore)}>
-                <span>{landingPreview.healthScore}</span>
-              </div>
-              <strong>오늘의 건강 점수</strong>
-              <p>최근 기록 기반 예시 화면입니다.</p>
-            </div>
-            <div className="preview-bars">
-              <div className="preview-bar-row">
-                <span>당뇨 위험도</span>
-                <strong>관리 필요</strong>
-                <div className="progress-bar">
-                  <div className="progress-fill warning-fill" style={toPercentStyle(landingPreview.diabetesRiskScore)} />
-                </div>
-              </div>
-              <div className="preview-bar-row">
-                <span>고혈압 위험도</span>
-                <strong>낮음</strong>
-                <div className="progress-bar">
-                  <div className="progress-fill success-fill" style={toPercentStyle(landingPreview.hypertensionRiskScore)} />
-                </div>
-              </div>
-              <div className="preview-bar-row">
-                <span>챌린지 진행률</span>
-                <strong>{landingPreview.challengeProgress}%</strong>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={toPercentStyle(landingPreview.challengeProgress)} />
-                </div>
-              </div>
-            </div>
-            <div className="preview-record-card">
-              <span className="badge badge-reference">최근 기록</span>
-              <strong>{previewMetrics[4][1]}</strong>
-              <p>검진표 등록과 직접 입력 기록을 함께 관리합니다.</p>
-            </div>
-          </div>
-        </Card>
       </section>
       <section className="landing-cta">
         <div>

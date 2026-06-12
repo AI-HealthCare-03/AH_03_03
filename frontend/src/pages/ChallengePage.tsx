@@ -11,6 +11,9 @@ import {
 } from "../api/challenges";
 import Card from "../components/Card";
 
+import { type ReactNode } from "react";
+import { Salad, Dumbbell, Moon, Pill, Droplets, Droplet, Activity, Medal, Leaf, Gauge, ListChecks } from "lucide-react";
+
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
@@ -28,18 +31,18 @@ const tabToCategory: Record<string, string | null> = {
   생활습관: "HABIT",
 };
 
-const categoryIcon: Record<string, string> = {
-  DIET: "🥗",
-  EXERCISE: "🚶",
-  SLEEP: "🌙",
-  MEDICATION: "💊",
-  WATER: "💧",
-  BLOOD_SUGAR: "🩸",
-  BLOOD_GLUCOSE: "🩸",
-  BLOOD_PRESSURE: "🩺",
-  HABIT: "✅",
-  COMMON: "🌿",
-  WEIGHT: "⚖️",
+const categoryIcon: Record<string, ReactNode> = {
+  DIET: <Salad size={20} />,
+  EXERCISE: <Dumbbell size={20} />,
+  SLEEP: <Moon size={20} />,
+  MEDICATION: <Pill size={20} />,
+  WATER: <Droplets size={20} />,
+  BLOOD_SUGAR: <Droplet size={20} />,
+  BLOOD_GLUCOSE: <Droplet size={20} />,
+  BLOOD_PRESSURE: <Activity size={20} />,
+  HABIT: <ListChecks size={20} />,
+  COMMON: <Leaf size={20} />,
+  WEIGHT: <Gauge size={20} />,
 };
 
 const categoryLabel: Record<string, string> = {
@@ -719,13 +722,13 @@ export default function ChallengePage() {
               })}
             </div>
             <div className="pagination-row">
-              <button className="secondary compact-button" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+              <button className="secondary compact-button" disabled={page <= 1} onClick={() => { setPage((prev) => Math.max(1, prev - 1)); window.scrollTo(0, 0); }}>
                 이전
               </button>
               <span>
                 {page} / {pageCount}
               </span>
-              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}>
+              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => { setPage((prev) => Math.min(pageCount, prev + 1)); window.scrollTo(0, 0); }}>
                 다음
               </button>
             </div>
@@ -854,7 +857,7 @@ export default function ChallengePage() {
                     key={cell.key}
                   >
                     <strong>{cell.day}</strong>
-                    {complete ? <em>✅</em> : null}
+                    {complete ? <em><Medal size={16} /></em> : null}
                     {partial ? <small>{state.label}</small> : null}
                   </span>
                 );

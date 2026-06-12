@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { changePassword, deactivateMe, updateMe } from "../api/auth";
+import { changePassword, updateMe } from "../api/auth";
 import { getLatestAnalysisResults } from "../api/analysis";
 import { listChallenges, listMyChallenges } from "../api/challenges";
 import { listHealthRecords } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+
+import { Mail, Phone } from 'lucide-react';
+import { Activity, Gauge, Droplet, Moon } from "lucide-react";
 
 type Item = Record<string, unknown>;
 
@@ -53,9 +56,6 @@ const myPageMenuItems = [
   { label: "복약/영양제", to: "/medications" },
   { label: "챌린지 현황", to: "/challenges" },
   { label: "내 가족", to: "/family" },
-  { label: "알림 설정", to: "/settings" },
-  { label: "개인정보", to: "/settings", badge: "설정에서 관리" },
-  { label: "회원탈퇴", action: "deactivate", danger: true },
 ];
 
 function getText(item: Item | undefined | null, key: string, fallback = "-"): string {
@@ -241,8 +241,6 @@ export default function MyPage() {
       ["성별", backendUser?.gender === "FEMALE" ? "여성" : backendUser?.gender === "MALE" ? "남성" : "-"],
       ["키/몸무게", `${getText(latestHealth, "height_cm")}cm / ${getText(latestHealth, "weight_kg")}kg`],
       ["BMI", getText(latestHealth, "bmi")],
-      ["휴대폰", backendUser?.phone_number ?? "-"],
-      ["이메일", backendUser?.email ?? "-"],
     ],
     [backendUser, latestHealth],
   );
@@ -297,23 +295,6 @@ export default function MyPage() {
     }
   };
 
-  const deactivateAccount = async () => {
-    setError("");
-    setNotice("");
-    if (!window.confirm("회원탈퇴를 진행하면 계정이 비활성화됩니다. 계속하시겠습니까?")) {
-      return;
-    }
-    if (!window.confirm("탈퇴 후에는 현재 계정으로 서비스 이용이 제한됩니다. 정말 탈퇴하시겠습니까?")) {
-      return;
-    }
-    try {
-      await deactivateMe();
-      await logout();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "회원탈퇴 처리에 실패했습니다.");
-    }
-  };
-
   return (
     <div className="dashboard-grid">
       <Card title="마이페이지">
@@ -323,30 +304,17 @@ export default function MyPage() {
               return (
                 <Link className="mypage-menu-item" key={item.label} to={item.to}>
                   <span>{item.label}</span>
-                  {item.badge && <span className="badge badge-reference">{item.badge}</span>}
                 </Link>
               );
             }
 
             return (
               <button
-                className={[
-                  "mypage-menu-item",
-                  item.status === "active" ? "active" : "",
-                  item.danger ? "danger-ghost" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className="mypage-menu-item"
                 key={item.label}
                 type="button"
-                onClick={() => {
-                  if (item.action === "deactivate") {
-                    void deactivateAccount();
-                  }
-                }}
               >
                 <span>{item.label}</span>
-                {item.badge && <span className="badge badge-reference">{item.badge}</span>}
               </button>
             );
           })}
@@ -357,7 +325,13 @@ export default function MyPage() {
         {notice && <div className="state-box">{notice}</div>}
         {error && <ErrorMessage message={error} />}
 
-        <Card title="프로필/기본 내역">
+        <Card title="프로필/기본 내역" actions={
+          !isEditingProfile ? (
+            <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
+              수정
+            </button>
+          ) : undefined
+        }>
           <div className="profile-card-row">
             <span className="avatar avatar-large">{profileInitial}</span>
             <div className="profile-card-main">
@@ -384,12 +358,16 @@ export default function MyPage() {
                 </div>
               ) : (
                 <>
-                  <strong>{displayName}</strong>
-                  <p className="muted">{backendUser?.email ?? "이메일 정보 없음"}</p>
-                  <div className="chip-list">
-                    <span className="badge badge-saved">{backendUser?.role ?? "USER"}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <strong style={{ fontSize: "40px" }}>{displayName}</strong>
                     <span className="badge badge-reference">{backendUser?.login_id ?? "로그인 ID 미등록"}</span>
                   </div>
+                  <p className="muted" style={{ marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Mail size={14} /> {backendUser?.email ?? "이메일 정보 없음"}
+                  </p>
+                  <p className="muted" style={{ margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Phone size={14} /> {backendUser?.phone_number ?? "미등록"}
+                  </p>
                 </>
               )}
             </div>
@@ -415,24 +393,12 @@ export default function MyPage() {
                   취소
                 </button>
               </>
-            ) : (
-              <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
-                수정
-              </button>
-            )}
-            <button className="secondary" onClick={() => setShowPasswordForm((prev) => !prev)} type="button">
-              비밀번호 변경
-            </button>
-            <button className="danger-ghost" onClick={() => void deactivateAccount()} type="button">
-              회원탈퇴
-            </button>
-            <Link className="button secondary" to="/settings">
-              설정으로 이동
-            </Link>
+            ) : null}
+
           </div>
         </Card>
 
-        {showPasswordForm && (
+        {(showPasswordForm || isEditingProfile) && (
           <Card title="비밀번호 변경">
             <div className="form three-col">
               <label>
@@ -471,6 +437,7 @@ export default function MyPage() {
           </Card>
         )}
 
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         <Card title="기본 건강정보">
           <div className="table-list">
             {profileRows.map(([label, value]) => (
@@ -493,29 +460,37 @@ export default function MyPage() {
           </div>
         </Card>
 
-        <div className="page-grid">
-          <Card title="현재 상태">
+        <Card title="현재 상태">
             <div className="metric-grid mypage-metric-grid">
               <div>
-                <span>BMI</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Gauge size={14} /> BMI
+                </span>
                 <strong>{getText(latestHealth, "bmi", "기록 없음")}</strong>
               </div>
               <div>
-                <span>혈압</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Activity size={14} /> 혈압
+                </span>
                 <strong>
                   {getText(latestHealth, "systolic_bp", "-")}/{getText(latestHealth, "diastolic_bp", "-")}
                 </strong>
               </div>
               <div>
-                <span>공복혈당</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Droplet size={14} /> 공복혈당
+                </span>
                 <strong>{getText(latestHealth, "fasting_glucose", "기록 없음")}</strong>
               </div>
               <div>
-                <span>수면</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Moon size={14} /> 수면
+                </span>
                 <strong>{getText(latestHealth, "sleep_hours", "기록 없음")}</strong>
               </div>
             </div>
           </Card>
+          </div>
 
           <Card title="건강 목표">
             <div className="card-list">
@@ -529,7 +504,6 @@ export default function MyPage() {
               </div>
             </div>
           </Card>
-        </div>
 
         <div className="page-grid">
           <Card title="최근 분석 결과">
@@ -541,20 +515,19 @@ export default function MyPage() {
                 const resultId = Number(result.id);
                 return (
                   <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
-                    <div>
-                      <span className="muted">분석 유형</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type ?? "-")}</strong>
+                      {Number.isFinite(resultId) && (
+                        <Link className="muted" style={{ fontSize: "13px" }} to={`/analysis/${resultId}`}>
+                          상세보기 →
+                        </Link>
+                      )}
                     </div>
-                    <div className="button-row">
+                    <div className="button-row" style={{ marginTop: "6px" }}>
                       <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
                       <span className="badge badge-reference">{score}/100</span>
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
-                    {Number.isFinite(resultId) && (
-                      <Link className="button secondary" to={`/analysis/${resultId}`}>
-                        상세보기
-                      </Link>
-                    )}
                   </div>
                 );
               })}
@@ -568,20 +541,22 @@ export default function MyPage() {
                 const progress = getChallengeProgress(challenge);
                 return (
                   <div className="mini-card" key={String(challenge.id)}>
-                    <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong>{getChallengeTitle(challenge, challengeMasters)}</strong>
-                      <p className="muted">{getChallengeStatusLabel(challenge)}</p>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${progress}%` }} />
-                    </div>
-                    <div className="button-row">
-                      <span className="badge badge-reference">진행률 {progress}%</span>
                       {getChallengeId(challenge) && (
-                        <Link className="button secondary" to={`/challenges/${String(getChallengeId(challenge))}`}>
-                          상세보기
+                        <Link className="muted" style={{ fontSize: "13px" }} to={`/challenges/${String(getChallengeId(challenge))}`}>
+                          상세보기 →
                         </Link>
                       )}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span className="muted" style={{ fontSize: "13px" }}>진행률</span>
+                        <span className="muted" style={{ fontSize: "13px" }}>{progress}%</span>
+                      </div>
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${progress}%` }} />
+                      </div>
                     </div>
                   </div>
                 );
@@ -589,29 +564,6 @@ export default function MyPage() {
             </div>
           </Card>
         </div>
-
-        <Card title="복용중인 약물/영양제 목록">
-          <div className="empty-state">
-            <strong>복약/영양제 정보는 복약 관리 화면에서 확인할 수 있습니다.</strong>
-            <p>등록된 약물, 영양제, 복약 기록을 한 곳에서 관리해보세요.</p>
-            <Link className="button secondary" to="/medications">
-              복약 관리로 이동
-            </Link>
-          </div>
-        </Card>
-
-        <Card title="가족 요약">
-          <div className="family-summary-card">
-            <div>
-              <span className="badge badge-reference">내 가족</span>
-              <h3>가족을 연결하면 건강정보 공유와 보호자 알림을 설정할 수 있습니다.</h3>
-              <p className="muted">현재 연결된 가족 0명, 공유 알림 0건입니다.</p>
-            </div>
-            <Link className="button" to="/family">
-              가족 관리로 이동
-            </Link>
-          </div>
-        </Card>
       </div>
     </div>
   );

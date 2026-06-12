@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -15,6 +15,16 @@ import {
   getDashboardTrends,
 } from "../api/dashboard";
 import { getTodayRecommendations, TodayRecommendations } from "../api/recommendations";
+import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";
+
+function getChallengeIcon(category: unknown): ReactNode {
+  const key = String(category ?? "").toUpperCase();
+  if (key.includes("DIET") || key.includes("식")) return <Salad size={20} />;
+  if (key.includes("MEDICATION") || key.includes("복약")) return <Pill size={20} />;
+  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return <Dumbbell size={20} />;
+  if (key.includes("WATER") || key.includes("수분")) return <Droplets size={20} />;
+  return <Trophy size={20} />;
+}
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -446,15 +456,6 @@ function formatDate(value: unknown): string {
   return `${y}.${mo}.${day}`;
 }
 
-function getChallengeIcon(category: unknown): string {
-  const key = String(category ?? "").toUpperCase();
-  if (key.includes("DIET") || key.includes("식")) return "🥗";
-  if (key.includes("MEDICATION") || key.includes("복약")) return "💊";
-  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return "🚶";
-  if (key.includes("WATER") || key.includes("수분")) return "💧";
-  return "✅";
-}
-
 function getChallengeTitle(challenge: AnyRecord): string {
   const nested = challenge.challenge as AnyRecord | undefined;
   return String(nested?.title ?? challenge.title ?? "추천 챌린지");
@@ -744,7 +745,7 @@ export default function DashboardPage() {
     <div className="dashboard-shell">
       <header className="dashboard-header">
         <div>
-          <h1>추적 대시보드</h1>
+          <h1>건강 리포트</h1>
           <p>혈당, 혈압, 체중, 식단, 챌린지 변화를 한 번에 확인합니다.</p>
         </div>
         <div className="dashboard-period-tabs" aria-label="조회 기간">

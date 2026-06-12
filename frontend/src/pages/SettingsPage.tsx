@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
+import { deactivateMe } from "../api/auth";
 import { getMySettings, updateMySettings } from "../api/settings";
+import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import {
@@ -21,8 +23,15 @@ const settingLabels: Record<string, string> = {
   medication_reminder_enabled: "복약/영양제 알림",
   diet_reminder_enabled: "식단 기록 알림",
 };
+const settingDescriptions: Record<string, string> = {
+  notification_enabled: "서비스 공지, 건강 분석 완료 등 주요 알림을 받습니다.",
+  challenge_reminder_enabled: "참여 중인 챌린지의 오늘 수행 여부 및 완료 알림을 받습니다.",
+  medication_reminder_enabled: "등록된 복약/영양제의 복용 시간 알림을 받습니다.",
+  diet_reminder_enabled: "식단 기록이 없을 때 기록을 유도하는 알림을 받습니다.",
+};
 
 export default function SettingsPage() {
+  const { logout } = useAuth();
   const [settings, setSettings] = useState<Settings>({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -60,11 +69,21 @@ export default function SettingsPage() {
     }).then((cleanup) => {
       unsubscribe = cleanup;
     });
-
     return () => {
       unsubscribe?.();
     };
   }, []);
+
+  const handleDeactivate = async () => {
+      if (!window.confirm("회원탈퇴를 진행하면 계정이 비활성화됩니다. 계속하시겠습니까?")) return;
+      if (!window.confirm("탈퇴 후에는 현재 계정으로 서비스 이용이 제한됩니다. 정말 탈퇴하시겠습니까?")) return;
+      try {
+        await deactivateMe();
+        await logout();
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
   const toggle = async (key: string) => {
     const next = { [key]: !settings[key] };
@@ -138,7 +157,10 @@ export default function SettingsPage() {
         {["notification_enabled", "challenge_reminder_enabled", "medication_reminder_enabled", "diet_reminder_enabled"].map(
           (key) => (
             <label key={key} className="toggle-row">
-              <span>{settingLabels[key]}</span>
+              <span>
+                <span>{settingLabels[key]}</span>
+                <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>{settingDescriptions[key]}</p>
+              </span>
               <input checked={Boolean(settings[key])} onChange={() => void toggle(key)} type="checkbox" />
             </label>
           ),
@@ -177,6 +199,12 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+      </div>
+      <div style={{ marginTop: "32px", paddingTop: "20px", borderTop: "1px solid var(--color-border)" }}>
+        <p className="muted" style={{ marginTop: "4px", marginBottom: "12px" }}>회원탈퇴 시 계정이 비활성화되며 복구가 어렵습니다.</p>
+        <button className="danger-ghost" onClick={() => void handleDeactivate()} type="button">
+          회원탈퇴
+        </button>
       </div>
     </Card>
   );
