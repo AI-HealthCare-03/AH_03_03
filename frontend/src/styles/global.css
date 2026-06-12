@@ -5402,3 +5402,9 @@ input:-webkit-autofill:focus {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.med-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
