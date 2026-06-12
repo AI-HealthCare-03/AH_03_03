@@ -6,6 +6,8 @@ AI HealthCare MVP는 건강정보 입력, 건강검진 OCR, 식단/복약 분석
 
 ## 빠른 실행 요약
 
+Docker 통합 개발:
+
 ```bash
 cp envs/example.local.env .env
 make dev-up
@@ -20,6 +22,21 @@ make dev-health
 - API Docs: `http://localhost:8080/api/docs`
 - Health: `http://localhost:8080/api/v1/system/health`
 
+프론트 로컬 개발:
+
+```bash
+# 터미널 1
+make dev-stack
+
+# 터미널 2
+make dev-front
+```
+
+접속:
+
+- Frontend Vite dev server: `http://localhost:5173`
+- Docker/Nginx 통합 확인: `http://localhost:8080`
+
 ## 사전 준비
 
 - Docker Desktop 또는 Docker Engine
@@ -27,6 +44,8 @@ make dev-health
 - `uv`
 
 Full Docker dev stack은 프론트엔드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 함께 실행합니다. 웹 시연만 할 때는 Node.js/npm을 직접 실행할 필요가 없습니다. 프론트엔드는 Docker build 단계에서 정적 파일로 빌드되고, frontend 컨테이너 내부 Nginx가 이를 서빙합니다.
+
+프론트 개발 중에는 Docker frontend를 매번 rebuild하지 않고 로컬 Vite dev server를 권장합니다. 이때 Backend/FastAPI, Postgres, Redis, ai-worker, Nginx는 Docker로 실행하고, 화면은 `http://localhost:5173`에서 확인합니다.
 
 로컬에서 테스트나 스크립트를 직접 실행할 때만 의존성을 동기화합니다.
 
@@ -98,6 +117,18 @@ LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
 make dev-up
 ```
 
+동일한 Docker 통합 stack을 직접 compose로 실행해야 할 때는 아래 명령을 사용합니다.
+
+```bash
+cp envs/example.local.env .env
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
+make dev-health
+```
+
+접속:
+
+- Docker 통합 Web: `http://localhost:8080`
+
 중지:
 
 ```bash
@@ -113,6 +144,43 @@ make dev-down
 - `docker rm -f redis postgres fastapi ai-worker nginx` 방식으로 컨테이너를 직접 지우지 마세요.
 - `down -v`는 DB volume을 삭제할 수 있으므로 시연/협업 중 사용하지 마세요.
 
+## 프론트 로컬 개발
+
+프론트 팀원이 UI를 빠르게 개발할 때는 Docker frontend rebuild 대신 로컬 Vite dev server를 사용합니다.
+
+터미널 1에서 Docker 백엔드 개발 스택을 실행합니다.
+
+```bash
+make dev-stack
+```
+
+터미널 2에서 로컬 Vite dev server를 실행합니다.
+
+```bash
+make dev-front
+```
+
+한 터미널에서 이어서 실행하려면 아래 명령을 사용할 수 있습니다. `npm run dev`가 foreground로 실행되므로 터미널을 점유합니다.
+
+```bash
+make dev-local
+```
+
+접속:
+
+- 프론트 로컬 개발: `http://localhost:5173`
+- API/Nginx 통합: `http://localhost:8080`
+- Docker frontend 빌드 결과 확인: `http://localhost:8080`
+
+`localhost:5173`은 Vite dev server라 프론트 수정사항이 바로 반영됩니다. `frontend/vite.config.ts`에서 `/api` 요청은 `http://localhost:8080`으로 proxy됩니다. 따라서 화면은 `localhost:5173`으로 접속하되, API는 Docker Nginx/FastAPI를 사용합니다.
+
+프론트 개발 중에는 매번 Docker frontend를 rebuild하지 않아도 됩니다. 최종 통합 확인이 필요할 때만 Docker frontend 이미지를 다시 빌드합니다.
+
+```bash
+make dev-rebuild-frontend
+make dev-health
+```
+
 ## DB Migration / Seed
 
 DB migration:
@@ -127,6 +195,8 @@ make dev-migrate
 make dev-seed
 ```
 
+`make dev-seed`는 `docs/data/challenges/team_challenge_master.csv` 기준으로 챌린지를 반영합니다. CSV에 없는 기존 active 챌린지는 seed 정책상 inactive 처리됩니다. DB migration이 아니라 seed 데이터 반영입니다.
+
 데모 seed:
 
 ```bash
@@ -135,7 +205,8 @@ DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
 
 ## 접속 주소
 
-- Web: `http://localhost:8080`
+- Frontend local dev: `http://localhost:5173`
+- Docker integrated Web: `http://localhost:8080`
 - API Docs: `http://localhost:8080/api/docs`
 - API Health: `http://localhost:8080/api/v1/system/health`
 - FastAPI 직접 접근: `http://localhost:8000`
