@@ -27,7 +27,6 @@ export const sidebarSections: SidebarSection[] = [
   {
     title: "기록/관리",
     links: [
-      { to: "/ocr", icon: <FileText size={20} />, label: "검진·복약 등록" },
       { to: "/medications", icon: <Pill size={20} />, label: "복약/영양제" },
       { to: "/diets", icon: <Salad size={20} />, label: "식단 분석" },
       { to: "/challenges", icon: <Trophy size={20} />, label: "챌린지" },

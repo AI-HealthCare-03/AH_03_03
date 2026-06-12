@@ -245,7 +245,7 @@ export default function ExamOcrPage() {
           <h1>건강검진표 측정값 확인</h1>
           <p>검진표 이미지/PDF 기반 측정값 후보를 생성하고 확인 후 건강정보에 반영합니다.</p>
         </div>
-        <Link className="button secondary" to="/ocr">
+        <Link className="button secondary" to="/analysis">
           등록 선택으로 돌아가기
         </Link>
       </div>

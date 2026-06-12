@@ -181,7 +181,7 @@ export default function MedicationOcrPage() {
           <h1>복약/처방전 정보 확인</h1>
           <p>처방전 또는 약봉투 이미지/텍스트 기반 복약 정보 후보를 생성합니다.</p>
         </div>
-        <Link className="button secondary" to="/ocr">
+        <Link className="button secondary" to="/medications">
           등록 선택으로 돌아가기
         </Link>
       </div>
