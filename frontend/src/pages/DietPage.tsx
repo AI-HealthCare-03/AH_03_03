@@ -516,7 +516,7 @@ export default function DietPage() {
               <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />
             ) : null}
           </div>
-          <div className="button-row">
+          <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button disabled={isAnalyzing} type="button" onClick={runDietAnalysis}>
               {isAnalyzing ? "식단 분석 중..." : "간편 식단 분석"}
             </button>
@@ -658,7 +658,7 @@ export default function DietPage() {
             메모
             <textarea value={manualMemo} onChange={(event) => setManualMemo(event.target.value)} />
           </label>
-          <div className="button-row">
+          <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button type="submit">직접 기록 저장</button>
           </div>
         </form>

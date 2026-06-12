@@ -3531,6 +3531,10 @@ pre {
   text-align: center;
 }
 
+.upload-box .button-row {
+  justify-content: center;
+}
+
 .upload-box input[type="file"] {
   display: none;
   justify-self: center;
