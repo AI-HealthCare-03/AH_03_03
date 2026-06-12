@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -55,6 +55,7 @@ const mealTypeOptions = [
   { value: "SNACK", label: "간식" },
   { value: "LATE_NIGHT", label: "야식" },
 ];
+const DIET_ANALYSIS_JOB_POLLING_INTERVAL_MS = 10000;
 
 function currentLocalDateTime(): string {
   const now = new Date();
@@ -170,6 +171,9 @@ export default function DietPage() {
   const [error, setError] = useState("");
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryAnalysis, setCanRetryAnalysis] = useState(false);
+  const analysisRequestInFlightRef = useRef(false);
+  const analysisStartedAtRef = useRef<number | null>(null);
+  const handledAnalysisJobIdsRef = useRef<Set<number>>(new Set());
 
   const load = async () => {
     setError("");
@@ -195,9 +199,21 @@ export default function DietPage() {
   useAsyncJobPolling({
     jobId: analysisJobId,
     enabled: isAnalyzing && analysisJobId !== null,
-    intervalMs: 1500,
+    intervalMs: DIET_ANALYSIS_JOB_POLLING_INTERVAL_MS,
     timeoutMs: 120000,
     onSuccess: async (job) => {
+      if (handledAnalysisJobIdsRef.current.has(job.id)) {
+        return;
+      }
+      handledAnalysisJobIdsRef.current.add(job.id);
+      const finishedAt = Date.now();
+      if (analysisStartedAtRef.current !== null) {
+        console.info("Diet analysis completed", {
+          jobId: job.id,
+          elapsedMs: finishedAt - analysisStartedAtRef.current,
+        });
+      }
+      analysisRequestInFlightRef.current = false;
       setIsAnalyzing(false);
       setAnalysisJobId(null);
       try {
@@ -222,6 +238,11 @@ export default function DietPage() {
       }
     },
     onFailure: (job) => {
+      if (handledAnalysisJobIdsRef.current.has(job.id)) {
+        return;
+      }
+      handledAnalysisJobIdsRef.current.add(job.id);
+      analysisRequestInFlightRef.current = false;
       setFeedbackDialog({
         title: "식단 분석에 실패했습니다.",
         message: job.status === "CANCELED" ? "식단 분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
@@ -232,6 +253,7 @@ export default function DietPage() {
       setAnalysisJobId(null);
     },
     onTimeout: () => {
+      analysisRequestInFlightRef.current = false;
       setFeedbackDialog({
         title: "식단 분석에 실패했습니다.",
         message: "잠시 후 다시 시도해 주세요.",
@@ -328,6 +350,9 @@ export default function DietPage() {
   };
 
   const runDietAnalysis = async () => {
+    if (isAnalyzing || analysisRequestInFlightRef.current) {
+      return;
+    }
     setError("");
     setMessage("");
     setFeedbackDialog(null);
@@ -340,13 +365,18 @@ export default function DietPage() {
     }
     setAnalysisResult(null);
     setCanRetryAnalysis(false);
+    analysisRequestInFlightRef.current = true;
+    analysisStartedAtRef.current = Date.now();
     setIsAnalyzing(true);
     try {
       const payload = buildDietAnalysisFormData(selectedImageFile, analysisDescription);
       const job = await analyzeDiet(payload);
+      handledAnalysisJobIdsRef.current.delete(job.id);
+      console.info("Diet analysis job started", { jobId: job.id });
       setMessage("");
       setAnalysisJobId(job.id);
     } catch (err) {
+      analysisRequestInFlightRef.current = false;
       setError("분석 요청을 시작하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해주세요.");
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
