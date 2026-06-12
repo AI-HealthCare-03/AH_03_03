@@ -405,10 +405,6 @@ export default function DietPage() {
   const detectedFoods = Array.isArray(analysisResult?.detected_foods)
     ? (analysisResult.detected_foods as Record<string, unknown>[])
     : [];
-  const nutrition =
-    analysisResult?.nutrition_summary && typeof analysisResult.nutrition_summary === "object"
-      ? (analysisResult.nutrition_summary as Record<string, unknown>)
-      : {};
   const warnings = Array.isArray(analysisResult?.warnings) ? (analysisResult.warnings as string[]) : [];
   const recommendedActions = Array.isArray(analysisResult?.recommended_actions)
     ? (analysisResult.recommended_actions as string[])
@@ -418,6 +414,7 @@ export default function DietPage() {
     candidateFoods.autoConfirmed.length > 0 ||
     candidateFoods.needsConfirmation.length > 0 ||
     candidateFoods.noCandidate.length > 0;
+  const hasAnyMfdsNutrition = detectedFoods.some(hasMfdsNutrition);
 
   return (
     <div className="page-grid">
@@ -674,32 +671,6 @@ export default function DietPage() {
                 {detectedFoods.length > 0 ? detectedFoods.map(foodDisplayName).join(", ") : "음식명 확인 불가"}
               </strong>
             </div>
-            <div className="state-box">
-              아래 값은 현재 분석 흐름의 참고용 추정 영양정보입니다. MFDS 기준 영양성분과 섭취량이 확정되기 전까지
-              한 끼 전체 영양성분으로 해석하지 마세요.
-            </div>
-            <div className="nutrition-grid">
-              <div>
-                <span>칼로리</span>
-                <strong>{String(nutrition.calories ?? "-")} kcal</strong>
-              </div>
-              <div>
-                <span>탄수화물</span>
-                <strong>{String(nutrition.carbohydrate_g ?? "-")} g</strong>
-              </div>
-              <div>
-                <span>단백질</span>
-                <strong>{String(nutrition.protein_g ?? "-")} g</strong>
-              </div>
-              <div>
-                <span>지방</span>
-                <strong>{String(nutrition.fat_g ?? "-")} g</strong>
-              </div>
-              <div>
-                <span>나트륨</span>
-                <strong>{String(nutrition.sodium_mg ?? "-")} mg</strong>
-              </div>
-            </div>
             <div className="chip-list">
               {detectedFoods.length === 0 && <span className="badge badge-reference">음식명 확인 불가</span>}
               {detectedFoods.map((food, index) => (
@@ -708,6 +679,11 @@ export default function DietPage() {
                 </span>
               ))}
             </div>
+            {!hasAnyMfdsNutrition && (
+              <div className="state-box">
+                영양성분 후보를 찾지 못했습니다. 음식명 확인 또는 섭취량 입력 후 더 정확한 분석이 가능합니다.
+              </div>
+            )}
             {detectedFoods.some((food) => mfdsCandidateName(food) || hasMfdsNutrition(food)) && (
               <div className="card-list">
                 <div className="state-box">

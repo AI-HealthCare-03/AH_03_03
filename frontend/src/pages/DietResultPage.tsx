@@ -185,6 +185,7 @@ export default function DietResultPage() {
     candidateFoods.autoConfirmed.length > 0 ||
     candidateFoods.needsConfirmation.length > 0 ||
     candidateFoods.noCandidate.length > 0;
+  const hasAnyMfdsNutrition = detectedFoods.some(hasMfdsNutrition);
   const detailImageUrl =
     imageUrlFromPayload(record) ||
     imageUrlFromPayload(photoResults[0]) ||
@@ -450,50 +451,44 @@ export default function DietResultPage() {
           </div>
         </Card>
       )}
-      <Card title="추정 영양정보">
-        {!hasNutrition ? (
-          <div className="state-box">입력된 영양정보가 없습니다.</div>
-        ) : (
-          <div className="card-list">
-            <div className="state-box">
-              아래 값은 현재 저장된 참고용 요약값입니다. MFDS 기준 영양성분과 섭취량이 확정되기 전까지 한 끼 전체
-              영양성분으로 해석하지 마세요.
-            </div>
-            {[
-              ["탄수화물", nutrition.carbohydrate_g, "g"],
-              ["단백질", nutrition.protein_g, "g"],
-              ["지방", nutrition.fat_g, "g"],
-              ["나트륨", nutrition.sodium_mg, "mg"],
-            ].map(([label, value, unit]) => (
-              <div className="bar-row" key={String(label)}>
-                <span>{String(label)}</span>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${Math.min(Number(value ?? 0), 100)}%` }} />
-                </div>
-                <strong>
-                  {String(value ?? "-")} {String(unit)}
-                </strong>
-              </div>
-            ))}
-            <div className="nutrition-grid" style={{ marginTop: 12 }}>
-              <div>
-                <span>칼로리</span>
-                <strong>{String(nutrition.calories ?? "-")} kcal</strong>
-              </div>
-              {!isManual && (
-                <div>
-                  <span>인식 신뢰도</span>
+      {isManual ? (
+        <Card title="입력 영양정보">
+          {!hasNutrition ? (
+            <div className="state-box">입력된 영양정보가 없습니다.</div>
+          ) : (
+            <div className="card-list">
+              {[
+                ["탄수화물", nutrition.carbohydrate_g, "g"],
+                ["단백질", nutrition.protein_g, "g"],
+                ["지방", nutrition.fat_g, "g"],
+                ["나트륨", nutrition.sodium_mg, "mg"],
+              ].map(([label, value, unit]) => (
+                <div className="bar-row" key={String(label)}>
+                  <span>{String(label)}</span>
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${Math.min(Number(value ?? 0), 100)}%` }} />
+                  </div>
                   <strong>
-                    {photoConfidence.average_confidence
-                      ? `${Math.round(Number(photoConfidence.average_confidence) * 100)}%`
-                      : "-"}
+                    {String(value ?? "-")} {String(unit)}
                   </strong>
                 </div>
-              )}
+              ))}
+              <div className="nutrition-grid" style={{ marginTop: 12 }}>
+                <div>
+                  <span>칼로리</span>
+                  <strong>{String(nutrition.calories ?? "-")} kcal</strong>
+                </div>
+              </div>
             </div>
+          )}
+        </Card>
+      ) : !hasAnyMfdsNutrition ? (
+        <Card title="영양성분 후보">
+          <div className="state-box">
+            영양성분 후보를 찾지 못했습니다. 음식명 확인 또는 섭취량 입력 후 더 정확한 분석이 가능합니다.
           </div>
-        )}
-      </Card>
+        </Card>
+      ) : null}
       {!isManual && (
         <Card title="질환별 식단 평가">
           <div className="card-list">
