@@ -47,6 +47,16 @@ const mealTypeOptions = [
   { value: "SNACK", label: "간식" },
   { value: "LATE_NIGHT", label: "야식" },
 ];
+
+function getDefaultMealType(): string {
+  const hour = new Date().getHours();
+  if (hour < 10) return "BREAKFAST";
+  if (hour < 15) return "LUNCH";
+  if (hour < 20) return "DINNER";
+  if (hour < 23) return "LATE_NIGHT";
+  return "SNACK";
+}
+
 const DIET_ANALYSIS_JOB_POLLING_INTERVAL_MS = 10000;
 
 function currentLocalDateTime(): string {
@@ -171,6 +181,7 @@ function candidateFoodName(food: DietCandidateFood): string {
 }
 
 export default function DietPage() {
+  const [analysisMealType, setAnalysisMealType] = useState(getDefaultMealType());
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [manualMealType, setManualMealType] = useState("LUNCH");
   const [manualMealTime, setManualMealTime] = useState(currentLocalDateTime());
@@ -388,7 +399,7 @@ export default function DietPage() {
     analysisStartedAtRef.current = Date.now();
     setIsAnalyzing(true);
     try {
-      const payload = buildDietAnalysisFormData(selectedImageFile, analysisDescription);
+      const payload = buildDietAnalysisFormData(selectedImageFile, analysisDescription, analysisMealType);
       const job = await analyzeDiet(payload);
       handledAnalysisJobIdsRef.current.delete(job.id);
       console.info("Diet analysis job started", { jobId: job.id });
@@ -446,6 +457,16 @@ export default function DietPage() {
         }
       >
         <form className="form" onSubmit={(event) => event.preventDefault()}>
+          <label>
+            식사 구분
+            <select value={analysisMealType} onChange={(event) => setAnalysisMealType(event.target.value)}>
+              {mealTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             식단 메모
             <textarea value={analysisDescription} onChange={(event) => setAnalysisDescription(event.target.value)} />
@@ -833,11 +854,12 @@ export default function DietPage() {
   );
 }
 
-function buildDietAnalysisFormData(file: File, description: string): FormData {
+function buildDietAnalysisFormData(file: File, description: string, mealType: string): FormData {
   const formData = new FormData();
   formData.append("image", file);
   formData.append("description", description || "사진으로 선택한 식단");
   formData.append("meal_time", new Date().toISOString());
+  formData.append("meal_type", mealType);
   formData.append("image_path", file.name);
   return formData;
 }
