@@ -23,8 +23,18 @@ DISEASE_LABELS = {
     "DL": "이상지질혈증",
     "OBESITY": "비만",
     "OBE": "비만",
+    "ABDOMINAL_OBESITY": "복부비만",
+    "ABO": "복부비만",
+    "FATTY_LIVER": "지방간",
+    "FL": "지방간",
     "ANEMIA": "빈혈",
     "ANEM": "빈혈",
+    "LIVER_FUNCTION": "간기능",
+    "LF": "간기능",
+    "KIDNEY_FUNCTION": "신장기능",
+    "KF": "신장기능",
+    "CHRONIC_KIDNEY_DISEASE": "만성콩팥병",
+    "CKD": "만성콩팥병",
 }
 
 DIET_LOW_SCORE_MESSAGES = {
@@ -146,12 +156,14 @@ def _disease_label(disease_type: str) -> str:
 
 def _risk_level_label(risk_level: str) -> str:
     value = str(risk_level).upper()
-    if value == "HIGH":
-        return "높음"
-    if value == "MEDIUM":
-        return "관리 필요"
     if value == "LOW":
         return "낮음"
+    if value == "ATTENTION":
+        return "관심 필요"
+    if value in {"CAUTION", "MEDIUM"}:
+        return "주의"
+    if value in {"HIGH_CAUTION", "HIGH"}:
+        return "높은 주의"
     return str(risk_level)
 
 
@@ -172,8 +184,11 @@ def _model_summary(model_name: str | None, model_version: str | None) -> str:
 
 def _analysis_action(disease_type: str, risk_level: str) -> str:
     disease_key = str(disease_type).upper()
-    if str(risk_level).upper() == "LOW":
+    level = str(risk_level).upper()
+    if level == "LOW":
         return "현재 기록 습관을 유지하면서 정기적으로 건강정보를 업데이트해 보세요."
+    if level == "ATTENTION":
+        return "건강정보를 꾸준히 기록하며 식사, 활동량, 수면 변화를 함께 확인해 보세요."
     if disease_key in {"DIABETES", "DM"}:
         return "식후 활동, 당류 섭취, 공복혈당 기록을 함께 관리해 보세요."
     if disease_key in {"HYPERTENSION", "HTN"}:

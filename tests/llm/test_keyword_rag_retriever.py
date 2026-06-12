@@ -167,8 +167,12 @@ def test_keyword_rag_trace_is_noop_when_rag_disabled(monkeypatch) -> None:
 
 
 def test_langfuse_event_is_noop_without_env(monkeypatch) -> None:
-    for key in ("LANGFUSE_ENABLED", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"):
-        monkeypatch.delenv(key, raising=False)
+    import ai_runtime.llm.llm_client as llm_client
+
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_ENABLED", False)
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_PUBLIC_KEY", None)
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_SECRET_KEY", None)
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_BASE_URL", None)
 
     recorded = record_langfuse_event(
         name="rag.keyword_retrieval",
@@ -181,10 +185,12 @@ def test_langfuse_event_is_noop_without_env(monkeypatch) -> None:
 
 
 def test_langfuse_event_is_noop_when_disabled_even_with_env(monkeypatch) -> None:
-    monkeypatch.setenv("LANGFUSE_ENABLED", "false")
-    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
-    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
-    monkeypatch.setenv("LANGFUSE_BASE_URL", "http://localhost:3000")
+    import ai_runtime.llm.llm_client as llm_client
+
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_ENABLED", False)
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_SECRET_KEY", "sk-lf-test")
+    monkeypatch.setattr(llm_client.config, "LANGFUSE_BASE_URL", "http://localhost:3000")
 
     recorded = record_langfuse_event(
         name="rag.keyword_retrieval",

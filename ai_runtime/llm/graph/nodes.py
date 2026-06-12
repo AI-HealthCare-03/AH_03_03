@@ -25,6 +25,7 @@ from ai_runtime.llm.response_router import route_main_health_chatbot_response
 from ai_runtime.llm.safety import check_medical_safety, detect_mental_health_safety
 from ai_runtime.llm.schemas import MainHealthChatbotInput
 from app.core import config
+from app.core.providers import has_langfuse_config
 
 from .state import HealthChatbotGraphState
 
@@ -515,7 +516,7 @@ def trace_graph_node(
     metadata: dict[str, Any] | None = None,
 ) -> bool:
     record_event_is_test_double = record_langfuse_event is not _REAL_RECORD_LANGFUSE_EVENT
-    if not config.LANGFUSE_ENABLED and not record_event_is_test_double:
+    if not (config.LANGFUSE_ENABLED and has_langfuse_config(config)) and not record_event_is_test_double:
         return False
 
     trace_metadata = state.get("trace_metadata", {})

@@ -77,6 +77,7 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
         {
             "recipient_email": "family@example.com",
             "inviter_display_name": "동욱",
+            "invite_code": "invite-token",
             "invite_url": "http://localhost:8080/family/invitations/accept?code=invite-token",
             "expires_at_text": invite.expires_at.astimezone(family_service.config.TIMEZONE).strftime("%Y-%m-%d %H:%M"),
         }
@@ -91,6 +92,7 @@ async def test_family_invite_email_send_is_safe_when_email_disabled(monkeypatch:
     sent = await EmailService().send_family_invite_email(
         "family@example.com",
         inviter_display_name="동욱",
+        invite_code="invite-token",
         invite_url="http://localhost:8080/family/invitations/accept?code=invite-token",
         expires_at_text="2026-05-31 10:00",
     )
@@ -104,10 +106,17 @@ async def test_family_invite_email_body_does_not_include_sensitive_health_values
 ) -> None:
     captured: dict[str, str] = {}
 
-    async def fake_send_email(self: EmailService, recipient: str, subject: str, body: str) -> bool:
+    async def fake_send_email(
+        self: EmailService,
+        recipient: str,
+        subject: str,
+        body: str,
+        html_body: str | None = None,
+    ) -> bool:
         captured["recipient"] = recipient
         captured["subject"] = subject
         captured["body"] = body
+        captured["html_body"] = html_body or ""
         return True
 
     monkeypatch.setattr(EmailService, "_send_email", fake_send_email)
@@ -115,15 +124,21 @@ async def test_family_invite_email_body_does_not_include_sensitive_health_values
     sent = await EmailService().send_family_invite_email(
         "family@example.com",
         inviter_display_name="동욱",
+        invite_code="invite-token",
         invite_url="http://localhost:8080/family/invitations/accept?code=invite-token",
         expires_at_text="2026-05-31 10:00",
     )
 
     assert sent is True
-    assert captured["subject"] == "AI HealthCare 가족연동 초대가 도착했습니다."
-    assert "동욱님이 가족연동을 요청했습니다." in captured["body"]
+    assert captured["subject"] == "[Health Ladder] 가족 건강관리 초대 안내"
+    assert "가족 건강관리 기능에 초대되었습니다." in captured["body"]
+    assert "초대 코드: invite-token" in captured["body"]
+    assert "http://localhost:8080/family/invitations/accept?code=invite-token" in captured["body"]
+    assert '<p style="font-size: 20px; font-weight: 700;">초대 코드: invite-token</p>' in captured["html_body"]
+    assert '<a href="http://localhost:8080/family/invitations/accept?code=invite-token"' in captured["html_body"]
     for sensitive_value in ("120", "혈압", "혈당", "체중", "질병 위험도", "OCR"):
         assert sensitive_value not in captured["body"]
+        assert sensitive_value not in captured["html_body"]
 
 
 @pytest.mark.asyncio

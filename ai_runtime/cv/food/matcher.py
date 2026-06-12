@@ -15,6 +15,7 @@ class FoodMatchResult:
     match_source: str = "local_stub_unmatched"
     match_confidence: float | None = None
     needs_user_confirmation: bool = True
+    metadata: dict[str, object] | None = None
 
 
 class FoodDbMatcher(Protocol):
@@ -35,6 +36,12 @@ _LOCAL_ALIAS_MATCHES = {
     "ricecakes": ("가래떡", "local_stub:garaetteok", 0.86),
     "koreanricecake": ("가래떡", "local_stub:garaetteok", 0.86),
     "garaetteok": ("가래떡", "local_stub:garaetteok", 0.95),
+    "흰쌀밥": ("쌀밥", "local_stub:white_rice", 0.92),
+    "흰밥": ("쌀밥", "local_stub:white_rice", 0.9),
+    "백미밥": ("쌀밥", "local_stub:white_rice", 0.9),
+    "white밥": ("쌀밥", "local_stub:white_rice", 0.84),
+    "whiterice": ("쌀밥", "local_stub:white_rice", 0.88),
+    "plainrice": ("쌀밥", "local_stub:white_rice", 0.84),
 }
 
 

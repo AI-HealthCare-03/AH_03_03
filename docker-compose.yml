@@ -9,7 +9,8 @@
 #   docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
 #
 # Standard EC2/prod stack:
-#   docker compose --env-file .env -f infra/docker/docker-compose.prod.yml up -d --build --force-recreate
+#   docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
+#   docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
 #
 services:
   # 1. Redis (메시지 브로커 및 캐싱)

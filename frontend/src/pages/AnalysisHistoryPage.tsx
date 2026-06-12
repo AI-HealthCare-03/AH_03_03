@@ -4,6 +4,18 @@ import { Link, useParams } from "react-router-dom";
 import { getAnalysisResultDetail, listAnalysisResults } from "../api/analysis";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import {
+  getAnalysisSourceBadgeLabel,
+  getAnalysisTypeLabel,
+  getDisplayRiskLabel,
+  getExpectedAnalysisTypesByMode,
+  getLatestResultsByAnalysisType,
+  getRiskClassName,
+  getX2StageSummary,
+  isKnownAnalysisType,
+  mergeResultsWithExpectedAnalysisTypes,
+} from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type ReferenceSource = {
@@ -30,13 +42,6 @@ type AnalysisDetail = {
   explanation?: AnalysisExplanation | null;
 };
 
-const labels: Record<string, string> = {
-  DIABETES: "당뇨",
-  OBESITY: "비만",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  HYPERTENSION: "고혈압",
-};
-
 const tabs = ["전체", "당뇨", "고혈압", "콜레스테롤·중성지방", "비만"];
 const tabToType: Record<string, string | null> = {
   전체: null,
@@ -46,40 +51,69 @@ const tabToType: Record<string, string | null> = {
   비만: "OBESITY",
 };
 
-const factorValueLabels: Record<string, Record<string, string>> = {
-  family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
-  family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
-  family_dyslipidemia: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
-  smoking_status: { NON_SMOKER: "비흡연", PAST_SMOKER: "과거 흡연", CURRENT_SMOKER: "현재 흡연" },
-  drinking_frequency: {
-    RARE: "월 1회 미만",
-    MONTHLY_2_4: "월 2-4회",
-    WEEKLY_2_3: "주 2-3회",
-    WEEKLY_4_PLUS: "주 4회 이상",
-  },
-  drinking_amount: {
-    NONE: "마시지 않음",
-    ONE_TO_TWO: "1-2잔",
-    THREE_TO_FOUR: "3-4잔",
-    FIVE_TO_SIX: "5-6잔",
-    SEVEN_PLUS: "7잔 이상",
-  },
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-const factorDirectionLabels: Record<string, string> = {
-  POSITIVE: "위험 증가",
-  NEGATIVE: "위험 감소",
-  NEUTRAL: "중립",
-};
-
-function displayFactorValue(factor: AnalysisResult): string {
-  const key = String(factor.factor_key ?? "");
-  const rawValue = factor.factor_value;
-  if (rawValue === undefined || rawValue === null || rawValue === "") {
-    return "값 정보 없음";
+function getSnapshotInputFeatures(snapshot: AnalysisResult | null | undefined): Record<string, unknown> {
+  if (!isRecord(snapshot?.input_payload)) {
+    return {};
   }
-  const value = String(rawValue);
-  return factorValueLabels[key]?.[value] ?? value;
+  const inputPayload = snapshot.input_payload;
+  return isRecord(inputPayload.input_features) ? inputPayload.input_features : inputPayload;
+}
+
+function formatSummaryValue(value: unknown, unit = ""): string {
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  return `${String(value)}${unit}`;
+}
+
+function formatBloodPressure(input: Record<string, unknown>): string {
+  const systolic = input.systolic_bp;
+  const diastolic = input.diastolic_bp;
+  if ((systolic === undefined || systolic === null || systolic === "") && (diastolic === undefined || diastolic === null || diastolic === "")) {
+    return "-";
+  }
+  return `${String(systolic ?? "-")} / ${String(diastolic ?? "-")} mmHg`;
+}
+
+function getResultTimestamp(result: AnalysisResult | null | undefined): number {
+  const candidates = [result?.analyzed_at, result?.created_at, result?.analyzedAt, result?.createdAt];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(String(candidate ?? ""));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+function getRelatedAnalysisRunResults(target: AnalysisResult | null | undefined, allResults: AnalysisResult[]): AnalysisResult[] {
+  if (!target) {
+    return [];
+  }
+  const targetJobId = target.async_job_id;
+  const targetMode = String(target.analysis_mode ?? "");
+  const targetTimestamp = getResultTimestamp(target);
+  const related = [target, ...allResults].filter((result) => {
+    if (!isKnownAnalysisType(result.analysis_type)) {
+      return false;
+    }
+    if (targetJobId !== undefined && targetJobId !== null && targetJobId !== "") {
+      return String(result.async_job_id ?? "") === String(targetJobId);
+    }
+    if (!targetTimestamp) {
+      return String(result.id ?? "") === String(target.id ?? "");
+    }
+    return String(result.analysis_mode ?? "") === targetMode && Math.abs(getResultTimestamp(result) - targetTimestamp) <= 120000;
+  });
+  const deduped = new Map<string, AnalysisResult>();
+  related.forEach((result) => {
+    deduped.set(String(result.id ?? `${String(result.analysis_type)}-${getResultTimestamp(result)}`), result);
+  });
+  return Array.from(deduped.values());
 }
 
 export default function AnalysisHistoryPage() {
@@ -97,14 +131,6 @@ export default function AnalysisHistoryPage() {
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ko-KR");
   };
 
-  const scoreLabel = (value: unknown) => {
-    const score = Number(value);
-    if (!Number.isFinite(score)) {
-      return "-";
-    }
-    return `${Math.round(score <= 1 ? score * 100 : score)}/100`;
-  };
-
   const displayResults = useMemo(() => {
     const selectedType = tabToType[activeTab];
     if (!selectedType) {
@@ -120,22 +146,32 @@ export default function AnalysisHistoryPage() {
     }
     return "상세보기에서 주요 요인을 확인할 수 있습니다.";
   };
+  const diseaseRiskItems: DiseaseRiskItem[] = getLatestResultsByAnalysisType(
+    displayResults.filter((result) => isKnownAnalysisType(result.analysis_type)),
+  )
+    .map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
 
-  const snapshotInput =
-    detail?.snapshot?.input_payload && typeof detail.snapshot.input_payload === "object"
-      ? (detail.snapshot.input_payload as Record<string, unknown>)
-      : {};
-    const snapshotOutput =
-      detail?.snapshot?.output_payload && typeof detail.snapshot.output_payload === "object"
-        ? (detail.snapshot.output_payload as Record<string, unknown>)
-        : {};
+  const snapshotInput = getSnapshotInputFeatures(detail?.snapshot);
   const referenceSources = detail?.explanation?.reference_sources ?? [];
 
   useEffect(() => {
     const load = async () => {
       setError("");
       if (analysisId) {
-        setDetail(await getAnalysisResultDetail<AnalysisDetail>(Number(analysisId)));
+        const [nextDetail, nextResults] = await Promise.all([
+          getAnalysisResultDetail<AnalysisDetail>(Number(analysisId)),
+          listAnalysisResults<AnalysisResult[]>(),
+        ]);
+        setDetail(nextDetail);
+        setResults(nextResults);
         return;
       }
       setResults(await listAnalysisResults<AnalysisResult[]>());
@@ -149,6 +185,14 @@ export default function AnalysisHistoryPage() {
 
   if (analysisId) {
     const result = detail?.result;
+    const detailRiskClassName = getRiskClassName(result);
+    const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
+    const x2StageSummary = getX2StageSummary(result);
+    const relatedResults = getRelatedAnalysisRunResults(result, results);
+    const detailSlots = result
+      ? mergeResultsWithExpectedAnalysisTypes(relatedResults, result.analysis_mode)
+      : [];
+    const expectedSlotCount = result ? getExpectedAnalysisTypesByMode(result.analysis_mode).length : 0;
     return (
       <div className="page-grid">
         {error && <ErrorMessage message={error} />}
@@ -160,33 +204,54 @@ export default function AnalysisHistoryPage() {
             </Link>
           }
         >
-          <div className="score-panel">
-            <span>{labels[String(result?.analysis_type)] ?? String(result?.analysis_type ?? "분석")}</span>
-            <strong>{String(result?.risk_level ?? "-")}</strong>
-            <span className="badge badge-reference">{scoreLabel(result?.risk_score)}</span>
-            <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+          <div className={`score-panel risk-detail-panel ${detailRiskClassName}`}>
+            <span>{getAnalysisTypeLabel(result?.analysis_type, "분석")}</span>
+            <strong>{getDisplayRiskLabel(result)}</strong>
+            <div className="button-row">
+              <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+            </div>
             <p>{String(result?.summary ?? "")}</p>
+            {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
         </Card>
-        <Card title="주요 위험 요인">
-          <div className="card-list">
-            {(detail?.factors ?? []).length === 0 && <div className="state-box">표시할 주요 요인이 없습니다.</div>}
-            {(detail?.factors ?? []).map((factor) => (
-              <div className="mini-card" key={String(factor.id ?? factor.factor_key)}>
-                <div className="record-row">
-                  <div>
-                    <strong>{String(factor.factor_name ?? factor.factor_key ?? "요인")}</strong>
-                    <p className="muted">{displayFactorValue(factor)}</p>
+        {detailSlots.length > 0 && (
+          <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 판정" : "간편분석 질환별 판정"}>
+            <div className="card-list">
+              {detailSlots.map((slot) => {
+                if (slot.isUnavailable || !slot.result) {
+                  return (
+                    <div className="mini-card" key={slot.analysisType}>
+                      <strong>{slot.diseaseName} 관리 단계</strong>
+                      <div className="button-row">
+                        <span className="badge badge-missing">검진 수치 부족</span>
+                        <span className="badge badge-reference">판정 불가</span>
+                      </div>
+                      <p className="muted">{slot.unavailableReason}</p>
+                    </div>
+                  );
+                }
+                const slotRiskClassName = getRiskClassName(slot.result);
+                const slotSourceBadgeLabel = getAnalysisSourceBadgeLabel(slot.result);
+                const slotX2StageSummary = getX2StageSummary(slot.result);
+                return (
+                  <div className="mini-card" key={String(slot.result.id ?? slot.analysisType)}>
+                    <strong>{slot.diseaseName} 관리 단계</strong>
+                    <div className="button-row">
+                      <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
+                      <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                      {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
+                    </div>
+                    {slotX2StageSummary && <p className="muted">{slotX2StageSummary}</p>}
                   </div>
-                  <span className="badge badge-reference">
-                    {factorDirectionLabels[String(factor.direction ?? "NEUTRAL")] ?? String(factor.direction ?? "중립")}
-                  </span>
-                </div>
-                <span className="badge risk-medium">기여도 {String(factor.contribution_score ?? "-")}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+                );
+              })}
+            </div>
+            {result?.analysis_mode === "PRECISION" && detailSlots.length < expectedSlotCount && (
+              <div className="state-box">정밀분석 표시 항목을 불러오는 중입니다.</div>
+            )}
+          </Card>
+        )}
         {detail?.explanation && (
           <Card title="분석 설명">
             <div className="card-list">
@@ -204,7 +269,6 @@ export default function AnalysisHistoryPage() {
                     {referenceSources.map((source) => (
                       <span className="badge badge-reference" key={String(source.id ?? source.title)}>
                         {String(source.source_org ?? source.title ?? "참고 출처")}
-                        {source.status ? ` · ${String(source.status)}` : ""}
                       </span>
                     ))}
                   </div>
@@ -216,12 +280,13 @@ export default function AnalysisHistoryPage() {
         <Card title="분석 입력 요약">
           <div className="record-table">
             {[
-              ["키", snapshotInput.height_cm],
-              ["몸무게", snapshotInput.weight_kg],
-              ["BMI", snapshotInput.bmi],
-              ["혈압", `${String(snapshotInput.systolic_bp ?? "-")} / ${String(snapshotInput.diastolic_bp ?? "-")}`],
-              ["공복혈당", snapshotInput.fasting_glucose],
-              ["위험도", snapshotOutput.risk_level ?? result?.risk_level],
+              ["키", formatSummaryValue(snapshotInput.height_cm, "cm")],
+              ["몸무게", formatSummaryValue(snapshotInput.weight_kg, "kg")],
+              ["BMI", formatSummaryValue(snapshotInput.bmi)],
+              ["혈압", formatBloodPressure(snapshotInput)],
+              ["공복혈당", formatSummaryValue(snapshotInput.fasting_glucose, "mg/dL")],
+              ["분석일", formatDate(result?.analyzed_at ?? result?.created_at)],
+              ["관리 필요 단계", getDisplayRiskLabel(result)],
             ].map(([label, value]) => (
               <div className="record-table-row" key={String(label)}>
                 <span>{String(label)}</span>
@@ -257,20 +322,20 @@ export default function AnalysisHistoryPage() {
           </button>
         ))}
       </div>
+      {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
       <div className="table-list">
         {displayResults.map((result) => {
+          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
-              <span className={`badge risk-${String(result.risk_level ?? "").toLowerCase()}`}>
-                {String(result.risk_level ?? "-")}
-              </span>
+              <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
               <div>
-                <strong>{labels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
+                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
                 <p className="muted">{mainFactorLabel(result)}</p>
               </div>
-              <span>{scoreLabel(result.risk_score)}</span>
               <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
               <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
               <span className="badge badge-reference">상세보기</span>
             </>
           );

@@ -105,7 +105,7 @@ def test_analysis_explanation_falls_back_when_context_generation_fails(monkeypat
             id=1,
             analysis_type=AnalysisType.DIABETES,
             risk_score=Decimal("0.72"),
-            risk_level=RiskLevel.HIGH,
+            risk_level=RiskLevel.HIGH_CAUTION,
             model_name="catboost",
             model_version="dm_catboost_final",
         ),

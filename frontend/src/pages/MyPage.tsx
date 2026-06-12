@@ -8,11 +8,29 @@ import { listHealthRecords } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import {
+  getAnalysisSourceBadgeLabel,
+  getAnalysisTypeLabel,
+  getDisplayRiskLabel,
+  getLatestResultsByAnalysisType,
+  getRiskClassName,
+  isKnownAnalysisType,
+} from "../utils/riskDisplay";
 
 import { Mail, Phone } from 'lucide-react';
 import { Activity, Gauge, Droplet, Moon } from "lucide-react";
 
 type Item = Record<string, unknown>;
+
+type MyPageMenuItem = {
+  label: string;
+  to?: string;
+  status?: "active";
+  badge?: string;
+  danger?: boolean;
+  action?: "deactivate";
+};
 
 type ProfileDraft = {
   nickname: string;
@@ -23,19 +41,6 @@ type PasswordDraft = {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
-};
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  HYPERTENSION: "고혈압",
-  OBESITY: "비만",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-};
-
-const riskFallbackScores: Record<string, number> = {
-  HIGH: 80,
-  MEDIUM: 55,
-  LOW: 25,
 };
 
 const challengeStatusLabels: Record<string, string> = {
@@ -50,7 +55,7 @@ const challengeStatusLabels: Record<string, string> = {
   GIVEN_UP: "참여 전",
 };
 
-const myPageMenuItems = [
+const myPageMenuItems: MyPageMenuItem[] = [
   { label: "프로필", status: "active" },
   { label: "기본 건강정보", to: "/health/profile" },
   { label: "복약/영양제", to: "/medications" },
@@ -75,18 +80,6 @@ function getDateLabel(value: unknown): string {
     return String(value);
   }
   return date.toLocaleDateString("ko-KR");
-}
-
-function getRiskLevel(result: Item): string {
-  return String(result.risk_level ?? "").toUpperCase();
-}
-
-function getRiskScore(result: Item): number {
-  const score = Number(result.risk_score);
-  if (Number.isFinite(score) && score > 0) {
-    return Math.round(score <= 1 ? score * 100 : score);
-  }
-  return riskFallbackScores[getRiskLevel(result)] ?? 0;
 }
 
 function normalizeStatus(value: unknown): string {
@@ -232,6 +225,19 @@ export default function MyPage() {
 
   const latestHealth = health[0];
   const visibleChallenges = challenges.filter(isVisibleMyChallenge);
+  const latestDiseaseAnalysis = getLatestResultsByAnalysisType(
+    analysis.filter((result) => isKnownAnalysisType(result.analysis_type)),
+  );
+  const diseaseRiskItems: DiseaseRiskItem[] = latestDiseaseAnalysis
+    .map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
   const displayName = backendUser?.nickname ?? backendUser?.name ?? backendUser?.login_id ?? "사용자";
   const profileInitial = displayName.slice(0, 1).toUpperCase();
 
@@ -293,6 +299,10 @@ export default function MyPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "비밀번호 변경에 실패했습니다.");
     }
+  };
+
+  const deactivateAccount = () => {
+    window.alert("회원 탈퇴 기능은 준비 중입니다.");
   };
 
   return (
@@ -509,14 +519,14 @@ export default function MyPage() {
           <Card title="최근 분석 결과">
             <div className="card-list">
               {analysis.length === 0 && <div className="state-box">최근 분석 결과가 없습니다.</div>}
-              {analysis.map((result) => {
-                const level = getRiskLevel(result);
-                const score = getRiskScore(result);
+              {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
+              {latestDiseaseAnalysis.map((result) => {
                 const resultId = Number(result.id);
+                const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
                 return (
                   <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type ?? "-")}</strong>
+                      <strong>{getAnalysisTypeLabel(result.analysis_type, "-")}</strong>
                       {Number.isFinite(resultId) && (
                         <Link className="muted" style={{ fontSize: "13px" }} to={`/analysis/${resultId}`}>
                           상세보기 →
@@ -524,8 +534,8 @@ export default function MyPage() {
                       )}
                     </div>
                     <div className="button-row" style={{ marginTop: "6px" }}>
-                      <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
-                      <span className="badge badge-reference">{score}/100</span>
+                      <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                      {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
                   </div>

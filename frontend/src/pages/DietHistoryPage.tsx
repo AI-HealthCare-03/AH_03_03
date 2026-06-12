@@ -64,6 +64,7 @@ export default function DietHistoryPage() {
         </Link>
       }
     >
+      <div className="state-box">식단 점수와 분석 결과는 건강관리 참고용이며, 실제 식사량과 음식 선택에 따라 달라질 수 있습니다.</div>
       <div className="filter-tabs">
         {TABS.map((tab) => (
           <span

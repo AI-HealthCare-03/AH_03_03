@@ -1,0 +1,58 @@
+{
+  "source_path": "experiment/ml/kdu/screening/artifacts",
+  "promoted_to_runtime_path": "ai_runtime/ml/artifacts/screening",
+  "model_type": "screening_catboost",
+  "role": "simple_check_screening_signal",
+  "service_policy_allowed": true,
+  "diagnostic_only": false,
+  "validation_note": "30,000개 KNHANES/X1 real data 비교 실험에서 dual-stage 정책 검증 완료",
+  "policy_note": "screening은 gate가 아니라 보조 신호이며, base high + screening low는 낮음으로 downgrade하지 않음",
+  "htn_family_policy": "runtime adapter에서 HTN 가족력 feature는 neutral value 처리 예정",
+  "diseases": {
+    "HTN": {
+      "source_path": "experiment/ml/kdu/screening/artifacts/htn/screening_catboost",
+      "promoted_to_runtime_path": "ai_runtime/ml/artifacts/screening/htn/screening_catboost",
+      "required_files": [
+        "model_fold1.cbm",
+        "model_fold2.cbm",
+        "model_fold3.cbm",
+        "model_fold4.cbm",
+        "model_fold5.cbm",
+        "feature_columns.json",
+        "threshold.json",
+        "metrics.json",
+        "model_params.json"
+      ]
+    },
+    "DM": {
+      "source_path": "experiment/ml/kdu/screening/artifacts/dm/screening_catboost",
+      "promoted_to_runtime_path": "ai_runtime/ml/artifacts/screening/dm/screening_catboost",
+      "required_files": [
+        "model_fold1.cbm",
+        "model_fold2.cbm",
+        "model_fold3.cbm",
+        "model_fold4.cbm",
+        "model_fold5.cbm",
+        "feature_columns.json",
+        "threshold.json",
+        "metrics.json",
+        "model_params.json"
+      ]
+    },
+    "DL": {
+      "source_path": "experiment/ml/kdu/screening/artifacts/dl/screening_catboost",
+      "promoted_to_runtime_path": "ai_runtime/ml/artifacts/screening/dl/screening_catboost",
+      "required_files": [
+        "model_fold1.cbm",
+        "model_fold2.cbm",
+        "model_fold3.cbm",
+        "model_fold4.cbm",
+        "model_fold5.cbm",
+        "feature_columns.json",
+        "threshold.json",
+        "metrics.json",
+        "model_params.json"
+      ]
+    }
+  }
+}

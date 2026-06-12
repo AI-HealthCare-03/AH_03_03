@@ -12,10 +12,16 @@ import {
 } from "../api/exams";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import { isHeicFile } from "../utils/files";
+
+type FeedbackDialog = {
+  message: string;
+  title: string;
+  tone?: "default" | "danger";
+};
 
 export default function ExamOcrPage() {
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -28,8 +34,10 @@ export default function ExamOcrPage() {
   const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunningOcr, setIsRunningOcr] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isAppliedToHealth, setIsAppliedToHealth] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryOcr, setCanRetryOcr] = useState(false);
 
   useEffect(() => {
@@ -51,51 +59,66 @@ export default function ExamOcrPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const { latestJob: latestOcrJob } = useAsyncJobPolling({
+  useEffect(() => {
+    if (exam?.is_confirmed) {
+      setIsAppliedToHealth(true);
+    }
+  }, [exam?.is_confirmed]);
+
+  useAsyncJobPolling({
     jobId: ocrJobId,
     enabled: isRunningOcr && ocrJobId !== null,
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: async () => {
+      setIsRunningOcr(false);
+      setOcrJobId(null);
       if (!exam) {
-        setError("검진표 정보를 찾지 못했습니다. 파일을 다시 선택해주세요.");
-        setIsRunningOcr(false);
-        setOcrJobId(null);
+        setFeedbackDialog({
+          title: "검진표 인식에 실패했습니다.",
+          message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
+          tone: "danger",
+        });
         return;
       }
       try {
         const latestMeasurements = await listMeasurements(exam.id);
         setMeasurements(latestMeasurements);
         setCanRetryOcr(false);
-        setMessage(
-          latestMeasurements.length > 0
-            ? `${getAsyncJobStatusMessage("SUCCESS")} 저장 전 검진 수치를 확인해주세요.`
-            : `${getAsyncJobStatusMessage("SUCCESS")} 인식된 측정값 후보가 없습니다. 파일을 다시 확인해주세요.`,
-        );
+        setFeedbackDialog({
+          title: "검진표 인식이 완료되었습니다.",
+          message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요.",
+        });
       } catch {
-        setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
+        setFeedbackDialog({
+          title: "검진표 인식에 실패했습니다.",
+          message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
+          tone: "danger",
+        });
         setCanRetryOcr(true);
-      } finally {
-        setIsRunningOcr(false);
-        setOcrJobId(null);
       }
     },
     onFailure: (job) => {
-      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      setFeedbackDialog({
+        title: "검진표 인식에 실패했습니다.",
+        message: job.status === "CANCELED" ? "검진표 인식 작업이 취소되었습니다." : "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        tone: "danger",
+      });
       setCanRetryOcr(true);
       setIsRunningOcr(false);
       setOcrJobId(null);
     },
     onTimeout: () => {
-      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      setFeedbackDialog({
+        title: "검진표 인식에 실패했습니다.",
+        message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        tone: "danger",
+      });
       setCanRetryOcr(true);
       setIsRunningOcr(false);
       setOcrJobId(null);
     },
   });
-
-  const ocrStatusMessage =
-    isRunningOcr && ocrJobId !== null ? getAsyncJobStatusMessage(latestOcrJob?.status ?? "PENDING") : "";
 
   const handleFileSelection = async (file: File | null) => {
     if (selectedPreviewUrl) {
@@ -103,7 +126,14 @@ export default function ExamOcrPage() {
     }
     setSelectedPreviewUrl("");
     setPreviewMessage("");
+    setIsAppliedToHealth(false);
+    setExam(null);
+    setMeasurements([]);
+    setMessage("");
+    setError("");
     if (!file) {
+      setSelectedFile(null);
+      setSelectedFileName("");
       return;
     }
     setSelectedFile(file);
@@ -133,8 +163,10 @@ export default function ExamOcrPage() {
   const startExamOcr = async () => {
     setError("");
     setMessage("");
+    setFeedbackDialog(null);
     setMeasurements([]);
     setCanRetryOcr(false);
+    setIsAppliedToHealth(false);
     if (!selectedFile) {
       setError("검진표 이미지 또는 PDF 파일을 먼저 선택해주세요.");
       return;
@@ -160,6 +192,8 @@ export default function ExamOcrPage() {
   };
 
   const updateLocalMeasurement = (measurementId: number, value: string) => {
+    setIsAppliedToHealth(false);
+    setMessage("");
     setMeasurements((prev) =>
       prev.map((measurement) => (measurement.id === measurementId ? { ...measurement, value } : measurement)),
     );
@@ -182,10 +216,22 @@ export default function ExamOcrPage() {
           }),
         ),
       );
-      await confirmExam(exam.id);
+      const confirmedExam = await confirmExam(exam.id);
+      setExam(confirmedExam);
       setMeasurements(await listMeasurements(exam.id));
-      setMessage("건강정보에 반영되었습니다.");
+      setIsAppliedToHealth(true);
+      setMessage("");
+      setFeedbackDialog({
+        title: "건강정보에 반영되었습니다.",
+        message: "이제 정밀분석에서 최신 검진 수치를 사용할 수 있습니다.",
+      });
     } catch (err) {
+      setIsAppliedToHealth(false);
+      setFeedbackDialog({
+        title: "건강정보 반영에 실패했습니다.",
+        message: "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setError(err instanceof Error ? err.message : "건강정보 반영에 실패했습니다.");
     } finally {
       setIsConfirming(false);
@@ -211,8 +257,17 @@ export default function ExamOcrPage() {
           </button>
         </div>
       ) : null}
-      {ocrStatusMessage && <div className="state-box">{ocrStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
+      {feedbackDialog && (
+        <ConfirmDialog
+          confirmLabel="확인"
+          message={feedbackDialog.message}
+          onConfirm={() => setFeedbackDialog(null)}
+          showCancel={false}
+          title={feedbackDialog.title}
+          tone={feedbackDialog.tone}
+        />
+      )}
       <div className="page-grid">
         <Card title="파일 업로드">
           <div className="upload-box">
@@ -300,8 +355,16 @@ export default function ExamOcrPage() {
             {measurements.length === 0 ? (
               <p className="muted">측정값 후보가 생성되면 건강정보 반영 버튼을 사용할 수 있습니다.</p>
             ) : null}
-            <button disabled={measurements.length === 0 || isConfirming} onClick={saveAndConfirm} type="button">
-              {isConfirming ? "건강정보에 반영 중..." : "선택한 후보값을 건강정보에 반영"}
+            <button
+              disabled={measurements.length === 0 || isConfirming || isAppliedToHealth}
+              onClick={saveAndConfirm}
+              type="button"
+            >
+              {isConfirming
+                ? "건강정보 반영 중..."
+                : isAppliedToHealth
+                  ? "건강정보 반영 완료"
+                  : "선택한 후보값을 건강정보에 반영"}
             </button>
           </div>
         </div>

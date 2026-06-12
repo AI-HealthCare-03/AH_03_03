@@ -101,7 +101,9 @@ async def get_analysis_readiness(user_id: int) -> dict[str, object]:
         if _is_missing_value(getattr(latest_record, field_name))
     ]
     basic_ready = not missing_basic_fields
-    precision_ready = not missing_precision_fields
+    # PRECISION은 BASIC 결과를 기본으로 만들고 질환별로 가능한 X2 수치만 보정한다.
+    # 따라서 검진 수치 일부가 없어도 실행 자체는 BASIC 최소 입력이 있으면 가능하다.
+    precision_ready = basic_ready
     message = "건강 분석을 실행할 수 있습니다." if basic_ready else "기본 분석에 필요한 항목을 더 입력해 주세요."
     return {
         "is_ready": basic_ready,

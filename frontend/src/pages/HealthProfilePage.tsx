@@ -81,7 +81,6 @@ const x2Fields: Array<{ key: keyof HealthProfileFormState; label: string }> = [
   { key: "systolic_bp", label: "수축기 혈압" },
   { key: "diastolic_bp", label: "이완기 혈압" },
   { key: "fasting_glucose", label: "공복혈당" },
-  { key: "hba1c", label: "당화혈색소" },
   { key: "total_cholesterol", label: "총콜레스테롤" },
   { key: "triglyceride", label: "중성지방" },
   { key: "hdl_cholesterol", label: "HDL 콜레스테롤" },
@@ -162,19 +161,12 @@ const readOnlySections: Array<{
       { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
       { key: "fasting_glucose", label: "공복혈당", unit: "mg/dL" },
-      { key: "hba1c", label: "당화혈색소", unit: "%" },
+      { key: "hba1c", label: "당화혈색소", unit: "%", optional: true },
       { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL" },
       { key: "triglyceride", label: "중성지방", unit: "mg/dL" },
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL" },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL" },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
-    ],
-  },
-  {
-    title: "선택 설문",
-    items: [
-      { key: "education_level", label: "교육수준", optional: true, referenceOnly: true },
-      { key: "income_level", label: "소득수준", optional: true, referenceOnly: true },
     ],
   },
 ];
@@ -405,7 +397,7 @@ export default function HealthProfilePage() {
   );
   const precisionMissingLabels = (readiness?.missing_precision_fields ?? []).map(
     (field) => backendMissingLabelMap[field] ?? field,
-  );
+  ).filter((label) => label !== "당화혈색소");
 
   const load = async () => {
     const [record, readinessResult] = await Promise.all([
@@ -530,7 +522,7 @@ export default function HealthProfilePage() {
               {precisionMissingLabels.length > 0 && (
                 <p>검진/혈액검사 수치는 선택 입력입니다. 추가 입력하면 정밀 분석 정확도가 높아집니다: {precisionMissingLabels.join(", ")}</p>
               )}
-              <p>교육수준과 소득수준은 편향 및 입력 신뢰도 이슈가 있어 현재 기본 분석 필수 항목에서 제외했습니다.</p>
+              <p>당화혈색소는 선택값입니다. 입력하면 정밀 분석에 함께 반영됩니다.</p>
             </div>
           </div>
         </Card>
@@ -623,9 +615,7 @@ export default function HealthProfilePage() {
               <section className="profile-section" key={section.title}>
                 <div className="section-heading">
                   <h3>{section.title}</h3>
-                  {section.title === "선택 설문" && (
-                    <p>선택 항목입니다. 입력하지 않아도 분석을 진행할 수 있습니다.</p>
-                  )}
+                  {section.title === "정밀 검진값" && <p>당화혈색소는 선택값이며, 입력되어 있으면 분석에 함께 반영됩니다.</p>}
                 </div>
                 <div className="readonly-health-grid">
                   {section.items.map((item) => {
@@ -634,8 +624,10 @@ export default function HealthProfilePage() {
                       <div className="readonly-health-item" key={`${section.title}-${item.key}`}>
                         <div className="item-header">
                           <span>{item.label}</span>
-                          {item.referenceOnly ? (
+                          {item.optional ? (
                             <em className="badge badge-reference">선택</em>
+                          ) : item.referenceOnly ? (
+                            <em className="badge badge-reference">참고</em>
                           ) : (
                             <em className="badge badge-required">필수</em>
                           )}

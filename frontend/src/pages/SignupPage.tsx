@@ -20,6 +20,8 @@ type AvailabilityCheck = {
   message: string;
 };
 
+type EmailSendStatus = "idle" | "sending" | "success" | "error";
+
 export default function SignupPage() {
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +64,8 @@ export default function SignupPage() {
   const [emailCode, setEmailCode] = useState("");
   const [emailDebugCode, setEmailDebugCode] = useState<string | null>(null);
   const [emailVerification, setEmailVerification] = useState<AvailabilityCheck | null>(null);
+  const [emailSendStatus, setEmailSendStatus] = useState<EmailSendStatus>("idle");
+  const [emailSendMessage, setEmailSendMessage] = useState("");
   const [checkingField, setCheckingField] = useState<
     "login_id" | "email" | "phone" | "email_send" | "email_verify" | null
   >(null);
@@ -279,6 +283,8 @@ export default function SignupPage() {
       setEmailVerification(null);
       setEmailCode("");
       setEmailDebugCode(null);
+      setEmailSendStatus("idle");
+      setEmailSendMessage("");
       setFieldErrors((prev) => {
         const { email: _email, email_check, email_verification, ...rest } = prev;
         return rest;
@@ -343,21 +349,21 @@ export default function SignupPage() {
     }
     try {
       setCheckingField("email_send");
+      setEmailSendStatus("sending");
+      setEmailSendMessage("인증 코드를 이메일로 보내는 중입니다. 잠시만 기다려 주세요.");
       const result = await sendEmailVerification(normalizedEmail);
       setEmailVerification(null);
       setEmailCode(result.debug_code ?? "");
       setEmailDebugCode(result.debug_code ?? null);
-      setNotice(
-        result.debug_code
-          ? "인증코드를 생성했습니다. 아래 개발/시연용 인증코드로 확인해주세요."
-          : "인증코드를 발송했습니다. 이메일을 확인해주세요.",
-      );
+      setEmailSendStatus("success");
+      setEmailSendMessage("인증 코드가 이메일로 발송되었습니다. 메일함을 확인해 주세요.");
       setFieldErrors((prev) => {
         const { email_verification, ...rest } = prev;
         return rest;
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "인증코드 발송에 실패했습니다.");
+    } catch {
+      setEmailSendStatus("error");
+      setEmailSendMessage("인증 코드 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setCheckingField(null);
     }
@@ -568,6 +574,8 @@ export default function SignupPage() {
                     setEmailVerification(null);
                     setEmailCode("");
                     setEmailDebugCode(null);
+                    setEmailSendStatus("idle");
+                    setEmailSendMessage("");
                   }}
                   type="email"
                   required
@@ -593,6 +601,19 @@ export default function SignupPage() {
                 >
                   {checkingField === "email_send" ? "발송 중..." : "인증코드 발송"}
                 </button>
+                {emailSendMessage && (
+                  <div
+                    className={
+                      emailSendStatus === "success"
+                        ? "success-text"
+                        : emailSendStatus === "error"
+                          ? "warning-text"
+                          : "state-box"
+                    }
+                  >
+                    {emailSendMessage}
+                  </div>
+                )}
                 <label>
                   인증코드
                   <input

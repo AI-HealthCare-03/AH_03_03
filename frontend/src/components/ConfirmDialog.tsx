@@ -3,8 +3,9 @@ type ConfirmDialogProps = {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  showCancel?: boolean;
   tone?: "default" | "danger";
-  onCancel: () => void;
+  onCancel?: () => void;
   onConfirm: () => void;
 };
 
@@ -13,6 +14,7 @@ export default function ConfirmDialog({
   message,
   confirmLabel = "확인",
   cancelLabel = "취소",
+  showCancel = true,
   tone = "default",
   onCancel,
   onConfirm,
@@ -23,9 +25,11 @@ export default function ConfirmDialog({
         <h2>{title}</h2>
         <p>{message}</p>
         <div className="button-row">
-          <button className="btn-secondary" onClick={onCancel} type="button">
-            {cancelLabel}
-          </button>
+          {showCancel && (
+            <button className="btn-secondary" onClick={onCancel} type="button">
+              {cancelLabel}
+            </button>
+          )}
           <button className={tone === "danger" ? "btn-danger" : "btn-primary"} onClick={onConfirm} type="button">
             {confirmLabel}
           </button>

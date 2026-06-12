@@ -48,6 +48,7 @@ class DietRecordResponse(BaseModel):
     analysis_method: str | None
     is_user_corrected: bool
     memo: str | None
+    image_url: str | None = None
     created_at: datetime
     updated_at: datetime
 

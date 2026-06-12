@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from ai_runtime.jobs import exam_ocr_handler
+from ai_runtime.ocr.checkup.extractor import parse_from_text_lines
 from app.services import exams as exam_service
 from app.services.exams import (
     build_health_record_update_from_exam_measurements,
@@ -52,6 +53,74 @@ def test_non_numeric_exam_values_are_not_measurement_candidates() -> None:
     )
 
     assert measurements == [("ldl", "LDL 콜레스테롤", "132 mg/dL", "mg/dL")]
+
+
+def test_x2_only_numeric_exam_values_are_measurement_candidates() -> None:
+    measurements = exam_service._measurement_tuples_from_mapping(
+        {
+            "hb": "13.2 g/dL",
+            "hemoglobin": "13.1 g/dL",
+            "ast": "30 U/L",
+            "alt": "25 U/L",
+            "gamma_gtp": "44 U/L",
+            "creatinine": "0.9 mg/dL",
+            "egfr": "82 mL/min/1.73m2",
+            "hba1c": "5.8 %",
+        }
+    )
+
+    assert ("hb", "혈색소", "13.2 g/dL", "g/dL") in measurements
+    assert ("hemoglobin", "혈색소", "13.1 g/dL", "g/dL") in measurements
+    assert ("ast", "AST", "30 U/L", "U/L") in measurements
+    assert ("alt", "ALT", "25 U/L", "U/L") in measurements
+    assert ("gamma_gtp", "감마GTP", "44 U/L", "U/L") in measurements
+    assert ("creatinine", "크레아티닌", "0.9 mg/dL", "mg/dL") in measurements
+    assert ("egfr", "eGFR", "82 mL/min/1.73m2", "mL/min/1.73m2") in measurements
+    assert ("hba1c", "당화혈색소", "5.8 %", "%") in measurements
+
+
+def test_x2_only_measurements_are_not_synced_to_health_record() -> None:
+    data = build_health_record_update_from_exam_measurements(
+        [
+            _measurement("hemoglobin", "13.2 g/dL"),
+            _measurement("ast", "30 U/L"),
+            _measurement("alt", "25 U/L"),
+            _measurement("gamma_gtp", "44 U/L"),
+            _measurement("creatinine", "0.9 mg/dL"),
+            _measurement("egfr", "82 mL/min/1.73m2"),
+        ]
+    )
+
+    assert data == {}
+
+
+def test_urine_protein_exam_value_can_be_preserved_as_measurement_candidate() -> None:
+    measurements = exam_service._measurement_tuples_from_mapping({"urine_protein": "음성"})
+
+    assert measurements == [("urine_protein", "요단백", "음성", None)]
+
+
+def test_paddleocr_text_parser_extracts_x2_numeric_fields() -> None:
+    data, low_confidence_fields, _raw_texts = parse_from_text_lines(
+        [
+            ("혈색소 13.2 g/dL", 0.95),
+            ("HbA1c 5.8 %", 0.95),
+            ("AST 30 U/L", 0.95),
+            ("ALT 25 U/L", 0.95),
+            ("감마GTP 44 U/L", 0.95),
+            ("크레아티닌 0.9 mg/dL", 0.95),
+            ("eGFR 82 mL/min/1.73m2", 0.95),
+        ]
+    )
+
+    assert data.hb == 13.2
+    assert data.hba1c == 5.8
+    assert data.ast == 30
+    assert data.alt == 25
+    assert data.gamma_gtp == 44
+    assert data.creatinine == 0.9
+    assert data.egfr == 82
+    assert low_confidence_fields == []
 
 
 def test_numeric_exam_value_takes_priority_over_later_non_numeric_value() -> None:
@@ -226,7 +295,7 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
     class FakeVisionClient:
         def __init__(self, api_key: str, model: str):
             assert api_key == "test-key"
-            assert model == "gpt-4o-mini"
+            assert model == "gpt-4o"
 
         async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
             assert analysis_type == "checkup"
@@ -246,6 +315,7 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
     monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_MODEL", "gpt-4o")
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
 
     result = await exam_ocr_handler._extract_exam_measurements_with_provider(b"image", "image/png")
@@ -279,7 +349,7 @@ async def test_exam_ocr_converts_pdf_before_gpt_vision(monkeypatch) -> None:
     class FakeVisionClient:
         def __init__(self, api_key: str, model: str):
             assert api_key == "test-key"
-            assert model == "gpt-4o-mini"
+            assert model == "gpt-4o"
 
         async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
             assert analysis_type == "checkup"
@@ -308,6 +378,7 @@ async def test_exam_ocr_converts_pdf_before_gpt_vision(monkeypatch) -> None:
     monkeypatch.setattr(exam_ocr_handler, "_convert_exam_pdf_to_png_images", fake_convert)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_MODEL", "gpt-4o")
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
 

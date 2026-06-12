@@ -1,15 +1,16 @@
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from ai_runtime.cv.food.fallback_policy import select_food_detection_candidate
-from ai_runtime.cv.food.matcher import FoodMatchResult, match_food_name
+from ai_runtime.cv.food.matcher import FoodMatchResult, LocalFallbackFoodDbMatcher, match_food_name
 from ai_runtime.cv.food.normalization import normalize_food_name
+from ai_runtime.cv.food.nutrition.providers import MfdsFoodDbMatcher
 from ai_runtime.cv.food.nutrition.scoring.disease_food_scorer import DiseaseFoodScorer
 from ai_runtime.cv.food.nutrition.scoring.schemas import DISEASE_CODES, DiseaseFoodScoreRecord
-from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
-from ai_runtime.cv.providers.gpt_vision import AnalysisType, VisionClient
+from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_analysis_pipeline
+from ai_runtime.cv.providers.gpt_vision import VisionClient
 from ai_runtime.llm.explanation_service import generate_diet_score_explanation
 from ai_runtime.llm.schemas import DietScoreExplanationInput
 from app.core import config
@@ -18,6 +19,7 @@ from app.dtos.diets import (
     DietAnalyzeResponse,
     DietPhotoResultCreateRequest,
     DietRecordCreateRequest,
+    DietRecordResponse,
     DietRecordUpdateRequest,
 )
 from app.models.diets import DietPhotoResult, DietRecord
@@ -43,6 +45,56 @@ async def create_diet_record(user_id: int, request: DietRecordCreateRequest) -> 
 
 async def get_diet_record(diet_record_id: int) -> DietRecord | None:
     return await diet_repository.get_diet_record_by_id(diet_record_id)
+
+
+def build_diet_record_response(record: DietRecord) -> DietRecordResponse:
+    return DietRecordResponse(
+        id=int(record.id),
+        user_id=int(record.user_id),
+        meal_type=getattr(record, "meal_type", None),
+        meal_time=getattr(record, "meal_time", None),
+        description=getattr(record, "description", None),
+        image_path=getattr(record, "image_path", None),
+        detected_foods=getattr(record, "detected_foods", None),
+        nutrition_summary=getattr(record, "nutrition_summary", None),
+        diet_score=getattr(record, "diet_score", None),
+        diet_feedback=getattr(record, "diet_feedback", None),
+        analysis_method=getattr(record, "analysis_method", None),
+        is_user_corrected=bool(getattr(record, "is_user_corrected", False)),
+        memo=getattr(record, "memo", None),
+        image_url=diet_record_image_url(record),
+        created_at=getattr(record, "created_at", None) or datetime.now(UTC),
+        updated_at=getattr(record, "updated_at", None) or datetime.now(UTC),
+    )
+
+
+def diet_record_image_url(record: DietRecord) -> str | None:
+    image_key = _diet_record_image_key(record)
+    if not image_key:
+        return None
+    try:
+        if not get_storage_service().exists(image_key):
+            return None
+    except (OSError, ValueError):
+        return None
+    return f"/api/v1/diets/{int(record.id)}/image"
+
+
+def read_diet_record_image(record: DietRecord) -> tuple[bytes, str, str] | None:
+    image_key = _diet_record_image_key(record)
+    if not image_key:
+        return None
+    storage = get_storage_service()
+    try:
+        if not storage.exists(image_key):
+            return None
+        return (
+            storage.read_bytes(image_key),
+            _media_type_from_upload_path(image_key) or "application/octet-stream",
+            Path(image_key).name,
+        )
+    except (OSError, ValueError):
+        return None
 
 
 async def list_diet_records(
@@ -83,20 +135,25 @@ async def run_diet_analysis(
     image_media_type: str | None = None,
 ) -> dict[str, object]:
     case = _select_rule_based_diet_case(request)
-    cv_result, fallback_used, provider_message = await _detect_foods_with_provider(
+    food_analysis = await run_food_analysis_pipeline(
+        rule_based_foods=case["detected_foods"],
         image_bytes=image_bytes,
         image_media_type=image_media_type,
+        config=FoodAnalysisPipelineConfig(
+            provider=str(config.DIET_VISION_PROVIDER or "rule_based"),
+            gpt_vision_enabled=bool(config.DIET_GPT_VISION_ENABLED),
+            gpt_vision_fallback_enabled=bool(config.GPT_VISION_FALLBACK_ENABLED),
+            confidence_threshold=float(config.FOOD_CV_CONFIDENCE_THRESHOLD),
+            openai_api_key=config.OPENAI_API_KEY,
+            gpt_vision_model=config.DIET_GPT_VISION_MODEL,
+            vision_client_cls=VisionClient,
+            food_db_matcher=_build_food_db_matcher(),
+        ),
     )
-    food_candidate = select_food_detection_candidate(
-        cv_result=cv_result,
-        rule_based_foods=case["detected_foods"],
-        gpt_vision_fallback_enabled=config.GPT_VISION_FALLBACK_ENABLED,
-        confidence_threshold=config.FOOD_CV_CONFIDENCE_THRESHOLD,
-    )
-    if cv_result is None or food_candidate.provider != cv_result.provider:
-        fallback_used = True
-        provider_message = provider_message or "rule_based_food_detection fallback used"
-    detected_foods = food_candidate.to_scorer_foods()
+    food_candidate = food_analysis.food_candidate
+    detected_foods = food_analysis.detected_foods
+    fallback_used = food_analysis.fallback_used
+    provider_message = food_analysis.provider_message
     scoring_result = _safe_build_nutrition_scoring_result(detected_foods)
     explanation = _safe_generate_diet_explanation(scoring_result["disease_scores"])
     nutrition_summary = {
@@ -130,7 +187,7 @@ async def run_diet_analysis(
                 "needs_review": food_candidate.needs_review,
                 "fallback_reason": food_candidate.fallback_reason,
                 "scoring_source": scoring_result["scoring_source"],
-                "gpt_vision_called": cv_result is not None,
+                "gpt_vision_called": food_analysis.provider_candidate is not None,
                 "fallback_used": fallback_used,
                 "provider_message": provider_message,
             },
@@ -158,7 +215,7 @@ async def run_diet_analysis(
     )
     return {
         "message": "식단 분석이 완료되었습니다.",
-        "diet_record": diet_record,
+        "diet_record": build_diet_record_response(diet_record),
         "photo_result": photo_result,
         "detected_foods": detected_foods,
         "nutrition_summary": nutrition_summary,
@@ -214,7 +271,7 @@ async def run_diet_analysis_from_job(job_id: int) -> DietAnalyzeResponse:
         meal_type=str(payload.get("meal_type") or "") or None,
         meal_time=payload.get("meal_time") or None,
         description=str(payload.get("description") or "") or None,
-        image_path=str(payload.get("image_path") or upload_path or "") or None,
+        image_path=str(upload_path or payload.get("image_path") or "") or None,
         memo=str(payload.get("memo") or "") or None,
     )
     response = await run_diet_analysis(
@@ -224,72 +281,6 @@ async def run_diet_analysis_from_job(job_id: int) -> DietAnalyzeResponse:
         image_media_type=str(payload.get("image_media_type") or "") or _media_type_from_upload_path(upload_path),
     )
     return DietAnalyzeResponse.model_validate(response)
-
-
-async def _detect_foods_with_provider(
-    image_bytes: bytes | None,
-    image_media_type: str | None,
-) -> tuple[FoodDetectionCandidateSet | None, bool, str | None]:
-    provider = str(config.DIET_VISION_PROVIDER or "rule_based").lower()
-    if provider != "gpt_vision" or not config.DIET_GPT_VISION_ENABLED:
-        return None, True, "diet GPT Vision disabled"
-    if not image_bytes:
-        return None, True, "image file not provided"
-    if not config.OPENAI_API_KEY:
-        return None, True, "OPENAI_API_KEY missing"
-
-    try:
-        client = VisionClient(api_key=config.OPENAI_API_KEY, model=config.DIET_GPT_VISION_MODEL)
-        raw = await client.analyze(
-            analysis_type=AnalysisType.DIET,
-            image_bytes=image_bytes,
-            media_type=image_media_type or "image/jpeg",
-        )
-    except Exception:
-        logger.exception("Diet GPT Vision provider failed; using rule_based_food_detection fallback")
-        return None, True, "gpt_vision_failed"
-
-    foods = raw.get("foods") if isinstance(raw, dict) else None
-    if not isinstance(foods, list):
-        return None, True, "gpt_vision_returned_no_foods"
-
-    detected_foods = [
-        str(food.get("name") or food.get("food_name") or "").strip()
-        for food in foods
-        if isinstance(food, dict) and str(food.get("name") or food.get("food_name") or "").strip()
-    ]
-    if not detected_foods:
-        return None, True, "gpt_vision_returned_empty_foods"
-
-    confidence = _average_confidence_from_provider_foods(foods)
-    return (
-        FoodDetectionCandidateSet(
-            provider="gpt_vision",
-            detected_foods=detected_foods,
-            confidence=confidence,
-            needs_review=False,
-            raw_output=raw,
-            raw_provider_status=str(raw.get("analysis_status") or "success"),
-            metadata={"model": config.DIET_GPT_VISION_MODEL},
-        ),
-        False,
-        "gpt_vision_food_detection",
-    )
-
-
-def _average_confidence_from_provider_foods(foods: list[Any]) -> float | None:
-    values = [float(value) for food in foods if isinstance(food, dict) and _is_number(value := food.get("confidence"))]
-    if not values:
-        return None
-    return round(sum(values) / len(values), 4)
-
-
-def _is_number(value: Any) -> bool:
-    try:
-        float(value)
-    except (TypeError, ValueError):
-        return False
-    return True
 
 
 def _build_diet_analysis_upload_key(*, user_id: int, suffix: str) -> str:
@@ -321,6 +312,38 @@ def _read_diet_analysis_bytes(path_value: str) -> bytes | None:
     if not path.exists() or not path.is_file():
         raise ValueError("diet_analysis_upload_missing")
     return path.read_bytes()
+
+
+def _build_food_db_matcher() -> MfdsFoodDbMatcher | None:
+    if not config.DIET_MFDS_ENABLED:
+        return None
+    service_key = (config.MFDS_SERVICE_KEY or "").strip()
+    encoded_service_key = (config.MFDS_SERVICE_KEY_ENCODED or "").strip()
+    if not service_key and not encoded_service_key:
+        logger.warning("DIET_MFDS_ENABLED=true but MFDS service key is missing; using local food matcher")
+        return None
+    return MfdsFoodDbMatcher(
+        service_key=service_key or encoded_service_key,
+        encoded_service_key=encoded_service_key or None,
+        timeout_seconds=float(config.DIET_MFDS_TIMEOUT_SECONDS),
+        max_candidates=int(config.DIET_MFDS_MAX_CANDIDATES),
+        fallback_matcher=LocalFallbackFoodDbMatcher(),
+    )
+
+
+def _diet_record_image_key(record: DietRecord) -> str | None:
+    image_path = str(getattr(record, "image_path", "") or "").strip()
+    if not image_path or not _looks_like_diet_analysis_storage_key(image_path):
+        return None
+    try:
+        return normalize_storage_key(image_path)
+    except ValueError:
+        return None
+
+
+def _looks_like_diet_analysis_storage_key(value: str) -> bool:
+    normalized = value.replace("\\", "/").strip("/")
+    return normalized.startswith("diet-analysis/") or "/diet-analysis/" in normalized
 
 
 def _media_type_from_upload_path(path_value: str) -> str | None:
@@ -402,7 +425,8 @@ def _safe_generate_diet_explanation(disease_scores: dict[str, float | int | None
 
 def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseFoodScoreRecord]) -> dict[str, Any]:
     match = _food_match(food)
-    lookup_name = match.matched_food_name or match.query_name
+    use_query_name_as_display = _is_mfds_match(match)
+    lookup_name = match.query_name if use_query_name_as_display else match.matched_food_name or match.query_name
     matched = _match_food_score(lookup_name, runtime_scores) if lookup_name else None
     matched_food_name = match.matched_food_name or (matched.food_name if matched is not None else None)
     needs_user_confirmation = match.needs_user_confirmation and matched is None
@@ -411,7 +435,7 @@ def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseF
     )
     match_confidence = match.match_confidence if match.matched_food_name else 0.7 if matched is not None else None
     base_detail = {
-        "food_name": matched_food_name or match.query_name,
+        "food_name": match.query_name if use_query_name_as_display else matched_food_name or match.query_name,
         "original_name": match.original_name,
         "query_name": match.query_name,
         "matched_food_name": matched_food_name,
@@ -435,7 +459,13 @@ def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseF
 
 def _food_name(food: dict[str, Any]) -> str:
     match = _food_match(food)
-    return str(match.matched_food_name or match.query_name)
+    if _is_mfds_match(match):
+        return str(match.query_name or match.original_name)
+    return str(match.matched_food_name or match.query_name or match.original_name)
+
+
+def _is_mfds_match(match: FoodMatchResult) -> bool:
+    return str(match.match_source or "").startswith("mfds_")
 
 
 def _food_match(food: dict[str, Any]) -> FoodMatchResult:
