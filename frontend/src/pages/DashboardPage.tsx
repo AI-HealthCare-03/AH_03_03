@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -25,6 +25,8 @@ import {
   getLatestResultsByAnalysisType,
   isKnownAnalysisType,
 } from "../utils/riskDisplay";
+
+import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";  // ReactNode import 추가
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -91,7 +93,7 @@ function getRiskStageChartValue(point: DashboardRiskTrendPoint): number {
 function getRiskTrendPointKey(point: DashboardRiskTrendPoint, fallbackIndex: number): string {
   const timestamp = String(point.analyzed_at ?? point.created_at ?? "").trim();
   if (timestamp) {
-    return timestamp;
+    return timestamp.slice(0, 10); // yyyy-mm-dd만 사용
   }
   const id = String(point.id ?? "").trim();
   return id ? `id:${id}` : `index:${fallbackIndex}`;
@@ -276,13 +278,13 @@ function EmptyChartState() {
   );
 }
 
-function LineChart({ axisTicks, series }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[] }) {
+function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean; connectPairs?: boolean }) {
   const visibleSeries = series
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
   const allPoints = visibleSeries.flatMap((item) => item.points);
   const uniqueDates = Array.from(new Set(allPoints.map((point) => point.date || point.label))).sort();
-  const hasEnoughData = uniqueDates.length >= 2 || visibleSeries.some((item) => item.points.length >= 2);
+  const hasEnoughData = uniqueDates.length >= 1 || visibleSeries.some((item) => item.points.length >= 1);
 
   if (!hasEnoughData) {
     return <EmptyChartState />;
@@ -292,10 +294,10 @@ function LineChart({ axisTicks, series }: { axisTicks?: ChartAxisTick[]; series:
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const rangePadding = rawMin === rawMax ? Math.max(rawMax * 0.1, 1) : (rawMax - rawMin) * 0.12;
-  const min = Math.max(0, rawMin - rangePadding);
-  const max = rawMax + rangePadding;
+  const min = clampTo100 ? 0 : Math.max(0, rawMin - rangePadding);
+  const max = clampTo100 ? 100 : rawMax + rangePadding;
   const width = 640;
-  const height = 240;
+  const height = 180;
   const padding = { top: 20, right: 24, bottom: 34, left: axisTicks?.length ? 76 : 44 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
@@ -340,19 +342,47 @@ function LineChart({ axisTicks, series }: { axisTicks?: ChartAxisTick[]; series:
             return (
               <g key={item.key}>
                 <path className="line-chart-path" d={d} style={{ "--series-color": item.color } as CSSProperties} />
-                {item.points.map((point, index) => (
-                  <circle
-                    className="line-chart-point"
-                    cx={xFor(point.date || point.label, index)}
-                    cy={yFor(point.value)}
-                    key={`${item.key}-${point.date}-${index}`}
-                    r="3.5"
-                    style={{ "--series-color": item.color } as CSSProperties}
-                  >
-                    <title>{point.tooltipLines?.join("\n") ?? `${item.label} · ${point.label} · ${point.displayValue ?? Math.round(point.value)}`}</title>
-                  </circle>
-                ))}
-              </g>
+                {item.points.map((point, index) => {
+                  const isLast = index === item.points.length - 1;
+                  const cx = xFor(point.date || point.label, index);
+                  const cy = yFor(point.value);
+                  return (
+                    <g key={`${item.key}-${point.date}-${index}`}>
+                      <circle
+                        className="line-chart-point"
+                        cx={cx}
+                        cy={cy}
+                        r={isLast ? 6 : 3.5}
+                        style={{
+                          "--series-color": item.color,
+                          ...(isLast ? { fill: item.color } : {})
+                        } as CSSProperties}
+                      >
+                        <title>{point.tooltipLines?.join("\n") ?? `${item.label} · ${point.label} · ${point.displayValue ?? Math.round(point.value)}`}</title>
+                      </circle>
+                    </g>
+                  );
+                })}
+                </g>
+            );
+          })}
+          {connectPairs && visibleSeries.length >= 2 && uniqueDates.map((date) => {
+            const point0 = visibleSeries[0].points.find((p) => p.date === date);
+            const point1 = visibleSeries[1].points.find((p) => p.date === date);
+            if (!point0 || !point1) return null;
+            const x = xFor(date, 0);
+            return (
+              <line
+                key={`pair-${date}`}
+                x1={x}
+                y1={yFor(point0.value)}
+                x2={x}
+                y2={yFor(point1.value)}
+                stroke={visibleSeries[0].color}
+                strokeWidth="1.2"
+                strokeDasharray="3,3"
+                opacity="0.6"
+              />
             );
           })}
         </svg>
@@ -510,14 +540,15 @@ function formatDate(value: unknown): string {
   return `${y}.${mo}.${day}`;
 }
 
-function getChallengeIcon(category: unknown): string {
+function getChallengeIcon(category: unknown): ReactNode {
   const key = String(category ?? "").toUpperCase();
-  if (key.includes("DIET") || key.includes("식")) return "🥗";
-  if (key.includes("MEDICATION") || key.includes("복약")) return "💊";
-  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return "🚶";
-  if (key.includes("WATER") || key.includes("수분")) return "💧";
-  return "✅";
+  if (key.includes("DIET") || key.includes("식")) return <Salad size={20} />;
+  if (key.includes("MEDICATION") || key.includes("복약")) return <Pill size={20} />;
+  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return <Dumbbell size={20} />;
+  if (key.includes("WATER") || key.includes("수분")) return <Droplets size={20} />;
+  return <Trophy size={20} />;
 }
+
 
 function getChallengeTitle(challenge: AnyRecord): string {
   const nested = challenge.challenge as AnyRecord | undefined;
@@ -623,9 +654,19 @@ export default function DashboardPage() {
   const dashboardMedicationRecords = Array.isArray(medicationSection.recent_medication_records)
     ? (medicationSection.recent_medication_records as AnyRecord[])
     : [];
-  const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
-    ? (challengeSection.user_challenges as AnyRecord[])
-    : [];
+const activeChallengesMap = Object.fromEntries(
+  (Array.isArray(challengeSection.active_challenges)
+    ? (challengeSection.active_challenges as AnyRecord[])
+    : []
+  ).map((c) => [Number(c.id), c])
+);
+
+const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
+  ? (challengeSection.user_challenges as AnyRecord[]).map((uc) => ({
+      ...uc,
+      challenge: activeChallengesMap[Number(uc.challenge_id)],
+    }))
+  : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
   const dietScore = dashboardDiets[0]?.diet_score ? String(dashboardDiets[0].diet_score) : latestValue(trends.diet_score);
   const bloodPressureSeries = [
@@ -888,7 +929,7 @@ export default function DashboardPage() {
                     <strong>{item.title}</strong>
                     <span>{item.unit}</span>
                   </div>
-                  <LineChart series={item.series} />
+                  <LineChart series={item.series} clampTo100={activeMetricKey === "exercise"} connectPairs={activeMetricKey === "blood"} />
                   <div className="dashboard-chart-stat">
                     <span>현재</span>
                     <strong>
@@ -917,12 +958,10 @@ export default function DashboardPage() {
             {todayRecommendations.items.map((item) => (
               <article className="mini-card today-recommendation-item" key={`${item.action_type}-${item.title}`}>
                 <div className="record-row">
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.description}</p>
-                  </div>
+                  <strong>{item.title}</strong>
                   <span className="badge">{getAnalysisTypeLabel(item.related_disease, "생활습관")}</span>
                 </div>
+                <p>{item.description}</p>
                 <p className="muted">{item.reason}</p>
               </article>
             ))}
@@ -945,12 +984,19 @@ export default function DashboardPage() {
             분석 기록 보기
           </Link>
         </div>
-        {hasRiskTrendEnoughData ? (
-          <LineChart axisTicks={riskStageAxisTicks} series={riskTrendSeries} />
+        {riskTrendSeries.length > 0 ? (
+          <div className="risk-trend-charts">
+            {riskTrendSeries.map((series) => (
+              <div key={series.key} className="risk-trend-chart-item">
+                <span className="risk-trend-chart-label" style={{ color: series.color }}>{series.label}</span>
+                <LineChart axisTicks={riskStageAxisTicks} series={[series]} />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="empty-state">
-            <strong>아직 추이를 계산할 분석 기록이 부족합니다.</strong>
-            <p>질환별 분석을 2회 이상 실행하면 관리 단계 변화 그래프가 표시됩니다.</p>
+            <strong>아직 분석 기록이 없습니다.</strong>
+            <p>간편 분석을 실행하면 질환별 관리 단계 변화를 확인할 수 있습니다.</p>
             <Link className="button secondary compact-button" to="/analysis">
               분석 실행하기
             </Link>
@@ -959,38 +1005,6 @@ export default function DashboardPage() {
       </section>
 
       <section className="dashboard-primary-grid">
-        <section className="card dashboard-analysis-summary-card">
-          <div className="card-header">
-            <h2>최근 분석 결과</h2>
-          </div>
-          {diseaseAnalysisResults.length > 0 ? (
-            <>
-              <RiskStageBoard items={diseaseRiskItems} />
-              <div className="chip-list">
-                {diseaseAnalysisResults.map((result) => {
-                  const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
-                  if (!sourceBadgeLabel) {
-                    return null;
-                  }
-                  return (
-                    <span className="badge badge-reference" key={String(result.id ?? result.analysis_type)}>
-                      {getAnalysisTypeLabel(result.analysis_type)} · {sourceBadgeLabel}
-                    </span>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <strong>최근 분석 결과가 없습니다.</strong>
-              <p>건강정보를 입력하고 분석을 실행하면 질환별 결과가 표시됩니다.</p>
-              <Link className="button secondary compact-button" to="/analysis">
-                분석 실행하기
-              </Link>
-            </div>
-          )}
-        </section>
-
         <section className="card diet-summary-section">
           <div className="card-header">
             <div>
