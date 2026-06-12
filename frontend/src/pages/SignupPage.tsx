@@ -818,7 +818,9 @@ export default function SignupPage() {
                     }}
                     type="checkbox"
                   />
-                  위 내용을 확인하고 개인정보 수집·이용에 동의합니다.
+                  <span>
+                  위 내용을 모두 확인하였으며, 개인정보 수집 및 이용에 동의합니다.
+                  </span>
                 </label>
                 {fieldErrors.privacy_consent && <span className="field-error">{fieldErrors.privacy_consent}</span>}
               </div>
