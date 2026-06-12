@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import {
@@ -31,7 +31,13 @@ export default function SignupPage() {
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [phoneParts, setPhoneParts] = useState({ first: "010", second: "", third: "" });
-  const [birthDate, setBirthDate] = useState("");
+  const [birthParts, setBirthParts] = useState({ year: "", month: "", day: "" });
+  const birthDate = [birthParts.year, birthParts.month.padStart(2, "0"), birthParts.day.padStart(2, "0")].every(Boolean)
+    ? `${birthParts.year}-${birthParts.month.padStart(2, "0")}-${birthParts.day.padStart(2, "0")}`
+    : "";
+  const birthMonthRef = useRef<HTMLInputElement>(null);
+  const birthDayRef = useRef<HTMLInputElement>(null);
+  const birthCalendarRef = useRef<HTMLInputElement>(null);
   const [gender, setGender] = useState<"MALE" | "FEMALE">("MALE");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -70,7 +76,7 @@ export default function SignupPage() {
     "login_id" | "email" | "phone" | "email_send" | "email_verify" | null
   >(null);
 
-  const steps = ["계정 정보", "기본 정보", "생활 습관", "간편 분석 정보"];
+  const steps = ["계정 정보", "기본 정보", "생활 습관", "건강 정보"];
   const bmi =
     extraHealth.height && extraHealth.weight
       ? Number(extraHealth.weight) / (Number(extraHealth.height) / 100) ** 2
@@ -356,7 +362,7 @@ export default function SignupPage() {
       setEmailCode(result.debug_code ?? "");
       setEmailDebugCode(result.debug_code ?? null);
       setEmailSendStatus("success");
-      setEmailSendMessage("인증 코드가 이메일로 발송되었습니다. 메일함을 확인해 주세요.");
+      setEmailSendMessage("인증 코드가 이메일로 발송되었습니다. 메일함을 확인해 주세요.\n3분 이내에 이메일이 도착하지 않으면 스팸메일함 또는 입력한 이메일 주소를 확인해 주세요.");
       setFieldErrors((prev) => {
         const { email_verification, ...rest } = prev;
         return rest;
@@ -457,28 +463,32 @@ export default function SignupPage() {
         <Card title="회원가입 완료">
           {healthInfoSaved === false && (
             <div className="state-box">
-              회원가입은 완료되었습니다. 간편 분석 정보 저장은 나중에 건강정보 화면에서 다시 입력할 수 있습니다.
+              회원가입이 완료되었습니다. 입력하신 정보는 마이페이지 - 건강정보 메뉴에서 언제든지 수정할 수 있습니다.
             </div>
           )}
           <div className="signup-complete-panel">
             <span className="badge badge-saved">가입 완료</span>
-            <h2>간편 건강 분석을 시작할 준비가 되었습니다.</h2>
+            <h2>건강 분석을 시작할 준비가 되었습니다.</h2>
             <p>
-              입력하신 x1 기본 정보는 간편 건강 분석과 맞춤 챌린지 추천에 사용됩니다. 검진표 수치나
-              혈액검사 결과는 정밀 분석에서 추가로 반영됩니다.
+              입력하신 기본 정보는 간편 건강 분석과 맞춤 챌린지 추천에 사용됩니다.
+              <br />
+              건강검진 결과를 추가하면 더욱 정확한 분석을 받을 수 있습니다.
             </p>
           </div>
           <div className="signup-ocr-choice">
             <div>
-              <strong>건강검진표로 정밀 분석 정보 추가</strong>
+              <h2>정밀 분석을 위한 추가 정보 입력</h2>
               <p>
-                건강검진 결과지가 있다면 혈압, 혈당, 콜레스테롤 등 정밀 분석 정보를 자동 입력할 수
-                있습니다. 검진표가 없어도 간편 분석은 바로 이용할 수 있습니다.
+                건강검진 결과지가 있다면 혈압, 혈당, 콜레스테롤 등 건강 정보를 추가로 등록해보세요.
+                <br />
+                건강검진 결과를 등록하면 더욱 정확한 건강 분석을 받을 수 있습니다.
+                <br />
+                검진표가 없어도 간편 분석은 바로 이용할 수 있습니다.
               </p>
             </div>
             <div className="button-row">
               <Link className="button" to="/ocr/exam">
-                건강검진표로 정밀 분석 정보 추가
+                추가 정보 입력 및 정밀 분석
               </Link>
               <button className="secondary" onClick={() => navigate("/")} type="button">
                 나중에 입력하기
@@ -611,7 +621,9 @@ export default function SignupPage() {
                           : "state-box"
                     }
                   >
-                    {emailSendMessage}
+                    {emailSendMessage.split("\n").map((line, i) => (
+                      <span key={i}>{line}<br /></span>
+                    ))}
                   </div>
                 )}
                 <label>
@@ -624,7 +636,7 @@ export default function SignupPage() {
                       setEmailCode(event.target.value.replace(/\D/g, "").slice(0, 6));
                       setEmailVerification(null);
                     }}
-                    placeholder="6자리 코드"
+                    placeholder="6자리드 숫자 코드"
                   />
                 </label>
                 <button
@@ -834,8 +846,63 @@ export default function SignupPage() {
               </label>
               <label>
                 생년월일
-                <input value={birthDate} onChange={(event) => setBirthDate(event.target.value)} type="date" required />
-                <span className="muted">YYYY-MM-DD 형식으로 전송됩니다.</span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <div className="phone-input-grid" style={{ gridTemplateColumns: "1.4fr 0.8fr 0.8fr", flex: 1 }}>
+                    <input
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="YYYY"
+                      value={birthParts.year}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        setBirthParts((prev) => ({ ...prev, year: val }));
+                        if (val.length === 4) birthMonthRef.current?.focus();
+                      }}
+                    />
+                    <input
+                      ref={birthMonthRef}
+                      inputMode="numeric"
+                      maxLength={2}
+                      placeholder="MM"
+                      value={birthParts.month}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 2);
+                        setBirthParts((prev) => ({ ...prev, month: val }));
+                        if (val.length === 2) birthDayRef.current?.focus();
+                      }}
+                    />
+                    <input
+                      ref={birthDayRef}
+                      inputMode="numeric"
+                      maxLength={2}
+                      placeholder="DD"
+                      value={birthParts.day}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 2);
+                        setBirthParts((prev) => ({ ...prev, day: val }));
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", fontSize: "20px", padding: "4px" }}
+                    onClick={() => birthCalendarRef.current?.showPicker()}
+                    title="캘린더에서 선택"
+                  >
+                    📅
+                  </button>
+                  <input
+                    ref={birthCalendarRef}
+                    type="date"
+                    style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+                    value={birthDate}
+                    onChange={(e) => {
+                      const [y, m, d] = e.target.value.split("-");
+                      if (y && m && d) setBirthParts({ year: y, month: m, day: d });
+                    }}
+                  />
+                </div>
+                <span className="muted">예시: 1995 / 04 / 07</span>
                 {fieldErrors.birth_date && <span className="field-error">{fieldErrors.birth_date}</span>}
               </label>
               <label>
@@ -852,9 +919,8 @@ export default function SignupPage() {
           {step === 2 && (
             <>
               <div className="state-box signup-analysis-guide">
-                <strong>간편 분석에 필요한 최소 생활습관 정보입니다.</strong>
-                <p>입력하신 정보는 가입 직후 간편 건강 분석과 맞춤 챌린지 추천을 제공하기 위한 최소 항목입니다.</p>
-                <p>검진표 수치나 혈액검사 결과는 정밀 분석에서 추가로 반영됩니다.</p>
+                <strong>건강 분석을 위한 생활습관 정보입니다.</strong>
+                <p>가입 후 건강 분석 메뉴에서 검진 결과를 등록하면 더욱 정확한 분석을 받을 수 있습니다.</p>
               </div>
               <label>
                 흡연 여부
@@ -915,16 +981,15 @@ export default function SignupPage() {
                   <span className="field-error">{fieldErrors.strength_days_per_week}</span>
                 )}
               </label>
-              <p className="placeholder">생활 습관 항목은 간편 분석 정보로 저장됩니다.</p>
+              <p className="placeholder">입력하신 정보는 건강 분석 및 맞춤 챌린지 서비스 제공 목적으로만 활용됩니다.</p>
             </>
           )}
 
           {step === 3 && (
             <>
               <div className="state-box signup-analysis-guide">
-                <strong>간편 분석에 필요한 신체계측과 가족력 정보입니다.</strong>
-                <p>혈압, 혈당, 콜레스테롤, 허리둘레 같은 검진값은 회원가입에서 직접 입력하지 않습니다.</p>
-                <p>가입 완료 후 건강검진표 등록을 선택하면 정밀 분석 정보를 추가할 수 있습니다.</p>
+                <strong>건강 분석에 필요한 신체 및 가족력 정보입니다.</strong>
+                <p>가입 후 건강 분석 메뉴에서 검진 결과를 등록하면 더욱 정확한 분석을 받을 수 있습니다.</p>
               </div>
               <label>
                 <span className="field-label-row">
@@ -1010,7 +1075,7 @@ export default function SignupPage() {
                 </select>
               </label>
               <p className="placeholder">
-                키, 몸무게, BMI 자동 계산값, 직업군, 질병별 가족력은 간편 분석 정보로 저장됩니다.
+                입력하신 정보는 건강 분석 및 맞춤 챌린지 서비스 제공 목적으로만 활용됩니다.
               </p>
             </>
           )}

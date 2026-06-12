@@ -2512,6 +2512,10 @@ pre {
   max-width: 680px;
 }
 
+.auth-page .card-header h2 {
+  font-size: 28px;
+}
+
 .muted,
 .placeholder {
   color: var(--color-muted);
@@ -3608,6 +3612,11 @@ input:-webkit-autofill:focus {
 
 .signup-ocr-choice {
   margin-top: 16px;
+}
+
+.signup-ocr-choice h2 {
+  display: block;
+  margin-bottom: 8px;
 }
 
 .field-group {
