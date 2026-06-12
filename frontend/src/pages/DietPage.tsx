@@ -816,12 +816,14 @@ export default function DietPage() {
                   <span className="badge badge-reference">{mealTypeLabel(record.meal_type)}</span>
                   {isManual && <span className="badge badge-reference">직접 기록</span>}
                 </div>
-                <strong>{String(record.description ?? "식단 기록")}</strong>
-                {scoreRaw !== null ? (
-                  <span className={`badge ${scoreBadgeClass(scoreRaw)}`}>{scoreRaw}점</span>
-                ) : isManual ? (
-                  <span className="badge badge-reference">점수 미산정</span>
-                ) : null}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                  <strong>{String(record.description ?? "식단 기록")}</strong>
+                  {scoreRaw !== null ? (
+                    <span className={`badge ${scoreBadgeClass(scoreRaw)}`}>{scoreRaw}점</span>
+                  ) : isManual ? (
+                    <span className="badge badge-reference">점수 미산정</span>
+                  ) : null}
+                </div>
               </Link>
             );
           })}
