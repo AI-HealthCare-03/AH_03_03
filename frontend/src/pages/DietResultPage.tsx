@@ -47,7 +47,7 @@ function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
 
 function foodDisplayName(food: Record<string, unknown>): string {
   return (
-    String(food.food_name ?? food.name ?? food.query_name ?? food.original_name ?? food.matched_food_name ?? "").trim() ||
+    String(food.original_name ?? food.query_name ?? food.name ?? food.food_name ?? food.matched_food_name ?? "").trim() ||
     "음식명 확인 불가"
   );
 }

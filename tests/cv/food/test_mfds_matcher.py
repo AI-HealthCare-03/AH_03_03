@@ -240,6 +240,7 @@ def test_mfds_matcher_normalizes_nutrition_from_fixture_payload() -> None:
         "basis_unit": "g",
         "basis_label": "100g 기준",
         "serving_size": "100g",
+        "serving_reference": "100g",
     }
     top_candidate = result.metadata["top_candidates"][0]
     assert top_candidate["nutrition"] == result.metadata["nutrition"]
@@ -277,3 +278,45 @@ def test_mfds_matcher_marks_nutrition_basis_unknown_when_serving_size_missing() 
     assert nutrition["basis_amount"] is None
     assert nutrition["basis_unit"] is None
     assert nutrition["basis_label"] == "기준량 확인 필요"
+
+
+def test_mfds_matcher_preserves_serving_reference_and_food_weight_metadata() -> None:
+    def fake_fetch_payload(_: str) -> dict:
+        return {
+            "response": {
+                "body": {
+                    "items": {
+                        "item": [
+                            {
+                                "FOOD_NM_KR": "돌솥비빔밥",
+                                "FOOD_CD": "D101-002",
+                                "영양성분 함량 기준량": "1회 제공량",
+                                "1회섭취 참고량": "350 g",
+                                "식품중량": "420 g",
+                                "AMT_NUM1": "820",
+                                "AMT_NUM3": "28",
+                                "AMT_NUM4": "24",
+                                "AMT_NUM6": "112",
+                                "AMT_NUM13": "1150",
+                                "raw_url": "do-not-store",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+    matcher = MfdsFoodDbMatcher(service_key="test-key", fetch_payload=fake_fetch_payload)
+
+    result = matcher.match("돌솥비빔밥")
+
+    assert result.metadata is not None
+    nutrition = result.metadata["nutrition"]
+    assert nutrition["calories_kcal"] == 820.0
+    assert nutrition["basis_amount"] == 1
+    assert nutrition["basis_unit"] == "serving"
+    assert nutrition["basis_label"] == "1회 제공량 기준"
+    assert nutrition["basis_reference"] == "1회 제공량"
+    assert nutrition["serving_reference"] == "350 g"
+    assert nutrition["food_weight"] == "420 g"
+    assert "raw_url" not in str(result.metadata)

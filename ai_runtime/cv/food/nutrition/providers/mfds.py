@@ -349,35 +349,77 @@ def _nutrition_from_item(item: dict[str, Any]) -> dict[str, Any] | None:
     if not any(value is not None for value in nutrition.values()):
         return None
 
-    serving_size = _first_value(
+    nutrition_basis = _first_value(
+        item,
+        [
+            "NUTR_CONT_BASE",
+            "NUTR_CONT_UNIT",
+            "nutritionBasis",
+            "nutrition_basis",
+            "영양성분함량기준량",
+            "영양성분 함량 기준량",
+            "영양성분기준량",
+        ],
+    )
+    serving_reference = _first_value(
         item,
         [
             "SERVING_SIZE",
             "SERVING_SIZE_G",
             "SERVING_UNIT",
-            "NUTR_CONT_BASE",
             "MAKER_SERVING_SIZE",
+            "servingSize",
+            "serving_size",
+            "1회섭취참고량",
+            "1회섭취 참고량",
             "1회제공량",
+            "1회 제공량",
+        ],
+    )
+    food_weight = _first_value(
+        item,
+        [
+            "FOOD_WEIGHT",
+            "foodWeight",
+            "foodSize",
+            "FD_WGH",
+            "NET_WEIGHT",
+            "식품중량",
             "총내용량",
         ],
     )
     return {
         **nutrition,
-        **_basis_from_serving_size(serving_size),
+        **_basis_from_references(
+            nutrition_basis=nutrition_basis,
+            serving_reference=serving_reference,
+            food_weight=food_weight,
+        ),
     }
 
 
-def _basis_from_serving_size(serving_size: str | None) -> dict[str, Any]:
-    if not serving_size:
+def _basis_from_references(
+    *,
+    nutrition_basis: str | None,
+    serving_reference: str | None,
+    food_weight: str | None,
+) -> dict[str, Any]:
+    basis_source = nutrition_basis or serving_reference or food_weight
+    if not basis_source:
         return {
             "basis_amount": None,
             "basis_unit": None,
             "basis_label": "기준량 확인 필요",
         }
 
-    normalized = serving_size.strip()
+    normalized = basis_source.strip()
     lower = normalized.lower()
     number_match = re.search(r"(\d+(?:\.\d+)?)\s*(g|그램|ml|mL|㎖)", normalized)
+    extra_fields = _reference_metadata(
+        nutrition_basis=nutrition_basis,
+        serving_reference=serving_reference,
+        food_weight=food_weight,
+    )
     if number_match:
         amount = _optional_float(number_match.group(1))
         raw_unit = number_match.group(2).lower()
@@ -388,6 +430,7 @@ def _basis_from_serving_size(serving_size: str | None) -> dict[str, Any]:
             "basis_unit": unit,
             "basis_label": label,
             "serving_size": normalized,
+            **extra_fields,
         }
 
     if "1회" in normalized or "serving" in lower:
@@ -396,6 +439,7 @@ def _basis_from_serving_size(serving_size: str | None) -> dict[str, Any]:
             "basis_unit": "serving",
             "basis_label": "1회 제공량 기준",
             "serving_size": normalized,
+            **extra_fields,
         }
 
     return {
@@ -403,7 +447,24 @@ def _basis_from_serving_size(serving_size: str | None) -> dict[str, Any]:
         "basis_unit": None,
         "basis_label": "기준량 확인 필요",
         "serving_size": normalized,
+        **extra_fields,
     }
+
+
+def _reference_metadata(
+    *,
+    nutrition_basis: str | None,
+    serving_reference: str | None,
+    food_weight: str | None,
+) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    if nutrition_basis:
+        metadata["basis_reference"] = nutrition_basis.strip()
+    if serving_reference:
+        metadata["serving_reference"] = serving_reference.strip()
+    if food_weight:
+        metadata["food_weight"] = food_weight.strip()
+    return metadata
 
 
 def _processed_food_penalty(*, food_name: str, query: str) -> float:
