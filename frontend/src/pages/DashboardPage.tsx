@@ -278,7 +278,7 @@ function EmptyChartState() {
   );
 }
 
-function LineChart({ axisTicks, series, clampTo100 }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean }) {
+function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean; connectPairs?: boolean }) {
   const visibleSeries = series
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
@@ -364,6 +364,25 @@ function LineChart({ axisTicks, series, clampTo100 }: { axisTicks?: ChartAxisTic
                   );
                 })}
                 </g>
+            );
+          })}
+          {connectPairs && visibleSeries.length >= 2 && uniqueDates.map((date) => {
+            const point0 = visibleSeries[0].points.find((p) => p.date === date);
+            const point1 = visibleSeries[1].points.find((p) => p.date === date);
+            if (!point0 || !point1) return null;
+            const x = xFor(date, 0);
+            return (
+              <line
+                key={`pair-${date}`}
+                x1={x}
+                y1={yFor(point0.value)}
+                x2={x}
+                y2={yFor(point1.value)}
+                stroke={visibleSeries[0].color}
+                strokeWidth="1.2"
+                strokeDasharray="3,3"
+                opacity="0.6"
+              />
             );
           })}
         </svg>
@@ -910,7 +929,7 @@ const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
                     <strong>{item.title}</strong>
                     <span>{item.unit}</span>
                   </div>
-                  <LineChart series={item.series} clampTo100 />
+                  <LineChart series={item.series} clampTo100={activeMetricKey === "exercise"} connectPairs={activeMetricKey === "blood"} />
                   <div className="dashboard-chart-stat">
                     <span>현재</span>
                     <strong>
