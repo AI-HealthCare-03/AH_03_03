@@ -63,7 +63,6 @@ const steps = [
   "가족력/생활정보",
   "신체계측",
   "혈액/검진 정보",
-  "분석 실행",
 ];
 
 const stepToSection: Record<number, string[]> = {
@@ -403,46 +402,27 @@ export default function HealthRecordPage() {
       <Card title="건강정보 입력">
         {error && <ErrorMessage message={error} />}
         {notice && <div className="state-box">{notice}</div>}
-        <div className="state-box">
-          직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.
-          <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
-          <div className="button-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
-            <Link className="button secondary" to="/ocr/exam">
-              검진표로 입력
-            </Link>
-            <Link className="button secondary" to="/health/profile">
-              필수 건강정보 관리로 이동
-            </Link>
-          </div>
-        </div>
-        <form className="form" onSubmit={submit}>
-          {activeStep < 4 ? (
-            <HealthProfileForm
-              bmi={bmi ? bmi.toFixed(1) : ""}
-              form={form}
-              onChange={(key, value) => setForm((prev) => ({ ...prev, [key]: value }))}
-              visibleSections={stepToSection[activeStep]}
-            />
-          ) : (
-            <div className="page-stack">
-              <div className="state-box">
-                <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "기본 분석에 필요한 정보가 부족합니다."}</strong>
-                <p>
-                  직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수
-                  있습니다.
-                </p>
-                <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
-              </div>
-              <div className="chip-list">
-                {missingBasicFields.map((field) => (
-                  <span className="badge badge-missing" key={field}>
-                    {field}
-                  </span>
-                ))}
-                {missingBasicFields.length === 0 && <span className="badge badge-saved">기본 분석 부족 항목 없음</span>}
-              </div>
+        {activeStep < 4 && (
+          <div className="state-box">
+            직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.
+            <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
+            <div className="button-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
+              <Link className="button secondary" to="/ocr/exam">
+                검진표로 입력
+              </Link>
+              <Link className="button secondary" to="/health/profile">
+                필수 건강정보 관리로 이동
+              </Link>
             </div>
-          )}
+          </div>
+        )}
+        <form className="form" onSubmit={submit}>
+          <HealthProfileForm
+            bmi={bmi ? bmi.toFixed(1) : ""}
+            form={form}
+            onChange={(key, value) => setForm((prev) => ({ ...prev, [key]: value }))}
+            visibleSections={stepToSection[activeStep]}
+          />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button className="secondary" onClick={() => navigate(-1)} type="button">
               이전
@@ -450,7 +430,7 @@ export default function HealthRecordPage() {
             <button className="secondary" type="submit">
               저장
             </button>
-            <button onClick={runAnalysis} type="button">
+            <button disabled={activeStep === 4 && !readiness?.is_ready} onClick={runAnalysis} type="button">
               분석 실행
             </button>
           </div>
