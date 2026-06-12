@@ -2516,6 +2516,10 @@ pre {
   max-width: 680px;
 }
 
+.auth-page .card-header h2 {
+  font-size: 28px;
+}
+
 .muted,
 .placeholder {
   color: var(--color-muted);
@@ -2945,7 +2949,7 @@ pre {
   align-items: center;
   background: transparent;
   border: 0;
-  color: var(--color-primary-dark);
+  color: unset;
   cursor: pointer;
   display: inline-flex;
   font-size: 0.9rem;
@@ -2995,6 +2999,11 @@ pre {
   border-radius: var(--radius-sm);
   cursor: pointer;
   padding: 12px;
+}
+
+.privacy-consent-check span {
+  flex: 1;
+  text-align: center;
 }
 
 .checkbox-row {
@@ -3650,6 +3659,11 @@ input:-webkit-autofill:focus {
 
 .signup-ocr-choice {
   margin-top: 16px;
+}
+
+.signup-ocr-choice h2 {
+  display: block;
+  margin-bottom: 8px;
 }
 
 .field-group {
