@@ -278,7 +278,7 @@ function EmptyChartState() {
   );
 }
 
-function LineChart({ axisTicks, series }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[] }) {
+function LineChart({ axisTicks, series, clampTo100 }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean }) {
   const visibleSeries = series
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
@@ -294,10 +294,10 @@ function LineChart({ axisTicks, series }: { axisTicks?: ChartAxisTick[]; series:
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const rangePadding = rawMin === rawMax ? Math.max(rawMax * 0.1, 1) : (rawMax - rawMin) * 0.12;
-  const min = Math.max(0, rawMin - rangePadding);
-  const max = rawMax + rangePadding;
+  const min = clampTo100 ? 0 : Math.max(0, rawMin - rangePadding);
+  const max = clampTo100 ? 100 : rawMax + rangePadding;
   const width = 640;
-  const height = 240;
+  const height = 180;
   const padding = { top: 20, right: 24, bottom: 34, left: axisTicks?.length ? 76 : 44 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
@@ -891,7 +891,7 @@ export default function DashboardPage() {
                     <strong>{item.title}</strong>
                     <span>{item.unit}</span>
                   </div>
-                  <LineChart series={item.series} />
+                  <LineChart series={item.series} clampTo100 />
                   <div className="dashboard-chart-stat">
                     <span>현재</span>
                     <strong>
