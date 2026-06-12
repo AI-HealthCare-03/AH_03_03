@@ -7,12 +7,17 @@ import ErrorMessage from "../components/ErrorMessage";
 
 function formatLoginError(message: string): string {
   const normalizedMessage = message.trim();
+
   if (!normalizedMessage || normalizedMessage.startsWith("API 요청 실패")) {
-    return "아이디 또는 이메일과 비밀번호를 확인해주세요.";
+    return "아이디/이메일 또는 비밀번호를 확인해주세요.";
   }
 
-  if (normalizedMessage.includes("Authenticate Failed") || normalizedMessage.includes("인증")) {
-    return "아이디 또는 이메일과 비밀번호를 확인해주세요.";
+  if (
+    normalizedMessage.includes("Authenticate Failed") ||
+    normalizedMessage.includes("인증") ||
+    normalizedMessage.includes("비밀번호가 올바르지")
+  ) {
+    return "아이디/이메일 또는 비밀번호를 확인해주세요.";
   }
 
   return normalizedMessage;
@@ -28,6 +33,17 @@ export default function LoginPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+
+    if (email.trim().length < 6) {
+    setError("아이디/이메일 또는 비밀번호를 확인해주세요.");
+    return;
+  }
+
+  if (!password.trim()) {
+    setError("비밀번호를 입력해주세요.");
+    return;
+  }
+
     try {
       await login(email, password);
       navigate("/");
