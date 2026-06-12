@@ -8,14 +8,6 @@ import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format"
 
 type Item = Record<string, unknown>;
 
-const diseaseScoreLabels: Record<string, string> = {
-  DM: "당뇨",
-  HTN: "고혈압",
-  DL: "콜레스테롤·중성지방",
-  OBE: "비만",
-  ANEM: "빈혈",
-};
-
 function analysisMethodLabel(value: unknown): string {
   const method = String(value ?? "").toUpperCase();
   if (method === "MANUAL") {
@@ -38,13 +30,6 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
-  const scores = asRecord(value);
-  return Object.entries(diseaseScoreLabels)
-    .map(([code, label]) => [label, scores[code]] as [string, unknown])
-    .filter(([, score]) => score !== null && score !== undefined && score !== "");
-}
-
 function foodDisplayName(food: Record<string, unknown>): string {
   return (
     String(food.original_name ?? food.query_name ?? food.name ?? food.food_name ?? food.matched_food_name ?? "").trim() ||
@@ -62,18 +47,36 @@ function mfdsCandidateName(food: Record<string, unknown>): string {
 }
 
 function matchStatusLabel(food: Record<string, unknown>): string {
-  return food.needs_user_confirmation === true ? "확인 필요" : "확인 완료";
+  const source = String(food.match_source ?? "").toLowerCase();
+  const sourceLabels: Record<string, string> = {
+    mfds_matched: "MFDS 후보 확인 필요",
+    mfds_multiple_candidates: "후보 여러 개 확인 필요",
+    mfds_weak_match: "낮은 신뢰 후보",
+    mfds_no_candidates: "영양성분 후보 없음",
+    mfds_skipped_generic: "재료/소스성 후보로 영양 검색 제외",
+    mfds_skipped_low_confidence: "낮은 신뢰도로 영양 검색 제외",
+    mfds_skipped_lookup_limit: "검색 제한으로 제외",
+  };
+  return sourceLabels[source] ?? (food.needs_user_confirmation === true ? "확인 필요" : "확인 완료");
 }
 
-function scoringSourceLabel(value: unknown): string {
-  const source = String(value ?? "").toLowerCase();
-  if (!source) {
-    return "";
+function mfdsNutrition(food: Record<string, unknown>): Record<string, unknown> {
+  return asRecord(asRecord(food.match_metadata).nutrition);
+}
+
+function hasMfdsNutrition(food: Record<string, unknown>): boolean {
+  const nutrition = mfdsNutrition(food);
+  return ["calories_kcal", "carbohydrate_g", "protein_g", "fat_g", "sodium_mg"].some(
+    (key) => nutrition[key] !== null && nutrition[key] !== undefined && nutrition[key] !== "",
+  );
+}
+
+function nutritionValue(value: unknown, unit: string): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
   }
-  if (source.includes("vision") || source.includes("gpt")) {
-    return "이미지 인식 + 식단 기준표";
-  }
-  return "식단 기준표";
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? `${numberValue.toLocaleString("ko-KR")} ${unit}` : `${String(value)} ${unit}`;
 }
 
 function candidateFoodsFromPayload(...payloads: Array<Record<string, unknown> | null | undefined>): {
@@ -177,11 +180,6 @@ export default function DietResultPage() {
       ? (photoResults[0].confidence_payload as Record<string, unknown>)
       : {};
   const rawOutput = asRecord(photoResults[0]?.raw_output);
-  const diseaseScores = diseaseScoreEntries(nutrition.disease_scores ?? rawOutput.disease_scores);
-  const foodScoreDetails = Array.isArray(rawOutput.food_score_details)
-    ? (rawOutput.food_score_details as Item[])
-    : [];
-  const scoringSource = scoringSourceLabel(nutrition.scoring_source ?? rawOutput.scoring_source);
   const candidateFoods = candidateFoodsFromPayload(rawOutput, record);
   const hasCandidateSection =
     candidateFoods.autoConfirmed.length > 0 ||
@@ -348,6 +346,67 @@ export default function DietResultPage() {
                 </span>
               ))}
             </div>
+            {detectedFoods.some((food) => mfdsCandidateName(food) || hasMfdsNutrition(food)) && (
+              <>
+                <div className="state-box">
+                  MFDS 영양성분은 식약처 데이터 기준 후보입니다. 기준량은 100g 또는 1회 제공량일 수 있으며, 실제
+                  섭취량 입력 전까지 총 영양성분은 확정되지 않습니다.
+                </div>
+                {detectedFoods
+                  .filter((food) => mfdsCandidateName(food) || hasMfdsNutrition(food))
+                  .map((food, index) => {
+                    const candidateName = mfdsCandidateName(food);
+                    const mfds = mfdsNutrition(food);
+                    return (
+                      <div className="mini-card" key={`${foodDisplayName(food)}-mfds-${index}`}>
+                        <strong>{foodDisplayName(food)}</strong>
+                        {candidateName && <span className="muted">MFDS 후보: {candidateName}</span>}
+                        <span className="badge badge-reference">상태: {matchStatusLabel(food)}</span>
+                        {hasMfdsNutrition(food) ? (
+                          <>
+                            <span className="muted">MFDS 기준 영양성분</span>
+                            <div className="nutrition-grid">
+                              <div>
+                                <span>기준량</span>
+                                <strong>{String(mfds.basis_label ?? "기준량 확인 필요")}</strong>
+                              </div>
+                              <div>
+                                <span>열량</span>
+                                <strong>{nutritionValue(mfds.calories_kcal, "kcal")}</strong>
+                              </div>
+                              <div>
+                                <span>탄수화물</span>
+                                <strong>{nutritionValue(mfds.carbohydrate_g, "g")}</strong>
+                              </div>
+                              <div>
+                                <span>단백질</span>
+                                <strong>{nutritionValue(mfds.protein_g, "g")}</strong>
+                              </div>
+                              <div>
+                                <span>지방</span>
+                                <strong>{nutritionValue(mfds.fat_g, "g")}</strong>
+                              </div>
+                              <div>
+                                <span>나트륨</span>
+                                <strong>{nutritionValue(mfds.sodium_mg, "mg")}</strong>
+                              </div>
+                            </div>
+                            {(mfds.serving_reference || mfds.food_weight) && (
+                              <span className="muted">
+                                {[mfds.serving_reference ? `제공량: ${String(mfds.serving_reference)}` : "", mfds.food_weight ? `식품중량: ${String(mfds.food_weight)}` : ""]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="muted">표시할 MFDS 영양성분 후보가 없습니다.</span>
+                        )}
+                      </div>
+                    );
+                  })}
+              </>
+            )}
           </div>
         </Card>
       )}
@@ -391,11 +450,15 @@ export default function DietResultPage() {
           </div>
         </Card>
       )}
-      <Card title="영양 구성">
+      <Card title="추정 영양정보">
         {!hasNutrition ? (
           <div className="state-box">입력된 영양정보가 없습니다.</div>
         ) : (
           <div className="card-list">
+            <div className="state-box">
+              아래 값은 현재 저장된 참고용 요약값입니다. MFDS 기준 영양성분과 섭취량이 확정되기 전까지 한 끼 전체
+              영양성분으로 해석하지 마세요.
+            </div>
             {[
               ["탄수화물", nutrition.carbohydrate_g, "g"],
               ["단백질", nutrition.protein_g, "g"],
@@ -432,45 +495,11 @@ export default function DietResultPage() {
         )}
       </Card>
       {!isManual && (
-        <Card title="질병군별 식단 점수">
+        <Card title="질환별 식단 평가">
           <div className="card-list">
-            {diseaseScores.length === 0 && <div className="state-box">표시할 식단 점수가 없습니다.</div>}
-            {diseaseScores.length > 0 && (
-              <div className="nutrition-grid">
-                {diseaseScores.map(([label, score]) => (
-                  <div key={label}>
-                    <span>{label}</span>
-                    <strong>{Math.round(Number(score))}점</strong>
-                  </div>
-                ))}
-              </div>
-            )}
-            {foodScoreDetails.slice(0, 4).map((detail, index) => {
-              const mfdsCandidate = mfdsCandidateName(detail);
-              const detailScores = diseaseScoreEntries(detail.scores);
-              return (
-                <div className="mini-card" key={`${foodDisplayName(detail)}-${index}`}>
-                  <strong>{foodDisplayName(detail)}</strong>
-                  <span className="muted">
-                    {mfdsCandidate ? "MFDS 후보" : "점수 기준"}:{" "}
-                    {mfdsCandidate || String(detail.matched_food_name ?? "매칭 정보 없음")}
-                  </span>
-                  {mfdsCandidate && <span className="badge badge-reference">상태: {matchStatusLabel(detail)}</span>}
-                  {detailScores.length > 0 ? (
-                    <div className="chip-list">
-                      {detailScores.map(([label, score]) => (
-                        <span className="badge badge-reference" key={`${foodDisplayName(detail)}-${label}`}>
-                          {label}: {Math.round(Number(score))}점
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="muted">음식별 점수 확인 불가</span>
-                  )}
-                </div>
-              );
-            })}
-            {scoringSource && <span className="badge badge-reference">점수 기준: {scoringSource}</span>}
+            <div className="state-box">
+              질환별 식단 평가는 준비 중입니다. 사용자의 건강정보와 실제 섭취량을 기준으로 LLM 해석을 거쳐 제공될 예정입니다.
+            </div>
           </div>
         </Card>
       )}
