@@ -2905,7 +2905,8 @@ pre {
 .state-box,
 .error-box {
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 8px 12px;
+  margin: 1px 0 6px;
 }
 
 .state-box {
