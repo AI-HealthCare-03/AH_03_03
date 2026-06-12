@@ -8,6 +8,19 @@ import ErrorMessage from "../components/ErrorMessage";
 type Inquiry = Record<string, unknown>;
 type Item = Record<string, unknown>;
 
+const inquiryStatusLabels: Record<string, string> = {
+  PENDING: "답변 대기",
+  ANSWERED: "답변 완료",
+  CLOSED: "종료",
+  CANCELED: "취소됨",
+  CANCELLED: "취소됨",
+};
+
+function getInquiryStatusLabel(value: unknown): string {
+  const status = String(value ?? "").trim().toUpperCase();
+  return inquiryStatusLabels[status] ?? "상태 확인 중";
+}
+
 export default function InquiryPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -94,7 +107,7 @@ export default function InquiryPage() {
               <div className="table-row" key={String(item.id)}>
                 <span>{String(item.category)}</span>
                 <strong>{String(item.title)}</strong>
-                <span>{String(item.status)}</span>
+                <span>{getInquiryStatusLabel(item.status)}</span>
               </div>
             ))}
             {items.length === 0 && <p className="placeholder">등록된 문의가 없습니다.</p>}

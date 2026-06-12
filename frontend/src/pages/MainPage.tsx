@@ -10,6 +10,8 @@ import { listMedications } from "../api/medications";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
 import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import { getAnalysisTypeLabel, getLatestResultsByAnalysisType, isKnownAnalysisType } from "../utils/riskDisplay";
 
 type MainData = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
@@ -22,8 +24,8 @@ const publicFallback = {
 const landingFeatures = [
   {
     icon: "🧭",
-    title: "AI 위험도 분석",
-    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 이상 위험도를 확인합니다.",
+    title: "AI 관리 단계 확인",
+    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 관리 필요도를 확인합니다.",
     redirect: "/analysis",
   },
   {
@@ -41,7 +43,7 @@ const landingFeatures = [
   {
     icon: "🚶",
     title: "맞춤 챌린지",
-    description: "위험도와 생활습관에 맞춘 작은 건강 습관을 실천합니다.",
+    description: "관리 단계와 생활습관에 맞춘 작은 건강 습관을 실천합니다.",
     redirect: "/challenges",
   },
   {
@@ -64,10 +66,10 @@ const landingPersonas = [
     icon: "📋",
     title: "검진 결과가 걱정되는 직장인",
     quote: "검진표는 받았는데 수치가 뭘 의미하는지 모르겠어요.",
-    features: ["검진표 등록", "위험도 분석", "AI 코멘트"],
+    features: ["검진표 등록", "관리 단계 확인", "AI 코멘트"],
     flow: [
       { icon: "📄", title: "검진표 업로드", description: "촬영하거나 파일로 올립니다." },
-      { icon: "📊", title: "위험도 분석", description: "주요 질환 위험도를 확인합니다." },
+      { icon: "📊", title: "관리 단계 확인", description: "주요 질환 관리 필요도를 확인합니다." },
       { icon: "✅", title: "챌린지 추천", description: "생활습관 액션을 이어갑니다." },
     ],
   },
@@ -126,15 +128,15 @@ const personaIcons: Record<string, React.ReactNode> = {
 
 const serviceFlow = [
   { icon: "📄", label: "검진표 등록" },
-  { icon: "📊", label: "위험도 분석" },
+  { icon: "📊", label: "관리 단계 확인" },
   { icon: "🤖", label: "AI 상담" },
   { icon: "✅", label: "맞춤 챌린지" },
 ];
 
 const previewMetrics = [
   ["오늘의 건강 점수", "82점"],
-  ["당뇨 위험도", "관리 필요"],
-  ["고혈압 위험도", "낮음"],
+  ["당뇨 관리 단계", "주의"],
+  ["고혈압 관리 단계", "낮음"],
   ["추천 챌린지", "식후 10분 걷기"],
   ["최근 검진일", "2026.05.20"],
 ];
@@ -144,19 +146,6 @@ const landingPreview = {
   diabetesRiskScore: 58,
   hypertensionRiskScore: 32,
   challengeProgress: 72,
-};
-
-const riskLabelMap: Record<string, string> = {
-  LOW: "낮음",
-  MEDIUM: "관리 필요",
-  HIGH: "높음",
-};
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  HYPERTENSION: "고혈압",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  OBESITY: "비만",
 };
 
 const categoryLabel: Record<string, string> = {
@@ -175,11 +164,6 @@ const categoryLabel: Record<string, string> = {
 
 function asRecord(value: unknown): AnyRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as AnyRecord) : {};
-}
-
-function formatRisk(value: unknown): string {
-  const raw = String(value ?? "").toUpperCase();
-  return riskLabelMap[raw] ?? (raw || "-");
 }
 
 function formatDate(value: unknown): string {
@@ -363,26 +347,37 @@ export default function MainPage() {
     const effectiveAnalysisResults =
       analysisResults.length > 0 ? analysisResults : latestAnalysis.analysis_type ? [latestAnalysis] : [];
     const hasAnalysisResults = effectiveAnalysisResults.length > 0;
-    const displayAnalysisResults = effectiveAnalysisResults.filter((result) =>
-      Boolean(analysisTypeLabels[String(result.analysis_type ?? "")]),
+    const displayAnalysisResults = getLatestResultsByAnalysisType(
+      effectiveAnalysisResults.filter((result) =>
+        isKnownAnalysisType(result.analysis_type),
+      ),
     );
+    const diseaseRiskItems: DiseaseRiskItem[] = displayAnalysisResults.map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
     const basicReady = readiness.basic_ready ?? readiness.is_ready;
     const todayCards = [
       {
         title: basicReady === false ? "기본 건강정보 입력" : "건강정보 확인",
         description:
           basicReady === false
-            ? "기본 건강정보를 입력하면 건강 위험도 분석을 실행할 수 있습니다."
+            ? "기본 건강정보를 입력하면 건강 관리 단계 확인을 실행할 수 있습니다."
             : "저장된 건강정보를 확인하고 필요한 항목을 보완해보세요.",
         buttonLabel: "건강정보 입력하기",
         to: "/health",
       },
       {
-        title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "건강 위험도 분석",
+        title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "건강 관리 단계 확인",
         description:
           effectiveAnalysisResults.length > 0
             ? "최근 분석 결과를 확인하고 다음 관리 행동을 정리해보세요."
-            : "건강정보 입력 후 위험도 분석을 실행해보세요.",
+            : "건강정보 입력 후 관리 단계를 확인해보세요.",
         buttonLabel: effectiveAnalysisResults.length > 0 ? "분석 결과 보기" : "분석하러 가기",
         to: effectiveAnalysisResults.length > 0 ? "/analysis/history" : "/analysis",
       },
@@ -452,7 +447,7 @@ export default function MainPage() {
             <Link className="home-action-card" to="/analysis">
               <span className="home-action-card__icon"><HeartPulse size={24} /></span>
               <span>
-                <strong className="home-action-card__title">건강위험도 분석하기</strong>
+                <strong className="home-action-card__title">건강 관리 단계 확인하기</strong>
                 <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 질환별 결과를 확인합니다.</em>
               </span>
             </Link>
@@ -493,38 +488,16 @@ export default function MainPage() {
             <p>최근 기록된 건강 지표를 시각적으로 확인합니다.</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-            {/* 왼쪽: 질환별 위험도 - main-dashboard-grid에서 이동 */}
+            {/* 왼쪽: 질환별 관리 필요도 - main-dashboard-grid에서 이동 */}
             <div className="viz-card">
               <div className="viz-card-row">
-                <span className="viz-card-label">질환별 위험도</span>
+                <span className="viz-card-label">질환별 관리 필요도</span>
                 <span style={{ color: "var(--color-muted)", fontSize: "12px" }}>
                   {displayAnalysisResults.length > 0 ? formatDate(displayAnalysisResults[0]?.analyzed_at ?? displayAnalysisResults[0]?.created_at) : ""}
                 </span>
               </div>
               {displayAnalysisResults.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  {displayAnalysisResults.map((result) => {
-                    const level = String(result.risk_level ?? "").toUpperCase();
-                    const score = typeof result.risk_score === "number" ? result.risk_score : parseFloat(String(result.risk_score ?? "0"));
-                    const pct = Math.round(score * 100);
-                    const circumference = 2 * Math.PI * 28;
-                    const dashFilled = (score * circumference).toFixed(1);
-                    const dashEmpty = (circumference - score * circumference).toFixed(1);
-                    const color = level === "HIGH" ? "#EF4444" : level === "MEDIUM" ? "#F59E0B" : "#1D9E75";
-                    const badgeBg = level === "HIGH" ? "#FCEBEB" : level === "MEDIUM" ? "#FAEEDA" : "#E1F5EE";
-                    const badgeColor = level === "HIGH" ? "#A32D2D" : level === "MEDIUM" ? "#854F0B" : "#0F6E56";
-                    return (
-                      <div key={String(result.id ?? result.analysis_type)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "10px 8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-text)" }}>{analysisTypeLabels[String(result.analysis_type)]}</span>
-                        <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`${analysisTypeLabels[String(result.analysis_type)]} ${formatRisk(result.risk_level)}`}>
-                          <circle cx="65" cy="65" r="52" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                          <circle cx="65" cy="65" r="52" fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${(score * 2 * Math.PI * 52).toFixed(1)} ${(2 * Math.PI * 52 * (1 - score)).toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 65 65)"/>
-                          <text x="65" y="71" textAnchor="middle" fontSize="16" fontWeight="500" fill={color}>{formatRisk(result.risk_level)}</text>
-                        </svg>
-                      </div>
-                    );
-                  })}
-                </div>
+                <RiskStageBoard items={diseaseRiskItems} />
               ) : (
                 <div className="viz-empty">
                   아직 분석 결과가 없습니다.<br />
@@ -676,7 +649,7 @@ export default function MainPage() {
       <section className="hero-panel">
         <div>
           <span className="eyebrow">Health Ladder</span>
-          <h1>건강검진표부터 생활습관까지, 내 건강 위험도를 쉽게 확인하세요</h1>
+          <h1>건강검진표부터 생활습관까지, 내 건강 관리 단계를 쉽게 확인하세요</h1>
           <p>{String(data.service_description)}</p>
           <div className="button-row">
             <Link className="button" to="/signup">
@@ -707,30 +680,25 @@ export default function MainPage() {
 
       <section className="landing-section">
         <Card title="예시 대시보드 미리보기">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <div>
-              <span className="viz-card-label">질환별 위험도</span>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: "0px", marginTop: "2px" }}>
-                {[
-                  { label: "고혈압", score: landingPreview.hypertensionRiskScore / 100, color: "#1D9E75", text: "낮음" },
-                  { label: "비만", score: landingPreview.diabetesRiskScore / 100, color: "#F59E0B", text: "관리필요" },
-                  { label: "당뇨", score: landingPreview.hypertensionRiskScore / 100, color: "#F59E0B", text: "관리필요" },
-                  { label: "콜레스테롤", score: 0.22, color: "#1D9E75", text: "낮음" },
-                ].map(({ label, score, color, text }) => (
-                  <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px", background: "var(--color-background-secondary)", borderRadius: "var(--border-radius-md)" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text)" }}>{label}</span>
-                    <svg width="110" height="110" viewBox="0 0 110 110">
-                      <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                      <circle cx="55" cy="55" r="44" fill="none" stroke={color} strokeWidth="10"
-                        strokeDasharray={`${(score * 2 * Math.PI * 44).toFixed(1)} ${(2 * Math.PI * 44 * (1 - score)).toFixed(1)}`}
-                        strokeLinecap="round" transform="rotate(-90 55 55)"/>
-                      <text x="55" y="61" textAnchor="middle" fontSize="14" fontWeight="500" fill={color}>{text}</text>
-                    </svg>
-                  </div>
-                ))}
-              </div>
+          <div className="landing-preview-dashboard">
+            <div className="landing-preview-risk-panel">
+              <span className="viz-card-label">질환별 관리 필요도</span>
+              <p className="muted">건강검진 결과를 4단계 관리 항목으로 정리해 보여줍니다.</p>
+              <RiskStageBoard
+                items={[
+                  { analyzed_at: "2026-06-01", diseaseName: "고혈압", id: 1, risk_level: "LOW" },
+                  { analyzed_at: "2026-06-01", diseaseName: "비만", id: 2, risk_level: "CAUTION" },
+                  { analyzed_at: "2026-06-01", diseaseName: "당뇨", id: 3, risk_level: "CAUTION" },
+                  { analyzed_at: "2026-06-01", diseaseName: "콜레스테롤·중성지방", id: 4, risk_level: "HIGH_CAUTION" },
+                ]}
+                maxItemsPerStage={3}
+                showCounts={false}
+                showEmptyStages
+                title="예시 관리 단계"
+                variant="preview"
+              />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div className="landing-preview-vitals-panel">
               <div>
                 <span className="viz-card-label">최근 검진표</span>
                 <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>132 mg/dL</strong></div>
@@ -831,7 +799,7 @@ export default function MainPage() {
       <section className="landing-cta">
         <div>
           <h2>내 건강 데이터를 입력하고 맞춤 분석을 받아보세요.</h2>
-          <p>회원가입 후 기본 건강정보를 입력하면 건강 위험도 분석과 맞춤 챌린지를 바로 확인할 수 있습니다.</p>
+          <p>회원가입 후 기본 건강정보를 입력하면 건강 관리 단계와 맞춤 챌린지를 바로 확인할 수 있습니다.</p>
         </div>
         <div className="button-row">
           <Link className="button" to="/signup">

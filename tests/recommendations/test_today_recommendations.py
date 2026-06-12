@@ -22,7 +22,7 @@ async def test_today_recommendations_use_latest_analysis_and_user_context(monkey
         return [
             SimpleNamespace(
                 analysis_type=AnalysisType.DIABETES,
-                risk_level=RiskLevel.HIGH,
+                risk_level=RiskLevel.HIGH_CAUTION,
                 risk_score=Decimal("0.72"),
             )
         ]
@@ -64,11 +64,11 @@ async def test_today_recommendations_are_deterministic_for_same_inputs(monkeypat
     async def fake_analysis_results(user_id: int):
         return [
             SimpleNamespace(
-                analysis_type=AnalysisType.OBESITY, risk_level=RiskLevel.MEDIUM, risk_score=Decimal("0.68")
+                analysis_type=AnalysisType.OBESITY, risk_level=RiskLevel.CAUTION, risk_score=Decimal("0.68")
             ),
             SimpleNamespace(
                 analysis_type=AnalysisType.HYPERTENSION,
-                risk_level=RiskLevel.MEDIUM,
+                risk_level=RiskLevel.ATTENTION,
                 risk_score=Decimal("0.41"),
             ),
         ]

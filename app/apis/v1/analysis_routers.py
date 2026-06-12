@@ -87,7 +87,8 @@ async def list_analysis_results(
         resource_type="ANALYSIS_RESULT",
         access_reason="analysis_results.list",
     )
-    return await analysis_service.list_analysis_results(user.id, limit=limit, offset=offset)
+    results = await analysis_service.list_analysis_results(user.id, limit=limit, offset=offset)
+    return await analysis_service.list_analysis_result_responses(results)
 
 
 @analysis_router.get("/results/latest", response_model=list[AnalysisResultResponse])
@@ -99,7 +100,8 @@ async def list_latest_analysis_results(request: Request, user: Annotated[User, D
         resource_type="ANALYSIS_RESULT",
         access_reason="analysis_results.latest",
     )
-    return await analysis_service.list_latest_analysis_results(user.id)
+    results = await analysis_service.list_latest_analysis_results(user.id)
+    return await analysis_service.list_analysis_result_responses(results)
 
 
 @analysis_router.get("/results/{result_id}", response_model=AnalysisResultResponse)
@@ -114,7 +116,7 @@ async def get_analysis_result(result_id: int, request: Request, user: Annotated[
         resource_id=result.id,
         access_reason="analysis_results.detail",
     )
-    return result
+    return await analysis_service.get_analysis_result_response(result)
 
 
 @analysis_router.get("/results/{result_id}/detail")

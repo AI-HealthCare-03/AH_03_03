@@ -4,10 +4,16 @@ from tortoise import fields, models
 
 
 class AnalysisType(StrEnum):
-    DIABETES = "DIABETES"
-    OBESITY = "OBESITY"
-    DYSLIPIDEMIA = "DYSLIPIDEMIA"
     HYPERTENSION = "HYPERTENSION"
+    DIABETES = "DIABETES"
+    DYSLIPIDEMIA = "DYSLIPIDEMIA"
+    OBESITY = "OBESITY"
+    ABDOMINAL_OBESITY = "ABDOMINAL_OBESITY"
+    FATTY_LIVER = "FATTY_LIVER"
+    ANEMIA = "ANEMIA"
+    LIVER_FUNCTION = "LIVER_FUNCTION"
+    KIDNEY_FUNCTION = "KIDNEY_FUNCTION"
+    CHRONIC_KIDNEY_DISEASE = "CHRONIC_KIDNEY_DISEASE"
 
 
 class AnalysisMode(StrEnum):
@@ -17,8 +23,9 @@ class AnalysisMode(StrEnum):
 
 class RiskLevel(StrEnum):
     LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
+    ATTENTION = "ATTENTION"
+    CAUTION = "CAUTION"
+    HIGH_CAUTION = "HIGH_CAUTION"
 
 
 class FactorDirection(StrEnum):

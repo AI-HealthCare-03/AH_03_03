@@ -12,7 +12,7 @@ def test_analysis_explanation_is_rule_based_and_safe() -> None:
         AnalysisExplanationInput(
             disease_type="DIABETES",
             risk_score=0.72,
-            risk_level="HIGH",
+            risk_level="HIGH_CAUTION",
             model_name="catboost",
             model_version="dm_catboost_final",
             factors=[HealthRiskFactor(name="공복혈당", value="132", reason="positive")],

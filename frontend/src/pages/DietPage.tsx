@@ -1,10 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
   analyzeDiet,
   createDietRecord,
   listDietRecords,
+  type DietCandidateFood,
   type DietFoodItem,
   type DietAnalyzeResponse,
   type DietNutritionSummary,
@@ -12,9 +13,9 @@ import {
 } from "../api/diets";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
-import { getAsyncJobStatusMessage } from "../utils/asyncJobStatus";
 import { isHeicFile } from "../utils/files";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
 
@@ -33,13 +34,10 @@ type NutritionDraft = {
   fat_g: string;
   sodium_mg: string;
 };
-
-const diseaseScoreLabels: Record<string, string> = {
-  DM: "당뇨",
-  HTN: "고혈압",
-  DL: "콜레스테롤·중성지방",
-  OBE: "비만",
-  ANEM: "빈혈",
+type FeedbackDialog = {
+  message: string;
+  title: string;
+  tone?: "default" | "danger";
 };
 
 const mealTypeOptions = [
@@ -49,6 +47,7 @@ const mealTypeOptions = [
   { value: "SNACK", label: "간식" },
   { value: "LATE_NIGHT", label: "야식" },
 ];
+const DIET_ANALYSIS_JOB_POLLING_INTERVAL_MS = 10000;
 
 function currentLocalDateTime(): string {
   const now = new Date();
@@ -86,26 +85,89 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
-  const scores = asRecord(value);
-  return Object.entries(diseaseScoreLabels)
-    .map(([code, label]) => [label, scores[code]] as [string, unknown])
-    .filter(([, score]) => score !== null && score !== undefined && score !== "");
-}
-
 function foodDisplayName(food: Record<string, unknown>): string {
-  return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
+  return (
+    String(food.original_name ?? food.query_name ?? food.name ?? food.food_name ?? food.matched_food_name ?? "").trim() ||
+    "음식명 확인 불가"
+  );
 }
 
-function scoringSourceLabel(value: unknown): string {
-  const source = String(value ?? "").toLowerCase();
-  if (!source) {
+function mfdsCandidateName(food: Record<string, unknown>): string {
+  const source = String(food.match_source ?? "").toLowerCase();
+  const matched = String(food.matched_food_name ?? "").trim();
+  if (!source.startsWith("mfds_") || !matched || matched === foodDisplayName(food)) {
     return "";
   }
-  if (source.includes("vision") || source.includes("gpt")) {
-    return "이미지 인식 + 식단 기준표";
+  return matched;
+}
+
+function matchStatusLabel(food: Record<string, unknown>): string {
+  const source = String(food.match_source ?? "").toLowerCase();
+  const sourceLabels: Record<string, string> = {
+    mfds_matched: "MFDS 후보 확인 필요",
+    mfds_multiple_candidates: "후보 여러 개 확인 필요",
+    mfds_weak_match: "낮은 신뢰 후보",
+    mfds_no_candidates: "영양성분 후보 없음",
+    mfds_skipped_generic: "재료/소스성 후보로 영양 검색 제외",
+    mfds_skipped_low_confidence: "낮은 신뢰도로 영양 검색 제외",
+    mfds_skipped_lookup_limit: "검색 제한으로 제외",
+  };
+  return sourceLabels[source] ?? (food.needs_user_confirmation === true ? "확인 필요" : "확인 완료");
+}
+
+function mfdsNutrition(food: Record<string, unknown>): Record<string, unknown> {
+  return asRecord(asRecord(food.match_metadata).nutrition);
+}
+
+function hasMfdsNutrition(food: Record<string, unknown>): boolean {
+  const nutrition = mfdsNutrition(food);
+  return ["calories_kcal", "carbohydrate_g", "protein_g", "fat_g", "sodium_mg"].some(
+    (key) => nutrition[key] !== null && nutrition[key] !== undefined && nutrition[key] !== "",
+  );
+}
+
+function nutritionValue(value: unknown, unit: string): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
   }
-  return "식단 기준표";
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? `${numberValue.toLocaleString("ko-KR")} ${unit}` : `${String(value)} ${unit}`;
+}
+
+function candidateFoodsFromPayload(payload: Record<string, unknown> | null): {
+  autoConfirmed: DietCandidateFood[];
+  needsConfirmation: DietCandidateFood[];
+  noCandidate: DietCandidateFood[];
+  nutritionStatus: string;
+} {
+  const rawOutput = asRecord(payload?.raw_output);
+  const photoResult = asRecord(payload?.photo_result);
+  const photoRawOutput = asRecord(photoResult.raw_output);
+  const source: Record<string, unknown> = [payload, rawOutput, photoRawOutput].find((item) => hasCandidateFoods(item)) ?? {};
+  return {
+    autoConfirmed: candidateFoodList(source.auto_confirmed_foods),
+    needsConfirmation: candidateFoodList(source.needs_confirmation_foods),
+    noCandidate: candidateFoodList(source.no_candidate_foods),
+    nutritionStatus: String(source.nutrition_calculation_status ?? asRecord(source.summary).nutrition_calculation_status ?? ""),
+  };
+}
+
+function hasCandidateFoods(value: unknown): value is Record<string, unknown> {
+  const record = asRecord(value);
+  return ["auto_confirmed_foods", "needs_confirmation_foods", "no_candidate_foods"].some((key) =>
+    Array.isArray(record[key]),
+  );
+}
+
+function candidateFoodList(value: unknown): DietCandidateFood[] {
+  return Array.isArray(value) ? (value.filter((item) => item && typeof item === "object") as DietCandidateFood[]) : [];
+}
+
+function candidateFoodName(food: DietCandidateFood): string {
+  return (
+    String(food.display_name ?? food.vision_food_name ?? food.raw_food_name ?? food.selected_candidate?.food_name ?? "").trim() ||
+    "음식명 확인 필요"
+  );
 }
 
 export default function DietPage() {
@@ -120,12 +182,17 @@ export default function DietPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
+  const [detectedFoodsImagePreviewFailed, setDetectedFoodsImagePreviewFailed] = useState(false);
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryAnalysis, setCanRetryAnalysis] = useState(false);
+  const analysisRequestInFlightRef = useRef(false);
+  const analysisStartedAtRef = useRef<number | null>(null);
+  const handledAnalysisJobIdsRef = useRef<Set<number>>(new Set());
 
   const load = async () => {
     setError("");
@@ -148,12 +215,26 @@ export default function DietPage() {
     };
   }, [selectedImagePreviewUrl]);
 
-  const { latestJob: latestAnalysisJob } = useAsyncJobPolling({
+  useAsyncJobPolling({
     jobId: analysisJobId,
     enabled: isAnalyzing && analysisJobId !== null,
-    intervalMs: 1500,
+    intervalMs: DIET_ANALYSIS_JOB_POLLING_INTERVAL_MS,
     timeoutMs: 120000,
     onSuccess: async (job) => {
+      if (handledAnalysisJobIdsRef.current.has(job.id)) {
+        return;
+      }
+      handledAnalysisJobIdsRef.current.add(job.id);
+      const finishedAt = Date.now();
+      if (analysisStartedAtRef.current !== null) {
+        console.info("Diet analysis completed", {
+          jobId: job.id,
+          elapsedMs: finishedAt - analysisStartedAtRef.current,
+        });
+      }
+      analysisRequestInFlightRef.current = false;
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
       try {
         const result = dietAnalysisResultFromPayload(job.result_payload);
         if (!result) {
@@ -161,32 +242,47 @@ export default function DietPage() {
         }
         setAnalysisResult(result as unknown as Record<string, unknown>);
         setCanRetryAnalysis(false);
-        setMessage(`${getAsyncJobStatusMessage("SUCCESS")} 저장된 결과를 확인해주세요.`);
+        setFeedbackDialog({
+          title: "식단 분석이 완료되었습니다.",
+          message: "저장된 식단 분석 결과를 확인해 주세요.",
+        });
         await load();
       } catch {
-        setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요.");
+        setFeedbackDialog({
+          title: "식단 분석에 실패했습니다.",
+          message: "잠시 후 다시 시도해 주세요.",
+          tone: "danger",
+        });
         setCanRetryAnalysis(true);
-      } finally {
-        setIsAnalyzing(false);
-        setAnalysisJobId(null);
       }
     },
     onFailure: (job) => {
-      setError(getAsyncJobStatusMessage(job.status === "CANCELED" ? "CANCELED" : "FAILED"));
+      if (handledAnalysisJobIdsRef.current.has(job.id)) {
+        return;
+      }
+      handledAnalysisJobIdsRef.current.add(job.id);
+      analysisRequestInFlightRef.current = false;
+      setFeedbackDialog({
+        title: "식단 분석에 실패했습니다.",
+        message: job.status === "CANCELED" ? "식단 분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
-      setError(getAsyncJobStatusMessage("TIMEOUT"));
+      analysisRequestInFlightRef.current = false;
+      setFeedbackDialog({
+        title: "식단 분석에 실패했습니다.",
+        message: "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
       setAnalysisJobId(null);
     },
   });
-
-  const analysisStatusMessage =
-    isAnalyzing && analysisJobId !== null ? getAsyncJobStatusMessage(latestAnalysisJob?.status ?? "PENDING") : "";
 
   const handleDietImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -194,6 +290,7 @@ export default function DietPage() {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setImagePreviewMessage("");
+    setDetectedFoodsImagePreviewFailed(false);
     if (!file) {
       setSelectedImageFile(null);
       setSelectedImagePreviewUrl("");
@@ -226,6 +323,7 @@ export default function DietPage() {
     }
     setSelectedImageFile(null);
     setSelectedImagePreviewUrl("");
+    setDetectedFoodsImagePreviewFailed(false);
     setImagePreviewMessage("");
   };
 
@@ -271,23 +369,33 @@ export default function DietPage() {
   };
 
   const runDietAnalysis = async () => {
+    if (isAnalyzing || analysisRequestInFlightRef.current) {
+      return;
+    }
     setError("");
     setMessage("");
+    setFeedbackDialog(null);
+    if (!selectedImageFile) {
+      setFeedbackDialog({
+        title: "이미지를 선택해 주세요",
+        message: "식단 분석을 진행하려면 먼저 식단 사진을 업로드해 주세요.",
+      });
+      return;
+    }
     setAnalysisResult(null);
     setCanRetryAnalysis(false);
+    analysisRequestInFlightRef.current = true;
+    analysisStartedAtRef.current = Date.now();
     setIsAnalyzing(true);
     try {
-      const payload = selectedImageFile
-        ? buildDietAnalysisFormData(selectedImageFile, analysisDescription)
-        : {
-            description: analysisDescription || "기록된 식단",
-            meal_time: new Date().toISOString(),
-            image_path: null,
-          };
+      const payload = buildDietAnalysisFormData(selectedImageFile, analysisDescription);
       const job = await analyzeDiet(payload);
+      handledAnalysisJobIdsRef.current.delete(job.id);
+      console.info("Diet analysis job started", { jobId: job.id });
       setMessage("");
       setAnalysisJobId(job.id);
     } catch (err) {
+      analysisRequestInFlightRef.current = false;
       setError("분석 요청을 시작하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해주세요.");
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
@@ -297,19 +405,16 @@ export default function DietPage() {
   const detectedFoods = Array.isArray(analysisResult?.detected_foods)
     ? (analysisResult.detected_foods as Record<string, unknown>[])
     : [];
-  const nutrition =
-    analysisResult?.nutrition_summary && typeof analysisResult.nutrition_summary === "object"
-      ? (analysisResult.nutrition_summary as Record<string, unknown>)
-      : {};
-  const diseaseScores = diseaseScoreEntries(analysisResult?.disease_scores ?? nutrition.disease_scores);
-  const foodScoreDetails = Array.isArray(analysisResult?.food_score_details)
-    ? (analysisResult.food_score_details as Record<string, unknown>[])
-    : [];
   const warnings = Array.isArray(analysisResult?.warnings) ? (analysisResult.warnings as string[]) : [];
   const recommendedActions = Array.isArray(analysisResult?.recommended_actions)
     ? (analysisResult.recommended_actions as string[])
     : [];
-  const scoringSource = scoringSourceLabel(analysisResult?.scoring_source);
+  const candidateFoods = candidateFoodsFromPayload(analysisResult);
+  const hasCandidateSection =
+    candidateFoods.autoConfirmed.length > 0 ||
+    candidateFoods.needsConfirmation.length > 0 ||
+    candidateFoods.noCandidate.length > 0;
+  const hasAnyMfdsNutrition = detectedFoods.some(hasMfdsNutrition);
 
   return (
     <div className="page-grid">
@@ -321,8 +426,17 @@ export default function DietPage() {
           </button>
         </div>
       ) : null}
-      {analysisStatusMessage && <div className="state-box">{analysisStatusMessage}</div>}
       {message && <div className="state-box">{message}</div>}
+      {feedbackDialog && (
+        <ConfirmDialog
+          confirmLabel="확인"
+          message={feedbackDialog.message}
+          onConfirm={() => setFeedbackDialog(null)}
+          showCancel={false}
+          title={feedbackDialog.title}
+          tone={feedbackDialog.tone}
+        />
+      )}
       <Card
         title="식단 이미지 분석"
         actions={
@@ -529,6 +643,9 @@ export default function DietPage() {
         </form>
       </Card>
       <Card title="간편 분석 결과">
+        <div className="state-box">
+          참고용 식단 분석입니다. 음식명과 영양 정보는 사진 상태와 매칭 결과에 따라 달라질 수 있으니 저장 전 확인해 주세요.
+        </div>
         {!analysisResult && (
           <div className="state-box">식단 메모를 입력하거나 사진 업로드 영역을 확인한 뒤 간편 분석을 실행해보세요.</div>
         )}
@@ -540,32 +657,19 @@ export default function DietPage() {
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
             <div className="mini-card">
-              <span className="muted">분석 음식</span>
+              {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
+                <img
+                  alt="업로드한 식단 사진"
+                  className="upload-preview"
+                  onError={() => setDetectedFoodsImagePreviewFailed(true)}
+                  src={selectedImagePreviewUrl}
+                  style={{ maxHeight: 140 }}
+                />
+              )}
+              <span className="muted">감지된 음식</span>
               <strong>
                 {detectedFoods.length > 0 ? detectedFoods.map(foodDisplayName).join(", ") : "음식명 확인 불가"}
               </strong>
-            </div>
-            <div className="nutrition-grid">
-              <div>
-                <span>칼로리</span>
-                <strong>{String(nutrition.calories ?? "-")} kcal</strong>
-              </div>
-              <div>
-                <span>탄수화물</span>
-                <strong>{String(nutrition.carbohydrate_g ?? "-")} g</strong>
-              </div>
-              <div>
-                <span>단백질</span>
-                <strong>{String(nutrition.protein_g ?? "-")} g</strong>
-              </div>
-              <div>
-                <span>지방</span>
-                <strong>{String(nutrition.fat_g ?? "-")} g</strong>
-              </div>
-              <div>
-                <span>나트륨</span>
-                <strong>{String(nutrition.sodium_mg ?? "-")} mg</strong>
-              </div>
             </div>
             <div className="chip-list">
               {detectedFoods.length === 0 && <span className="badge badge-reference">음식명 확인 불가</span>}
@@ -575,42 +679,113 @@ export default function DietPage() {
                 </span>
               ))}
             </div>
-            {diseaseScores.length > 0 && (
-              <div className="nutrition-grid">
-                {diseaseScores.map(([label, score]) => (
-                  <div key={label}>
-                    <span>{label} 식단 점수</span>
-                    <strong>{Math.round(Number(score))}점</strong>
-                  </div>
-                ))}
+            {!hasAnyMfdsNutrition && (
+              <div className="state-box">
+                영양성분 후보를 찾지 못했습니다. 음식명 확인 또는 섭취량 입력 후 더 정확한 분석이 가능합니다.
               </div>
             )}
-            {foodScoreDetails.length > 0 && (
+            {detectedFoods.some((food) => mfdsCandidateName(food) || hasMfdsNutrition(food)) && (
               <div className="card-list">
-                {foodScoreDetails.slice(0, 3).map((detail, index) => {
-                  const matched = detail.matched_food_name ? String(detail.matched_food_name) : "매칭 정보 없음";
-                  const detailScores = diseaseScoreEntries(detail.scores);
-                  return (
-                    <div className="mini-card" key={`${foodDisplayName(detail)}-${index}`}>
-                      <strong>{foodDisplayName(detail)}</strong>
-                      <span className="muted">점수 기준: {matched}</span>
-                      {detailScores.length > 0 ? (
-                        <div className="chip-list">
-                          {detailScores.map(([label, score]) => (
-                            <span className="badge badge-reference" key={`${foodDisplayName(detail)}-${label}`}>
-                              {label}: {Math.round(Number(score))}점
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="muted">음식별 점수 확인 불가</span>
-                      )}
-                    </div>
-                  );
-                })}
+                <div className="state-box">
+                  MFDS 영양성분은 식약처 데이터 기준 후보입니다. 기준량은 100g 또는 1회 제공량일 수 있으며, 실제
+                  섭취량 입력 전까지 총 영양성분은 확정되지 않습니다.
+                </div>
+                {detectedFoods
+                  .filter((food) => mfdsCandidateName(food) || hasMfdsNutrition(food))
+                  .map((food, index) => {
+                    const candidateName = mfdsCandidateName(food);
+                    const mfds = mfdsNutrition(food);
+                    return (
+                      <div className="mini-card" key={`${foodDisplayName(food)}-mfds-${index}`}>
+                        <strong>{foodDisplayName(food)}</strong>
+                        {candidateName && <span className="muted">MFDS 후보: {candidateName}</span>}
+                        <span className="badge badge-reference">상태: {matchStatusLabel(food)}</span>
+                        {hasMfdsNutrition(food) ? (
+                          <>
+                            <span className="muted">MFDS 기준 영양성분</span>
+                            <div className="nutrition-grid">
+                              <div>
+                                <span>기준량</span>
+                                <strong>{String(mfds.basis_label ?? "기준량 확인 필요")}</strong>
+                              </div>
+                              <div>
+                                <span>열량</span>
+                                <strong>{nutritionValue(mfds.calories_kcal, "kcal")}</strong>
+                              </div>
+                              <div>
+                                <span>탄수화물</span>
+                                <strong>{nutritionValue(mfds.carbohydrate_g, "g")}</strong>
+                              </div>
+                              <div>
+                                <span>단백질</span>
+                                <strong>{nutritionValue(mfds.protein_g, "g")}</strong>
+                              </div>
+                              <div>
+                                <span>지방</span>
+                                <strong>{nutritionValue(mfds.fat_g, "g")}</strong>
+                              </div>
+                              <div>
+                                <span>나트륨</span>
+                                <strong>{nutritionValue(mfds.sodium_mg, "mg")}</strong>
+                              </div>
+                            </div>
+                            {(mfds.serving_reference || mfds.food_weight) && (
+                              <span className="muted">
+                                {[mfds.serving_reference ? `제공량: ${String(mfds.serving_reference)}` : "", mfds.food_weight ? `식품중량: ${String(mfds.food_weight)}` : ""]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="muted">표시할 MFDS 영양성분 후보가 없습니다.</span>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             )}
-            {scoringSource && <span className="badge badge-reference">점수 기준: {scoringSource}</span>}
+            <div className="state-box">
+              질환별 식단 평가는 준비 중입니다. 사용자의 건강정보와 실제 섭취량을 기준으로 LLM 해석을 거쳐 제공될 예정입니다.
+            </div>
+            {hasCandidateSection && (
+              <div className="card-list">
+                <div className="mini-card">
+                  <strong>음식 후보 확인</strong>
+                  <span className="muted">
+                    후보 확인형 분석 응답이 포함된 경우에만 표시됩니다. 확정 전 음식은 영양 합산에서 제외될 수 있습니다.
+                  </span>
+                  {candidateFoods.nutritionStatus && (
+                    <span className="badge badge-reference">
+                      영양 계산 상태: {candidateFoods.nutritionStatus === "partial" ? "일부 확인 필요" : "확인 완료"}
+                    </span>
+                  )}
+                </div>
+                <div className="nutrition-grid">
+                  <div>
+                    <span>자동 확정</span>
+                    <strong>{candidateFoods.autoConfirmed.length}개</strong>
+                  </div>
+                  <div>
+                    <span>확인 필요</span>
+                    <strong>{candidateFoods.needsConfirmation.length}개</strong>
+                  </div>
+                  <div>
+                    <span>직접 입력 필요</span>
+                    <strong>{candidateFoods.noCandidate.length}개</strong>
+                  </div>
+                </div>
+                {candidateFoods.needsConfirmation.length > 0 && (
+                  <div className="chip-list">
+                    {candidateFoods.needsConfirmation.slice(0, 8).map((food, index) => (
+                      <span className="badge badge-reference" key={`${candidateFoodName(food)}-${index}`}>
+                        {candidateFoodName(food)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {warnings.length > 0 && (
               <div className="warning-card card-list">
                 {warnings.map((warning) => (

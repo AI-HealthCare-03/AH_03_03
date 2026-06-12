@@ -5,8 +5,19 @@ import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAna
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
+import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
+import {
+  getAnalysisSourceBadgeLabel,
+  getAnalysisTypeLabel,
+  getDisplayRiskLabel,
+  getLatestAnalysisMode,
+  getLatestResultsByAnalysisType,
+  isKnownAnalysisType,
+  mergeResultsWithExpectedAnalysisTypes,
+} from "../utils/riskDisplay";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -41,26 +52,10 @@ type Readiness = {
   missing_precision_fields?: string[];
   message: string;
 };
-
-const analysisTypeLabels: Record<string, string> = {
-  DIABETES: "당뇨",
-  OBESITY: "비만",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
-  HYPERTENSION: "고혈압",
-};
-
-const riskFallbackScores: Record<string, number> = {
-  HIGH: 80,
-  MEDIUM: 55,
-  LOW: 25,
-};
-
-const asyncJobStatusMessages: Record<string, string> = {
-  PENDING: "분석 작업 대기 중입니다.",
-  PROCESSING: "분석 중입니다.",
-  SUCCESS: "분석이 완료되었습니다.",
-  FAILED: "분석에 실패했습니다.",
-  CANCELED: "분석 작업이 취소되었습니다.",
+type FeedbackDialog = {
+  message: string;
+  title: string;
+  tone?: "default" | "danger";
 };
 
 const missingFieldLabels: Record<string, string> = {
@@ -116,18 +111,6 @@ function displayFactorValue(factor: AnalysisFactor): string {
   return factorValueLabels[key]?.[value] ?? value;
 }
 
-function getRiskLevel(result: AnalysisResult): string {
-  return String(result.risk_level ?? "").toUpperCase();
-}
-
-function getRiskScore(result: AnalysisResult): number {
-  const raw = Number(result.risk_score);
-  if (Number.isFinite(raw) && raw > 0) {
-    return Math.round(raw <= 1 ? raw * 100 : raw);
-  }
-  return riskFallbackScores[getRiskLevel(result)] ?? 0;
-}
-
 function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId: Record<string, AnalysisExplanation>): string {
   const firstResult = results[0];
   if (!firstResult) {
@@ -143,6 +126,51 @@ function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId:
   return "분석 결과는 입력된 건강정보 기준의 참고 신호입니다. 상세 화면에서 주요 요인을 확인해보세요.";
 }
 
+function getResultTimestamp(result: AnalysisResult | null | undefined): number {
+  const candidates = [result?.analyzed_at, result?.created_at, result?.analyzedAt, result?.createdAt];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(String(candidate ?? ""));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+function getResultId(result: AnalysisResult | null | undefined): number {
+  const parsed = Number(result?.id);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getMostRecentAnalysisRunResults(items: AnalysisResult[]): AnalysisResult[] {
+  const latest = items.reduce<AnalysisResult | null>((current, item) => {
+    if (!current) {
+      return item;
+    }
+    const itemTimestamp = getResultTimestamp(item);
+    const currentTimestamp = getResultTimestamp(current);
+    if (itemTimestamp !== currentTimestamp) {
+      return itemTimestamp > currentTimestamp ? item : current;
+    }
+    return getResultId(item) > getResultId(current) ? item : current;
+  }, null);
+  if (!latest) {
+    return [];
+  }
+  const latestJobId = latest.async_job_id;
+  const latestMode = String(latest.analysis_mode ?? "");
+  const latestTimestamp = getResultTimestamp(latest);
+  return items.filter((item) => {
+    if (latestJobId !== undefined && latestJobId !== null && latestJobId !== "") {
+      return String(item.async_job_id ?? "") === String(latestJobId);
+    }
+    if (!latestTimestamp) {
+      return String(item.id ?? "") === String(latest.id ?? "");
+    }
+    return String(item.analysis_mode ?? "") === latestMode && Math.abs(getResultTimestamp(item) - latestTimestamp) <= 120000;
+  });
+}
+
 export default function AnalysisPage() {
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [healthRecordId, setHealthRecordId] = useState<number | null>(null);
@@ -155,31 +183,39 @@ export default function AnalysisPage() {
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
 
-  const { latestJob, isPolling, pollingError } = useAsyncJobPolling({
+  const { pollingError } = useAsyncJobPolling({
     jobId: analysisJobId,
     enabled: analysisJobId !== null && runningMode !== null,
     intervalMs: 1500,
     timeoutMs: 120000,
     onSuccess: async () => {
-      await load();
-      setNotice("분석이 완료되었습니다.");
       setRunningMode(null);
       setAnalysisJobId(null);
+      await load();
+      setFeedbackDialog({
+        title: "분석이 완료되었습니다.",
+        message: "결과 화면에서 건강 관리 단계를 확인해 주세요.",
+      });
     },
     onFailure: (job) => {
-      setError(
-        job.status === "CANCELED"
-          ? "분석 작업이 취소되었습니다."
-          : "분석에 실패했습니다. 잠시 후 다시 시도해주세요.",
-      );
+      setFeedbackDialog({
+        title: "분석에 실패했습니다.",
+        message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
-      setNotice("분석 시간이 길어지고 있습니다. 잠시 후 결과를 다시 확인해주세요.");
+      setFeedbackDialog({
+        title: "분석에 실패했습니다.",
+        message: "잠시 후 다시 시도해 주세요.",
+        tone: "danger",
+      });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
@@ -235,6 +271,7 @@ export default function AnalysisPage() {
   const run = async (mode: AnalysisMode) => {
     setError("");
     setNotice("");
+    setFeedbackDialog(null);
     setAnalysisJobId(null);
     setRunningMode(mode);
     try {
@@ -248,14 +285,17 @@ export default function AnalysisPage() {
       setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
       if (!readiness.latest_health_record_id) {
         setNotice(mode === "PRECISION" ? "건강검진 데이터를 입력해주세요." : "분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
+        setRunningMode(null);
         return;
       }
       if (!currentBasicReady) {
         setNotice("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
+        setRunningMode(null);
         return;
       }
       if (mode === "PRECISION" && !currentPrecisionReady) {
         setNotice("건강검진 데이터를 입력해주세요.");
+        setRunningMode(null);
         return;
       }
       const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);
@@ -267,12 +307,23 @@ export default function AnalysisPage() {
   };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
-  const jobStatusMessage = latestJob
-    ? asyncJobStatusMessages[latestJob.status] ?? "분석 작업 상태를 확인하고 있습니다."
-    : analysisJobId
-      ? "분석 작업 대기 중입니다."
-      : "";
-  const showJobStatus = analysisJobId !== null && (isPolling || Boolean(jobStatusMessage));
+  const latestRunResults = getMostRecentAnalysisRunResults(results.filter((result) => isKnownAnalysisType(result.analysis_type)));
+  const latestDiseaseResults = getLatestResultsByAnalysisType(latestRunResults);
+  const displayMode = getLatestAnalysisMode(latestDiseaseResults);
+  const analysisSlots = latestDiseaseResults.length > 0 ? mergeResultsWithExpectedAnalysisTypes(latestDiseaseResults, displayMode) : [];
+  const availableDiseaseResults = analysisSlots
+    .filter((slot) => !slot.isUnavailable && slot.result)
+    .map((slot) => slot.result as AnalysisResult);
+  const diseaseRiskItems: DiseaseRiskItem[] = availableDiseaseResults
+    .map((result) => ({
+      analyzed_at: result.analyzed_at,
+      created_at: result.created_at,
+      diseaseName: getAnalysisTypeLabel(result.analysis_type),
+      id: result.id,
+      risk_level: result.risk_level,
+      service_band: result.service_band,
+      service_band_label: result.service_band_label,
+    }));
 
   return (
     <div className="page-stack">
@@ -296,13 +347,15 @@ export default function AnalysisPage() {
       {error && <ErrorMessage message={error} />}
       {pollingError && <ErrorMessage message={pollingError.message} />}
       {notice && <div className="state-box">{notice}</div>}
-      {showJobStatus && (
-        <div className="state-box">
-          {jobStatusMessage}
-          {latestJob?.status && latestJob.status !== "SUCCESS" && latestJob.status !== "FAILED" && (
-            <span className="muted"> 현재 상태: {latestJob.status}</span>
-          )}
-        </div>
+      {feedbackDialog && (
+        <ConfirmDialog
+          confirmLabel="확인"
+          message={feedbackDialog.message}
+          onConfirm={() => setFeedbackDialog(null)}
+          showCancel={false}
+          title={feedbackDialog.title}
+          tone={feedbackDialog.tone}
+        />
       )}
       {missingFields.length > 0 && (
         <Card title="분석에 필요한 정보가 부족합니다">
@@ -344,18 +397,35 @@ export default function AnalysisPage() {
           <p>{analysisComment}</p>
         </Card>
       </div>
+      <Card title="질환별 위험도">
+        <RiskStageBoard items={diseaseRiskItems} />
+      </Card>
       <div className="metric-grid">
-        {results.map((result) => {
-          const level = getRiskLevel(result);
-          const score = getRiskScore(result);
+        {analysisSlots.map((slot) => {
+          if (slot.isUnavailable || !slot.result) {
+            return (
+              <div className="metric-card card" key={slot.analysisType}>
+                <span>{slot.diseaseName} 관리 단계</span>
+                <strong>검진 수치 부족</strong>
+                <div className="button-row">
+                  <span className="badge badge-missing">판정 불가</span>
+                </div>
+                <p>{slot.unavailableReason}</p>
+              </div>
+            );
+          }
+          const result = slot.result;
           const explanation = explanationsByResultId[String(result.id)];
           const referenceSources = explanation?.reference_sources ?? [];
+          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
-              <span>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)} 위험도</span>
-              <strong>{score}/100</strong>
-              <span className={`badge risk-${level.toLowerCase()}`}>{level || "-"}</span>
-              <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              <span>{slot.diseaseName} 관리 필요 단계</span>
+              <strong>{getDisplayRiskLabel(result)}</strong>
+              <div className="button-row">
+                <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+              </div>
               <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (
@@ -370,7 +440,7 @@ export default function AnalysisPage() {
             </div>
           );
         })}
-        {results.length === 0 && (
+        {analysisSlots.length === 0 && (
           <div className="metric-card card">
             <span>분석 결과 없음</span>
             <strong>-</strong>
@@ -407,11 +477,11 @@ export default function AnalysisPage() {
       </Card>
       <Card title="상세 요인 카드">
         <div className="card-list">
-          {results.map((result) => {
+          {latestDiseaseResults.map((result) => {
             const factors = factorsByResultId[String(result.id)] ?? [];
             return (
               <div className="mini-card" key={String(result.id)}>
-                <strong>{analysisTypeLabels[String(result.analysis_type)] ?? String(result.analysis_type)}</strong>
+                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
                 {factors.length > 0 ? (
                   <div className="chip-list">
                     {factors.slice(0, 4).map((factor) => {

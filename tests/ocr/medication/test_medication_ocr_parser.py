@@ -57,7 +57,7 @@ async def test_medication_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch)
     class FakeVisionClient:
         def __init__(self, api_key: str, model: str):
             assert api_key == "test-key"
-            assert model == "gpt-4o-mini"
+            assert model == "gpt-4o"
 
         async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
             assert analysis_type == "prescription"
@@ -78,6 +78,7 @@ async def test_medication_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch)
     monkeypatch.setattr(medication_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(medication_ocr_handler.config, "MEDICATION_GPT_VISION_MODEL", "gpt-4o")
     monkeypatch.setattr(medication_ocr_handler.config, "OPENAI_API_KEY", "test-key")
 
     response = await medication_ocr_handler.run_medication_ocr(

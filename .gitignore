@@ -17,6 +17,7 @@ wheels/
 .venv
 .*.env
 .env
+prod.env
 *.env
 .env.local
 *.env.local
@@ -99,6 +100,7 @@ ai_runtime/ml/LGB18~24/outputs/
 !ML/models/report/*.csv
 !experiment/ml/ML/models/report/*.csv
 !ai_runtime/cv/food/nutrition/data/food_disease_scores.csv
+!experiment/ai/cv/gpt_vision_food_eval/sample_labels.csv
 *.parquet
 *.pkl
 *.joblib
@@ -180,6 +182,14 @@ ocr-compare/results/summary.md
 !ai_runtime/ml/artifacts/*/catboost/metrics.json
 !ai_runtime/ml/artifacts/*/catboost/model_params.json
 !ai_runtime/ml/artifacts/*/catboost/experiment_config.json
+!ai_runtime/ml/artifacts/screening/
+!ai_runtime/ml/artifacts/screening/**/
+!ai_runtime/ml/artifacts/screening/ARTIFACT_MANIFEST.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/*.cbm
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/feature_columns.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/threshold.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/metrics.json
+!ai_runtime/ml/artifacts/screening/**/screening_catboost/model_params.json
 ai_runtime/ml/artifacts/**/oof_*.npy
 ai_runtime/ml/artifacts/**/threshold_tuning.csv
 
@@ -222,3 +232,20 @@ var/
 # KDU local experiment reports
 experiment/ml/kdu/reports/
 experiment/ml/kdu/reports/**
+
+# GPT Vision food eval local data/outputs
+!experiment/ai/cv/gpt_vision_food_eval/sample_labels.csv
+!experiment/ai/cv/gpt_vision_food_eval/data/
+!experiment/ai/cv/gpt_vision_food_eval/data/.gitkeep
+!experiment/ai/cv/gpt_vision_food_eval/data/json_zips/
+experiment/ai/cv/gpt_vision_food_eval/data/json_zips/*
+!experiment/ai/cv/gpt_vision_food_eval/data/json_zips/.gitkeep
+!experiment/ai/cv/gpt_vision_food_eval/data/images/
+experiment/ai/cv/gpt_vision_food_eval/data/images/*
+!experiment/ai/cv/gpt_vision_food_eval/data/images/.gitkeep
+!experiment/ai/cv/gpt_vision_food_eval/data/labels/
+experiment/ai/cv/gpt_vision_food_eval/data/labels/*
+!experiment/ai/cv/gpt_vision_food_eval/data/labels/.gitkeep
+!experiment/ai/cv/gpt_vision_food_eval/outputs/
+experiment/ai/cv/gpt_vision_food_eval/outputs/*
+!experiment/ai/cv/gpt_vision_food_eval/outputs/.gitkeep
