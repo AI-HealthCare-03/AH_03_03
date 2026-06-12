@@ -626,9 +626,19 @@ export default function DashboardPage() {
   const dashboardMedicationRecords = Array.isArray(medicationSection.recent_medication_records)
     ? (medicationSection.recent_medication_records as AnyRecord[])
     : [];
-  const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
-    ? (challengeSection.user_challenges as AnyRecord[])
-    : [];
+const activeChallengesMap = Object.fromEntries(
+  (Array.isArray(challengeSection.active_challenges)
+    ? (challengeSection.active_challenges as AnyRecord[])
+    : []
+  ).map((c) => [Number(c.id), c])
+);
+
+const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
+  ? (challengeSection.user_challenges as AnyRecord[]).map((uc) => ({
+      ...uc,
+      challenge: activeChallengesMap[Number(uc.challenge_id)],
+    }))
+  : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
   const dietScore = dashboardDiets[0]?.diet_score ? String(dashboardDiets[0].diet_score) : latestValue(trends.diet_score);
   const bloodPressureSeries = [
