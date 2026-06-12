@@ -19,7 +19,7 @@ class FoodAnalysisPipelineConfig:
     gpt_vision_fallback_enabled: bool = False
     confidence_threshold: float = CV_CONFIDENCE_THRESHOLD
     openai_api_key: str | None = None
-    gpt_vision_model: str = "gpt-4o-mini"
+    gpt_vision_model: str = "gpt-4o"
     vision_client_cls: type[Any] = VisionClient
     food_db_matcher: FoodDbMatcher | None = None
 

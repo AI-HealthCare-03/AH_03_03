@@ -64,9 +64,9 @@ class Config(BaseSettings):
     GPT_VISION_FALLBACK_ENABLED: bool = False
     FOOD_CV_CONFIDENCE_THRESHOLD: float = 0.75
     OPENAI_API_KEY: str | None = None
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = "gpt-4o"
     DIET_GPT_VISION_ENABLED: bool = False
-    DIET_GPT_VISION_MODEL: str = "gpt-4o-mini"
+    DIET_GPT_VISION_MODEL: str = "gpt-4o"
     DIET_VISION_PROVIDER: str = "rule_based"
     DIET_MFDS_ENABLED: bool = False
     MFDS_SERVICE_KEY: str | None = None
@@ -75,11 +75,11 @@ class Config(BaseSettings):
     DIET_MFDS_MAX_CANDIDATES: int = 5
     EXAM_OCR_PROVIDER: str = "auto"
     EXAM_GPT_VISION_ENABLED: bool = False
-    EXAM_GPT_VISION_MODEL: str = "gpt-4o-mini"
+    EXAM_GPT_VISION_MODEL: str = "gpt-4o"
     PADDLE_OCR_ENABLED: bool = False
     MEDICATION_OCR_PROVIDER: str = "fallback"
     MEDICATION_GPT_VISION_ENABLED: bool = False
-    MEDICATION_GPT_VISION_MODEL: str = "gpt-4o-mini"
+    MEDICATION_GPT_VISION_MODEL: str = "gpt-4o"
     CHATBOT_USE_REAL_LLM: bool = False
     RAG_ENABLED: bool = False
     LANGFUSE_ENABLED: bool = False

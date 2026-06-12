@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from app.core import config
 from app.core.providers import has_langfuse_config, has_openai_config
 
-DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_OPENAI_MODEL = "gpt-4o"
 OPENAI_CONNECT_TIMEOUT_SECONDS = 3.0
 OPENAI_READ_TIMEOUT_SECONDS = 15.0
 OPENAI_WRITE_TIMEOUT_SECONDS = 15.0

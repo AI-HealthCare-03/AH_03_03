@@ -295,7 +295,7 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
     class FakeVisionClient:
         def __init__(self, api_key: str, model: str):
             assert api_key == "test-key"
-            assert model == "gpt-4o-mini"
+            assert model == "gpt-4o"
 
         async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
             assert analysis_type == "checkup"
@@ -315,6 +315,7 @@ async def test_exam_ocr_uses_gpt_vision_provider_when_enabled(monkeypatch) -> No
     monkeypatch.setattr(exam_ocr_handler, "VisionClient", FakeVisionClient)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_MODEL", "gpt-4o")
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
 
     result = await exam_ocr_handler._extract_exam_measurements_with_provider(b"image", "image/png")
@@ -348,7 +349,7 @@ async def test_exam_ocr_converts_pdf_before_gpt_vision(monkeypatch) -> None:
     class FakeVisionClient:
         def __init__(self, api_key: str, model: str):
             assert api_key == "test-key"
-            assert model == "gpt-4o-mini"
+            assert model == "gpt-4o"
 
         async def analyze(self, analysis_type: str, image_bytes: bytes, media_type: str):
             assert analysis_type == "checkup"
@@ -377,6 +378,7 @@ async def test_exam_ocr_converts_pdf_before_gpt_vision(monkeypatch) -> None:
     monkeypatch.setattr(exam_ocr_handler, "_convert_exam_pdf_to_png_images", fake_convert)
     monkeypatch.setattr(exam_service.config, "EXAM_OCR_PROVIDER", "gpt_vision")
     monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(exam_service.config, "EXAM_GPT_VISION_MODEL", "gpt-4o")
     monkeypatch.setattr(exam_service.config, "OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(exam_service.config, "PADDLE_OCR_ENABLED", False)
 

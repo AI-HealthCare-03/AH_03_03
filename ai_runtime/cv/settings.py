@@ -4,7 +4,7 @@ ai_runtime/cv/settings.py
 envs/.local.env 에 아래 항목을 추가하세요:
 
     OPENAI_API_KEY=<your-openai-api-key>
-    OPENAI_MODEL=gpt-4o-mini
+    OPENAI_MODEL=gpt-4o
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +18,6 @@ class VisionSettings(BaseSettings):
     )
 
     openai_api_key: str
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-4o"
     cv_max_image_size_mb: int = 10
     cv_min_confidence: float = 0.6
