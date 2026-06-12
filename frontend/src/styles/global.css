@@ -5408,3 +5408,46 @@ input:-webkit-autofill:focus {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+/* ── Notice Box ── */
+.notice-box {
+  background: var(--color-muted-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.notice-box i {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Pill Tabs ── */
+.pill-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill-tab {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  border: 0.5px solid var(--color-border);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.pill-tab.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}

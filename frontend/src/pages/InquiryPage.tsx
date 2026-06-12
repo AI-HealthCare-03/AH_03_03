@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { createInquiry, listFaqs, listMyInquiries } from "../api/faqs";
 import Card from "../components/Card";
@@ -20,6 +20,26 @@ function getInquiryStatusLabel(value: unknown): string {
   const status = String(value ?? "").trim().toUpperCase();
   return inquiryStatusLabels[status] ?? "상태 확인 중";
 }
+
+const inquiryCategoryLabels: Record<string, string> = {
+  GENERAL: "일반 문의",
+  HEALTH: "건강 분석",
+  ACCOUNT: "계정",
+  ETC: "기타",
+};
+
+function getInquiryCategoryLabel(value: unknown): string {
+  return inquiryCategoryLabels[String(value ?? "").trim().toUpperCase()] ?? String(value ?? "-");
+}
+
+function getStatusBadgeClass(value: unknown): string {
+  const status = String(value ?? "").trim().toUpperCase();
+  if (status === "ANSWERED") return "badge badge-saved";
+  if (status === "PENDING") return "badge badge-required";
+  return "badge badge-missing";
+}
+
+const FAQ_CATEGORIES = ["전체", "회원/로그인", "건강분석", "챌린지", "식단/복약", "개인정보/보안"];
 
 export default function InquiryPage() {
   const location = useLocation();
@@ -57,30 +77,66 @@ export default function InquiryPage() {
     }
   };
 
+  const filteredFaqs = faqs
+    .filter((faq) =>
+      `${String(faq.question)} ${String(faq.answer)}`
+        .toLowerCase()
+        .includes(keyword.toLowerCase()),
+    )
+    .filter((faq) => faqCategory === "전체" || String(faq.category) === faqCategory);
+
   return (
-    <div className="page-grid">
+    <div className="page-stack">
+      {/* 헤더 */}
+      <div className="page-header">
+        <div>
+          <h1>고객센터</h1>
+          <p>문의하기 및 자주 묻는 질문을 확인하세요.</p>
+        </div>
+      </div>
+
+      {/* 안내 notice */}
+      <div className="notice-box">
+        <i className="ti ti-info-circle" aria-hidden="true" />
+        문의 답변은 관리자 확인 후 상태가 변경됩니다. FAQ를 먼저 확인하면 더 빠르게 해결할 수 있습니다.
+      </div>
+
+      {/* ── 1:1 문의 ── */}
       <Card
-        title={isNew ? "1:1 문의 작성" : "1:1 문의"}
+        title="1:1 문의"
         actions={
-          <Link className="button" to={isNew ? "/inquiries" : "/inquiries/new"}>
-            {isNew ? "문의 목록" : "새 문의"}
-          </Link>
+          <button
+            className="button"
+            onClick={() => navigate(isNew ? "/inquiries" : "/inquiries/new")}
+            type="button"
+          >
+            {isNew ? "문의 목록" : "+ 새 문의"}
+          </button>
         }
       >
-        <div className="filter-tabs">
-          <Link className={!isNew ? "filter-tab active" : "filter-tab"} to="/inquiries">
+        <div className="filter-tabs" style={{ marginBottom: 16 }}>
+          <button
+            className={!isNew ? "filter-tab active" : "filter-tab"}
+            onClick={() => navigate("/inquiries")}
+            type="button"
+          >
             상담 내역
-          </Link>
-          <Link className={isNew ? "filter-tab active" : "filter-tab"} to="/inquiries/new">
+          </button>
+          <button
+            className={isNew ? "filter-tab active" : "filter-tab"}
+            onClick={() => navigate("/inquiries/new")}
+            type="button"
+          >
             문의 작성
-          </Link>
+          </button>
         </div>
+
         {isNew ? (
           <form className="form" onSubmit={submit}>
             {error && <ErrorMessage message={error} />}
             <label>
               문의 유형
-              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
                 <option value="GENERAL">일반 문의</option>
                 <option value="HEALTH">건강 분석</option>
                 <option value="ACCOUNT">계정</option>
@@ -89,11 +145,11 @@ export default function InquiryPage() {
             </label>
             <label>
               제목
-              <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} required />
             </label>
             <label>
               내용
-              <textarea value={content} onChange={(event) => setContent(event.target.value)} required />
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} required />
             </label>
             <label className="toggle-row">
               <span>답변 알림 받기</span>
@@ -103,48 +159,73 @@ export default function InquiryPage() {
           </form>
         ) : (
           <div className="table-list">
+            {items.length === 0 && (
+              <p className="placeholder">등록된 문의가 없습니다.</p>
+            )}
             {items.map((item) => (
-              <div className="table-row" key={String(item.id)}>
-                <span>{String(item.category)}</span>
-                <strong>{String(item.title)}</strong>
-                <span>{getInquiryStatusLabel(item.status)}</span>
-              </div>
+              <details className="mini-card" key={String(item.id)}>
+                <summary style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", listStyle: "none" }}>
+                  <span className="muted" style={{ fontSize: 12, minWidth: 64, flexShrink: 0 }}>
+                    {getInquiryCategoryLabel(item.category)}
+                  </span>
+                  <strong style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {String(item.title)}
+                  </strong>
+                  <span className={getStatusBadgeClass(item.status)} style={{ flexShrink: 0 }}>
+                    {getInquiryStatusLabel(item.status)}
+                  </span>
+                </summary>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                  <p style={{ marginBottom: 6 }}><strong style={{ color: "var(--color-text-primary)" }}>문의 내용</strong></p>
+                  <p>{String(item.content ?? "내용 없음")}</p>
+                  {item.answer && (
+                    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--color-muted-surface)", borderRadius: "var(--border-radius-md)" }}>
+                      <p style={{ marginBottom: 4 }}><strong style={{ color: "var(--color-text-primary)" }}>답변</strong></p>
+                      <p>{String(item.answer)}</p>
+                    </div>
+                  )}
+                </div>
+              </details>
             ))}
-            {items.length === 0 && <p className="placeholder">등록된 문의가 없습니다.</p>}
           </div>
         )}
       </Card>
-      <Card title="답변 안내">
-        <p>문의 답변은 관리자 확인 후 상태가 변경됩니다.</p>
-        <p className="muted">자주 묻는 질문을 먼저 확인하면 더 빠르게 해결할 수 있습니다.</p>
-      </Card>
+
+      {/* ── FAQ ── */}
       <Card title="FAQ">
-        <div style={{ marginBottom: "12px" }}>
-          <p className="muted" style={{ marginBottom: "6px" }}>FAQ 검색</p>
-          <input className="search-input" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="키워드 입력" style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-border)" }} />
-        </div>
-        <div className="filter-tabs" style={{ marginTop: "12px" }}>
-          {["전체", "회원/로그인", "건강분석", "챌린지", "식단/복약", "개인정보/보안"].map((item) => (
-            <button className={faqCategory === item ? "filter-tab active" : "filter-tab"} key={item} onClick={() => setFaqCategory(item)}>
-              {item}
+        <input
+          className="search-input"
+          placeholder="키워드로 검색..."
+          style={{ width: "100%", marginBottom: 12 }}
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
+        <div className="pill-tabs" style={{ marginBottom: 12 }}>
+          {FAQ_CATEGORIES.map((cat) => (
+            <button
+              className={faqCategory === cat ? "pill-tab active" : "pill-tab"}
+              key={cat}
+              onClick={() => setFaqCategory(cat)}
+              type="button"
+            >
+              {cat}
             </button>
           ))}
         </div>
-        <div className="card-list" style={{ marginTop: "12px" }}>
-          {faqs
-            .filter((faq) =>
-              `${String(faq.question)} ${String(faq.answer)}`.toLowerCase().includes(keyword.toLowerCase()),
-            )
-            .filter((faq) => faqCategory === "전체" || String(faq.category) === faqCategory)
-            .map((faq) => (
-              <details className="mini-card" key={String(faq.id)}>
-                <summary>
-                  <strong>{String(faq.question)}</strong>
-                </summary>
-                <p>{String(faq.answer)}</p>
-              </details>
-            ))}
-          {faqs.length === 0 && <div className="state-box">등록된 FAQ가 없습니다.</div>}
+        <div className="card-list">
+          {filteredFaqs.length === 0 && (
+            <div className="state-box">등록된 FAQ가 없습니다.</div>
+          )}
+          {filteredFaqs.map((faq) => (
+            <details className="mini-card" key={String(faq.id)}>
+              <summary>
+                <strong>{String(faq.question)}</strong>
+              </summary>
+              <p style={{ marginTop: 8, color: "var(--color-text-secondary)", fontSize: 13, lineHeight: 1.6 }}>
+                {String(faq.answer)}
+              </p>
+            </details>
+          ))}
         </div>
       </Card>
     </div>
