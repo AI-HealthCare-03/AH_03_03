@@ -4,6 +4,7 @@ import pytest
 
 from ai_runtime.cv.food.matcher import FoodMatchResult
 from ai_runtime.cv.food.pipeline import FoodAnalysisPipelineConfig, run_food_analysis_pipeline
+from ai_runtime.cv.food.schemas import FoodDetectionCandidateSet
 from ai_runtime.cv.providers.gpt_vision import PROMPTS, AnalysisType
 
 
@@ -13,7 +14,10 @@ def test_runtime_diet_prompt_requests_food_candidates_without_nutrition_estimate
     assert '"foods"' in prompt
     assert '"name"' in prompt
     assert '"confidence"' in prompt
-    assert "foods=[]는 음식, 음료, 식재료, 소스, 포장 식품이 전혀 보이지 않는 경우에만 사용" in prompt
+    assert "완성 음식, 반찬, 음료, 명확한 사이드 메뉴 중심" in prompt
+    assert "재료, 소스, 양념, 토핑을 foods에 넣지 마세요" in prompt
+    assert "단독 일반 재료명만 반환하지 마세요" in prompt
+    assert "foods=[]는 음식, 음료, 식단으로 볼 수 있는 메뉴가 전혀 보이지 않는 경우에만 사용" in prompt
     assert '"nutrition"' not in prompt
     assert '"nutrient_category"' not in prompt
     assert '"search_keyword"' not in prompt
@@ -279,3 +283,134 @@ async def test_pipeline_preserves_gpt_vision_per_food_confidence() -> None:
     assert result.detected_foods[0]["confidence"] == 0.91
     assert result.detected_foods[1]["name"] == "핫초코"
     assert result.detected_foods[1]["confidence"] == 0.42
+
+
+def test_food_candidate_skips_generic_mfds_lookup_candidates() -> None:
+    class CountingMfdsMatcher:
+        applies_lookup_gating = True
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def match(self, query: str) -> FoodMatchResult:
+            self.calls.append(query)
+            return FoodMatchResult(original_name=query, query_name=query, matched_food_name=query)
+
+    matcher = CountingMfdsMatcher()
+    candidate = FoodDetectionCandidateSet(
+        provider="gpt_vision",
+        detected_foods=["계란", "고기", "고추장"],
+        detected_food_confidences=[0.9, 0.85, 0.8],
+        confidence=0.85,
+    )
+
+    foods = candidate.to_scorer_foods(matcher)
+
+    assert matcher.calls == []
+    assert [food["name"] for food in foods] == ["계란", "고기", "고추장"]
+    assert [food["match_source"] for food in foods] == [
+        "mfds_skipped_generic",
+        "mfds_skipped_generic",
+        "mfds_skipped_generic",
+    ]
+    assert all(food["needs_user_confirmation"] is True for food in foods)
+
+
+def test_food_candidate_skips_low_confidence_mfds_lookup_candidates() -> None:
+    class CountingMfdsMatcher:
+        applies_lookup_gating = True
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def match(self, query: str) -> FoodMatchResult:
+            self.calls.append(query)
+            return FoodMatchResult(original_name=query, query_name=query, matched_food_name=query)
+
+    matcher = CountingMfdsMatcher()
+    candidate = FoodDetectionCandidateSet(
+        provider="gpt_vision",
+        detected_foods=["중식 면요리"],
+        detected_food_confidences=[0.42],
+        confidence=0.42,
+    )
+
+    foods = candidate.to_scorer_foods(matcher)
+
+    assert matcher.calls == []
+    assert foods[0]["name"] == "중식 면요리"
+    assert foods[0]["match_source"] == "mfds_skipped_low_confidence"
+    assert foods[0]["matched_food_name"] is None
+    assert foods[0]["match_confidence"] is None
+
+
+def test_food_candidate_limits_mfds_lookup_to_three_unique_queries() -> None:
+    class CountingMfdsMatcher:
+        applies_lookup_gating = True
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def match(self, query: str) -> FoodMatchResult:
+            self.calls.append(query)
+            return FoodMatchResult(
+                original_name=query,
+                query_name=query,
+                matched_food_name=query,
+                matched_food_code=f"mfds:{query}",
+                match_source="mfds_matched",
+                match_confidence=0.95,
+            )
+
+    matcher = CountingMfdsMatcher()
+    candidate = FoodDetectionCandidateSet(
+        provider="gpt_vision",
+        detected_foods=["비빔밥", "짜장면", "김밥", "라면"],
+        detected_food_confidences=[0.9, 0.88, 0.86, 0.84],
+        confidence=0.87,
+    )
+
+    foods = candidate.to_scorer_foods(matcher)
+
+    assert matcher.calls == ["비빔밥", "짜장면", "김밥"]
+    assert [food["match_source"] for food in foods] == [
+        "mfds_matched",
+        "mfds_matched",
+        "mfds_matched",
+        "mfds_skipped_lookup_limit",
+    ]
+    assert foods[3]["matched_food_name"] is None
+
+
+def test_food_candidate_reuses_mfds_lookup_for_duplicate_normalized_query() -> None:
+    class CountingMfdsMatcher:
+        applies_lookup_gating = True
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def match(self, query: str) -> FoodMatchResult:
+            self.calls.append(query)
+            return FoodMatchResult(
+                original_name=query,
+                query_name=query,
+                matched_food_name="비빔밥",
+                matched_food_code="mfds:bibimbap",
+                match_source="mfds_matched",
+                match_confidence=0.98,
+            )
+
+    matcher = CountingMfdsMatcher()
+    candidate = FoodDetectionCandidateSet(
+        provider="gpt_vision",
+        detected_foods=["비빔밥", "비빔밥 "],
+        detected_food_confidences=[0.9, 0.8],
+        confidence=0.85,
+    )
+
+    foods = candidate.to_scorer_foods(matcher)
+
+    assert matcher.calls == ["비빔밥"]
+    assert [food["matched_food_name"] for food in foods] == ["비빔밥", "비빔밥"]
+    assert [food["match_source"] for food in foods] == ["mfds_matched", "mfds_matched"]
+    assert [food["original_name"] for food in foods] == ["비빔밥", "비빔밥"]

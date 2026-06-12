@@ -50,6 +50,8 @@ class MfdsFoodDbMatcher:
     auto-confirm nutrition candidates before the confirmation API exists.
     """
 
+    applies_lookup_gating = True
+
     def __init__(
         self,
         *,
