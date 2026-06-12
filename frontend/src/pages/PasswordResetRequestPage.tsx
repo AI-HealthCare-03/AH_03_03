@@ -40,7 +40,7 @@ export default function PasswordResetRequestPage() {
       <Card>
         <div className="page-header">
           <div>
-            <span className="eyebrow">Account Recovery</span>
+            <span className="eyebrow">HEALTH LADDER</span>
             <h1>비밀번호 찾기</h1>
             <p>가입 시 등록한 이메일을 입력하면 비밀번호 재설정 링크를 이메일로 보내드립니다.</p>
           </div>
