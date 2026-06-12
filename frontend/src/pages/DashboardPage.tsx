@@ -986,38 +986,6 @@ const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
       </section>
 
       <section className="dashboard-primary-grid">
-        <section className="card dashboard-analysis-summary-card">
-          <div className="card-header">
-            <h2>최근 분석 결과</h2>
-          </div>
-          {diseaseAnalysisResults.length > 0 ? (
-            <>
-              <RiskStageBoard items={diseaseRiskItems} />
-              <div className="chip-list">
-                {diseaseAnalysisResults.map((result) => {
-                  const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
-                  if (!sourceBadgeLabel) {
-                    return null;
-                  }
-                  return (
-                    <span className="badge badge-reference" key={String(result.id ?? result.analysis_type)}>
-                      {getAnalysisTypeLabel(result.analysis_type)} · {sourceBadgeLabel}
-                    </span>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <strong>최근 분석 결과가 없습니다.</strong>
-              <p>건강정보를 입력하고 분석을 실행하면 질환별 결과가 표시됩니다.</p>
-              <Link className="button secondary compact-button" to="/analysis">
-                분석 실행하기
-              </Link>
-            </div>
-          )}
-        </section>
-
         <section className="card diet-summary-section">
           <div className="card-header">
             <div>
