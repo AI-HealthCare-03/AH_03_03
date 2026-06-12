@@ -2612,7 +2612,7 @@ pre {
 
 .risk-stage-board-title {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   grid-column: 1 / -1;
   margin: 0;
@@ -2779,17 +2779,17 @@ pre {
 .risk-stage-board-preview .risk-stage-panel {
   border-radius: 9px;
   max-height: 112px;
-  min-height: 56px;
+  min-height: 90px;
   padding: 8px;
 }
 
 .risk-stage-board-preview .risk-stage-panel {
-  max-height: 96px;
+  max-height: 120px;
 }
 
 .risk-stage-board-compact .risk-stage-header span,
 .risk-stage-board-preview .risk-stage-header span {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -2799,9 +2799,9 @@ pre {
 .risk-stage-board-preview .risk-stage-chip,
 .risk-stage-board-preview .risk-stage-empty,
 .risk-stage-board-preview .risk-stage-more {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 3px 7px;
+  padding: 5px 11px;
 }
 
 .risk-stage-board-preview .risk-stage-empty {
