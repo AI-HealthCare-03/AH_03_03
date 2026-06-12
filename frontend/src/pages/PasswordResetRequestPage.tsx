@@ -64,7 +64,7 @@ export default function PasswordResetRequestPage() {
               value={email}
             />
           </label>
-          <button type="submit">요청하기</button>
+          <button type="submit">재설정 링크 받기</button>
         </form>
         <p className="muted">
           <Link className={"signup-link"} to="/login">
