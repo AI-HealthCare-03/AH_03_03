@@ -62,12 +62,31 @@ app-worker-logs:
 
 # Standard dev/demo stack
 # Full stack via infra/docker/docker-compose.dev.yml: postgres, redis, fastapi, ai-worker, frontend, nginx.
-.PHONY: dev-network dev-up dev-down dev-ps dev-logs dev-migrate dev-seed dev-health dev-rebuild-api dev-rebuild-frontend dev-rebuild-all dev-restart-nginx dev-config-check
+.PHONY: dev-network dev-up dev-stack dev-front dev-local dev-down dev-ps dev-logs dev-migrate dev-seed dev-health dev-rebuild-api dev-rebuild-frontend dev-rebuild-all dev-restart-nginx dev-config-check
 dev-network:
 	docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared >/dev/null
 
 dev-up: dev-network
 	$(DEV_COMPOSE) up -d --build
+
+dev-stack: dev-network
+	@echo "Starting Docker backend stack for local Vite frontend development..."
+	@echo "Backend stack: http://localhost:8080"
+	@echo "Frontend dev server: http://localhost:5173"
+	@echo "Note: nginx depends on the frontend service in compose, so Docker may start it as a dependency."
+	$(DEV_COMPOSE) up -d postgres redis fastapi ai-worker nginx
+	curl -fsS http://localhost:8080/api/v1/system/health
+
+dev-front:
+	@echo "Starting local Vite frontend dev server..."
+	@echo "Frontend dev server: http://localhost:5173"
+	@echo "API proxy target: http://localhost:8080"
+	cd frontend && npm run dev
+
+dev-local: dev-stack
+	@echo "Docker backend stack is ready."
+	@echo "Open the frontend at http://localhost:5173"
+	cd frontend && npm run dev
 
 dev-down:
 	$(DEV_COMPOSE) down --remove-orphans
