@@ -29,7 +29,7 @@ export default function PasswordResetRequestPage() {
 
     try {
       await requestPasswordReset(trimmedEmail);
-      setMessage("비밀번호 재설정 안내가 발송되었습니다. 이메일을 확인해주세요.");
+      setMessage("비밀번호 재설정 안내를 이메일로 발송했습니다.\n3분 이내에 메일이 도착하지 않으면 스팸메일함 또는 입력한 이메일 주소를 확인해주세요.");
     } catch {
       setError("입력한 이메일 정보를 확인해주세요.");
     }
@@ -48,7 +48,9 @@ export default function PasswordResetRequestPage() {
         {error && <ErrorMessage message={error} />}
         {message && (
           <div className="state-box">
-            {message}
+            {message.split("\n").map((line, i) => (
+              <span key={i}>{line}<br /></span>
+            ))}
           </div>
         )}
         <form className="form" onSubmit={submit}>
