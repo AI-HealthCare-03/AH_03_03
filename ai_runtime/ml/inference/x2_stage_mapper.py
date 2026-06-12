@@ -313,7 +313,9 @@ def _map_ckd(features: Mapping[str, Any]) -> X2StageMappingResult:
     if egfr is None:
         return _unavailable("CHRONIC_KIDNEY_DISEASE", ["egfr"])
     if egfr < 30:
-        return _available("CHRONIC_KIDNEY_DISEASE", ServiceBand.HIGH_CAUTION, "EGFR_UNDER_30", "eGFR 30 미만, 상담 권장")
+        return _available(
+            "CHRONIC_KIDNEY_DISEASE", ServiceBand.HIGH_CAUTION, "EGFR_UNDER_30", "eGFR 30 미만, 상담 권장"
+        )
     if egfr < 45:
         return _available("CHRONIC_KIDNEY_DISEASE", ServiceBand.CAUTION, "EGFR_30_44", "eGFR 30~44, 추적 관찰 필요")
     if egfr < 60:

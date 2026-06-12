@@ -287,7 +287,9 @@ def _build_basic_analysis_plans(*, user: User | None, health_record: HealthRecor
 
 async def _build_precision_analysis_plans(*, user: User | None, health_record: HealthRecord) -> list[dict[str, Any]]:
     plans: list[dict[str, Any]] = []
-    base_plans = {plan["analysis_type"]: plan for plan in _build_basic_analysis_plans(user=user, health_record=health_record)}
+    base_plans = {
+        plan["analysis_type"]: plan for plan in _build_basic_analysis_plans(user=user, health_record=health_record)
+    }
     precision_input = await build_precision_analysis_input_payload(user=user, health_record=health_record)
     x2_features = precision_input["x2_input_payload"]
 
@@ -644,7 +646,9 @@ def _x2_feature_payload(*, user: User | None, health_record: HealthRecord) -> di
         "hemoglobin",
     )
     payload = {field_name: getattr(health_record, field_name, None) for field_name in field_names}
-    payload["sex"] = getattr(user, "gender", None) or getattr(health_record, "sex", None) or getattr(health_record, "gender", None)
+    payload["sex"] = (
+        getattr(user, "gender", None) or getattr(health_record, "sex", None) or getattr(health_record, "gender", None)
+    )
     return payload
 
 
@@ -1067,11 +1071,17 @@ def _analysis_snapshot_request(
     input_features = _health_record_input_payload(health_record)
     selected_exam_report_id = precision_input.get("selected_exam_report_id") if precision_input else None
     x1_input_payload = precision_input.get("x1_input_payload") if precision_input else input_features
-    x2_input_payload = precision_input.get("x2_input_payload") if precision_input else _x2_feature_payload(
-        user=None,
-        health_record=health_record,
+    x2_input_payload = (
+        precision_input.get("x2_input_payload")
+        if precision_input
+        else _x2_feature_payload(
+            user=None,
+            health_record=health_record,
+        )
     )
-    x2_measurement_source = precision_input.get("x2_measurement_source") if precision_input else "health_record_fallback"
+    x2_measurement_source = (
+        precision_input.get("x2_measurement_source") if precision_input else "health_record_fallback"
+    )
     x2_field_sources = precision_input.get("x2_field_sources") if precision_input else {}
     shap_outputs = [
         {
@@ -1083,14 +1093,18 @@ def _analysis_snapshot_request(
         }
         for factor in factors
     ]
-    final_outputs = {
-        "risk_level": risk_level,
-        "guide_message": guide_message,
-        "service_band": risk_level,
-        "service_band_label": _risk_level_label(risk_level),
-        "service_band_percent": _risk_level_display_percent(risk_level),
-        "legacy_risk_level": None,
-    } | _screening_dual_stage_final_outputs(screening_dual_stage) | _x2_rule_final_outputs(x2_rule)
+    final_outputs = (
+        {
+            "risk_level": risk_level,
+            "guide_message": guide_message,
+            "service_band": risk_level,
+            "service_band_label": _risk_level_label(risk_level),
+            "service_band_percent": _risk_level_display_percent(risk_level),
+            "legacy_risk_level": None,
+        }
+        | _screening_dual_stage_final_outputs(screening_dual_stage)
+        | _x2_rule_final_outputs(x2_rule)
+    )
     return AnalysisSnapshotCreateRequest(
         input_payload=_to_json_value(
             {

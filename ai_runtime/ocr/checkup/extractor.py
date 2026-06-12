@@ -272,7 +272,9 @@ def _extract_value_from_context(field, text_lines, i, text):
     confidence = text_lines[i][1]
     if value is None:
         for j in range(i + 1, min(i + 3, len(text_lines))):
-            value = next((number for number in extract_numbers(text_lines[j][0]) if validate_value(field, number)), None)
+            value = next(
+                (number for number in extract_numbers(text_lines[j][0]) if validate_value(field, number)), None
+            )
             if value is not None:
                 confidence = text_lines[j][1]
                 break

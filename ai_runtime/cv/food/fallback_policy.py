@@ -85,7 +85,11 @@ def _average_confidence(foods: list[dict[str, Any]]) -> float | None:
 
 
 def _food_confidences(foods: list[dict[str, Any]]) -> list[float | None]:
-    return [round(float(value), 4) if _is_number(value := food.get("confidence")) else None for food in foods if _food_name(food)]
+    return [
+        round(float(value), 4) if _is_number(value := food.get("confidence")) else None
+        for food in foods
+        if _food_name(food)
+    ]
 
 
 def _is_number(value: Any) -> bool:

@@ -56,7 +56,9 @@ class FoodDetectionCandidateSet:
         lookup_count = 0
         use_lookup_gate = bool(getattr(matcher, "applies_lookup_gating", False))
         for index, food_name in enumerate(self.detected_foods):
-            food_confidence = self.detected_food_confidences[index] if index < len(self.detected_food_confidences) else None
+            food_confidence = (
+                self.detected_food_confidences[index] if index < len(self.detected_food_confidences) else None
+            )
             if use_lookup_gate:
                 match, did_lookup = _gated_match_food_name(
                     food_name=food_name,
@@ -103,9 +105,13 @@ def _gated_match_food_name(
     query_name = cleanup_food_query(food_name)
     normalized_query = normalize_food_name(query_name)
     if not query_name:
-        return _skipped_food_match(food_name=food_name, query_name=query_name, match_source="mfds_skipped_no_query"), False
+        return _skipped_food_match(
+            food_name=food_name, query_name=query_name, match_source="mfds_skipped_no_query"
+        ), False
     if normalized_query in GENERIC_MFDS_LOOKUP_BLOCKLIST:
-        return _skipped_food_match(food_name=food_name, query_name=query_name, match_source="mfds_skipped_generic"), False
+        return _skipped_food_match(
+            food_name=food_name, query_name=query_name, match_source="mfds_skipped_generic"
+        ), False
     if confidence is not None and confidence < MFDS_LOOKUP_CONFIDENCE_THRESHOLD:
         return _skipped_food_match(
             food_name=food_name,

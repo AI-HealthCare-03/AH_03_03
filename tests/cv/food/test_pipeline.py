@@ -227,7 +227,9 @@ async def test_pipeline_uses_injected_food_db_matcher_for_detected_foods() -> No
         rule_based_foods=[{"name": "비빔국수", "confidence": 0.9}],
         image_bytes=None,
         image_media_type=None,
-        config=FoodAnalysisPipelineConfig(provider="rule_based", gpt_vision_enabled=False, food_db_matcher=FakeMatcher()),
+        config=FoodAnalysisPipelineConfig(
+            provider="rule_based", gpt_vision_enabled=False, food_db_matcher=FakeMatcher()
+        ),
     )
 
     assert result.detected_foods[0]["name"] == "비빔국수"

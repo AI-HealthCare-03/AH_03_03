@@ -172,7 +172,9 @@ class ScreeningArtifact:
     def predict_dummy(self, user: SimpleNamespace, record: SimpleNamespace) -> tuple[float, bool]:
         mapping = map_service_features(user, record, self.feature_columns, strict=False)
         features = _neutralize_missing_family(mapping.features)
-        frame = pd.DataFrame([{column: features[column] for column in self.feature_columns}], columns=self.feature_columns)
+        frame = pd.DataFrame(
+            [{column: features[column] for column in self.feature_columns}], columns=self.feature_columns
+        )
         probabilities = self.predict_frame(frame)
         probability = float(probabilities[0])
         return probability, probability >= self.threshold
@@ -319,7 +321,9 @@ def run_real_mode(
             htn_family_mode=htn_family_mode,
         )
         outputs.append(result)
-        lines.extend(real_disease_summary_lines(result, disease=disease, source_path=source_path, label_column=label_column))
+        lines.extend(
+            real_disease_summary_lines(result, disease=disease, source_path=source_path, label_column=label_column)
+        )
 
     return pd.concat(outputs, ignore_index=True), lines
 
@@ -435,7 +439,9 @@ def build_real_result_frame(
     base_levels = base_scores.map(score_to_level)
     base_high = base_levels.map(lambda level: is_base_high_value(level, base_high_level))
     screening_high = probabilities >= threshold
-    service_band = [POLICY_LABELS[(bool(base), bool(screening))] for base, screening in zip(base_high, screening_high, strict=True)]
+    service_band = [
+        POLICY_LABELS[(bool(base), bool(screening))] for base, screening in zip(base_high, screening_high, strict=True)
+    ]
     output = pd.DataFrame(
         {
             "case_id": [f"{source_path.stem}:{index}" for index in raw.index],
@@ -479,7 +485,9 @@ def calculate_base_scores(features: pd.DataFrame, disease: str) -> pd.Series:
         family = features[HTN_FAMILY_COLUMNS].fillna(0).sum(axis=1).clip(upper=1.0) * 0.16
         return pd.Series(np.minimum(0.20 + age_adj + family + bmi_risk + lifestyle, 0.86), index=features.index)
     if disease == "DM":
-        family = features[["당뇨가족력_부", "당뇨가족력_모", "당뇨가족력_형제"]].fillna(0).sum(axis=1).clip(upper=1.0) * 0.16
+        family = (
+            features[["당뇨가족력_부", "당뇨가족력_모", "당뇨가족력_형제"]].fillna(0).sum(axis=1).clip(upper=1.0) * 0.16
+        )
         return pd.Series(np.minimum(0.20 + age_adj + family + bmi_risk + lifestyle, 0.88), index=features.index)
     if disease == "DL":
         family = (
@@ -801,7 +809,9 @@ def synthetic_summary_lines(rows: list[SyntheticRow]) -> list[str]:
         lines.extend([f"## {disease}", ""])
         for base_high, screening_high in [(False, False), (False, True), (True, False), (True, True)]:
             matched = [
-                row.case_id for row in disease_rows if row.base_high == base_high and row.screening_high == screening_high
+                row.case_id
+                for row in disease_rows
+                if row.base_high == base_high and row.screening_high == screening_high
             ]
             lines.append(
                 f"- base_{_state(base_high)} + screening_{_state(screening_high)} "
@@ -823,7 +833,9 @@ def print_policy_truth_table() -> None:
 def policy_truth_table_lines() -> list[str]:
     lines = ["# Policy truth table", "", "| base | screening | policy |", "|---|---|---|"]
     for base_high, screening_high in [(False, False), (False, True), (True, False), (True, True)]:
-        lines.append(f"| {_state(base_high)} | {_state(screening_high)} | {POLICY_LABELS[(base_high, screening_high)]} |")
+        lines.append(
+            f"| {_state(base_high)} | {_state(screening_high)} | {POLICY_LABELS[(base_high, screening_high)]} |"
+        )
     lines.append("")
     return lines
 

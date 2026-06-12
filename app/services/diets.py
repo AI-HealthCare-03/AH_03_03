@@ -88,7 +88,11 @@ def read_diet_record_image(record: DietRecord) -> tuple[bytes, str, str] | None:
     try:
         if not storage.exists(image_key):
             return None
-        return storage.read_bytes(image_key), _media_type_from_upload_path(image_key) or "application/octet-stream", Path(image_key).name
+        return (
+            storage.read_bytes(image_key),
+            _media_type_from_upload_path(image_key) or "application/octet-stream",
+            Path(image_key).name,
+        )
     except (OSError, ValueError):
         return None
 
