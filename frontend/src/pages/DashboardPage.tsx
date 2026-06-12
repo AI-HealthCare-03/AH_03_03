@@ -93,7 +93,7 @@ function getRiskStageChartValue(point: DashboardRiskTrendPoint): number {
 function getRiskTrendPointKey(point: DashboardRiskTrendPoint, fallbackIndex: number): string {
   const timestamp = String(point.analyzed_at ?? point.created_at ?? "").trim();
   if (timestamp) {
-    return timestamp;
+    return timestamp.slice(0, 10); // yyyy-mm-dd만 사용
   }
   const id = String(point.id ?? "").trim();
   return id ? `id:${id}` : `index:${fallbackIndex}`;
@@ -284,7 +284,7 @@ function LineChart({ axisTicks, series, clampTo100 }: { axisTicks?: ChartAxisTic
     .filter((item) => item.points.length > 0);
   const allPoints = visibleSeries.flatMap((item) => item.points);
   const uniqueDates = Array.from(new Set(allPoints.map((point) => point.date || point.label))).sort();
-  const hasEnoughData = uniqueDates.length >= 2 || visibleSeries.some((item) => item.points.length >= 2);
+  const hasEnoughData = uniqueDates.length >= 1 || visibleSeries.some((item) => item.points.length >= 1);
 
   if (!hasEnoughData) {
     return <EmptyChartState />;
@@ -956,12 +956,19 @@ const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
             분석 기록 보기
           </Link>
         </div>
-        {hasRiskTrendEnoughData ? (
-          <LineChart axisTicks={riskStageAxisTicks} series={riskTrendSeries} />
+        {riskTrendSeries.length > 0 ? (
+          <div className="risk-trend-charts">
+            {riskTrendSeries.map((series) => (
+              <div key={series.key} className="risk-trend-chart-item">
+                <span className="risk-trend-chart-label" style={{ color: series.color }}>{series.label}</span>
+                <LineChart axisTicks={riskStageAxisTicks} series={[series]} />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="empty-state">
-            <strong>아직 추이를 계산할 분석 기록이 부족합니다.</strong>
-            <p>질환별 분석을 2회 이상 실행하면 관리 단계 변화 그래프가 표시됩니다.</p>
+            <strong>아직 분석 기록이 없습니다.</strong>
+            <p>간편 분석을 실행하면 질환별 관리 단계 변화를 확인할 수 있습니다.</p>
             <Link className="button secondary compact-button" to="/analysis">
               분석 실행하기
             </Link>

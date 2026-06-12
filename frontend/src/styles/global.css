@@ -2802,6 +2802,23 @@ pre {
   opacity: 0.72;
 }
 
+.risk-trend-charts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.risk-trend-chart-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.risk-trend-chart-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
 [data-theme="dark"] .risk-stage-card {
   --risk-stage-chip-bg: rgba(255, 255, 255, 0.07);
   --risk-stage-chip-border: rgba(255, 255, 255, 0.14);
