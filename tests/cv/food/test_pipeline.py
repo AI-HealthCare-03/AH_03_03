@@ -414,3 +414,42 @@ def test_food_candidate_reuses_mfds_lookup_for_duplicate_normalized_query() -> N
     assert [food["matched_food_name"] for food in foods] == ["비빔밥", "비빔밥"]
     assert [food["match_source"] for food in foods] == ["mfds_matched", "mfds_matched"]
     assert [food["original_name"] for food in foods] == ["비빔밥", "비빔밥"]
+
+
+def test_food_candidate_keeps_query_name_as_display_name_for_mfds_candidate() -> None:
+    class MfdsLikeMatcher:
+        applies_lookup_gating = True
+
+        def match(self, query: str) -> FoodMatchResult:
+            return FoodMatchResult(
+                original_name=query,
+                query_name=query,
+                matched_food_name="The미식 전주 돌솥비빔밥",
+                matched_food_code="D101-999",
+                match_source="mfds_matched",
+                match_confidence=0.96,
+                needs_user_confirmation=True,
+                metadata={
+                    "provider": "mfds",
+                    "status": "matched",
+                    "nutrition": {
+                        "calories_kcal": 650.0,
+                        "basis_label": "100g 기준",
+                    },
+                },
+            )
+
+    candidate = FoodDetectionCandidateSet(
+        provider="gpt_vision",
+        detected_foods=["비빔밥"],
+        detected_food_confidences=[0.91],
+        confidence=0.91,
+    )
+
+    foods = candidate.to_scorer_foods(MfdsLikeMatcher())
+
+    assert foods[0]["name"] == "비빔밥"
+    assert foods[0]["query_name"] == "비빔밥"
+    assert foods[0]["matched_food_name"] == "The미식 전주 돌솥비빔밥"
+    assert foods[0]["match_source"] == "mfds_matched"
+    assert foods[0]["match_metadata"]["nutrition"]["calories_kcal"] == 650.0

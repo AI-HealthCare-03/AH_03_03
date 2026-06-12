@@ -421,7 +421,8 @@ def _safe_generate_diet_explanation(disease_scores: dict[str, float | int | None
 
 def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseFoodScoreRecord]) -> dict[str, Any]:
     match = _food_match(food)
-    lookup_name = match.matched_food_name or match.query_name
+    use_query_name_as_display = _is_mfds_match(match)
+    lookup_name = match.query_name if use_query_name_as_display else match.matched_food_name or match.query_name
     matched = _match_food_score(lookup_name, runtime_scores) if lookup_name else None
     matched_food_name = match.matched_food_name or (matched.food_name if matched is not None else None)
     needs_user_confirmation = match.needs_user_confirmation and matched is None
@@ -430,7 +431,7 @@ def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseF
     )
     match_confidence = match.match_confidence if match.matched_food_name else 0.7 if matched is not None else None
     base_detail = {
-        "food_name": matched_food_name or match.query_name,
+        "food_name": match.query_name if use_query_name_as_display else matched_food_name or match.query_name,
         "original_name": match.original_name,
         "query_name": match.query_name,
         "matched_food_name": matched_food_name,
@@ -454,7 +455,13 @@ def _build_food_score_detail(food: dict[str, Any], runtime_scores: list[DiseaseF
 
 def _food_name(food: dict[str, Any]) -> str:
     match = _food_match(food)
-    return str(match.matched_food_name or match.query_name)
+    if _is_mfds_match(match):
+        return str(match.query_name or match.original_name)
+    return str(match.matched_food_name or match.query_name or match.original_name)
+
+
+def _is_mfds_match(match: FoodMatchResult) -> bool:
+    return str(match.match_source or "").startswith("mfds_")
 
 
 def _food_match(food: dict[str, Any]) -> FoodMatchResult:

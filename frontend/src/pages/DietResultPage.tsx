@@ -46,7 +46,23 @@ function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
 }
 
 function foodDisplayName(food: Record<string, unknown>): string {
-  return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
+  return (
+    String(food.food_name ?? food.name ?? food.query_name ?? food.original_name ?? food.matched_food_name ?? "").trim() ||
+    "음식명 확인 불가"
+  );
+}
+
+function mfdsCandidateName(food: Record<string, unknown>): string {
+  const source = String(food.match_source ?? "").toLowerCase();
+  const matched = String(food.matched_food_name ?? "").trim();
+  if (!source.startsWith("mfds_") || !matched || matched === foodDisplayName(food)) {
+    return "";
+  }
+  return matched;
+}
+
+function matchStatusLabel(food: Record<string, unknown>): string {
+  return food.needs_user_confirmation === true ? "확인 필요" : "확인 완료";
 }
 
 function scoringSourceLabel(value: unknown): string {
@@ -430,13 +446,16 @@ export default function DietResultPage() {
               </div>
             )}
             {foodScoreDetails.slice(0, 4).map((detail, index) => {
+              const mfdsCandidate = mfdsCandidateName(detail);
               const detailScores = diseaseScoreEntries(detail.scores);
               return (
                 <div className="mini-card" key={`${foodDisplayName(detail)}-${index}`}>
                   <strong>{foodDisplayName(detail)}</strong>
                   <span className="muted">
-                    점수 기준: {String(detail.matched_food_name ?? "매칭 정보 없음")}
+                    {mfdsCandidate ? "MFDS 후보" : "점수 기준"}:{" "}
+                    {mfdsCandidate || String(detail.matched_food_name ?? "매칭 정보 없음")}
                   </span>
+                  {mfdsCandidate && <span className="badge badge-reference">상태: {matchStatusLabel(detail)}</span>}
                   {detailScores.length > 0 ? (
                     <div className="chip-list">
                       {detailScores.map(([label, score]) => (

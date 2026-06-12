@@ -70,7 +70,7 @@ class FoodDetectionCandidateSet:
             else:
                 match = match_food_name(food_name, matcher=matcher)
 
-            display_name = match.matched_food_name or match.query_name
+            display_name = _display_food_name(match, prefer_query_name=use_lookup_gate)
             if not display_name:
                 continue
 
@@ -149,3 +149,9 @@ def _copy_match_for_query(match: FoodMatchResult, *, food_name: str, query_name:
         needs_user_confirmation=match.needs_user_confirmation,
         metadata=match.metadata,
     )
+
+
+def _display_food_name(match: FoodMatchResult, *, prefer_query_name: bool) -> str | None:
+    if prefer_query_name and str(match.match_source or "").startswith("mfds_"):
+        return match.query_name
+    return match.matched_food_name or match.query_name

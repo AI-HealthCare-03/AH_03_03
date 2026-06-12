@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -37,6 +38,7 @@ class MfdsCandidate:
     source_query: str
     rank_score: float
     rank_reason: str
+    nutrition: dict[str, Any] | None = None
 
 
 FetchPayload = Callable[[str], dict[str, Any]]
@@ -113,6 +115,7 @@ class MfdsFoodDbMatcher:
                 "used_query": top.source_query,
                 "rank_score": top.rank_score,
                 "rank_reason": top.rank_reason,
+                "nutrition": top.nutrition,
                 "top_candidates": _serialize_top_candidates(top_candidates[:TOP_CANDIDATE_METADATA_LIMIT]),
                 "latency_ms": latency_ms,
             },
@@ -262,6 +265,7 @@ def _candidate_from_item(*, item: dict[str, Any], source_query: str, original_qu
         source_query=source_query,
         rank_score=score,
         rank_reason=reason,
+        nutrition=_nutrition_from_item(item),
     )
 
 
@@ -328,9 +332,78 @@ def _serialize_top_candidates(candidates: list[MfdsCandidate]) -> list[dict[str,
             "food_code": candidate.food_code,
             "rank_score": candidate.rank_score,
             "rank_reason": candidate.rank_reason,
+            "nutrition": candidate.nutrition,
         }
         for candidate in candidates
     ]
+
+
+def _nutrition_from_item(item: dict[str, Any]) -> dict[str, Any] | None:
+    nutrition = {
+        "calories_kcal": _optional_float(_first_value(item, ["AMT_NUM1", "ENERGY_KCAL", "ENERC", "NUTR_CONT1"])),
+        "carbohydrate_g": _optional_float(_first_value(item, ["AMT_NUM6", "CARBOHYDRATE_G", "CHOCDF", "NUTR_CONT2"])),
+        "protein_g": _optional_float(_first_value(item, ["AMT_NUM3", "PROTEIN_G", "PROCNT", "NUTR_CONT3"])),
+        "fat_g": _optional_float(_first_value(item, ["AMT_NUM4", "FAT_G", "FATCE", "NUTR_CONT4"])),
+        "sodium_mg": _optional_float(_first_value(item, ["AMT_NUM13", "SODIUM_MG", "NA", "NUTR_CONT6"])),
+    }
+    if not any(value is not None for value in nutrition.values()):
+        return None
+
+    serving_size = _first_value(
+        item,
+        [
+            "SERVING_SIZE",
+            "SERVING_SIZE_G",
+            "SERVING_UNIT",
+            "NUTR_CONT_BASE",
+            "MAKER_SERVING_SIZE",
+            "1회제공량",
+            "총내용량",
+        ],
+    )
+    return {
+        **nutrition,
+        **_basis_from_serving_size(serving_size),
+    }
+
+
+def _basis_from_serving_size(serving_size: str | None) -> dict[str, Any]:
+    if not serving_size:
+        return {
+            "basis_amount": None,
+            "basis_unit": None,
+            "basis_label": "기준량 확인 필요",
+        }
+
+    normalized = serving_size.strip()
+    lower = normalized.lower()
+    number_match = re.search(r"(\d+(?:\.\d+)?)\s*(g|그램|ml|mL|㎖)", normalized)
+    if number_match:
+        amount = _optional_float(number_match.group(1))
+        raw_unit = number_match.group(2).lower()
+        unit = "ml" if raw_unit in {"ml", "㎖"} else "g"
+        label = f"{amount:g}{unit} 기준" if amount is not None else "기준량 확인 필요"
+        return {
+            "basis_amount": amount,
+            "basis_unit": unit,
+            "basis_label": label,
+            "serving_size": normalized,
+        }
+
+    if "1회" in normalized or "serving" in lower:
+        return {
+            "basis_amount": 1,
+            "basis_unit": "serving",
+            "basis_label": "1회 제공량 기준",
+            "serving_size": normalized,
+        }
+
+    return {
+        "basis_amount": None,
+        "basis_unit": None,
+        "basis_label": "기준량 확인 필요",
+        "serving_size": normalized,
+    }
 
 
 def _processed_food_penalty(*, food_name: str, query: str) -> float:
@@ -394,6 +467,14 @@ def _first_value(item: dict[str, Any], keys: list[str]) -> str | None:
             if text:
                 return text
     return None
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        text = str(value or "").replace(",", "").strip()
+        return float(text) if text else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _food_tokens(value: str) -> list[str]:

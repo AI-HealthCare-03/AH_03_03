@@ -101,7 +101,23 @@ function diseaseScoreEntries(value: unknown): Array<[string, unknown]> {
 }
 
 function foodDisplayName(food: Record<string, unknown>): string {
-  return String(food.food_name ?? food.name ?? food.matched_food_name ?? "").trim() || "음식명 확인 불가";
+  return (
+    String(food.food_name ?? food.name ?? food.query_name ?? food.original_name ?? food.matched_food_name ?? "").trim() ||
+    "음식명 확인 불가"
+  );
+}
+
+function mfdsCandidateName(food: Record<string, unknown>): string {
+  const source = String(food.match_source ?? "").toLowerCase();
+  const matched = String(food.matched_food_name ?? "").trim();
+  if (!source.startsWith("mfds_") || !matched || matched === foodDisplayName(food)) {
+    return "";
+  }
+  return matched;
+}
+
+function matchStatusLabel(food: Record<string, unknown>): string {
+  return food.needs_user_confirmation === true ? "확인 필요" : "확인 완료";
 }
 
 function scoringSourceLabel(value: unknown): string {
@@ -741,12 +757,14 @@ export default function DietPage() {
             {foodScoreDetails.length > 0 && (
               <div className="card-list">
                 {foodScoreDetails.slice(0, 3).map((detail, index) => {
-                  const matched = detail.matched_food_name ? String(detail.matched_food_name) : "매칭 정보 없음";
+                  const mfdsCandidate = mfdsCandidateName(detail);
+                  const matched = mfdsCandidate || (detail.matched_food_name ? String(detail.matched_food_name) : "매칭 정보 없음");
                   const detailScores = diseaseScoreEntries(detail.scores);
                   return (
                     <div className="mini-card" key={`${foodDisplayName(detail)}-${index}`}>
                       <strong>{foodDisplayName(detail)}</strong>
-                      <span className="muted">점수 기준: {matched}</span>
+                      <span className="muted">{mfdsCandidate ? "MFDS 후보" : "점수 기준"}: {matched}</span>
+                      {mfdsCandidate && <span className="badge badge-reference">상태: {matchStatusLabel(detail)}</span>}
                       {detailScores.length > 0 ? (
                         <div className="chip-list">
                           {detailScores.map(([label, score]) => (
