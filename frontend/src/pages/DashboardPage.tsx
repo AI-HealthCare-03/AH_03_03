@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -25,6 +25,8 @@ import {
   getLatestResultsByAnalysisType,
   isKnownAnalysisType,
 } from "../utils/riskDisplay";
+
+import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";  // ReactNode import 추가
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -510,14 +512,15 @@ function formatDate(value: unknown): string {
   return `${y}.${mo}.${day}`;
 }
 
-function getChallengeIcon(category: unknown): string {
+function getChallengeIcon(category: unknown): ReactNode {
   const key = String(category ?? "").toUpperCase();
-  if (key.includes("DIET") || key.includes("식")) return "🥗";
-  if (key.includes("MEDICATION") || key.includes("복약")) return "💊";
-  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return "🚶";
-  if (key.includes("WATER") || key.includes("수분")) return "💧";
-  return "✅";
+  if (key.includes("DIET") || key.includes("식")) return <Salad size={20} />;
+  if (key.includes("MEDICATION") || key.includes("복약")) return <Pill size={20} />;
+  if (key.includes("WALK") || key.includes("EXERCISE") || key.includes("운동")) return <Dumbbell size={20} />;
+  if (key.includes("WATER") || key.includes("수분")) return <Droplets size={20} />;
+  return <Trophy size={20} />;
 }
+
 
 function getChallengeTitle(challenge: AnyRecord): string {
   const nested = challenge.challenge as AnyRecord | undefined;
