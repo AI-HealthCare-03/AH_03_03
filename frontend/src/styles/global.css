@@ -3666,6 +3666,12 @@ input:-webkit-autofill:focus {
   margin-bottom: 8px;
 }
 
+.signup-link {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1.5px;
+}
+
 .field-group {
   display: grid;
   gap: 7px;

@@ -44,7 +44,7 @@ export default function LoginPage() {
           <div>
             <span className="eyebrow">Health Ladder</span>
             <h1>다시 만나 반가워요!</h1>
-            <p>아이디 또는 이메일로 로그인하고 오늘의 건강 상태를 확인하세요.</p>
+            <p>아이디 또는 이메일로 로그인하여 건강 상태를 확인하세요.</p>
           </div>
         </div>
         {error && <ErrorMessage message={error} />}
@@ -74,7 +74,10 @@ export default function LoginPage() {
           </Link>
         </div>
         <p className="muted">
-          계정이 없다면 <Link to="/signup">회원가입</Link>
+          계정이 없다면{" "}
+          <Link className="signup-link" to="/signup">
+            회원가입
+          </Link>
         </p>
       </Card>
     </div>
