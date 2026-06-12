@@ -930,12 +930,10 @@ const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
             {todayRecommendations.items.map((item) => (
               <article className="mini-card today-recommendation-item" key={`${item.action_type}-${item.title}`}>
                 <div className="record-row">
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.description}</p>
-                  </div>
+                  <strong>{item.title}</strong>
                   <span className="badge">{getAnalysisTypeLabel(item.related_disease, "생활습관")}</span>
                 </div>
+                <p>{item.description}</p>
                 <p className="muted">{item.reason}</p>
               </article>
             ))}
