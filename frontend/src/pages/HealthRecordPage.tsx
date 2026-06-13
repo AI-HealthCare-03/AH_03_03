@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { AnalysisMode, runAnalysisAsync } from "../api/analysis";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 import {
   createHealthRecord,
@@ -273,12 +275,36 @@ export default function HealthRecordPage() {
   const [notice, setNotice] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
+  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
 
   const bmi = useMemo(() => {
     const height = parseNumber(form.height_cm);
     const weight = parseNumber(form.weight_kg);
     return height && weight ? weight / (height / 100) ** 2 : null;
   }, [form.height_cm, form.weight_kg]);
+
+  useAsyncJobPolling({
+    jobId: analysisJobId,
+    enabled: analysisJobId !== null && runningMode !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      setRunningMode(null);
+      setAnalysisJobId(null);
+      navigate("/analysis");
+    },
+    onFailure: () => {
+      setError("분석에 실패했습니다. 다시 시도해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onTimeout: () => {
+      setError("분석 시간이 초과됐습니다. 다시 시도해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+  });
 
   const load = async () => {
     const [latest, list, readinessResult] = await Promise.all([
@@ -318,19 +344,27 @@ export default function HealthRecordPage() {
     await save().catch((err) => setError(err instanceof Error ? err.message : "건강정보 저장에 실패했습니다."));
   };
 
-  const runAnalysis = async () => {
+  const runAnalysis = async (mode: AnalysisMode) => {
     setError("");
-    const latestReadiness = await getAnalysisReadiness<Readiness>();
-    setReadiness(latestReadiness);
-    if (!latestReadiness.latest_health_record_id) {
-      setError("저장된 건강정보가 없습니다. 기본 정보를 저장한 뒤 분석을 실행해주세요.");
-      return;
+    setNotice("");
+    try {
+      await save();
+      const latestReadiness = await getAnalysisReadiness<Readiness>();
+      if (!latestReadiness.latest_health_record_id) {
+        setError("저장된 건강정보가 없습니다.");
+        return;
+      }
+      if (!latestReadiness.is_ready) {
+        setError("기본 분석에 필요한 정보가 부족합니다.");
+        return;
+      }
+      setRunningMode(mode);
+      const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, mode);
+      setAnalysisJobId(job.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      setRunningMode(null);
     }
-    if (!latestReadiness.is_ready) {
-      setError("기본 분석에 필요한 정보가 부족합니다.");
-      return;
-    }
-    navigate("/analysis");
   };
 
   const removeRecord = async () => {
@@ -424,15 +458,27 @@ export default function HealthRecordPage() {
             visibleSections={stepToSection[activeStep]}
           />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
-            <button className="secondary" onClick={() => navigate(-1)} type="button">
-              이전
-            </button>
             <button className="secondary" type="submit">
               저장
             </button>
-            <button disabled={activeStep === 4 && !readiness?.is_ready} onClick={runAnalysis} type="button">
-              분석 실행
-            </button>
+            {activeStep === 2 && (
+              <button
+                disabled={runningMode !== null}
+                onClick={() => void runAnalysis("BASIC")}
+                type="button"
+              >
+                {runningMode === "BASIC" ? "분석 중..." : "간편 분석 실행"}
+              </button>
+            )}
+            {activeStep === 3 && (
+              <button
+                disabled={runningMode !== null}
+                onClick={() => void runAnalysis("PRECISION")}
+                type="button"
+              >
+                {runningMode === "PRECISION" ? "분석 중..." : "정밀 분석 실행"}
+              </button>
+            )}
           </div>
         </form>
       </Card>

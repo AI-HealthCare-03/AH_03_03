@@ -333,12 +333,9 @@ export default function AnalysisPage() {
           <p>당뇨, 고혈압, 비만, 콜레스테롤·중성지방 이상 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
-          <button disabled={runningMode !== null} onClick={() => void run("BASIC")} type="button">
-            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석 실행"}
-          </button>
-          <button disabled={runningMode !== null} onClick={() => void run("PRECISION")} type="button">
-            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석 실행"}
-          </button>
+          <Link className="button secondary" to="/health">
+            분석 하기
+          </Link>
           <Link className="button secondary" to="/analysis/history">
             전체 결과
           </Link>
