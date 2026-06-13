@@ -419,10 +419,12 @@ export default function AnalysisPage() {
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{slot.diseaseName} 관리 필요 단계</span>
-              <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
-              <div className="button-row">
-                <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+                </div>
               </div>
               <p>{String(result.summary ?? "상세보기에서 주요 요인을 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
