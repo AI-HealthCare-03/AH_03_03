@@ -403,9 +403,12 @@ export default function HealthRecordPage() {
               {step}
             </button>
           ))}
+          <Link className="filter-tab" style={{ textAlign: "center", display: "block" }} to="/health/profile">
+            한눈에 보기
+          </Link>
         </div>
 
-        {/* 분석 준비 상태 인라인으로 이동 */}
+        {/* 분석 준비 상태 */}
         <div className="analysis-readiness-panel" style={{ marginTop: 58 }}>
           <div className={`readiness-status ${readiness?.is_ready ? "success-text" : "warning-text"}`}>
             <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}</strong>
@@ -441,9 +444,6 @@ export default function HealthRecordPage() {
             <div className="button-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
               <Link className="button secondary" to="/ocr/exam">
                 검진표로 입력
-              </Link>
-              <Link className="button secondary" to="/health/profile">
-                필수 건강정보 관리로 이동
               </Link>
             </div>
           </div>
