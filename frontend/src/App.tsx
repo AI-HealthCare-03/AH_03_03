@@ -33,7 +33,6 @@ const MedicationOcrPage = lazy(() => import("./pages/MedicationOcrPage"));
 const MyPage = lazy(() => import("./pages/MyPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const NotificationPage = lazy(() => import("./pages/NotificationPage"));
-const OcrPage = lazy(() => import("./pages/OcrPage"));
 const PasswordResetConfirmPage = lazy(() => import("./pages/PasswordResetConfirmPage"));
 const PasswordResetRequestPage = lazy(() => import("./pages/PasswordResetRequestPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -71,7 +70,6 @@ export default function App() {
               <Route path="/mypage" element={<MyPage />} />
               <Route path="/health" element={<HealthRecordPage />} />
               <Route path="/health/profile" element={<HealthProfilePage />} />
-              <Route path="/ocr" element={<OcrPage />} />
               <Route path="/ocr/exam" element={<ExamOcrPage />} />
               <Route path="/ocr/medication" element={<MedicationOcrPage />} />
               <Route path="/chatbot" element={<ChatbotPage />} />
