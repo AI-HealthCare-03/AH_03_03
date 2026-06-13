@@ -235,15 +235,17 @@ export default function AnalysisHistoryPage() {
                 const slotSourceBadgeLabel = getAnalysisSourceBadgeLabel(slot.result);
                 const slotX2StageSummary = getX2StageSummary(slot.result);
                 return (
-                  <div className="mini-card" key={String(slot.result.id ?? slot.analysisType)}>
-                    <strong>{slot.diseaseName} 관리 단계</strong>
-                    <div className="button-row">
-                      <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
-                      <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                      {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
+                  <Link to={`/analysis/${String(slot.result.id)}`} style={{ textDecoration: "none" }}>
+                    <div className="mini-card" key={String(slot.result.id ?? slot.analysisType)}>
+                      <strong>{slot.diseaseName} 관리 단계</strong>
+                      <div className="button-row">
+                        <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
+                        <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                        {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
+                      </div>
+                      {slotX2StageSummary && <p className="muted">{slotX2StageSummary}</p>}
                     </div>
-                    {slotX2StageSummary && <p className="muted">{slotX2StageSummary}</p>}
-                  </div>
+                  </Link>
                 );
               })}
             </div>
