@@ -438,14 +438,14 @@ export default function HealthRecordPage() {
         {error && <ErrorMessage message={error} />}
         {notice && <div className="state-box">{notice}</div>}
         {activeStep < 4 && (
-          <div className="state-box">
-            직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.
-            <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
-            <div className="button-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
-              <Link className="button secondary" to="/ocr/exam">
-                검진표로 입력
-              </Link>
+          <div className="state-box" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+            <div>
+              <p>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.</p>
+              <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
             </div>
+            <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">
+              검진표로 입력
+            </Link>
           </div>
         )}
         <form className="form" onSubmit={submit}>
