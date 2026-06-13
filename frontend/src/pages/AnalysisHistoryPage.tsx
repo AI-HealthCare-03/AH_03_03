@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 
 import { getAnalysisResultDetail, listAnalysisResults } from "../api/analysis";
 import Card from "../components/Card";
@@ -117,6 +117,7 @@ function getRelatedAnalysisRunResults(target: AnalysisResult | null | undefined,
 }
 
 export default function AnalysisHistoryPage() {
+  const navigate = useNavigate();
   const { analysisId } = useParams();
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [detail, setDetail] = useState<AnalysisDetail | null>(null);
@@ -273,9 +274,9 @@ export default function AnalysisHistoryPage() {
     <Card
       title="위험도 추론 결과 전체 리스트"
       actions={
-        <Link className="button" to="/analysis">
-          분석 실행
-        </Link>
+        <button className="button" onClick={() => navigate(-1)} type="button">
+          뒤로가기
+        </button>
       }
     >
       {error && <ErrorMessage message={error} />}
