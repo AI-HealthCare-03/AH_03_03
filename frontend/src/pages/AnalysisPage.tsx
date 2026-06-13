@@ -339,7 +339,7 @@ export default function AnalysisPage() {
           <Link className="button secondary" to="/health">
             정보 수정
           </Link>
-          <Link className="button secondary" to="/analysis/history">
+          <Link className="button" to="/analysis/history">
             전체 결과
           </Link>
         </div>
