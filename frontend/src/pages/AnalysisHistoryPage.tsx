@@ -42,13 +42,18 @@ type AnalysisDetail = {
   explanation?: AnalysisExplanation | null;
 };
 
-const tabs = ["전체", "당뇨", "고혈압", "콜레스테롤·중성지방", "비만"];
-const tabToType: Record<string, string | null> = {
-  전체: null,
-  당뇨: "DIABETES",
-  고혈압: "HYPERTENSION",
+const analysisTypeOptions: Record<string, string | null> = {
+  "전체": null,
+  "고혈압": "HYPERTENSION",
+  "당뇨": "DIABETES",
   "콜레스테롤·중성지방": "DYSLIPIDEMIA",
-  비만: "OBESITY",
+  "비만": "OBESITY",
+  "복부비만": "ABDOMINAL_OBESITY",
+  "지방간": "FATTY_LIVER",
+  "빈혈": "ANEMIA",
+  "간기능": "LIVER_FUNCTION",
+  "신장기능": "KIDNEY_FUNCTION",
+  "만성콩팥병": "CHRONIC_KIDNEY_DISEASE",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,7 +140,7 @@ export default function AnalysisHistoryPage() {
   };
 
   const displayResults = useMemo(() => {
-    const selectedType = tabToType[activeTab];
+    const selectedType = analysisTypeOptions[activeTab];
     if (!selectedType) {
       return results;
     }
@@ -285,17 +290,16 @@ export default function AnalysisHistoryPage() {
       }
     >
       {error && <ErrorMessage message={error} />}
-      <div className="filter-tabs">
-        {tabs.map((tab) => (
-          <button
-            className={activeTab === tab ? "filter-tab active" : "filter-tab"}
-            key={tab}
-            onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
-            type="button"
-          >
-            {tab}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <select
+          onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
+          style={{ fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", width: 200 }}
+          value={activeTab}
+        >
+          {Object.keys(analysisTypeOptions).map((key) => (
+            <option key={key} value={key}>{key}</option>
+          ))}
+        </select>
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
       <div className="table-list" style={{ marginTop: 16 }}>
