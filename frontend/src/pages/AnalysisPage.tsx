@@ -20,6 +20,8 @@ import {
   mergeResultsWithExpectedAnalysisTypes,
 } from "../utils/riskDisplay";
 
+import { categoryIcon } from "./ChallengePage";
+
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
 type ReferenceSource = {
@@ -456,7 +458,12 @@ export default function AnalysisPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {recommendedChallenges.map((challenge) => (
               <div className="mini-card" key={String(challenge.id)}>
-                <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="challenge-icon">
+                    {categoryIcon[String(challenge.category ?? "COMMON").toUpperCase()] ?? null}
+                  </span>
+                  <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
+                </div>
                 <p className="muted">{String(challenge.description ?? "분석 결과를 바탕으로 추천된 챌린지입니다.")}</p>
                 <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
                   상세보기
