@@ -15,6 +15,7 @@ import {
   getDisplayRiskLabel,
   getLatestAnalysisMode,
   getLatestResultsByAnalysisType,
+  getRiskColor,
   isKnownAnalysisType,
   mergeResultsWithExpectedAnalysisTypes,
 } from "../utils/riskDisplay";
@@ -418,7 +419,7 @@ export default function AnalysisPage() {
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{slot.diseaseName} 관리 필요 단계</span>
-              <strong>{getDisplayRiskLabel(result)}</strong>
+              <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
               <div className="button-row">
                 <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
                 {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
