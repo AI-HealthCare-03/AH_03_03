@@ -423,7 +423,7 @@ export default function AnalysisPage() {
                 <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
                 {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
               </div>
-              <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
+              <p>{String(result.summary ?? "상세보기에서 주요 요인을 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (
                 <div className="chip-list">
@@ -434,6 +434,9 @@ export default function AnalysisPage() {
                   ))}
                 </div>
               )}
+              <Link className="button secondary" style={{ marginTop: 8, textAlign: "center", display: "block" }} to={`/analysis/${String(result.id)}`}>
+                상세보기
+              </Link>
             </div>
           );
         })}
@@ -471,34 +474,6 @@ export default function AnalysisPage() {
             </Link>
           </div>
         )}
-      </Card>
-      <Card title="상세 요인 카드">
-        <div className="card-list">
-          {latestDiseaseResults.map((result) => {
-            const factors = factorsByResultId[String(result.id)] ?? [];
-            return (
-              <div className="mini-card" key={String(result.id)}>
-                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
-                {factors.length > 0 ? (
-                  <div className="chip-list">
-                    {factors.slice(0, 4).map((factor) => {
-                      const value = displayFactorValue(factor);
-                      return (
-                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
-                          {String(factor.factor_name ?? factor.factor_key)}
-                          {value ? `: ${value}` : ""}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <span>상세 요인은 분석 입력값과 질환별 기준에 따라 표시됩니다.</span>
-                )}
-                <Link to={`/analysis/${String(result.id)}`}>상세보기</Link>
-              </div>
-            );
-          })}
-        </div>
       </Card>
     </div>
   );
