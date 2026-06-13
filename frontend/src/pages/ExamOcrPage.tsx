@@ -24,7 +24,7 @@ type FeedbackDialog = {
 };
 
 // 스텝 인디케이터
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { label: string; num: Step }[] = [
@@ -81,7 +81,7 @@ export default function ExamOcrPage() {
   const [canRetryOcr, setCanRetryOcr] = useState(false);
 
   // 현재 스텝 계산
-  const currentStep: Step = isAppliedToHealth ? 3 : measurements.length > 0 ? 2 : 1;
+  const currentStep: Step = isAppliedToHealth ? 4 : measurements.length > 0 ? 3 : selectedFile ? 2 : 1;
 
   useEffect(() => {
     return () => {

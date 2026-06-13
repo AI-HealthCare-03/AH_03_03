@@ -21,7 +21,7 @@ type FeedbackDialog = {
   tone?: "default" | "danger";
 };
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { label: string; num: Step }[] = [
@@ -78,7 +78,7 @@ export default function MedicationOcrPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [canRetryOcr, setCanRetryOcr] = useState(false);
 
-  const currentStep: Step = isSaved ? 3 : items.length > 0 ? 2 : 1;
+  const currentStep: Step = isSaved ? 4 : items.length > 0 ? 3 : selectedImageFile ? 2 : 1;
 
   useEffect(() => {
     return () => {
