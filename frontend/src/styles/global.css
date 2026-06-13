@@ -2403,7 +2403,8 @@ pre {
 }
 
 .analysis-history-row {
-  grid-template-columns: auto 1fr auto auto auto;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
 }
 
 .record-row {

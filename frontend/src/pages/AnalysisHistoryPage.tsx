@@ -303,15 +303,21 @@ export default function AnalysisHistoryPage() {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
-              <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
               <div>
-                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                  <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
+                </div>
                 <p className="muted">{mainFactorLabel(result)}</p>
               </div>
-              <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
-              <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
-              <span className="badge badge-reference">상세보기</span>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "space-between", minWidth: 120 }}>
+                <span style={{ color: "var(--color-muted)", fontSize: 13 }}>상세보기 →</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: 13 }}>{formatDate(result.analyzed_at ?? result.created_at)}</span>
+                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+                </div>
+              </div>
             </>
           );
           return (
