@@ -278,7 +278,7 @@ export default function ExamOcrPage() {
           <h1>건강검진표 측정값 확인</h1>
           <p>검진표 이미지/PDF를 업로드하면 측정값을 자동으로 인식합니다.</p>
         </div>
-        <Link className="button secondary" to="/analysis">
+        <Link className="button secondary" to="/health">
           등록 선택으로 돌아가기
         </Link>
       </div>
