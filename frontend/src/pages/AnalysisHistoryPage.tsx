@@ -229,7 +229,7 @@ export default function AnalysisHistoryPage() {
         </Card>
         {detailSlots.length > 0 && (
           <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 판정" : "간편분석 질환별 판정"}>
-            <div className="card-list">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {detailSlots.map((slot) => {
                 if (slot.isUnavailable || !slot.result) {
                   return (
