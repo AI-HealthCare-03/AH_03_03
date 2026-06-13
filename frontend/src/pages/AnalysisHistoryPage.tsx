@@ -214,6 +214,18 @@ export default function AnalysisHistoryPage() {
             <p>{String(result?.summary ?? "")}</p>
             {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
+          {detail?.explanation && (
+            <div style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 8, marginTop: 16 }}>분석 설명</h3>
+              <div className="mini-card">
+                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
+                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
+                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
+                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
+                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
+              </div>
+            </div>
+          )}
         </Card>
         {detailSlots.length > 0 && (
           <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 판정" : "간편분석 질환별 판정"}>
@@ -252,31 +264,6 @@ export default function AnalysisHistoryPage() {
             {result?.analysis_mode === "PRECISION" && detailSlots.length < expectedSlotCount && (
               <div className="state-box">정밀분석 표시 항목을 불러오는 중입니다.</div>
             )}
-          </Card>
-        )}
-        {detail?.explanation && (
-          <Card title="분석 설명">
-            <div className="card-list">
-              <div className="mini-card">
-                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
-                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
-                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
-                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
-                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
-              </div>
-              {referenceSources.length > 0 && (
-                <div className="mini-card">
-                  <strong>참고 출처</strong>
-                  <div className="chip-list">
-                    {referenceSources.map((source) => (
-                      <span className="badge badge-reference" key={String(source.id ?? source.title)}>
-                        {String(source.source_org ?? source.title ?? "참고 출처")}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
           </Card>
         )}
         <Card title="분석 입력 요약">
