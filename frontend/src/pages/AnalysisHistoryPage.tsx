@@ -123,6 +123,8 @@ export default function AnalysisHistoryPage() {
   const [detail, setDetail] = useState<AnalysisDetail | null>(null);
   const [activeTab, setActiveTab] = useState("전체");
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const formatDate = (value: unknown) => {
     if (!value) {
@@ -139,6 +141,9 @@ export default function AnalysisHistoryPage() {
     }
     return results.filter((result) => String(result.analysis_type) === selectedType);
   }, [activeTab, results]);
+
+  const totalPages = Math.ceil(displayResults.length / itemsPerPage);
+  const pagedResults = displayResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const mainFactorLabel = (result: AnalysisResult) => {
     const summary = result.summary ?? result.guide_message ?? result.message;
@@ -294,7 +299,7 @@ export default function AnalysisHistoryPage() {
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
       <div className="table-list" style={{ marginTop: 16 }}>
-        {displayResults.map((result) => {
+        {pagedResults.map((result) => {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
@@ -315,10 +320,21 @@ export default function AnalysisHistoryPage() {
             </Link>
           );
         })}
-        {displayResults.length === 0 && (
+        {pagedResults.length === 0 && (
           <div className="state-box">표시할 분석 결과가 없습니다.</div>
         )}
       </div>
+      {totalPages > 1 && (
+        <div className="button-row" style={{ justifyContent: "center", marginTop: 16 }}>
+          <button className="secondary" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} type="button">
+            이전
+          </button>
+          <span>{currentPage} / {totalPages}</span>
+          <button className="secondary" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} type="button">
+            다음
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
