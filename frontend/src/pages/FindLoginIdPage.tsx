@@ -37,6 +37,10 @@ export default function FindLoginIdPage() {
       setError("이메일 또는 휴대폰 번호 중 하나를 입력해주세요.");
       return;
     }
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) || trimmedEmail.includes("..")) {
+      setError("올바른 이메일 주소를 입력해주세요.");
+      return;
+    }
     if (hasPhone && (phone1.length < 2 || phone2.length < 3 || phone3.length !== 4)) {
       setError("휴대폰 번호를 올바르게 입력해주세요.");
       return;
@@ -55,7 +59,7 @@ export default function FindLoginIdPage() {
         message: response.message,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "아이디 찾기에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "입력 정보를 확인해주세요.");
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +88,7 @@ export default function FindLoginIdPage() {
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="가입한 이메일"
+              placeholder="example@example.com"
               type="email"
             />
           </label>
@@ -113,7 +117,7 @@ export default function FindLoginIdPage() {
                 onChange={(event) => setPhone3(onlyDigits(event.target.value).slice(0, 4))}
               />
             </div>
-            <small className="muted">이메일 또는 휴대폰 번호 중 하나만 입력해도 됩니다.</small>
+            <small className="muted">이메일 또는 휴대폰 번호 중 하나만 입력해도 아이디를 찾을 수 있습니다.</small>
           </div>
 
           <button type="submit" disabled={isLoading}>
@@ -133,7 +137,10 @@ export default function FindLoginIdPage() {
         ) : null}
 
         <p className="muted">
-          비밀번호가 기억나지 않는다면 <Link to="/auth/password-reset">비밀번호 찾기</Link>
+          비밀번호가 기억나지 않는다면{" "}
+          <Link className="signup-link" to="/auth/password-reset">
+            비밀번호 찾기
+          </Link>
         </p>
       </Card>
     </div>
