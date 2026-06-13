@@ -290,7 +290,7 @@ export default function AnalysisHistoryPage() {
           <button
             className={activeTab === tab ? "filter-tab active" : "filter-tab"}
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
             type="button"
           >
             {tab}
