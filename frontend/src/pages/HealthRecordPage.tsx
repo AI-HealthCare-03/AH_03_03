@@ -61,17 +61,15 @@ const initialForm: HealthProfileFormState = {
 };
 
 const steps = [
-  "기본 정보",
+  "기본/신체 정보",
   "가족력/생활정보",
-  "신체계측",
   "혈액/검진 정보",
 ];
 
 const stepToSection: Record<number, string[]> = {
-  0: [healthProfileSectionTitles[0]],
+  0: [healthProfileSectionTitles[0],healthProfileSectionTitles[2]],
   1: [healthProfileSectionTitles[1]],
-  2: [healthProfileSectionTitles[2]],
-  3: [healthProfileSectionTitles[3]],
+  2: [healthProfileSectionTitles[3]],
 };
 
 const healthFieldLabels: Record<string, string> = {
@@ -461,7 +459,7 @@ export default function HealthRecordPage() {
             <button className="secondary" type="submit">
               저장
             </button>
-            {activeStep === 2 && (
+            {activeStep === 1 && (
               <button
                 disabled={runningMode !== null}
                 onClick={() => void runAnalysis("BASIC")}
@@ -470,7 +468,7 @@ export default function HealthRecordPage() {
                 {runningMode === "BASIC" ? "분석 중..." : "간편 분석 실행"}
               </button>
             )}
-            {activeStep === 3 && (
+            {activeStep === 2 && (
               <button
                 disabled={runningMode !== null}
                 onClick={() => void runAnalysis("PRECISION")}
