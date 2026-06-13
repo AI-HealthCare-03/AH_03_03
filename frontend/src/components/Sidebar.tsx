@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { HouseHeart, HeartPulse, ChartBar, FileText, Pill, Salad, Trophy, BotMessageSquare, User, Settings, MessageCircleQuestionMark, Shield } from "lucide-react";
+import { HouseHeart, HeartPulse, ChartBar, FileText, Pill, Salad, Trophy, BotMessageSquare, User, Settings, MessageCircleQuestionMark, Shield, ActivitySquare } from "lucide-react";
 
 import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
@@ -21,6 +21,7 @@ export const sidebarSections: SidebarSection[] = [
     links: [
       { to: "/", icon: <HouseHeart size={20} />, label: "홈" },
       { to: "/health", icon: <HeartPulse size={20} />, label: "건강 분석" },
+      { to: "/analysis", icon: <ActivitySquare size={20} />, label: "분석 결과" },
       { to: "/dashboard", icon: <ChartBar size={20} />, label: "건강 리포트" },
     ],
   },
