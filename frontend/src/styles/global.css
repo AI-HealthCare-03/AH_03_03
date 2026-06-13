@@ -2905,7 +2905,8 @@ pre {
 .state-box,
 .error-box {
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 8px 12px;
+  margin: 1px 0 6px;
 }
 
 .state-box {
@@ -3664,6 +3665,12 @@ input:-webkit-autofill:focus {
 .signup-ocr-choice h2 {
   display: block;
   margin-bottom: 8px;
+}
+
+.signup-link {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1.5px;
 }
 
 .field-group {

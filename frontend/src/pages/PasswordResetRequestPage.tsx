@@ -14,11 +14,24 @@ export default function PasswordResetRequestPage() {
     event.preventDefault();
     setError("");
     setMessage("");
+
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) || trimmedEmail.includes("..")) {
+      setError("올바른 이메일 주소를 입력해주세요.");
+      return;
+    }
+
     try {
-      await requestPasswordReset(email.trim());
-      setMessage("비밀번호 재설정 안내가 발송되었습니다. 이메일을 확인해주세요.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "비밀번호 재설정 요청에 실패했습니다.");
+      await requestPasswordReset(trimmedEmail);
+      setMessage("비밀번호 재설정 안내를 이메일로 발송했습니다.\n3분 이내에 메일이 도착하지 않으면 스팸메일함 또는 입력한 이메일 주소를 확인해주세요.");
+    } catch {
+      setError("입력한 이메일 정보를 확인해주세요.");
     }
   };
 
@@ -27,15 +40,17 @@ export default function PasswordResetRequestPage() {
       <Card>
         <div className="page-header">
           <div>
-            <span className="eyebrow">Account Recovery</span>
+            <span className="eyebrow">HEALTH LADDER</span>
             <h1>비밀번호 찾기</h1>
-            <p>가입한 이메일을 입력하면 비밀번호 재설정 안내를 보내드립니다.</p>
+            <p>가입 시 등록한 이메일을 입력하면 비밀번호 재설정 링크를 이메일로 보내드립니다.</p>
           </div>
         </div>
         {error && <ErrorMessage message={error} />}
         {message && (
           <div className="state-box">
-            {message}
+            {message.split("\n").map((line, i) => (
+              <span key={i}>{line}<br /></span>
+            ))}
           </div>
         )}
         <form className="form" onSubmit={submit}>
@@ -44,16 +59,20 @@ export default function PasswordResetRequestPage() {
             <input
               autoComplete="email"
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
+              onFocus={() => setError("")}
+              placeholder="example@example.com"
               required
               type="email"
               value={email}
             />
           </label>
-          <button type="submit">요청하기</button>
+          <button type="submit">재설정 링크 받기</button>
         </form>
         <p className="muted">
-          기억났다면 <Link to="/login">로그인으로 돌아가기</Link>
+          <Link className={"signup-link"} to="/login">
+            로그인
+          </Link>{" "}
+          페이지로 돌아가기
         </p>
       </Card>
     </div>
