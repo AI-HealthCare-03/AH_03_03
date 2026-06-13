@@ -255,7 +255,6 @@ export default function AnalysisHistoryPage() {
                         <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
                         {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
                       </div>
-                      {slotX2StageSummary && <p className="muted">{slotX2StageSummary}</p>}
                     </div>
                   </Link>
                 );
@@ -266,25 +265,6 @@ export default function AnalysisHistoryPage() {
             )}
           </Card>
         )}
-        <Card title="분석 입력 요약">
-          <div className="record-table">
-            {[
-              ["키", formatSummaryValue(snapshotInput.height_cm, "cm")],
-              ["몸무게", formatSummaryValue(snapshotInput.weight_kg, "kg")],
-              ["BMI", formatSummaryValue(snapshotInput.bmi)],
-              ["혈압", formatBloodPressure(snapshotInput)],
-              ["공복혈당", formatSummaryValue(snapshotInput.fasting_glucose, "mg/dL")],
-              ["분석일", formatDate(result?.analyzed_at ?? result?.created_at)],
-              ["관리 필요 단계", getDisplayRiskLabel(result)],
-            ].map(([label, value]) => (
-              <div className="record-table-row" key={String(label)}>
-                <span>{String(label)}</span>
-                <strong>{String(value ?? "-")}</strong>
-              </div>
-            ))}
-          </div>
-          {!detail?.snapshot && <div className="state-box">분석 입력 요약이 아직 저장되지 않았습니다.</div>}
-        </Card>
       </div>
     );
   }
