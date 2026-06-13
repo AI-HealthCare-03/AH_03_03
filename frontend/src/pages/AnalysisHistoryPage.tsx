@@ -127,6 +127,7 @@ export default function AnalysisHistoryPage() {
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [detail, setDetail] = useState<AnalysisDetail | null>(null);
   const [activeTab, setActiveTab] = useState("전체");
+  const [activeMode, setActiveMode] = useState("전체");
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -140,12 +141,18 @@ export default function AnalysisHistoryPage() {
   };
 
   const displayResults = useMemo(() => {
+    let filtered = results;
     const selectedType = analysisTypeOptions[activeTab];
-    if (!selectedType) {
-      return results;
+    if (selectedType) {
+      filtered = filtered.filter((result) => String(result.analysis_type) === selectedType);
     }
-    return results.filter((result) => String(result.analysis_type) === selectedType);
-  }, [activeTab, results]);
+    if (activeMode === "간편") {
+      filtered = filtered.filter((result) => result.analysis_mode === "BASIC");
+    } else if (activeMode === "정밀") {
+      filtered = filtered.filter((result) => result.analysis_mode === "PRECISION");
+    }
+    return filtered;
+  }, [activeTab, activeMode, results]);
 
   const totalPages = Math.ceil(displayResults.length / itemsPerPage);
   const pagedResults = displayResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -290,7 +297,8 @@ export default function AnalysisHistoryPage() {
       }
     >
       {error && <ErrorMessage message={error} />}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+
+      <div style={{ display: "flex", justifyContent: "flex-start", gap: 8, marginBottom: 8 }}>
         <select
           onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
           style={{ fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", width: 200 }}
@@ -300,14 +308,25 @@ export default function AnalysisHistoryPage() {
             <option key={key} value={key}>{key}</option>
           ))}
         </select>
+        <select
+          onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
+          style={{ fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", width: 100 }}
+          value={activeMode}
+        >
+          <option>전체</option>
+          <option>간편</option>
+          <option>정밀</option>
+        </select>
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
+
       <div className="table-list" style={{ marginTop: 16 }}>
         {pagedResults.map((result) => {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
               <div>
+
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
                   <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
