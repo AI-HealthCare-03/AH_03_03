@@ -293,7 +293,7 @@ export default function AnalysisHistoryPage() {
         ))}
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
-      <div className="table-list">
+      <div className="table-list" style={{ marginTop: 16 }}>
         {displayResults.map((result) => {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
