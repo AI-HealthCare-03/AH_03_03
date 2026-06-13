@@ -251,7 +251,7 @@ export default function AnalysisPage() {
     setMissingFields((readiness.basic_ready ?? readiness.is_ready) ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
     setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
     const [recommendations, challenges] = await Promise.allSettled([
-      listChallengeRecommendations<AnalysisResult[]>({ limit: 3 }),
+      listChallengeRecommendations<AnalysisResult[]>({ limit: 4 }),
       listChallenges<AnalysisResult[]>({ limit: 20 }),
     ]);
     if (recommendations.status === "fulfilled" && challenges.status === "fulfilled") {
@@ -445,9 +445,9 @@ export default function AnalysisPage() {
           </div>
         )}
       </div>
-      <Card title="추천 액션">
+      <Card title="추천 챌린지">
         {recommendedChallenges.length > 0 ? (
-          <div className="card-list">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {recommendedChallenges.map((challenge) => (
               <div className="mini-card" key={String(challenge.id)}>
                 <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
