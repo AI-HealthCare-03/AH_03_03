@@ -301,7 +301,7 @@ export default function AnalysisHistoryPage() {
       <div style={{ display: "flex", justifyContent: "flex-start", gap: 8, marginBottom: 8 }}>
         <select
           onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
-          style={{ fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", width: 200 }}
+          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 200, cursor: "pointer", outline: "none"  }}
           value={activeTab}
         >
           {Object.keys(analysisTypeOptions).map((key) => (
@@ -310,7 +310,7 @@ export default function AnalysisHistoryPage() {
         </select>
         <select
           onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
-          style={{ fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "0.5px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", width: 100 }}
+          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 100, cursor: "pointer", outline: "none"  }}
           value={activeMode}
         >
           <option>전체</option>
