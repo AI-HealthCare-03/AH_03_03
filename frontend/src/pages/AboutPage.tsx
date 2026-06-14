@@ -125,7 +125,7 @@ export default function AboutPage() {
         <div>
           <span className="eyebrow">Health Ladder</span>
           <h1>AI 만성질환 예측과 생활습관 관리까지, 나를 위한 건강 사다리를 시작하세요</h1>
-          <p>만성질환 위험도를 예측하고 식단 관리와 챌린지를 한 곳에서 스마트하게 케어하세요.</p>
+          <p>만성질환 위험도를 예측하고 식단 관리, 복약, 생활습관 챌린지를 스마트하게 케어하세요.</p>
           <div className="button-row">
             <Link className="button" to="/health">
               건강정보 입력하기
@@ -180,8 +180,8 @@ export default function AboutPage() {
       {/* 내 상황에 맞는 시작 방법 */}
       <section className="landing-section">
         <div className="section-heading">
-          <h2>내 상황에 맞는 시작 방법</h2>
-          <p>가장 가까운 상황을 선택하면 어떤 흐름으로 서비스를 쓰면 좋은지 안내합니다.</p>
+          <h2>나에게 맞는 건강 관리 시작하기</h2>
+          <p>현재 나의 상황과 가장 비슷한 항목을 선택하면 추천 흐름을 안내해드립니다.</p>
         </div>
         <div className="persona-grid">
           {aboutPersonas.map((persona) => (
@@ -238,7 +238,7 @@ export default function AboutPage() {
       <section className="landing-cta">
         <div>
           <h2>지금 바로 건강 관리를 시작하세요.</h2>
-          <p>기본 건강정보를 입력하면 건강 위험도 분석과 맞춤 챌린지를 바로 확인할 수 있습니다.</p>
+          <p>기본 건강정보를 입력하면 만성질환 위험도 예측과 건강 챌린지 서비스를 바로 이용할 수 있습니다.</p>
         </div>
         <div className="button-row">
           <Link className="button" to="/health">
