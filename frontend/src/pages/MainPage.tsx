@@ -18,7 +18,7 @@ type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
   service_title: "Health Ladder",
-  service_description: "AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
+  service_description: "간편한 입력과 검진표 분석으로 AI 질병 위험도를 예측하고, 식단부터 생활습관 챌린지까지 한 곳에서 스마트하게 케어하세요.",
 };
 
 const landingFeatures = [
@@ -649,8 +649,8 @@ export default function MainPage() {
       <section className="hero-panel">
         <div>
           <span className="eyebrow">Health Ladder</span>
-          <h1>건강검진표부터 생활습관까지, 내 건강 관리 단계를 쉽게 확인하세요</h1>
-          <p>{String(data.service_description)}</p>
+          <h1>AI 만성질환 예측과 생활습관 관리까지, 나를 위한 건강 사다리를 시작하세요</h1>
+          <p>만성질환 위험도를 예측하고 식단 관리와 챌린지를 한 곳에서 스마트하게 케어하세요.</p>
           <div className="button-row">
             <Link className="button" to="/signup">
               무료로 시작하기
@@ -679,11 +679,11 @@ export default function MainPage() {
       </section>
 
       <section className="landing-section">
-        <Card title="예시 대시보드 미리보기">
+        <Card title="만성질환 예측 미리보기">
           <div className="landing-preview-dashboard">
             <div className="landing-preview-risk-panel">
               <span className="viz-card-label">질환별 관리 필요도</span>
-              <p className="muted">건강검진 결과를 4단계 관리 항목으로 정리해 보여줍니다.</p>
+              <p className="muted">예측 결과를 4단계 관리 항목으로 정리해 보여줍니다.</p>
               <RiskStageBoard
                 items={[
                   { analyzed_at: "2026-06-01", diseaseName: "고혈압", id: 1, risk_level: "LOW" },

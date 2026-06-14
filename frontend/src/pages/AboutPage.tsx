@@ -124,8 +124,8 @@ export default function AboutPage() {
       <section className="hero-panel">
         <div>
           <span className="eyebrow">Health Ladder</span>
-          <h1>건강검진표부터 생활습관까지, 내 건강을 한 곳에서 관리하세요</h1>
-          <p>AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.</p>
+          <h1>AI 만성질환 예측과 생활습관 관리까지, 나를 위한 건강 사다리를 시작하세요</h1>
+          <p>만성질환 위험도를 예측하고 식단 관리와 챌린지를 한 곳에서 스마트하게 케어하세요.</p>
           <div className="button-row">
             <Link className="button" to="/health">
               건강정보 입력하기
