@@ -648,7 +648,7 @@ export default function MainPage() {
     <div className="landing-page">
       <section className="hero-panel">
         <div>
-          <span className="eyebrow">Health Ladder</span>
+          <span className="eyebrow">건강한 삶으로 오르는 가장 쉬운 방법, Health Ladder</span>
           <h1>AI 만성질환 예측과 생활습관 관리까지, 나를 위한 건강 사다리를 시작하세요</h1>
           <p>만성질환 위험도를 예측하고 식단 관리와 챌린지를 한 곳에서 스마트하게 케어하세요.</p>
           <div className="button-row">
@@ -679,10 +679,10 @@ export default function MainPage() {
       </section>
 
       <section className="landing-section">
-        <Card title="만성질환 예측 미리보기">
+        <Card title=" 미리보기">
           <div className="landing-preview-dashboard">
             <div className="landing-preview-risk-panel">
-              <span className="viz-card-label">질환별 관리 필요도</span>
+              <span className="viz-card-label">질환별 위험도 예측 결과</span>
               <p className="muted">예측 결과를 4단계 관리 항목으로 정리해 보여줍니다.</p>
               <RiskStageBoard
                 items={[
