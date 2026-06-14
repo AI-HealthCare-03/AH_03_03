@@ -15,9 +15,12 @@ import {
   getDisplayRiskLabel,
   getLatestAnalysisMode,
   getLatestResultsByAnalysisType,
+  getRiskColor,
   isKnownAnalysisType,
   mergeResultsWithExpectedAnalysisTypes,
 } from "../utils/riskDisplay";
+
+import { categoryIcon } from "./ChallengePage";
 
 type AnalysisResult = Record<string, unknown>;
 type AnalysisFactor = Record<string, unknown>;
@@ -251,7 +254,7 @@ export default function AnalysisPage() {
     setMissingFields((readiness.basic_ready ?? readiness.is_ready) ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
     setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
     const [recommendations, challenges] = await Promise.allSettled([
-      listChallengeRecommendations<AnalysisResult[]>({ limit: 3 }),
+      listChallengeRecommendations<AnalysisResult[]>({ limit: 4 }),
       listChallenges<AnalysisResult[]>({ limit: 20 }),
     ]);
     if (recommendations.status === "fulfilled" && challenges.status === "fulfilled") {
@@ -336,7 +339,7 @@ export default function AnalysisPage() {
           <Link className="button secondary" to="/health">
             정보 수정
           </Link>
-          <Link className="button secondary" to="/analysis/history">
+          <Link className="button" to="/analysis/history">
             전체 결과
           </Link>
         </div>
@@ -418,12 +421,14 @@ export default function AnalysisPage() {
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{slot.diseaseName} 관리 필요 단계</span>
-              <strong>{getDisplayRiskLabel(result)}</strong>
-              <div className="button-row">
-                <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+                </div>
               </div>
-              <p>{String(result.summary ?? "주요 factor는 상세 화면에서 확인할 수 있습니다.")}</p>
+              <p>{String(result.summary ?? "상세보기에서 주요 요인을 확인할 수 있습니다.")}</p>
               {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
               {referenceSources.length > 0 && (
                 <div className="chip-list">
@@ -434,6 +439,9 @@ export default function AnalysisPage() {
                   ))}
                 </div>
               )}
+              <Link className="button secondary" style={{ marginTop: 8, textAlign: "center", display: "block" }} to={`/analysis/${String(result.id)}`}>
+                상세보기
+              </Link>
             </div>
           );
         })}
@@ -445,12 +453,17 @@ export default function AnalysisPage() {
           </div>
         )}
       </div>
-      <Card title="추천 액션">
+      <Card title="추천 챌린지">
         {recommendedChallenges.length > 0 ? (
-          <div className="card-list">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {recommendedChallenges.map((challenge) => (
               <div className="mini-card" key={String(challenge.id)}>
-                <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="challenge-icon">
+                    {categoryIcon[String(challenge.category ?? "COMMON").toUpperCase()] ?? null}
+                  </span>
+                  <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
+                </div>
                 <p className="muted">{String(challenge.description ?? "분석 결과를 바탕으로 추천된 챌린지입니다.")}</p>
                 <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
                   상세보기
@@ -471,34 +484,6 @@ export default function AnalysisPage() {
             </Link>
           </div>
         )}
-      </Card>
-      <Card title="상세 요인 카드">
-        <div className="card-list">
-          {latestDiseaseResults.map((result) => {
-            const factors = factorsByResultId[String(result.id)] ?? [];
-            return (
-              <div className="mini-card" key={String(result.id)}>
-                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
-                {factors.length > 0 ? (
-                  <div className="chip-list">
-                    {factors.slice(0, 4).map((factor) => {
-                      const value = displayFactorValue(factor);
-                      return (
-                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_key)}>
-                          {String(factor.factor_name ?? factor.factor_key)}
-                          {value ? `: ${value}` : ""}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <span>상세 요인은 분석 입력값과 질환별 기준에 따라 표시됩니다.</span>
-                )}
-                <Link to={`/analysis/${String(result.id)}`}>상세보기</Link>
-              </div>
-            );
-          })}
-        </div>
       </Card>
     </div>
   );

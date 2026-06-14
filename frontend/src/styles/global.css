@@ -2403,7 +2403,8 @@ pre {
 }
 
 .analysis-history-row {
-  grid-template-columns: auto 1fr auto auto auto;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
 }
 
 .record-row {
@@ -2608,6 +2609,7 @@ pre {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .risk-stage-board-title {
@@ -2645,6 +2647,7 @@ pre {
   min-height: 0;
   min-width: 0;
   padding: 0;
+  height: 100%;
 }
 
 .risk-stage-low {
@@ -2709,7 +2712,7 @@ pre {
   border-radius: 10px;
   box-shadow: inset 3px 0 0 var(--risk-stage-border);
   max-height: 148px;
-  min-height: 72px;
+  min-height: 90px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 10px;

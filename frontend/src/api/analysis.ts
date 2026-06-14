@@ -72,8 +72,8 @@ export async function getLatestAnalysisResults<T>(): Promise<T> {
   return apiRequest<T>("/analysis/results/latest");
 }
 
-export async function listAnalysisResults<T>(): Promise<T> {
-  return apiRequest<T>("/analysis/results");
+export async function listAnalysisResults<T>(limit = 100): Promise<T> {
+  return apiRequest<T>(`/analysis/results?limit=${limit}`);
 }
 
 export async function getAnalysisResult<T>(analysisId: number): Promise<T> {

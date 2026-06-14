@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 
 import { getAnalysisResultDetail, listAnalysisResults } from "../api/analysis";
 import Card from "../components/Card";
@@ -42,13 +42,18 @@ type AnalysisDetail = {
   explanation?: AnalysisExplanation | null;
 };
 
-const tabs = ["전체", "당뇨", "고혈압", "콜레스테롤·중성지방", "비만"];
-const tabToType: Record<string, string | null> = {
-  전체: null,
-  당뇨: "DIABETES",
-  고혈압: "HYPERTENSION",
+const analysisTypeOptions: Record<string, string | null> = {
+  "전체": null,
+  "고혈압": "HYPERTENSION",
+  "당뇨": "DIABETES",
   "콜레스테롤·중성지방": "DYSLIPIDEMIA",
-  비만: "OBESITY",
+  "비만": "OBESITY",
+  "복부비만": "ABDOMINAL_OBESITY",
+  "지방간": "FATTY_LIVER",
+  "빈혈": "ANEMIA",
+  "간기능": "LIVER_FUNCTION",
+  "신장기능": "KIDNEY_FUNCTION",
+  "만성콩팥병": "CHRONIC_KIDNEY_DISEASE",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -117,11 +122,15 @@ function getRelatedAnalysisRunResults(target: AnalysisResult | null | undefined,
 }
 
 export default function AnalysisHistoryPage() {
+  const navigate = useNavigate();
   const { analysisId } = useParams();
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [detail, setDetail] = useState<AnalysisDetail | null>(null);
   const [activeTab, setActiveTab] = useState("전체");
+  const [activeMode, setActiveMode] = useState("전체");
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const formatDate = (value: unknown) => {
     if (!value) {
@@ -132,12 +141,21 @@ export default function AnalysisHistoryPage() {
   };
 
   const displayResults = useMemo(() => {
-    const selectedType = tabToType[activeTab];
-    if (!selectedType) {
-      return results;
+    let filtered = results;
+    const selectedType = analysisTypeOptions[activeTab];
+    if (selectedType) {
+      filtered = filtered.filter((result) => String(result.analysis_type) === selectedType);
     }
-    return results.filter((result) => String(result.analysis_type) === selectedType);
-  }, [activeTab, results]);
+    if (activeMode === "간편") {
+      filtered = filtered.filter((result) => result.analysis_mode === "BASIC");
+    } else if (activeMode === "정밀") {
+      filtered = filtered.filter((result) => result.analysis_mode === "PRECISION");
+    }
+    return filtered;
+  }, [activeTab, activeMode, results]);
+
+  const totalPages = Math.ceil(displayResults.length / itemsPerPage);
+  const pagedResults = displayResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const mainFactorLabel = (result: AnalysisResult) => {
     const summary = result.summary ?? result.guide_message ?? result.message;
@@ -214,10 +232,22 @@ export default function AnalysisHistoryPage() {
             <p>{String(result?.summary ?? "")}</p>
             {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
+          {detail?.explanation && (
+            <div style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 8, marginTop: 16 }}>분석 설명</h3>
+              <div className="mini-card">
+                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
+                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
+                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
+                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
+                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
+              </div>
+            </div>
+          )}
         </Card>
         {detailSlots.length > 0 && (
           <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 판정" : "간편분석 질환별 판정"}>
-            <div className="card-list">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {detailSlots.map((slot) => {
                 if (slot.isUnavailable || !slot.result) {
                   return (
@@ -235,15 +265,16 @@ export default function AnalysisHistoryPage() {
                 const slotSourceBadgeLabel = getAnalysisSourceBadgeLabel(slot.result);
                 const slotX2StageSummary = getX2StageSummary(slot.result);
                 return (
-                  <div className="mini-card" key={String(slot.result.id ?? slot.analysisType)}>
-                    <strong>{slot.diseaseName} 관리 단계</strong>
-                    <div className="button-row">
-                      <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
-                      <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                      {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
+                  <Link to={`/analysis/${String(slot.result.id)}`} style={{ textDecoration: "none" }}>
+                    <div className="mini-card" key={String(slot.result.id ?? slot.analysisType)}>
+                      <strong>{slot.diseaseName} 관리 단계</strong>
+                      <div className="button-row">
+                        <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
+                        <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                        {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
+                      </div>
                     </div>
-                    {slotX2StageSummary && <p className="muted">{slotX2StageSummary}</p>}
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -252,50 +283,6 @@ export default function AnalysisHistoryPage() {
             )}
           </Card>
         )}
-        {detail?.explanation && (
-          <Card title="분석 설명">
-            <div className="card-list">
-              <div className="mini-card">
-                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
-                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
-                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
-                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
-                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
-              </div>
-              {referenceSources.length > 0 && (
-                <div className="mini-card">
-                  <strong>참고 출처</strong>
-                  <div className="chip-list">
-                    {referenceSources.map((source) => (
-                      <span className="badge badge-reference" key={String(source.id ?? source.title)}>
-                        {String(source.source_org ?? source.title ?? "참고 출처")}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
-        <Card title="분석 입력 요약">
-          <div className="record-table">
-            {[
-              ["키", formatSummaryValue(snapshotInput.height_cm, "cm")],
-              ["몸무게", formatSummaryValue(snapshotInput.weight_kg, "kg")],
-              ["BMI", formatSummaryValue(snapshotInput.bmi)],
-              ["혈압", formatBloodPressure(snapshotInput)],
-              ["공복혈당", formatSummaryValue(snapshotInput.fasting_glucose, "mg/dL")],
-              ["분석일", formatDate(result?.analyzed_at ?? result?.created_at)],
-              ["관리 필요 단계", getDisplayRiskLabel(result)],
-            ].map(([label, value]) => (
-              <div className="record-table-row" key={String(label)}>
-                <span>{String(label)}</span>
-                <strong>{String(value ?? "-")}</strong>
-              </div>
-            ))}
-          </div>
-          {!detail?.snapshot && <div className="state-box">분석 입력 요약이 아직 저장되지 않았습니다.</div>}
-        </Card>
       </div>
     );
   }
@@ -304,39 +291,56 @@ export default function AnalysisHistoryPage() {
     <Card
       title="위험도 추론 결과 전체 리스트"
       actions={
-        <Link className="button" to="/analysis">
-          분석 실행
-        </Link>
+        <button className="button" onClick={() => navigate(-1)} type="button">
+          뒤로가기
+        </button>
       }
     >
       {error && <ErrorMessage message={error} />}
-      <div className="filter-tabs">
-        {tabs.map((tab) => (
-          <button
-            className={activeTab === tab ? "filter-tab active" : "filter-tab"}
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            type="button"
-          >
-            {tab}
-          </button>
-        ))}
+
+      <div style={{ display: "flex", justifyContent: "flex-start", gap: 8, marginBottom: 8 }}>
+        <select
+          onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
+          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 200, cursor: "pointer", outline: "none"  }}
+          value={activeTab}
+        >
+          {Object.keys(analysisTypeOptions).map((key) => (
+            <option key={key} value={key}>{key}</option>
+          ))}
+        </select>
+        <select
+          onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
+          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 100, cursor: "pointer", outline: "none"  }}
+          value={activeMode}
+        >
+          <option>전체</option>
+          <option>간편</option>
+          <option>정밀</option>
+        </select>
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
-      <div className="table-list">
-        {displayResults.map((result) => {
+
+      <div className="table-list" style={{ marginTop: 16 }}>
+        {pagedResults.map((result) => {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
-              <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
               <div>
-                <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                  <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
+                </div>
                 <p className="muted">{mainFactorLabel(result)}</p>
               </div>
-              <span>{formatDate(result.analyzed_at ?? result.created_at)}</span>
-              <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
-              <span className="badge badge-reference">상세보기</span>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "space-between", minWidth: 120 }}>
+                <span style={{ color: "var(--color-muted)", fontSize: 13 }}>상세보기 →</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: 13 }}>{formatDate(result.analyzed_at ?? result.created_at)}</span>
+                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
+                </div>
+              </div>
             </>
           );
           return (
@@ -345,10 +349,21 @@ export default function AnalysisHistoryPage() {
             </Link>
           );
         })}
-        {displayResults.length === 0 && (
+        {pagedResults.length === 0 && (
           <div className="state-box">표시할 분석 결과가 없습니다.</div>
         )}
       </div>
+      {totalPages > 1 && (
+        <div className="button-row" style={{ justifyContent: "center", marginTop: 16 }}>
+          <button className="secondary" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} type="button">
+            이전
+          </button>
+          <span>{currentPage} / {totalPages}</span>
+          <button className="secondary" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} type="button">
+            다음
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
