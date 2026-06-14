@@ -679,28 +679,27 @@ export default function MainPage() {
       </section>
 
       <section className="landing-section">
-        <Card title=" 미리보기">
+        <Card title="건강 분석 화면 미리보기">
           <div className="landing-preview-dashboard">
             <div className="landing-preview-risk-panel">
               <span className="viz-card-label">질환별 위험도 예측 결과</span>
-              <p className="muted">예측 결과를 4단계 관리 항목으로 정리해 보여줍니다.</p>
+              <p className="muted">예측 결과를 4단계로 정리해 보여줍니다.</p>
               <RiskStageBoard
                 items={[
                   { analyzed_at: "2026-06-01", diseaseName: "고혈압", id: 1, risk_level: "LOW" },
                   { analyzed_at: "2026-06-01", diseaseName: "비만", id: 2, risk_level: "CAUTION" },
                   { analyzed_at: "2026-06-01", diseaseName: "당뇨", id: 3, risk_level: "CAUTION" },
-                  { analyzed_at: "2026-06-01", diseaseName: "콜레스테롤·중성지방", id: 4, risk_level: "HIGH_CAUTION" },
+                  { analyzed_at: "2026-06-01", diseaseName: "이상지질혈증", id: 4, risk_level: "HIGH_CAUTION" },
                 ]}
                 maxItemsPerStage={3}
                 showCounts={false}
                 showEmptyStages
-                title="예시 관리 단계"
                 variant="preview"
               />
             </div>
             <div className="landing-preview-vitals-panel">
               <div>
-                <span className="viz-card-label">최근 검진표</span>
+                <span className="viz-card-label">최근 건강검진 결과</span>
                 <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>132 mg/dL</strong></div>
                 <div className="viz-stat-row"><span>혈압</span><strong>132/84 mmHg</strong></div>
                 <div className="viz-stat-row"><span>총콜레스테롤</span><strong>198 mg/dL</strong></div>
