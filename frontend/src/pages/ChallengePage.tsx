@@ -31,7 +31,7 @@ const tabToCategory: Record<string, string | null> = {
   생활습관: "HABIT",
 };
 
-const categoryIcon: Record<string, ReactNode> = {
+export const categoryIcon: Record<string, ReactNode> = {
   DIET: <Salad size={20} />,
   EXERCISE: <Dumbbell size={20} />,
   SLEEP: <Moon size={20} />,

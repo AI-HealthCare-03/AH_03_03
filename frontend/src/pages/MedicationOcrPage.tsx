@@ -21,6 +21,46 @@ type FeedbackDialog = {
   tone?: "default" | "danger";
 };
 
+type Step = 1 | 2 | 3 | 4;
+
+function StepIndicator({ current }: { current: Step }) {
+  const steps: { label: string; num: Step }[] = [
+    { num: 1, label: "파일 업로드" },
+    { num: 2, label: "복약정보 확인" },
+    { num: 3, label: "저장 완료" },
+  ];
+  return (
+    <div className="step-indicator">
+      {steps.map((step, i) => (
+        <div key={step.num} className="step-indicator__item">
+          <div
+            className={[
+              "step-indicator__circle",
+              current > step.num ? "step-indicator__circle--done" : "",
+              current === step.num ? "step-indicator__circle--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {current > step.num ? "✓" : step.num}
+          </div>
+          <span
+            className={[
+              "step-indicator__label",
+              current === step.num ? "step-indicator__label--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {step.label}
+          </span>
+          {i < steps.length - 1 && <div className="step-indicator__line" />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function MedicationOcrPage() {
   const [items, setItems] = useState<MedicationOcrItem[]>([]);
   const [sourceType, setSourceType] = useState("PRESCRIPTION");
@@ -35,13 +75,14 @@ export default function MedicationOcrPage() {
   const [ocrJobId, setOcrJobId] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [canRetryOcr, setCanRetryOcr] = useState(false);
+
+  const currentStep: Step = isSaved ? 4 : items.length > 0 ? 3 : selectedImageFile ? 2 : 1;
 
   useEffect(() => {
     return () => {
-      if (selectedPreviewUrl) {
-        URL.revokeObjectURL(selectedPreviewUrl);
-      }
+      if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
     };
   }, [selectedPreviewUrl]);
 
@@ -65,8 +106,7 @@ export default function MedicationOcrPage() {
       setIsRunning(false);
       setOcrJobId(null);
       const result = medicationResultFromPayload(job.result_payload);
-      const nextItems = result?.items ?? [];
-      setItems(nextItems);
+      setItems(result?.items ?? []);
       setCanRetryOcr(false);
       setFeedbackDialog({
         title: "복약 정보 인식이 완료되었습니다.",
@@ -76,7 +116,10 @@ export default function MedicationOcrPage() {
     onFailure: (job) => {
       setFeedbackDialog({
         title: "복약 정보 인식에 실패했습니다.",
-        message: job.status === "CANCELED" ? "복약 정보 인식 작업이 취소되었습니다." : "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        message:
+          job.status === "CANCELED"
+            ? "복약 정보 인식 작업이 취소되었습니다."
+            : "이미지를 다시 확인한 뒤 업로드해 주세요.",
         tone: "danger",
       });
       setCanRetryOcr(true);
@@ -100,6 +143,7 @@ export default function MedicationOcrPage() {
     setMessage("");
     setFeedbackDialog(null);
     setItems([]);
+    setIsSaved(false);
     setCanRetryOcr(false);
     if (!selectedImageFile) {
       setError("처방전 또는 약봉투 이미지 파일을 먼저 선택해주세요.");
@@ -107,8 +151,9 @@ export default function MedicationOcrPage() {
     }
     setIsRunning(true);
     try {
-      const job = await runMedicationOcr(buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename));
-      setMessage("");
+      const job = await runMedicationOcr(
+        buildMedicationOcrPayload(sourceType, selectedImageFile, imageFilename),
+      );
       setOcrJobId(job.id);
     } catch {
       setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
@@ -117,26 +162,28 @@ export default function MedicationOcrPage() {
     }
   };
 
-  const updateItem = (index: number, key: keyof MedicationOcrItem, value: string | number | string[] | null) => {
-    setItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
+  const updateItem = (
+    index: number,
+    key: keyof MedicationOcrItem,
+    value: string | number | string[] | null,
+  ) => {
+    setIsSaved(false);
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [key]: value } : item)),
+    );
   };
 
   const handleImageSelection = async (file: File | null) => {
-    if (selectedPreviewUrl) {
-      URL.revokeObjectURL(selectedPreviewUrl);
-    }
+    if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
     setSelectedPreviewUrl("");
     setPreviewMessage("");
-    if (!file) {
-      return;
-    }
+    if (!file) return;
     setSelectedImageFile(file);
     setImageFilename(file.name);
     if (!isHeicFile(file)) {
       setSelectedPreviewUrl(URL.createObjectURL(file));
       return;
     }
-
     setPreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
     try {
       const previewBlob = await normalizeImageForPreview(file);
@@ -166,7 +213,10 @@ export default function MedicationOcrPage() {
           memo: item.memo,
         })),
       });
-      setMessage(`확인한 복약 정보가 저장되었습니다. 생성 ${response.created_count}건, 건너뜀 ${response.skipped_count}건`);
+      setIsSaved(true);
+      setMessage(
+        `확인한 복약 정보가 저장되었습니다. 생성 ${response.created_count}건, 건너뜀 ${response.skipped_count}건`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약정보 저장에 실패했습니다.");
     } finally {
@@ -176,24 +226,32 @@ export default function MedicationOcrPage() {
 
   return (
     <div className="page-stack">
+      {/* 헤더 */}
       <div className="page-header">
         <div>
           <h1>복약/처방전 정보 확인</h1>
-          <p>처방전 또는 약봉투 이미지/텍스트 기반 복약 정보 후보를 생성합니다.</p>
+          <p>처방전 또는 약봉투 이미지 기반 복약 정보 후보를 생성합니다.</p>
         </div>
-        <Link className="button secondary" to="/ocr">
+        <Link className="button secondary" to="/medications">
           등록 선택으로 돌아가기
         </Link>
       </div>
+
+      {/* 스텝 인디케이터 */}
+      <StepIndicator current={currentStep} />
+
+      {/* 에러 / 재시도 */}
       {error && <ErrorMessage message={error} />}
-      {canRetryOcr ? (
+      {canRetryOcr && (
         <div className="button-row">
           <button disabled={isRunning} onClick={runMedicationRecognition} type="button">
             다시 시도
           </button>
         </div>
-      ) : null}
+      )}
       {message && <div className="state-box">{message}</div>}
+
+      {/* 피드백 다이얼로그 */}
       {feedbackDialog && (
         <ConfirmDialog
           confirmLabel="확인"
@@ -204,132 +262,159 @@ export default function MedicationOcrPage() {
           tone={feedbackDialog.tone}
         />
       )}
-      <div className="page-grid">
-        <Card title="처방전/약봉투 업로드">
-          <div className="upload-box">
-            <strong>이미지 업로드 영역</strong>
-            <span>촬영/업로드 후 생성된 후보 정보를 확인하고 저장해주세요.</span>
-            <p className="warning-text">
-              업로드한 이미지는 건강정보 추출 및 분석을 위해 사용됩니다. 자동 인식 결과는 오류가 있을 수 있으므로
-              저장 또는 분석 전에 내용을 확인해주세요. 복약 정보는 민감한 건강정보일 수 있으므로 본인 자료만
-              업로드해주세요.
-            </p>
-            <div className="upload-action-grid">
+
+      {/* ── STEP 1: 파일 업로드 ── */}
+      <Card title="처방전/약봉투 업로드">
+        <div className="upload-box">
+          <div className="upload-action-grid">
+            <label className="upload-action-button">
+              파일에서 선택
+              <input
+                accept="image/*,.heic,.heif"
+                type="file"
+                onChange={(e) => handleImageSelection(e.currentTarget.files?.[0] ?? null)}
+              />
+            </label>
+            {isMobileDevice ? (
               <label className="upload-action-button">
-                파일에서 선택
+                카메라로 촬영
                 <input
                   accept="image/*,.heic,.heif"
+                  capture="environment"
                   type="file"
-                  onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
+                  onChange={(e) => handleImageSelection(e.currentTarget.files?.[0] ?? null)}
                 />
               </label>
-              {isMobileDevice ? (
-                <label className="upload-action-button">
-                  카메라로 촬영
-                  <input
-                    accept="image/*,.heic,.heif"
-                    capture="environment"
-                    type="file"
-                    onChange={(event) => handleImageSelection(event.currentTarget.files?.[0] ?? null)}
-                  />
-                </label>
-              ) : (
-                <span className="upload-mobile-hint">카메라 촬영은 모바일에서 사용할 수 있습니다.</span>
-              )}
-            </div>
-            <span className="muted">선택된 파일: {imageFilename || "없음"}</span>
-            {previewMessage ? (
-              <div className="state-box heic-preview-notice">
-                {previewMessage}
-              </div>
-            ) : null}
-            {selectedPreviewUrl ? (
-              <img alt="선택한 처방전 또는 약봉투 이미지 미리보기" className="upload-preview" src={selectedPreviewUrl} />
-            ) : null}
+            ) : (
+              <span className="upload-action-button upload-action-button--disabled">
+                <span style={{ fontSize: "14px", fontWeight: 600 }}>카메라 촬영</span>
+                <span style={{ fontSize: "11px", fontWeight: 400, opacity: 0.7 }}>
+                  카메라 촬영은 모바일에서 사용할 수 있습니다.
+                </span>
+              </span>
+            )}
           </div>
-          <label>
-            인식 유형
-            <select className="input" value={sourceType} onChange={(event) => setSourceType(event.target.value)}>
-              <option value="PRESCRIPTION">처방전</option>
-              <option value="MEDICATION_BAG">약봉투</option>
-              <option value="SUPPLEMENT">영양제</option>
-            </select>
-          </label>
-          <button disabled={isRunning} onClick={runMedicationRecognition} type="button">
-            {isRunning ? "후보 생성 중..." : "복약 정보 후보 생성"}
+
+          <span className="muted">선택된 파일: {imageFilename || "없음"}</span>
+
+          {previewMessage && (
+            <div className="state-box heic-preview-notice">{previewMessage}</div>
+          )}
+          {selectedPreviewUrl && (
+            <img
+              alt="선택한 처방전 또는 약봉투 이미지 미리보기"
+              className="upload-preview"
+              src={selectedPreviewUrl}
+            />
+          )}
+        </div>
+
+        <p className="warning-text" style={{ marginTop: 8 }}>
+          업로드한 이미지는 건강정보 추출에만 사용됩니다. 자동 인식 결과에 오류가 있을 수
+          있으니 저장 전 반드시 확인하세요. 복약 정보는 민감한 정보이므로 본인 자료만
+          업로드해주세요.
+        </p>
+
+        <label style={{ marginTop: 12 }}>
+          인식 유형
+          <select className="input" value={sourceType} onChange={(e) => setSourceType(e.target.value)}>
+            <option value="PRESCRIPTION">처방전</option>
+            <option value="MEDICATION_BAG">약봉투</option>
+            <option value="SUPPLEMENT">영양제</option>
+          </select>
+        </label>
+
+        <div className="button-row" style={{ marginTop: 12 }}>
+          <button disabled={isRunning || !selectedImageFile} onClick={runMedicationRecognition} type="button">
+            {isRunning ? "후보 생성 중..." : "복약 정보 인식 시작"}
           </button>
-        </Card>
-        <Card title="확인 안내">
-          <p className="warning-text">약 정보는 반드시 사용자가 직접 확인해야 합니다. 치료 변경은 의료진과 상담해주세요.</p>
-          <button disabled={items.length === 0 || isSaving} onClick={save} type="button">
-            {isSaving ? "저장 중..." : "확인/저장"}
-          </button>
-          <Link className="button secondary" style={{ marginTop: 12 }} to="/medications">
-            복약정보 화면으로 이동
-          </Link>
-        </Card>
-      </div>
+        </div>
+      </Card>
+
+      {/* ── STEP 2~3: 복약 정보 후보 ── */}
       <Card title="복약 정보 후보">
         <div className="ocr-result-table">
-          {items.length === 0 && <div className="state-box">아직 추출 결과가 없습니다.</div>}
-          {items.map((item, index) => (
-            <div className="ocr-medication-card" key={item.temp_id ?? `${item.name}-${index}`}>
-              <label>
-                약 이름
-                <input value={item.name} onChange={(event) => updateItem(index, "name", event.target.value)} />
-              </label>
-              <label>
-                용량
-                <input value={item.dosage ?? ""} onChange={(event) => updateItem(index, "dosage", event.target.value)} />
-              </label>
-              <label>
-                복용 횟수
-                <input
-                  value={item.frequency ?? ""}
-                  onChange={(event) => updateItem(index, "frequency", event.target.value)}
-                />
-              </label>
-              <label>
-                복용 시간
-                <input
-                  value={item.time_slots.join(", ")}
-                  onChange={(event) =>
-                    updateItem(
-                      index,
-                      "time_slots",
-                      event.target.value
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                복용 기간
-                <input
-                  value={item.duration_days ?? ""}
-                  onChange={(event) =>
-                    updateItem(index, "duration_days", event.target.value ? Number(event.target.value) : null)
-                  }
-                />
-              </label>
-              <label>
-                메모
-                <input value={item.memo ?? ""} onChange={(event) => updateItem(index, "memo", event.target.value)} />
-              </label>
-              {item.confidence !== null && item.confidence !== undefined && (
-                <span className="badge">신뢰도 {(item.confidence * 100).toFixed(0)}%</span>
-              )}
+          {items.length === 0 ? (
+            <div className="state-box">
+              아직 추출 결과가 없습니다. 파일을 업로드하고 복약 정보 후보를 생성해주세요.
             </div>
-          ))}
+          ) : (
+            items.map((item, index) => (
+              <div className="ocr-medication-card" key={item.temp_id ?? `${item.name}-${index}`}>
+                <label>
+                  약 이름
+                  <input value={item.name} onChange={(e) => updateItem(index, "name", e.target.value)} />
+                </label>
+                <label>
+                  용량
+                  <input value={item.dosage ?? ""} onChange={(e) => updateItem(index, "dosage", e.target.value)} />
+                </label>
+                <label>
+                  복용 횟수
+                  <input value={item.frequency ?? ""} onChange={(e) => updateItem(index, "frequency", e.target.value)} />
+                </label>
+                <label>
+                  복용 시간
+                  <input
+                    value={item.time_slots.join(", ")}
+                    onChange={(e) =>
+                      updateItem(
+                        index,
+                        "time_slots",
+                        e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  복용 기간
+                  <input
+                    value={item.duration_days ?? ""}
+                    onChange={(e) =>
+                      updateItem(index, "duration_days", e.target.value ? Number(e.target.value) : null)
+                    }
+                  />
+                </label>
+                <label>
+                  메모
+                  <input value={item.memo ?? ""} onChange={(e) => updateItem(index, "memo", e.target.value)} />
+                </label>
+                {item.confidence !== null && item.confidence !== undefined && (
+                  <span className="badge">신뢰도 {(item.confidence * 100).toFixed(0)}%</span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* 하단 액션 */}
+        <div
+          className="button-row"
+          style={{ marginTop: 16, justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
+        >
+          <div className="button-row" style={{ margin: 0 }}>
+            <Link className="button secondary" to="/medications">
+              복약정보 화면으로 이동
+            </Link>
+          </div>
+          <button
+            disabled={items.length === 0 || isSaving || isSaved}
+            onClick={save}
+            type="button"
+          >
+            {isSaving ? "저장 중..." : isSaved ? "저장 완료 ✓" : "확인/저장"}
+          </button>
         </div>
       </Card>
     </div>
   );
 }
 
-function buildMedicationOcrPayload(sourceType: string, file: File | null, imageFilename: string): MedicationOcrRequest | FormData {
+function buildMedicationOcrPayload(
+  sourceType: string,
+  file: File | null,
+  imageFilename: string,
+): MedicationOcrRequest | FormData {
   if (!file) {
     return {
       source_type: sourceType,
@@ -344,9 +429,9 @@ function buildMedicationOcrPayload(sourceType: string, file: File | null, imageF
   return formData;
 }
 
-function medicationResultFromPayload(payload: Record<string, unknown> | null | undefined): MedicationOcrResponse | null {
-  if (!payload || !Array.isArray(payload.items)) {
-    return null;
-  }
+function medicationResultFromPayload(
+  payload: Record<string, unknown> | null | undefined,
+): MedicationOcrResponse | null {
+  if (!payload || !Array.isArray(payload.items)) return null;
   return payload as MedicationOcrResponse;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { AnalysisMode, runAnalysisAsync } from "../api/analysis";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 import {
   createHealthRecord,
@@ -381,12 +383,37 @@ export default function HealthProfilePage() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
+  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
 
   const bmi = useMemo(() => {
     const height = parseNumber(form.height_cm);
     const weight = parseNumber(form.weight_kg);
     return height && weight ? weight / (height / 100) ** 2 : null;
   }, [form.height_cm, form.weight_kg]);
+
+  useAsyncJobPolling({
+    jobId: analysisJobId,
+    enabled: analysisJobId !== null && runningMode !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      setRunningMode(null);
+      setAnalysisJobId(null);
+      navigate("/analysis");
+    },
+    onFailure: () => {
+      setError("분석에 실패했습니다. 다시 시도해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onTimeout: () => {
+      setError("분석 시간이 초과됐습니다. 다시 시도해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+  });
+
   const completedRequiredCount = x1RequiredFields.filter(({ key }) => isRequiredFilled(form, key, bmi)).length;
   const missingRequiredLabels = x1RequiredFields
     .filter(({ key }) => !isRequiredFilled(form, key, bmi))
@@ -435,14 +462,26 @@ export default function HealthProfilePage() {
   };
 
   const analyze = async () => {
-    const latestReadiness = await getAnalysisReadiness<Readiness>();
-    setReadiness(latestReadiness);
-    if (!latestReadiness.is_ready) {
-      setError("기본 분석에 필요한 정보가 부족합니다. 부족한 항목을 입력한 뒤 다시 시도해주세요.");
-      setEditing(true);
-      return;
+    setError("");
+    try {
+      const latestReadiness = await getAnalysisReadiness<Readiness>();
+      setReadiness(latestReadiness);
+      if (!latestReadiness.latest_health_record_id) {
+        setError("저장된 건강정보가 없습니다.");
+        return;
+      }
+      if (!latestReadiness.is_ready) {
+        setError("기본 분석에 필요한 정보가 부족합니다.");
+        setEditing(true);
+        return;
+      }
+      setRunningMode("PRECISION");
+      const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, "PRECISION");
+      setAnalysisJobId(job.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      setRunningMode(null);
     }
-    navigate("/analysis");
   };
 
   const handleConfirm = async () => {
@@ -482,8 +521,8 @@ export default function HealthProfilePage() {
               수정하기
             </button>
           )}
-          <button className="btn-secondary" onClick={analyze} type="button">
-            분석하기
+          <button className="btn-secondary" disabled={runningMode !== null} onClick={analyze} type="button">
+            {runningMode === "PRECISION" ? "분석 중..." : "분석하기"}
           </button>
         </div>
       </div>

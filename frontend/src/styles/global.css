@@ -2403,7 +2403,8 @@ pre {
 }
 
 .analysis-history-row {
-  grid-template-columns: auto 1fr auto auto auto;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
 }
 
 .record-row {
@@ -2608,11 +2609,12 @@ pre {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .risk-stage-board-title {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   grid-column: 1 / -1;
   margin: 0;
@@ -2645,6 +2647,7 @@ pre {
   min-height: 0;
   min-width: 0;
   padding: 0;
+  height: 100%;
 }
 
 .risk-stage-low {
@@ -2709,7 +2712,7 @@ pre {
   border-radius: 10px;
   box-shadow: inset 3px 0 0 var(--risk-stage-border);
   max-height: 148px;
-  min-height: 72px;
+  min-height: 90px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 10px;
@@ -2779,17 +2782,17 @@ pre {
 .risk-stage-board-preview .risk-stage-panel {
   border-radius: 9px;
   max-height: 112px;
-  min-height: 56px;
+  min-height: 90px;
   padding: 8px;
 }
 
 .risk-stage-board-preview .risk-stage-panel {
-  max-height: 96px;
+  max-height: 120px;
 }
 
 .risk-stage-board-compact .risk-stage-header span,
 .risk-stage-board-preview .risk-stage-header span {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -2799,9 +2802,9 @@ pre {
 .risk-stage-board-preview .risk-stage-chip,
 .risk-stage-board-preview .risk-stage-empty,
 .risk-stage-board-preview .risk-stage-more {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 3px 7px;
+  padding: 5px 11px;
 }
 
 .risk-stage-board-preview .risk-stage-empty {
@@ -3532,6 +3535,10 @@ pre {
   text-align: center;
 }
 
+.upload-box .button-row {
+  justify-content: center;
+}
+
 .upload-box input[type="file"] {
   display: none;
   justify-self: center;
@@ -3740,6 +3747,15 @@ input:-webkit-autofill:focus {
   padding: 12px 18px;
 }
 
+.upload-action-button--disabled {
+  background: var(--color-muted-surface);
+  color: var(--color-muted);
+  cursor: not-allowed;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0.7;
+}
+
 .upload-action-button input {
   display: none;
 }
@@ -3757,9 +3773,68 @@ input:-webkit-autofill:focus {
   padding: 12px 18px;
 }
 
+.step-indicator {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.step-indicator__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-indicator__circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1.5px solid var(--color-border);
+  color: var(--color-muted);
+  background: var(--color-background-primary);
+  flex-shrink: 0;
+}
+
+.step-indicator__circle--active {
+  background: var(--color-text-primary);
+  color: var(--color-background-primary);
+  border-color: var(--color-text-primary);
+}
+
+.step-indicator__circle--done {
+  background: #1d9e75;
+  color: white;
+  border-color: #1d9e75;
+}
+
+.step-indicator__label {
+  font-size: 13px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.step-indicator__label--active {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.step-indicator__line {
+  height: 1px;
+  background: var(--color-border);
+  min-width: 24px;
+  max-width: 60px;
+  margin: 0 6px;
+}
+
 .ocr-result-table {
   display: grid;
   gap: 10px;
+  grid-template-columns: 1fr 1fr;
 }
 
 .ocr-result-row {
@@ -5336,4 +5411,53 @@ input:-webkit-autofill:focus {
 .login-link {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.med-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ── Notice Box ── */
+.notice-box {
+  background: var(--color-muted-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.notice-box i {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Pill Tabs ── */
+.pill-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill-tab {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  border: 0.5px solid var(--color-border);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.pill-tab.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
 }

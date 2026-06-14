@@ -90,7 +90,7 @@ const riskColors: Record<string, string> = {
 };
 
 const analysisSourceLabels: Record<string, string> = {
-  X2_RULE: "검진 수치 반영",
+  X2_RULE: "수치 기반",
   BASIC_FALLBACK: "간편분석 유지",
 };
 

@@ -497,7 +497,7 @@ export default function MainPage() {
                 </span>
               </div>
               {displayAnalysisResults.length > 0 ? (
-                <RiskStageBoard items={diseaseRiskItems} />
+                <RiskStageBoard items={diseaseRiskItems} variant="preview" showEmptyStages />
               ) : (
                 <div className="viz-empty">
                   아직 분석 결과가 없습니다.<br />

@@ -23,6 +23,47 @@ type FeedbackDialog = {
   tone?: "default" | "danger";
 };
 
+// 스텝 인디케이터
+type Step = 1 | 2 | 3 | 4;
+
+function StepIndicator({ current }: { current: Step }) {
+  const steps: { label: string; num: Step }[] = [
+    { num: 1, label: "파일 업로드" },
+    { num: 2, label: "측정값 확인" },
+    { num: 3, label: "건강정보 반영" },
+  ];
+  return (
+    <div className="step-indicator">
+      {steps.map((step, i) => (
+        <div key={step.num} className="step-indicator__item">
+          <div
+            className={[
+              "step-indicator__circle",
+              current > step.num ? "step-indicator__circle--done" : "",
+              current === step.num ? "step-indicator__circle--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {current > step.num ? "✓" : step.num}
+          </div>
+          <span
+            className={[
+              "step-indicator__label",
+              current === step.num ? "step-indicator__label--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {step.label}
+          </span>
+          {i < steps.length - 1 && <div className="step-indicator__line" />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ExamOcrPage() {
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -35,16 +76,16 @@ export default function ExamOcrPage() {
   const [isRunningOcr, setIsRunningOcr] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isAppliedToHealth, setIsAppliedToHealth] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryOcr, setCanRetryOcr] = useState(false);
 
+  // 현재 스텝 계산
+  const currentStep: Step = isAppliedToHealth ? 4 : measurements.length > 0 ? 3 : selectedFile ? 2 : 1;
+
   useEffect(() => {
     return () => {
-      if (selectedPreviewUrl) {
-        URL.revokeObjectURL(selectedPreviewUrl);
-      }
+      if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
     };
   }, [selectedPreviewUrl]);
 
@@ -60,9 +101,7 @@ export default function ExamOcrPage() {
   }, []);
 
   useEffect(() => {
-    if (exam?.is_confirmed) {
-      setIsAppliedToHealth(true);
-    }
+    if (exam?.is_confirmed) setIsAppliedToHealth(true);
   }, [exam?.is_confirmed]);
 
   useAsyncJobPolling({
@@ -101,7 +140,10 @@ export default function ExamOcrPage() {
     onFailure: (job) => {
       setFeedbackDialog({
         title: "검진표 인식에 실패했습니다.",
-        message: job.status === "CANCELED" ? "검진표 인식 작업이 취소되었습니다." : "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        message:
+          job.status === "CANCELED"
+            ? "검진표 인식 작업이 취소되었습니다."
+            : "이미지를 다시 확인한 뒤 업로드해 주세요.",
         tone: "danger",
       });
       setCanRetryOcr(true);
@@ -121,15 +163,12 @@ export default function ExamOcrPage() {
   });
 
   const handleFileSelection = async (file: File | null) => {
-    if (selectedPreviewUrl) {
-      URL.revokeObjectURL(selectedPreviewUrl);
-    }
+    if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
     setSelectedPreviewUrl("");
     setPreviewMessage("");
     setIsAppliedToHealth(false);
     setExam(null);
     setMeasurements([]);
-    setMessage("");
     setError("");
     if (!file) {
       setSelectedFile(null);
@@ -138,14 +177,11 @@ export default function ExamOcrPage() {
     }
     setSelectedFile(file);
     setSelectedFileName(file.name);
-    if (isPdfFile(file)) {
-      return;
-    }
+    if (isPdfFile(file)) return;
     if (!isHeicFile(file)) {
       setSelectedPreviewUrl(URL.createObjectURL(file));
       return;
     }
-
     setPreviewMessage("HEIC 이미지를 미리보기용 JPG로 변환 중입니다.");
     try {
       const previewBlob = await normalizeImageForPreview(file);
@@ -162,7 +198,6 @@ export default function ExamOcrPage() {
 
   const startExamOcr = async () => {
     setError("");
-    setMessage("");
     setFeedbackDialog(null);
     setMeasurements([]);
     setCanRetryOcr(false);
@@ -179,12 +214,11 @@ export default function ExamOcrPage() {
           original_filename: selectedFileName,
           file_path: `exam-upload/${selectedFileName}`,
           uploaded_at: new Date().toISOString(),
-      }));
+        }));
       setExam(report);
       const job = await runExamOcr(report.id, selectedFile);
-      setMessage("");
       setOcrJobId(job.id);
-    } catch (err) {
+    } catch {
       setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
       setCanRetryOcr(true);
       setIsRunningOcr(false);
@@ -193,9 +227,8 @@ export default function ExamOcrPage() {
 
   const updateLocalMeasurement = (measurementId: number, value: string) => {
     setIsAppliedToHealth(false);
-    setMessage("");
     setMeasurements((prev) =>
-      prev.map((measurement) => (measurement.id === measurementId ? { ...measurement, value } : measurement)),
+      prev.map((m) => (m.id === measurementId ? { ...m, value } : m)),
     );
   };
 
@@ -208,10 +241,10 @@ export default function ExamOcrPage() {
     setIsConfirming(true);
     try {
       await Promise.all(
-        measurements.map((measurement) =>
-          updateMeasurement(measurement.id, {
-            value: measurement.value,
-            unit: measurement.unit,
+        measurements.map((m) =>
+          updateMeasurement(m.id, {
+            value: m.value,
+            unit: m.unit,
             is_user_confirmed: true,
           }),
         ),
@@ -220,7 +253,6 @@ export default function ExamOcrPage() {
       setExam(confirmedExam);
       setMeasurements(await listMeasurements(exam.id));
       setIsAppliedToHealth(true);
-      setMessage("");
       setFeedbackDialog({
         title: "건강정보에 반영되었습니다.",
         message: "이제 정밀분석에서 최신 검진 수치를 사용할 수 있습니다.",
@@ -240,24 +272,31 @@ export default function ExamOcrPage() {
 
   return (
     <div className="page-stack">
+      {/* 헤더 */}
       <div className="page-header">
         <div>
           <h1>건강검진표 측정값 확인</h1>
-          <p>검진표 이미지/PDF 기반 측정값 후보를 생성하고 확인 후 건강정보에 반영합니다.</p>
+          <p>검진표 이미지/PDF를 업로드하면 측정값을 자동으로 인식합니다.</p>
         </div>
-        <Link className="button secondary" to="/ocr">
+        <Link className="button secondary" to="/health">
           등록 선택으로 돌아가기
         </Link>
       </div>
+
+      {/* 스텝 인디케이터 */}
+      <StepIndicator current={currentStep} />
+
+      {/* 에러 / 재시도 */}
       {error && <ErrorMessage message={error} />}
-      {canRetryOcr ? (
+      {canRetryOcr && (
         <div className="button-row">
           <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
             다시 시도
           </button>
         </div>
-      ) : null}
-      {message && <div className="state-box">{message}</div>}
+      )}
+
+      {/* 피드백 다이얼로그 */}
       {feedbackDialog && (
         <ConfirmDialog
           confirmLabel="확인"
@@ -268,60 +307,94 @@ export default function ExamOcrPage() {
           tone={feedbackDialog.tone}
         />
       )}
-      <div className="page-grid">
-        <Card title="파일 업로드">
-          <div className="upload-box">
-            <strong>검진표 이미지/PDF 업로드</strong>
-            <span>촬영/업로드 후 생성된 후보 값을 확인하고 저장해주세요.</span>
-            <p className="warning-text">
-              업로드한 이미지는 건강정보 추출 및 분석을 위해 사용됩니다. 자동 인식 결과는 오류가 있을 수 있으므로
-              저장 또는 분석 전에 내용을 확인해주세요. 건강검진 결과는 민감한 건강정보일 수 있으므로 본인 자료만
-              업로드해주세요.
-            </p>
-            <div className="upload-action-grid">
+
+      {/* ── STEP 1: 파일 업로드 ── */}
+      <Card title="파일 업로드">
+        <div className="upload-box">
+          <div className="upload-action-grid">
+            <label className="upload-action-button">
+              파일에서 선택
+              <input
+                accept="image/*,.heic,.heif,.pdf"
+                onChange={(e) => handleFileSelection(e.target.files?.[0] ?? null)}
+                type="file"
+              />
+            </label>
+            {isMobileDevice ? (
               <label className="upload-action-button">
-                파일에서 선택
+                카메라로 촬영
                 <input
-                  accept="image/*,.heic,.heif,.pdf"
-                  onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
+                  accept="image/*,.heic,.heif"
+                  capture="environment"
+                  onChange={(e) => handleFileSelection(e.target.files?.[0] ?? null)}
                   type="file"
                 />
               </label>
-              {isMobileDevice ? (
-                <label className="upload-action-button">
-                  카메라로 촬영
-                  <input
-                    accept="image/*,.heic,.heif"
-                    capture="environment"
-                    onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
-                    type="file"
-                  />
-                </label>
-              ) : (
-                <span className="upload-mobile-hint">카메라 촬영은 모바일에서 사용할 수 있습니다.</span>
-              )}
-            </div>
-            <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
-            {previewMessage ? (
-              <div className="state-box heic-preview-notice">
-                {previewMessage}
-              </div>
-            ) : null}
-            {selectedPreviewUrl ? (
-              <img alt="선택한 검진표 이미지 미리보기" className="upload-preview" src={selectedPreviewUrl} />
-            ) : null}
+            ) : (
+              <span className="upload-action-button upload-action-button--disabled">
+                <span style={{ fontSize: "14px", fontWeight: 600 }}>카메라 촬영</span>
+                <span style={{ fontSize: "11px", fontWeight: 400, opacity: 0.7 }}>
+                  카메라 촬영은 모바일에서 사용할 수 있습니다.
+                </span>
+              </span>
+            )}
           </div>
-          <button disabled={isRunningOcr} onClick={startExamOcr} type="button">
+
+          <span className="muted">선택된 파일: {selectedFileName || "없음"}</span>
+
+          {previewMessage && (
+            <div className="state-box heic-preview-notice">{previewMessage}</div>
+          )}
+          {selectedPreviewUrl && (
+            <img
+              alt="선택한 검진표 이미지 미리보기"
+              className="upload-preview"
+              src={selectedPreviewUrl}
+            />
+          )}
+        </div>
+
+        {/* 경고 문구: 여기 한 번만 */}
+        <p className="warning-text" style={{ marginTop: 8 }}>
+          업로드한 이미지는 건강정보 추출에만 사용됩니다. 자동 인식 결과에 오류가 있을 수
+          있으니 저장 전 반드시 확인하세요. 건강검진 결과는 민감한 정보이므로 본인 자료만
+          업로드해주세요.
+        </p>
+
+        <div className="button-row" style={{ marginTop: 12 }}>
+          <button disabled={isRunningOcr || !selectedFile} onClick={startExamOcr} type="button">
             {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
           </button>
-        </Card>
-        <Card title="저장 전 확인">
-          <p className="warning-text">자동 인식으로 생성된 후보값입니다. 값과 단위를 확인한 뒤 저장해주세요.</p>
-          <p className="warning-text">
-            확인/저장 시 아래 인식 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
-            있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
-          </p>
-          <div className="button-row" style={{ marginTop: 12 }}>
+        </div>
+      </Card>
+
+      {/* ── STEP 2~3: 측정값 후보 (파일 선택 후 항상 노출) ── */}
+      <Card title="측정값 후보">
+        <div className="ocr-result-table">
+          {measurements.length === 0 ? (
+            <div className="state-box">
+              아직 측정값 후보가 없습니다. 파일을 업로드하고 측정값 후보를 생성해주세요.
+            </div>
+          ) : (
+            measurements.map((m) => (
+              <label className="ocr-result-row" key={m.id}>
+                <span>
+                  {m.measurement_name}
+                  <em className="badge badge-required">확인 필요</em>
+                </span>
+                <input
+                  onChange={(e) => updateLocalMeasurement(m.id, e.target.value)}
+                  value={m.value ?? ""}
+                />
+                <strong>{formatUnit(m.unit)}</strong>
+              </label>
+            ))
+          )}
+        </div>
+
+        {/* 하단 액션 영역 */}
+        <div className="button-row" style={{ marginTop: 16, justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div className="button-row" style={{ margin: 0 }}>
             <Link className="button secondary" to="/health/profile">
               건강정보 확인
             </Link>
@@ -329,44 +402,17 @@ export default function ExamOcrPage() {
               분석 화면 이동
             </Link>
           </div>
-        </Card>
-      </div>
-      <Card title="측정값 후보">
-        <div className="ocr-result-table">
-          {measurements.length === 0 && <div className="state-box">아직 측정값 후보가 없습니다.</div>}
-          {measurements.map((measurement) => (
-            <label className="ocr-result-row" key={measurement.id}>
-              <span>
-                {measurement.measurement_name}
-                <em className="badge badge-required">확인 필요</em>
-              </span>
-              <input
-                onChange={(event) => updateLocalMeasurement(measurement.id, event.target.value)}
-                value={measurement.value ?? ""}
-              />
-              <strong>{measurement.unit ?? "-"}</strong>
-            </label>
-          ))}
-          <div className="state-box">
-            <p className="warning-text">
-              확인/저장 시 아래 인식 후보값이 최신 건강정보에 반영됩니다. 기존에 직접 입력한 건강정보와 다를 수
-              있으므로, 검진일 기준 수치가 맞는지 확인해주세요.
-            </p>
-            {measurements.length === 0 ? (
-              <p className="muted">측정값 후보가 생성되면 건강정보 반영 버튼을 사용할 수 있습니다.</p>
-            ) : null}
-            <button
-              disabled={measurements.length === 0 || isConfirming || isAppliedToHealth}
-              onClick={saveAndConfirm}
-              type="button"
-            >
-              {isConfirming
-                ? "건강정보 반영 중..."
-                : isAppliedToHealth
-                  ? "건강정보 반영 완료"
-                  : "선택한 후보값을 건강정보에 반영"}
-            </button>
-          </div>
+          <button
+            disabled={measurements.length === 0 || isConfirming || isAppliedToHealth}
+            onClick={saveAndConfirm}
+            type="button"
+          >
+            {isConfirming
+              ? "건강정보 반영 중..."
+              : isAppliedToHealth
+                ? "건강정보 반영 완료 ✓"
+                : "건강정보에 반영"}
+          </button>
         </div>
       </Card>
     </div>
@@ -375,4 +421,9 @@ export default function ExamOcrPage() {
 
 function isPdfFile(file: File): boolean {
   return file.type.toLowerCase() === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function formatUnit(unit: string | null | undefined): string {
+  if (!unit) return "-";
+  return unit.replace("1.73m2", "1.73m²");
 }

@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { AnalysisMode, runAnalysisAsync } from "../api/analysis";
+import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 import {
   createHealthRecord,
@@ -59,18 +61,15 @@ const initialForm: HealthProfileFormState = {
 };
 
 const steps = [
-  "기본 정보",
+  "기본/신체 정보",
   "가족력/생활정보",
-  "신체계측",
   "혈액/검진 정보",
-  "분석 실행",
 ];
 
 const stepToSection: Record<number, string[]> = {
-  0: [healthProfileSectionTitles[0]],
+  0: [healthProfileSectionTitles[0],healthProfileSectionTitles[2]],
   1: [healthProfileSectionTitles[1]],
-  2: [healthProfileSectionTitles[2]],
-  3: [healthProfileSectionTitles[3]],
+  2: [healthProfileSectionTitles[3]],
 };
 
 const healthFieldLabels: Record<string, string> = {
@@ -274,12 +273,36 @@ export default function HealthRecordPage() {
   const [notice, setNotice] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
+  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
 
   const bmi = useMemo(() => {
     const height = parseNumber(form.height_cm);
     const weight = parseNumber(form.weight_kg);
     return height && weight ? weight / (height / 100) ** 2 : null;
   }, [form.height_cm, form.weight_kg]);
+
+  useAsyncJobPolling({
+    jobId: analysisJobId,
+    enabled: analysisJobId !== null && runningMode !== null,
+    intervalMs: 1500,
+    timeoutMs: 120000,
+    onSuccess: async () => {
+      setRunningMode(null);
+      setAnalysisJobId(null);
+      navigate("/analysis");
+    },
+    onFailure: () => {
+      setError("분석에 실패했습니다. 다시 시도해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+    onTimeout: () => {
+      setError("분석 시간이 초과됐습니다. 다시 시도해주세요.");
+      setRunningMode(null);
+      setAnalysisJobId(null);
+    },
+  });
 
   const load = async () => {
     const [latest, list, readinessResult] = await Promise.all([
@@ -319,19 +342,27 @@ export default function HealthRecordPage() {
     await save().catch((err) => setError(err instanceof Error ? err.message : "건강정보 저장에 실패했습니다."));
   };
 
-  const runAnalysis = async () => {
+  const runAnalysis = async (mode: AnalysisMode) => {
     setError("");
-    const latestReadiness = await getAnalysisReadiness<Readiness>();
-    setReadiness(latestReadiness);
-    if (!latestReadiness.latest_health_record_id) {
-      setError("저장된 건강정보가 없습니다. 기본 정보를 저장한 뒤 분석을 실행해주세요.");
-      return;
+    setNotice("");
+    try {
+      await save();
+      const latestReadiness = await getAnalysisReadiness<Readiness>();
+      if (!latestReadiness.latest_health_record_id) {
+        setError("저장된 건강정보가 없습니다.");
+        return;
+      }
+      if (!latestReadiness.is_ready) {
+        setError("기본 분석에 필요한 정보가 부족합니다.");
+        return;
+      }
+      setRunningMode(mode);
+      const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, mode);
+      setAnalysisJobId(job.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      setRunningMode(null);
     }
-    if (!latestReadiness.is_ready) {
-      setError("기본 분석에 필요한 정보가 부족합니다.");
-      return;
-    }
-    navigate("/analysis");
   };
 
   const removeRecord = async () => {
@@ -372,9 +403,12 @@ export default function HealthRecordPage() {
               {step}
             </button>
           ))}
+          <Link className="filter-tab" style={{ textAlign: "center", display: "block" }} to="/health/profile">
+            한눈에 보기
+          </Link>
         </div>
 
-        {/* 분석 준비 상태 인라인으로 이동 */}
+        {/* 분석 준비 상태 */}
         <div className="analysis-readiness-panel" style={{ marginTop: 58 }}>
           <div className={`readiness-status ${readiness?.is_ready ? "success-text" : "warning-text"}`}>
             <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}</strong>
@@ -403,56 +437,46 @@ export default function HealthRecordPage() {
       <Card title="건강정보 입력">
         {error && <ErrorMessage message={error} />}
         {notice && <div className="state-box">{notice}</div>}
-        <div className="state-box">
-          직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.
-          <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
-          <div className="button-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
-            <Link className="button secondary" to="/ocr/exam">
+        {activeStep < 4 && (
+          <div className="state-box" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+            <div>
+              <p>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.</p>
+              <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
+            </div>
+            <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">
               검진표로 입력
             </Link>
-            <Link className="button secondary" to="/health/profile">
-              필수 건강정보 관리로 이동
-            </Link>
           </div>
-        </div>
+        )}
         <form className="form" onSubmit={submit}>
-          {activeStep < 4 ? (
-            <HealthProfileForm
-              bmi={bmi ? bmi.toFixed(1) : ""}
-              form={form}
-              onChange={(key, value) => setForm((prev) => ({ ...prev, [key]: value }))}
-              visibleSections={stepToSection[activeStep]}
-            />
-          ) : (
-            <div className="page-stack">
-              <div className="state-box">
-                <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "기본 분석에 필요한 정보가 부족합니다."}</strong>
-                <p>
-                  직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수
-                  있습니다.
-                </p>
-                <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
-              </div>
-              <div className="chip-list">
-                {missingBasicFields.map((field) => (
-                  <span className="badge badge-missing" key={field}>
-                    {field}
-                  </span>
-                ))}
-                {missingBasicFields.length === 0 && <span className="badge badge-saved">기본 분석 부족 항목 없음</span>}
-              </div>
-            </div>
-          )}
+          <HealthProfileForm
+            bmi={bmi ? bmi.toFixed(1) : ""}
+            form={form}
+            onChange={(key, value) => setForm((prev) => ({ ...prev, [key]: value }))}
+            visibleSections={stepToSection[activeStep]}
+          />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
-            <button className="secondary" onClick={() => navigate(-1)} type="button">
-              이전
-            </button>
             <button className="secondary" type="submit">
               저장
             </button>
-            <button onClick={runAnalysis} type="button">
-              분석 실행
-            </button>
+            {activeStep === 1 && (
+              <button
+                disabled={runningMode !== null}
+                onClick={() => void runAnalysis("BASIC")}
+                type="button"
+              >
+                {runningMode === "BASIC" ? "분석 중..." : "간편 분석 실행"}
+              </button>
+            )}
+            {activeStep === 2 && (
+              <button
+                disabled={runningMode !== null}
+                onClick={() => void runAnalysis("PRECISION")}
+                type="button"
+              >
+                {runningMode === "PRECISION" ? "분석 중..." : "정밀 분석 실행"}
+              </button>
+            )}
           </div>
         </form>
       </Card>
