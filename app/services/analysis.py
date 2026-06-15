@@ -33,7 +33,7 @@ from app.models.analysis import (
     FactorDirection,
     RiskLevel,
 )
-from app.models.challenges import ChallengeCategory
+from app.models.challenges import ChallengeCategory, ChallengeTargetDisease
 from app.models.health import HealthRecord
 from app.models.users import User
 from app.repositories import analysis_repository
@@ -1383,19 +1383,104 @@ def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bo
     return _is_missing_value(getattr(record, field_name))
 
 
+def _enum_value(value: object) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+CHALLENGE_RECOMMENDATION_PROFILES: dict[AnalysisType, dict[str, tuple[str, ...]]] = {
+    AnalysisType.HYPERTENSION: {
+        "categories": (ChallengeCategory.BLOOD_PRESSURE.value, ChallengeCategory.DIET.value),
+        "target_diseases": (ChallengeTargetDisease.HYPERTENSION.value,),
+        "title_keywords": ("혈압", "나트륨", "염분", "국물", "소금"),
+    },
+    AnalysisType.DIABETES: {
+        "categories": (ChallengeCategory.BLOOD_GLUCOSE.value, ChallengeCategory.DIET.value),
+        "target_diseases": (ChallengeTargetDisease.DIABETES.value,),
+        "title_keywords": ("혈당", "당", "탄수", "식사", "간식"),
+    },
+    AnalysisType.DYSLIPIDEMIA: {
+        "categories": (ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.DYSLIPIDEMIA.value,),
+        "title_keywords": ("지방", "기름", "튀김", "식이섬유", "건강식탁", "걷기"),
+    },
+    AnalysisType.OBESITY: {
+        "categories": (ChallengeCategory.WEIGHT.value, ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.OBESITY.value,),
+        "title_keywords": ("체중", "야식", "폭식", "걷기", "활동"),
+    },
+    AnalysisType.ABDOMINAL_OBESITY: {
+        "categories": (ChallengeCategory.WEIGHT.value, ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.OBESITY.value,),
+        "title_keywords": ("체중", "허리", "야식", "걷기", "활동"),
+    },
+    AnalysisType.FATTY_LIVER: {
+        "categories": (ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.GENERAL.value, ChallengeTargetDisease.COMMON.value),
+        "title_keywords": ("기름", "당", "음주", "걷기", "식사"),
+    },
+    AnalysisType.ANEMIA: {
+        "categories": (ChallengeCategory.DIET.value, ChallengeCategory.MONITORING.value),
+        "target_diseases": (ChallengeTargetDisease.ANEMIA.value,),
+        "title_keywords": ("철분", "식사", "기록", "빈혈"),
+    },
+    AnalysisType.KIDNEY_FUNCTION: {
+        "categories": (
+            ChallengeCategory.MONITORING.value,
+            ChallengeCategory.DIET.value,
+            ChallengeCategory.BLOOD_PRESSURE.value,
+        ),
+        "target_diseases": (ChallengeTargetDisease.GENERAL.value, ChallengeTargetDisease.COMMON.value),
+        "title_keywords": ("식사일지", "기록", "염분", "나트륨", "상담"),
+    },
+    AnalysisType.CHRONIC_KIDNEY_DISEASE: {
+        "categories": (
+            ChallengeCategory.MONITORING.value,
+            ChallengeCategory.DIET.value,
+            ChallengeCategory.BLOOD_PRESSURE.value,
+        ),
+        "target_diseases": (ChallengeTargetDisease.GENERAL.value, ChallengeTargetDisease.COMMON.value),
+        "title_keywords": ("식사일지", "기록", "염분", "나트륨", "상담"),
+    },
+}
+
+
+def _challenge_recommendation_score(challenge: object, profile: dict[str, tuple[str, ...]]) -> int:
+    category = _enum_value(getattr(challenge, "category", None))
+    target_disease = _enum_value(getattr(challenge, "target_disease", None))
+    text = " ".join(
+        str(getattr(challenge, field, "") or "") for field in ("title", "description", "target_metric", "target_value")
+    )
+    score = 0
+    if category in profile.get("categories", ()):
+        score += 3
+    if target_disease in profile.get("target_diseases", ()):
+        score += 4
+    score += sum(2 for keyword in profile.get("title_keywords", ()) if keyword in text)
+    return score
+
+
+def _select_active_challenge_for_analysis(active_challenges: list[object], result: AnalysisResult) -> object | None:
+    if not active_challenges:
+        return None
+
+    profile = CHALLENGE_RECOMMENDATION_PROFILES.get(result.analysis_type)
+    if profile is None:
+        return None
+
+    ranked = sorted(
+        (
+            (_challenge_recommendation_score(challenge, profile), index, challenge)
+            for index, challenge in enumerate(active_challenges)
+        ),
+        key=lambda item: (-item[0], item[1]),
+    )
+    best_score, _, best_challenge = ranked[0]
+    return best_challenge if best_score > 0 else active_challenges[0]
+
+
 async def _create_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
     active_challenges = await challenge_service.list_active_challenges(limit=100)
-    target_category = {
-        AnalysisType.DIABETES: ChallengeCategory.BLOOD_GLUCOSE,
-        AnalysisType.OBESITY: ChallengeCategory.WEIGHT,
-        AnalysisType.DYSLIPIDEMIA: ChallengeCategory.DIET,
-        AnalysisType.HYPERTENSION: ChallengeCategory.BLOOD_PRESSURE,
-    }.get(result.analysis_type)
-    if target_category is None:
-        return []
-    challenge = next((item for item in active_challenges if item.category == target_category), None)
-    if challenge is None and active_challenges:
-        challenge = active_challenges[0]
+    challenge = _select_active_challenge_for_analysis(active_challenges, result)
     if challenge is None:
         return []
 

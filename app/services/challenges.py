@@ -2,6 +2,7 @@ import re
 from collections import Counter
 from datetime import date, datetime, time, timedelta
 from math import ceil
+from types import SimpleNamespace
 
 from fastapi import HTTPException
 from starlette import status
@@ -14,11 +15,27 @@ from app.dtos.challenges import (
     UserChallengeCreateRequest,
     UserChallengeUpdateRequest,
 )
-from app.models.challenges import Challenge, ChallengeLog, ChallengeRecommendation, UserChallenge, UserChallengeStatus
+from app.models.challenges import (
+    Challenge,
+    ChallengeCategory,
+    ChallengeLog,
+    ChallengeRecommendation,
+    ChallengeStatus,
+    UserChallenge,
+    UserChallengeStatus,
+)
 from app.repositories import challenge_repository
 
 DEFAULT_CHALLENGE_DURATION_DAYS = 7
 CHALLENGE_COMPLETION_THRESHOLD = 0.8
+RECOMMENDATION_FALLBACK_REASON_BY_CATEGORY = {
+    ChallengeCategory.BLOOD_PRESSURE.value: "혈압 관리 관점에서 부담 없이 시작하기 좋은 챌린지입니다.",
+    ChallengeCategory.BLOOD_GLUCOSE.value: "혈당 관리 관점에서 식사와 생활 리듬을 점검하기 좋은 챌린지입니다.",
+    ChallengeCategory.DIET.value: "식단 관리 관점에서 작은 실천을 이어가기 좋은 챌린지입니다.",
+    ChallengeCategory.WEIGHT.value: "체중 관리 관점에서 꾸준히 실천하기 좋은 챌린지입니다.",
+    ChallengeCategory.EXERCISE.value: "활동량을 조금씩 늘리는 데 도움이 될 수 있는 챌린지입니다.",
+    ChallengeCategory.MONITORING.value: "건강 상태를 꾸준히 기록하고 돌아보는 데 도움이 되는 챌린지입니다.",
+}
 
 
 def _get_daily_goal_count(challenge: Challenge | None) -> int:
@@ -87,6 +104,62 @@ def _attach_user_challenge_dates(user_challenge: UserChallenge) -> None:
 
 def _attach_challenge_log_dates(log: ChallengeLog) -> None:
     log.completed_date = _to_kst_date(log.completed_at)
+
+
+def _status_value(value: object) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _is_active_challenge_object(challenge: object | None) -> bool:
+    if challenge is None:
+        return False
+    return _status_value(getattr(challenge, "status", None)) == ChallengeStatus.ACTIVE.value
+
+
+def _recommendation_points_to_active_challenge(recommendation: object) -> bool:
+    challenge = getattr(recommendation, "challenge", None)
+    return challenge is None or _is_active_challenge_object(challenge)
+
+
+def _fallback_recommendation_reason(challenge: object) -> str:
+    category = _status_value(getattr(challenge, "category", None))
+    return RECOMMENDATION_FALLBACK_REASON_BY_CATEGORY.get(
+        category,
+        "건강관리 루틴을 가볍게 시작하는 데 도움이 될 수 있는 챌린지입니다.",
+    )
+
+
+def _dedupe_challenge_recommendations(recommendations: list[object]) -> list[object]:
+    seen_challenge_ids: set[int] = set()
+    deduped: list[object] = []
+    for recommendation in recommendations:
+        challenge_id = getattr(recommendation, "challenge_id", None)
+        if challenge_id is None or challenge_id in seen_challenge_ids:
+            continue
+        seen_challenge_ids.add(challenge_id)
+        deduped.append(recommendation)
+    return deduped
+
+
+def _synthetic_challenge_recommendation(
+    *,
+    user_id: int,
+    challenge: object,
+    index: int,
+) -> SimpleNamespace:
+    now = _now()
+    return SimpleNamespace(
+        id=-(index + 1),
+        user_id=user_id,
+        analysis_result_id=None,
+        challenge_id=challenge.id,
+        reason=_fallback_recommendation_reason(challenge),
+        priority=0,
+        is_selected=False,
+        created_at=now,
+        updated_at=now,
+        challenge=challenge,
+    )
 
 
 async def _with_user_challenge_progress(user_challenge: UserChallenge | None) -> UserChallenge | None:
@@ -445,7 +518,16 @@ async def create_challenge_recommendation(
     challenge_id: int,
     request: ChallengeRecommendationCreateRequest,
 ) -> ChallengeRecommendation:
+    challenge = await challenge_repository.get_challenge_by_id(challenge_id)
+    if not _is_active_challenge_object(challenge):
+        fallback_challenges = await list_active_challenges(limit=1)
+        if not fallback_challenges:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="추천 가능한 active 챌린지가 없습니다.")
+        challenge = fallback_challenges[0]
+        challenge_id = challenge.id
     data = request.model_dump(exclude={"analysis_result_id", "challenge_id"})
+    if not data.get("reason"):
+        data["reason"] = _fallback_recommendation_reason(challenge)
     return await challenge_repository.create_challenge_recommendation(
         user_id=user_id,
         analysis_result_id=analysis_result_id,
@@ -457,4 +539,34 @@ async def create_challenge_recommendation(
 async def list_challenge_recommendations(
     user_id: int, limit: int = 20, offset: int = 0
 ) -> list[ChallengeRecommendation]:
-    return await challenge_repository.list_challenge_recommendations(user_id, limit=limit, offset=offset)
+    if limit <= 0:
+        return []
+
+    fetch_limit = max(limit * 3, limit + 20)
+    recommendations = await challenge_repository.list_challenge_recommendations(
+        user_id,
+        limit=fetch_limit,
+        offset=offset,
+    )
+    active_recommendations = [
+        recommendation
+        for recommendation in recommendations
+        if _recommendation_points_to_active_challenge(recommendation)
+    ]
+    deduped = _dedupe_challenge_recommendations(active_recommendations)
+
+    if len(deduped) < limit and offset == 0:
+        existing_ids = {item.challenge_id for item in deduped}
+        active_challenges = await list_active_challenges(limit=100)
+        fallback_challenges = [
+            challenge
+            for challenge in active_challenges
+            if challenge.id not in existing_ids and _is_active_challenge_object(challenge)
+        ]
+        needed = limit - len(deduped)
+        deduped.extend(
+            _synthetic_challenge_recommendation(user_id=user_id, challenge=challenge, index=index)
+            for index, challenge in enumerate(fallback_challenges[:needed])
+        )
+
+    return deduped[:limit]
