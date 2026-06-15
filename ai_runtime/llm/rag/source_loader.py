@@ -26,6 +26,7 @@ class RagSourceMetadata:
     review_status: str
     enabled: bool
     notes: str | None = None
+    safety_level: str = "normal"
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> RagSourceMetadata:
@@ -46,6 +47,7 @@ class RagSourceMetadata:
             review_status=review_status,
             enabled=bool(payload.get("enabled", True)),
             notes=payload.get("notes"),
+            safety_level=str(payload.get("safety_level") or "normal"),
         )
 
     @property
