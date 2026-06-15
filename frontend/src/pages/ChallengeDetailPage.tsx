@@ -662,7 +662,7 @@ export default function ChallengeDetailPage() {
               </>
             )}
           </div>
-          {Boolean(challenge?.caution_message) && <div className="state-box warning-card">{String(challenge?.caution_message)}</div>}
+          {Boolean(challenge?.caution_message) && <div className="state-box warning-card" style={{ marginTop: "16px" }}>{String(challenge?.caution_message)}</div>}
           {Boolean(challenge?.contraindication_message) && (
             <div className="state-box warning-card">{String(challenge?.contraindication_message)}</div>
           )}
