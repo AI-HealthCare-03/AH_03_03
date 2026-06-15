@@ -419,11 +419,18 @@ async def test_diet_rag_strategy_hybrid_calls_vector_when_keyword_is_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     vector = FakeVectorRetriever(documents=[_vector_document(content="chunk content must stay internal")])
+    events: list[dict[str, Any]] = []
+
+    def fake_record_langfuse_event(**kwargs: Any) -> None:
+        events.append(kwargs)
+
     monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_first_vector_fallback")
+    monkeypatch.setattr(service.config, "RAG_ENABLED", True)
     monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", True)
     monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
     monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(service, "retrieve_keyword_rag_matches", lambda *args, **kwargs: [])
+    monkeypatch.setattr(service, "record_langfuse_event", fake_record_langfuse_event)
 
     result = await service.build_diet_health_recommendation_response_async(
         diet_record=_diet({"sodium_mg": 920}),
@@ -439,7 +446,21 @@ async def test_diet_rag_strategy_hybrid_calls_vector_when_keyword_is_empty(
     assert any(item["review_status"] == "reference" for item in result["rag_comment"]["evidence_sources"])
     serialized = str(result["rag_comment"])
     assert "chunk content must stay internal" not in serialized
+    assert "rag:hypertension:section:000:chunk:0000" not in serialized
+    assert "chunk_key" not in serialized
+    assert "score" not in serialized
+    assert "embedding" not in serialized
     assert "candidate_unreviewed" not in serialized
+    assert "missing_source" not in serialized
+    assert "후보 지식" not in serialized
+
+    assert events
+    trace_metadata = events[-1]["metadata"]
+    assert trace_metadata["keyword_returned_count"] == 0
+    assert trace_metadata["vector_returned_count"] >= 1
+    assert trace_metadata["fallback_used"] is True
+    assert trace_metadata["fallback_reason"] == "keyword_empty_vector_used"
+    assert "chunk content must stay internal" not in str(trace_metadata)
 
 
 @pytest.mark.asyncio

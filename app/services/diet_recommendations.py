@@ -691,6 +691,9 @@ async def _build_rag_comment_async(
                 vector_documents = []
             if vector_documents:
                 evidence_sources = _evidence_sources_from_documents(vector_documents, target_codes=target_codes)
+                fallback_reason = (
+                    "keyword_empty_vector_used" if len(matches) == 0 else "keyword_insufficient_vector_used"
+                )
             elif fallback_reason is None:
                 fallback_reason = "vector_no_result"
     else:
