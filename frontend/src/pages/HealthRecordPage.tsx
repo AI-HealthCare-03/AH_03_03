@@ -422,22 +422,24 @@ export default function HealthRecordPage() {
       <Card
         title="건강정보 입력"
         actions={
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
-            <span className={readiness?.is_ready ? "success-text" : "warning-text"} style={{ fontWeight: 700 }}>
-              {readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}
-            </span>
-            <span style={{ color: "var(--color-border)" }}>|</span>
-            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-              {missingBasicFields.length === 0
-                ? <span className="badge badge-saved">누락 항목 없음</span>
-                : missingBasicFields.map((field) => (
-                    <span className="badge badge-missing" key={field}>
-                      {healthFieldLabels[field] ?? field}
-                    </span>
-                  ))
-              }
+          activeStep === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+              <span className={readiness?.is_ready ? "success-text" : "warning-text"} style={{ fontWeight: 700 }}>
+                {readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}
+              </span>
+              <span style={{ color: "var(--color-border)" }}>|</span>
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {missingBasicFields.length === 0
+                  ? <span className="badge badge-saved">누락 항목 없음</span>
+                  : missingBasicFields.map((field) => (
+                      <span className="badge badge-missing" key={field}>
+                        {healthFieldLabels[field] ?? field}
+                      </span>
+                    ))
+                }
+              </div>
             </div>
-          </div>
+          ) : undefined
         }
       >
         {error && <ErrorMessage message={error} />}
