@@ -139,6 +139,28 @@ class DietRecommendedChallengeResponse(BaseModel):
     reason: str
 
 
+class DietRagDiseaseCommentResponse(BaseModel):
+    disease_code: str
+    label: str
+    comment: str
+    basis: str
+
+
+class DietRagEvidenceSourceResponse(BaseModel):
+    title: str
+    disease_code: str
+    review_status: str
+
+
+class DietRagCommentResponse(BaseModel):
+    enabled: bool
+    fallback_used: bool
+    summary: str
+    disease_comments: list[DietRagDiseaseCommentResponse]
+    evidence_sources: list[DietRagEvidenceSourceResponse]
+    safety_notice: str
+
+
 class DietHealthRecommendationResponse(BaseModel):
     diet_record_id: int
     nutrition_findings: list[DietNutritionFindingResponse]
@@ -147,3 +169,4 @@ class DietHealthRecommendationResponse(BaseModel):
     caution_foods: list[str]
     recommended_challenges: list[DietRecommendedChallengeResponse]
     safety_notice: str
+    rag_comment: DietRagCommentResponse | None = None

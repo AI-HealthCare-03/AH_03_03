@@ -5,6 +5,8 @@ from typing import Any
 from fastapi import HTTPException
 from starlette import status
 
+from ai_runtime.llm.rag.diet_sources import DIET_RAG_QUERY_TEMPLATES, ISSUE_TO_RAG_CODES, enabled_rag_codes
+from ai_runtime.llm.rag.keyword_retriever import KeywordRagMatch, retrieve_keyword_rag_matches
 from app.models.analysis import AnalysisType, RiskLevel
 from app.repositories import analysis_repository, health_repository
 from app.services import challenges as challenge_service
@@ -16,6 +18,9 @@ SAFETY_NOTICE = (
 
 MAX_FINDINGS = 5
 MAX_RECOMMENDED_CHALLENGES = 3
+MAX_RAG_EVIDENCE_SOURCES = 5
+GENERAL_RAG_CODES = {"DIET_NUTRITION", "DIET_CAUTION", "DIET_FAQ"}
+RAG_FALLBACK_SUMMARY = "참고 문서 기반 설명을 만들 수 없어 기존 식단 추천만 제공합니다."
 
 NUTRIENT_ALIASES = {
     "calories_kcal": ("calories_kcal", "calories", "kcal", "energy", "energy_kcal", "열량"),
@@ -194,6 +199,25 @@ FOOD_RECOMMENDATIONS = {
     "balanced_support": (("채소 반찬", "단백질 반찬", "잡곡밥"), ()),
 }
 
+RAG_COMMENT_TEMPLATES = {
+    "HTN": (
+        "혈압 관리 관점에서 저염 식습관을 우선 추천합니다. "
+        "현재 식단 후보에서 나트륨이 높은 음식이 포함된 것으로 보여 국물이나 짠 소스는 참고용으로 주의가 필요합니다."
+    ),
+    "DM": (
+        "혈당 관리 관점에서는 탄수화물과 당류 섭취 패턴을 함께 살펴보는 것이 좋습니다. "
+        "실제 섭취량이 확정되지 않아 참고용입니다."
+    ),
+    "DL": (
+        "지질 관리 관점에서는 기름진 음식과 포화지방 후보를 줄이고 식이섬유가 있는 식품을 보완하는 방향을 추천합니다."
+    ),
+    "OBE": "체중 관리 관점에서는 열량이 높은 후보와 야식/폭식 패턴을 함께 점검하는 것이 좋습니다.",
+    "CKD": (
+        "신장 관련 소견이 있다면 식단 제한은 개인 상태에 따라 달라질 수 있어 의료진 상담을 권장합니다. "
+        "식사일지를 기록해 상담 시 참고자료로 활용해 보세요."
+    ),
+}
+
 
 async def get_diet_health_recommendations(user_id: int, diet_record_id: int) -> dict[str, Any]:
     record = await diet_service.get_diet_record(diet_record_id)
@@ -239,6 +263,8 @@ def build_diet_health_recommendation_response(
     disease_context = [_disease_context_payload(code) for code in disease_codes if code in DISEASE_RULES]
     recommended_foods, caution_foods = _food_messages(issue_keys)
     recommended_challenges = _recommended_challenges(issue_keys, active_challenges)
+    rag_disease_codes = _rag_disease_codes_from_analysis_results(analysis_results)
+    rag_comment = _safe_build_rag_comment(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
     return {
         "diet_record_id": int(diet_record.id),
         "nutrition_findings": nutrition_findings,
@@ -247,6 +273,7 @@ def build_diet_health_recommendation_response(
         "caution_foods": caution_foods,
         "recommended_challenges": recommended_challenges,
         "safety_notice": SAFETY_NOTICE,
+        "rag_comment": rag_comment,
     }
 
 
@@ -395,6 +422,30 @@ def _is_relevant_result(result: Any | None) -> bool:
     return risk not in {"", RiskLevel.LOW.value}
 
 
+def _rag_disease_codes_from_analysis_results(analysis_results: Iterable[Any]) -> list[str]:
+    latest_by_type: dict[AnalysisType, Any] = {}
+    for result in analysis_results:
+        analysis_type = _analysis_type(getattr(result, "analysis_type", None))
+        if analysis_type is not None and analysis_type not in latest_by_type:
+            latest_by_type[analysis_type] = result
+
+    codes: list[str] = []
+    for code, rule in DISEASE_RULES.items():
+        if any(_is_rag_relevant_result(latest_by_type.get(analysis_type)) for analysis_type in rule["analysis_types"]):
+            codes.append(code)
+    return _dedupe(codes)
+
+
+def _is_rag_relevant_result(result: Any | None) -> bool:
+    if result is None:
+        return False
+    risk = _normalize_risk_level(getattr(result, "risk_level", None))
+    if not risk:
+        return False
+    low_or_normal = {"LOW", "NORMAL", "GOOD", "OK", "NONE", "정상", "양호", "낮음", "낮은위험"}
+    return risk not in low_or_normal
+
+
 def _rank_issue_keys(*, nutrition_issues: list[str], disease_codes: list[str]) -> list[str]:
     ranked: list[str] = []
     for disease_code in disease_codes:
@@ -470,6 +521,154 @@ def _recommended_challenges(issue_keys: list[str], active_challenges: Iterable[A
             if len(recommendations) >= MAX_RECOMMENDED_CHALLENGES:
                 return recommendations
     return recommendations
+
+
+def _safe_build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -> dict[str, Any]:
+    try:
+        return _build_rag_comment(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
+    except Exception:
+        return {
+            "enabled": False,
+            "fallback_used": True,
+            "summary": RAG_FALLBACK_SUMMARY,
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
+
+
+def _build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -> dict[str, Any]:
+    target_codes = _resolve_rag_target_codes(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
+    if not target_codes:
+        return {
+            "enabled": False,
+            "fallback_used": True,
+            "summary": "주의 이상 분석 결과와 연결된 참고 문서가 없어 기존 식단 추천만 제공합니다.",
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
+
+    matches = _retrieve_diet_rag_matches(issue_keys=issue_keys, target_codes=target_codes)
+    evidence_sources = _evidence_sources(matches)
+    if not matches:
+        return {
+            "enabled": True,
+            "fallback_used": True,
+            "summary": RAG_FALLBACK_SUMMARY,
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
+
+    disease_comments = _rag_disease_comments(
+        rag_disease_codes=rag_disease_codes,
+        target_codes=target_codes,
+        evidence_sources=evidence_sources,
+    )
+    summary = "주의 이상 분석 결과와 현재 식단 이슈에 맞춰 참고 문서 기반 생활관리 포인트를 정리했습니다."
+    if not disease_comments:
+        summary = "현재 식단 이슈와 연결되는 일반 식생활 참고 문서를 확인했습니다."
+    return {
+        "enabled": True,
+        "fallback_used": False,
+        "summary": summary,
+        "disease_comments": disease_comments,
+        "evidence_sources": evidence_sources,
+        "safety_notice": SAFETY_NOTICE,
+    }
+
+
+def _resolve_rag_target_codes(*, issue_keys: list[str], rag_disease_codes: list[str]) -> list[str]:
+    enabled_codes = enabled_rag_codes()
+    relevant_disease_codes = set(rag_disease_codes)
+    candidates: list[str] = []
+    for issue_key in issue_keys:
+        for code in ISSUE_TO_RAG_CODES.get(issue_key, ()):
+            if code in GENERAL_RAG_CODES or code in relevant_disease_codes:
+                candidates.append(code)
+    return _dedupe([code for code in candidates if code in enabled_codes])
+
+
+def _retrieve_diet_rag_matches(*, issue_keys: list[str], target_codes: list[str]) -> list[KeywordRagMatch]:
+    matches_by_source_id: dict[str, KeywordRagMatch] = {}
+    for code in target_codes:
+        query = DIET_RAG_QUERY_TEMPLATES.get(code, " ".join(issue_keys))
+        for match in retrieve_keyword_rag_matches(
+            user_message=query,
+            disease_code=code,
+            issue_keys=issue_keys,
+            top_k=2,
+            include_safety_disclaimer=False,
+        ):
+            if match.document.metadata.disease_code not in target_codes:
+                continue
+            existing = matches_by_source_id.get(match.source_id)
+            if existing is None or match.score > existing.score:
+                matches_by_source_id[match.source_id] = match
+    return sorted(matches_by_source_id.values(), key=lambda match: (-match.score, match.source_id))[
+        :MAX_RAG_EVIDENCE_SOURCES
+    ]
+
+
+def _evidence_sources(matches: list[KeywordRagMatch]) -> list[dict[str, str]]:
+    sources: list[dict[str, str]] = []
+    for match in matches[:MAX_RAG_EVIDENCE_SOURCES]:
+        metadata = match.document.metadata
+        sources.append(
+            {
+                "title": metadata.title,
+                "disease_code": metadata.disease_code,
+                "review_status": metadata.review_status,
+            }
+        )
+    return sources
+
+
+def _rag_disease_comments(
+    *,
+    rag_disease_codes: list[str],
+    target_codes: list[str],
+    evidence_sources: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    evidence_codes = {source["disease_code"] for source in evidence_sources}
+    comments: list[dict[str, str]] = []
+    for disease_code in rag_disease_codes:
+        if disease_code not in RAG_COMMENT_TEMPLATES:
+            continue
+        has_direct_evidence = disease_code in evidence_codes
+        has_caution_fallback = (
+            disease_code == "CKD" and "DIET_CAUTION" in evidence_codes and "DIET_CAUTION" in target_codes
+        )
+        if not has_direct_evidence and not has_caution_fallback:
+            continue
+        rule = DISEASE_RULES.get(disease_code, {})
+        comments.append(
+            {
+                "disease_code": disease_code,
+                "label": str(rule.get("label") or disease_code),
+                "comment": RAG_COMMENT_TEMPLATES[disease_code],
+                "basis": _basis_from_evidence(disease_code=disease_code, evidence_sources=evidence_sources),
+            }
+        )
+    return comments
+
+
+def _basis_from_evidence(*, disease_code: str, evidence_sources: list[dict[str, str]]) -> str:
+    titles = [
+        source["title"]
+        for source in evidence_sources
+        if source["disease_code"] == disease_code
+        or (disease_code == "CKD" and source["disease_code"] == "DIET_CAUTION")
+    ]
+    if not titles:
+        return "참고 문서 기반"
+    return f"참고 문서 기반: {', '.join(titles[:2])}"
+
+
+def _normalize_risk_level(value: Any) -> str:
+    raw = getattr(value, "value", value)
+    return re.sub(r"\s+", "", str(raw or "").upper())
 
 
 def _dedupe(items: Iterable[str]) -> list[str]:

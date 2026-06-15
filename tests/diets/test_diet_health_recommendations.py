@@ -212,6 +212,78 @@ def test_diet_health_recommendation_keeps_only_active_title_matches() -> None:
     assert "염분 빼볼까염 챌린지" not in challenge_titles
 
 
+def test_diet_rag_comment_uses_attention_or_higher_disease_only() -> None:
+    result = service.build_diet_health_recommendation_response(
+        diet_record=_diet({"sugar_g": 18}, food_name="달콤한 간식"),
+        analysis_results=[_analysis(AnalysisType.DIABETES, RiskLevel.LOW)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+    )
+
+    rag_comment = result["rag_comment"]
+    assert rag_comment["enabled"] is True
+    assert all(item["disease_code"] != "DM" for item in rag_comment["disease_comments"])
+    assert all(item["disease_code"] != "DM" for item in rag_comment["evidence_sources"])
+    assert any(item["disease_code"] == "DIET_NUTRITION" for item in rag_comment["evidence_sources"])
+
+
+def test_diet_rag_comment_for_htn_sodium_uses_htn_and_diet_sources() -> None:
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    rag_comment = result["rag_comment"]
+    assert rag_comment["enabled"] is True
+    assert rag_comment["fallback_used"] is False
+    assert any(item["disease_code"] == "HTN" for item in rag_comment["disease_comments"])
+    assert any(item["disease_code"] == "HTN" for item in rag_comment["evidence_sources"])
+    assert any(item["disease_code"] == "DIET_NUTRITION" for item in rag_comment["evidence_sources"])
+    assert rag_comment["safety_notice"] == service.SAFETY_NOTICE
+
+
+def test_diet_rag_comment_for_ckd_uses_diet_caution_when_ckd_source_is_disabled() -> None:
+    result = _build(
+        nutrition={"protein_g": 35, "potassium_mg": 900},
+        analysis_types=[AnalysisType.CHRONIC_KIDNEY_DISEASE],
+    )
+
+    rag_comment = result["rag_comment"]
+    assert rag_comment["enabled"] is True
+    assert any(item["disease_code"] == "CKD" for item in rag_comment["disease_comments"])
+    assert any(item["disease_code"] == "DIET_CAUTION" for item in rag_comment["evidence_sources"])
+    serialized = str(rag_comment)
+    assert "의료진 상담" in serialized
+    assert "단백질 제한" not in serialized
+    assert "칼륨 제한" not in serialized
+    assert "인 제한" not in serialized
+
+
+def test_diet_rag_comment_failure_keeps_rule_based_recommendation(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_retrieval(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(service, "retrieve_keyword_rag_matches", fail_retrieval)
+
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    assert "sodium_high" in [item["issue_key"] for item in result["nutrition_findings"]]
+    assert result["recommended_foods"]
+    assert result["rag_comment"]["fallback_used"] is True
+    assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
+
+
+def test_diet_rag_comment_does_not_use_forbidden_phrases() -> None:
+    result = _build(
+        nutrition={"sodium_mg": 920, "carbohydrate_g": 80, "fat_g": 28},
+        analysis_types=[AnalysisType.HYPERTENSION, AnalysisType.DIABETES, AnalysisType.DYSLIPIDEMIA],
+    )
+
+    serialized = str(result["rag_comment"])
+    assert "나트륨 과다입니다" not in serialized
+    assert "단백질이 부족합니다" not in serialized
+    assert "당뇨 식단으로 부적절합니다" not in serialized
+    assert "고혈압 식단입니다" not in serialized
+    assert "이 음식을 먹으면 안 됩니다" not in serialized
+
+
 @pytest.mark.asyncio
 async def test_diet_health_recommendation_forbids_other_user_record(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_get_diet_record(diet_record_id: int) -> SimpleNamespace:

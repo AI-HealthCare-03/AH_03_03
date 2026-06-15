@@ -114,6 +114,28 @@ export type DietRecommendedChallenge = {
   reason: string;
 };
 
+export type DietRagDiseaseComment = {
+  disease_code: string;
+  label: string;
+  comment: string;
+  basis: string;
+};
+
+export type DietRagEvidenceSource = {
+  title: string;
+  disease_code: string;
+  review_status: string;
+};
+
+export type DietRagComment = {
+  enabled: boolean;
+  fallback_used: boolean;
+  summary: string;
+  disease_comments: DietRagDiseaseComment[];
+  evidence_sources: DietRagEvidenceSource[];
+  safety_notice: string;
+};
+
 export type DietHealthRecommendation = {
   diet_record_id: number;
   nutrition_findings: DietNutritionFinding[];
@@ -122,6 +144,7 @@ export type DietHealthRecommendation = {
   caution_foods: string[];
   recommended_challenges: DietRecommendedChallenge[];
   safety_notice: string;
+  rag_comment?: DietRagComment | null;
 };
 
 export type DietRecordPayload = {

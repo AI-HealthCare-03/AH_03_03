@@ -551,6 +551,33 @@ export default function DietResultPage() {
       <Card title="건강관리 추천">
         <div className="card-list">
           <div className="state-box">{recommendation?.safety_notice || DEFAULT_DIET_RECOMMENDATION_NOTICE}</div>
+          {recommendation?.rag_comment && (
+            <div className="mini-card">
+              <strong>참고 문서 기반 코멘트</strong>
+              <span>{recommendation.rag_comment.summary}</span>
+              {recommendation.rag_comment.disease_comments.length > 0 && (
+                <div className="card-list">
+                  {recommendation.rag_comment.disease_comments.map((comment) => (
+                    <div className="mini-card" key={comment.disease_code}>
+                      <span className="badge badge-reference">{comment.label}</span>
+                      <span>{comment.comment}</span>
+                      <span className="muted">{comment.basis}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {recommendation.rag_comment.evidence_sources.length > 0 && (
+                <div className="chip-list">
+                  {recommendation.rag_comment.evidence_sources.map((source) => (
+                    <span className="badge badge-reference" key={`${source.disease_code}-${source.title}`}>
+                      참고 문서 기반: {source.title}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <span className="muted">{recommendation.rag_comment.safety_notice}</span>
+            </div>
+          )}
           {recommendationLoading && <div className="state-box">식단 기반 건강관리 추천을 불러오는 중입니다.</div>}
           {recommendationError && (
             <div className="state-box">
