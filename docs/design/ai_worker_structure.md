@@ -32,7 +32,6 @@
 - `email.verification.send`
 - `password_reset.email.send`
 - `family.invite.email.send`
-- `fcm.push.send`
 - `family.notification.create`
 
 프론트 분석 화면은 `/analysis/run-async`를 사용합니다. 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 막아 긴 분석이 요청 중 직접 실행되지 않게 합니다. 건강검진 OCR과 식단 분석은 202 Accepted로 job을 만들고 `/api/v1/jobs/{job_id}` polling으로 상태를 확인합니다. 복약 정보는 MVP에서 OCR 없이 직접 입력합니다.

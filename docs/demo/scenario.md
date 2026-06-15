@@ -5,16 +5,16 @@
 ## 0. 준비
 
 - 프론트 포함 전체 시연은 `make demo-up`으로 실행하고 `http://localhost:8080`에서 진행한다.
-- 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이므로 `http://localhost`가 404를 반환해도 정상이다. 프론트/Firebase/storage/scheduler까지 포함한 최신 dev full stack 검증에는 `infra/docker/docker-compose.dev.yml`을 사용한다.
+- 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이므로 `http://localhost`가 404를 반환해도 정상이다. 프론트/storage/scheduler까지 포함한 최신 dev full stack 검증에는 `infra/docker/docker-compose.dev.yml`을 사용한다.
 - Docker compose 기준으로 `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`가 실행 중인지 확인한다.
 - 필요 시 로컬/시연 seed를 실행한다.
 - 민감키가 보이는 `.env` 또는 `docker compose config` 전체 출력 화면은 공유하지 않는다.
 - 발표 설명 기준: 현재 `ai_runtime`의 로컬 모델 artifact는 DM/HTN/DL CatBoost 3종이다. OBESITY는 rule-based, ANEM은 공식 분석 결과가 아닌 X2/식단 참고 분류다. 식단/검진 OCR과 분석은 provider 설정과 Redis Stream async job 상태를 함께 확인하는 흐름으로 설명한다. 복약 정보는 MVP에서 직접 입력만 제공한다.
 - LLM/RAG 설명 기준: 공식 API에서 현재 직접 호출되는 LLM runtime은 분석/식단 결과 설명 생성(`ai_runtime.llm.explanation_service`)과 keyword RAG reference source 첨부다. 메인 챗봇 LLM 라우터, 추천/챌린지 문구 모듈, 기존 RAG generator는 준비/PoC 영역이며 공식 runtime 연결은 후속 작업으로 설명한다.
 - 건강검진 OCR 공식 시연 경로에서는 Clova OCR을 호출하지 않는다. `EXAM_OCR_PROVIDER=auto` 기준으로 PDF는 측정값 페이지를 우선 선택하고 PaddleOCR을 먼저 시도하며, 실패하거나 후보가 없으면 PyMuPDF로 페이지 이미지를 만든 뒤 GPT Vision fallback을 사용할 수 있다. 이미지는 GPT Vision 우선, PaddleOCR fallback 정책이다. 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영한다.
-- 비동기 처리 설명 기준: Redis Stream 기반 `async_jobs`와 `ai-worker` consumer가 동작한다. 주요 job type은 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`와 이메일/비밀번호/가족초대/FCM/가족알림 service job이다. 긴 작업은 job 생성 후 `/api/v1/jobs/{job_id}` polling으로 SUCCESS/FAILED를 확인한다.
+- 비동기 처리 설명 기준: Redis Stream 기반 `async_jobs`와 `ai-worker` consumer가 동작한다. 주요 job type은 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`와 이메일/비밀번호/가족초대/가족알림 service job이다. 긴 작업은 job 생성 후 `/api/v1/jobs/{job_id}` polling으로 SUCCESS/FAILED를 확인한다.
 - 인증 시연 기준: Brevo SMTP 이메일 인증은 live 발송 가능 경로로 설명한다. 휴대폰 인증은 MVP/시연 범위에서 보류하며, 회원가입 필수 인증은 이메일 인증만 사용한다. `phone_number`는 DB/프로필 호환성용 선택값으로 유지하고, 운영 전 SMS 인증이 필요하면 별도 provider를 재검토한다.
-- Firebase Web Push는 `/firebase-messaging-sw.js` service worker가 정상 서빙되고, 브라우저 권한 허용 후 FCM token이 서버에 등록되는지 설정 화면에서 확인한다.
+- 브라우저 Push 알림은 MVP 범위에서 제외한다. 알림은 서비스 내부 알림과 이메일 중심으로 확인한다.
 - `.env`, example env, `ai_runtime` 코드 변경 후 이미 떠 있는 Docker 컨테이너에 반영하려면 `docker compose up -d --force-recreate fastapi ai-worker`로 FastAPI/AI Worker를 재생성한다.
 
 안전한 확인 명령:

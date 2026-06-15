@@ -125,34 +125,19 @@ async def test_due_reminder_does_not_create_duplicate_notification(monkeypatch: 
 
 
 @pytest.mark.asyncio
-async def test_push_reminder_enqueues_fcm_job(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_email_channel_reminder_creates_notification_and_log(monkeypatch: pytest.MonkeyPatch) -> None:
     now = datetime(2026, 5, 31, 9, 0, 0, tzinfo=config.TIMEZONE)
     repository = FakeNotificationRepository(
-        [_schedule(channel=NotificationChannel.PUSH, next_trigger_at=now - timedelta(minutes=1))]
+        [_schedule(channel=NotificationChannel.EMAIL, next_trigger_at=now - timedelta(minutes=1))]
     )
-    push_jobs: list[dict[str, Any]] = []
-
-    async def fake_enqueue_fcm_push_send(**kwargs: Any) -> None:
-        push_jobs.append(kwargs)
 
     monkeypatch.setattr(notification_service, "notification_repository", repository)
-    monkeypatch.setattr("app.services.service_jobs.enqueue_fcm_push_send", fake_enqueue_fcm_push_send)
 
     created_count = await notification_service.process_due_reminder_schedules(now=now)
 
     assert created_count == 1
-    assert repository.logs[0]["status"] == NotificationLogStatus.PENDING
-    assert push_jobs == [
-        {
-            "user_id": 7,
-            "title": "챌린지 알림",
-            "body": "오늘 챌린지를 기록해보세요.",
-            "data": {"type": "CHALLENGE", "reminder_schedule_id": "1"},
-            "notification_type": "CHALLENGE",
-            "related_type": "challenge",
-            "related_id": 77,
-        }
-    ]
+    assert repository.logs[0]["status"] == NotificationLogStatus.SENT
+    assert repository.logs[0]["channel"] == NotificationChannel.EMAIL
 
 
 @pytest.mark.asyncio

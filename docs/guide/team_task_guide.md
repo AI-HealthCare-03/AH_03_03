@@ -175,7 +175,7 @@ make demo-ps
 - API Docs: `http://localhost:8080/api/docs`
 - FastAPI 직접 접근: `http://localhost:8000`
 
-루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이다. frontend, Firebase Web Push build args, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
+루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이다. frontend, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
 
 로그/종료:
 
