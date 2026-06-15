@@ -88,6 +88,67 @@ const metricLabel: Record<string, string> = {
   morning_health_record_count: "아침 건강 지표 기록",
 };
 
+const challengeImageMap: Record<number, string> = {
+  105: "/images/challenges/72.jpg",
+  106: "/images/challenges/73.jpg",
+  107: "/images/challenges/74.jpg",
+  108: "/images/challenges/75.jpg",
+  109: "/images/challenges/76.jpg",
+  110: "/images/challenges/77.jpg",
+  111: "/images/challenges/78.jpg",
+  112: "/images/challenges/79.jpg",
+  113: "/images/challenges/80.jpg",
+  114: "/images/challenges/81.jpg",
+  115: "/images/challenges/82.jpg",
+  116: "/images/challenges/83.jpg",
+  117: "/images/challenges/84.jpg",
+  118: "/images/challenges/85.jpg",
+  119: "/images/challenges/86.jpg",
+  120: "/images/challenges/87.jpg",
+  121: "/images/challenges/88.jpg",
+  122: "/images/challenges/89.jpg",
+  123: "/images/challenges/90.jpg",
+  124: "/images/challenges/91.jpg",
+  125: "/images/challenges/92.jpg",
+  126: "/images/challenges/93.jpg",
+  127: "/images/challenges/94.jpg",
+  128: "/images/challenges/95.jpg",
+  129: "/images/challenges/96.jpg",
+  130: "/images/challenges/97.jpg",
+  131: "/images/challenges/98.jpg",
+  132: "/images/challenges/99.jpg",
+  133: "/images/challenges/100.jpg",
+  134: "/images/challenges/101.jpg",
+  135: "/images/challenges/102.jpg",
+  136: "/images/challenges/103.jpg",
+  137: "/images/challenges/104.jpg",
+  138: "/images/challenges/105.jpg",
+  139: "/images/challenges/106.jpg",
+  140: "/images/challenges/107.jpg",
+  141: "/images/challenges/108.jpg",
+  142: "/images/challenges/109.jpg",
+  143: "/images/challenges/110.jpg",
+  144: "/images/challenges/111.jpg",
+  145: "/images/challenges/112.jpg",
+  146: "/images/challenges/113.jpg",
+  147: "/images/challenges/114.jpg",
+  148: "/images/challenges/115.jpg",
+  149: "/images/challenges/116.jpg",
+  150: "/images/challenges/117.jpg",
+  151: "/images/challenges/118.jpg",
+  152: "/images/challenges/119.jpg",
+  153: "/images/challenges/120.jpg",
+  154: "/images/challenges/121.jpg",
+  155: "/images/challenges/122.jpg",
+  156: "/images/challenges/123.jpg",
+  157: "/images/challenges/124.jpg",
+  158: "/images/challenges/125.jpg",
+  159: "/images/challenges/126.jpg",
+  160: "/images/challenges/127.jpg",
+  161: "/images/challenges/128.jpg",
+  162: "/images/challenges/129.jpg",
+};
+
 function normalizeStatus(value: unknown): string {
   return String(value ?? "").toUpperCase();
 }
@@ -546,7 +607,15 @@ export default function ChallengeDetailPage() {
           <span className="eyebrow">{getDisplayCategory(challenge)}</span>
           <h1>{String(challenge?.title ?? "챌린지")}</h1>
           <div className="challenge-icon-large" aria-label={`${category} challenge icon`}>
-            {categoryIcon[category] ?? "🌿"}
+            {category === "EXERCISE" && challenge?.id ? (
+              <img
+                src={challengeImageMap[Number(challenge.id)] ?? ""}
+                alt={challenge.title}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            ) : (
+              categoryIcon[category] ?? "🌿"
+            )}
           </div>
           <p>{getCleanDescription(challenge?.description) || "건강 습관을 작게 시작해보세요."}</p>
           <div className="metric-grid">
