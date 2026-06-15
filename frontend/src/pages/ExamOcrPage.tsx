@@ -22,9 +22,9 @@ type Step = 1 | 2 | 3 | 4;
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { label: string; num: Step }[] = [
-    { num: 1, label: "파일 업로드" },
-    { num: 2, label: "측정값 확인" },
-    { num: 3, label: "건강정보 반영" },
+    { num: 1, label: "파일 업로드 및 인식" },
+    { num: 2, label: "인식 결과 확인" },
+    { num: 3, label: "검진 결과 등록" },
   ];
   return (
     <div className="step-indicator">
@@ -72,6 +72,8 @@ export default function ExamOcrPage() {
   const [isAppliedToHealth, setIsAppliedToHealth] = useState(false);
   const [error, setError] = useState("");
   const [canRetryOcr, setCanRetryOcr] = useState(false);
+
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const { clearFeedback, feedbackDialog, showFailure, showFeedback, showProcessing, showSuccess } =
     useAnalysisFeedbackDialog();
 
@@ -241,7 +243,7 @@ export default function ExamOcrPage() {
         title: "건강정보 반영에 실패했습니다.",
         message: "잠시 후 다시 시도해 주세요.",
       });
-      setError(err instanceof Error ? err.message : "건강정보 반영에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "검진 결과 반영에 실패했습니다.");
     } finally {
       setIsConfirming(false);
     }
@@ -252,16 +254,74 @@ export default function ExamOcrPage() {
       {/* 헤더 */}
       <div className="page-header">
         <div>
-          <h1>건강검진표 측정값 확인</h1>
-          <p>검진표 이미지/PDF를 업로드하면 측정값을 자동으로 인식합니다.</p>
+          <h1>건강검진표 사진/PDF 등록</h1>
+          <p>검진표 이미지/PDF를 업로드하면 결과값을 자동으로 인식합니다.</p>
         </div>
         <Link className="button secondary" to="/health">
-          등록 선택으로 돌아가기
+          건강 분석으로 돌아가기
         </Link>
       </div>
 
       {/* 스텝 인디케이터 */}
       <StepIndicator current={currentStep} />
+
+      {/* 파일 업로드 도움말 모달 */}
+      {isHelpOpen && (
+        <div
+          onClick={() => setIsHelpOpen(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--color-surface)", borderRadius: "var(--radius-lg)",
+              padding: "28px", maxWidth: "560px", width: "100%",
+              maxHeight: "80vh", overflowY: "auto",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h2 style={{ margin: 0, fontSize: "18px" }}>건강검진 결과 PDF 다운로드 방법</h2>
+              <button
+                onClick={() => setIsHelpOpen(false)}
+                type="button"
+                style={{
+                  background: "none", border: "none", fontSize: "20px",
+                  cursor: "pointer", color: "var(--color-text-secondary)", lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <ol style={{ paddingLeft: "20px", lineHeight: "2", margin: "0 0 16px" }}>
+              <li>
+                <a
+                  href="https://www.nhis.or.kr/nhis/etc/personalLoginPage.do"
+                  rel="noreferrer"
+                  style={{ color: "var(--color-primary)", wordBreak: "break-all" }}
+                  target="_blank"
+                >
+                  https://www.nhis.or.kr/nhis/etc/personalLoginPage.do
+                </a>
+                {" "}(국민건강보험) 사이트에 접속합니다.
+              </li>
+              <li>건강모아 → 건강검진 결과조회</li>
+              <li>
+                <img
+                  alt="건강검진 결과조회 화면"
+                  src="/images/nhis-guide.png"
+                  style={{ marginTop: "8px", width: "100%", borderRadius: "8px", border: "1px solid var(--color-border)" }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </li>
+            </ol>
+          </div>
+        </div>
+      )}
 
       {/* 에러 / 재시도 */}
       {error && <ErrorMessage message={error} />}
@@ -277,7 +337,29 @@ export default function ExamOcrPage() {
       {feedbackDialog}
 
       {/* ── STEP 1: 파일 업로드 ── */}
-      <Card title="파일 업로드">
+      <Card>
+        <div className="card-header" style={{ marginBottom: "4px" }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            파일 업로드
+            <button
+              aria-label="파일 업로드 도움말"
+              onClick={() => setIsHelpOpen(true)}
+              type="button"
+              style={{
+                width: "20px", height: "20px", borderRadius: "50%",
+                border: "none", background: "var(--color-primary)",
+                color: "#fff", fontSize: "12px", fontWeight: 800,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, lineHeight: 1,
+              }}
+            >
+              ?
+            </button>
+          </h2>
+        </div>
+        <p className="muted" style={{ marginBottom: "12px", fontSize: "14px" }}>
+          국민건강보험공단 웹사이트의 [건강검진 결과조회] 메뉴에서 최근 검진 내역을 <strong>'PDF로 저장'</strong>하여 다운로드하실 수 있습니다. (자세한 방법은 우측의 ? 버튼을 참고해 주세요.)
+        </p>
         <div className="upload-box">
           <div className="upload-action-grid">
             <label className="upload-action-button">
@@ -331,24 +413,32 @@ export default function ExamOcrPage() {
 
         <div className="button-row" style={{ marginTop: 12 }}>
           <button disabled={isRunningOcr || !selectedFile} onClick={startExamOcr} type="button">
-            {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
+            {isRunningOcr ? "검진표 인식 중..." : "검진표 인식 시작"}
           </button>
         </div>
       </Card>
 
       {/* ── STEP 2~3: 측정값 후보 (파일 선택 후 항상 노출) ── */}
-      <Card title="측정값 후보">
+      <Card>
+        <div className="card-header" style={{ marginBottom: "4px" }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            검진표 인식 결과
+            {measurements.length > 0 && !isAppliedToHealth && (
+              <em className="badge badge-required">확인 필요</em>
+            )}
+          </h2>
+        </div>
+        <p className="muted" style={{ marginBottom: "12px", fontSize: "16px" }}>인식된 결과는 반드시 직접 확인해 주세요.</p>
         <div className="ocr-result-table">
           {measurements.length === 0 ? (
             <div className="state-box">
-              아직 측정값 후보가 없습니다. 파일을 업로드하고 측정값 후보를 생성해주세요.
+              아직 인식된 검진표가 없습니다. 파일을 업로드하고 '검진표 인식 시작'버튼을 눌러주세요.
             </div>
           ) : (
             measurements.map((m) => (
               <label className="ocr-result-row" key={m.id}>
                 <span>
                   {m.measurement_name}
-                  <em className="badge badge-required">확인 필요</em>
                 </span>
                 <input
                   onChange={(e) => updateLocalMeasurement(m.id, e.target.value)}
@@ -361,25 +451,27 @@ export default function ExamOcrPage() {
         </div>
 
         {/* 하단 액션 영역 */}
-        <div className="button-row" style={{ marginTop: 16, justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div className="button-row" style={{ margin: 0 }}>
-            <Link className="button secondary" to="/health/profile">
-              건강정보 확인
-            </Link>
-            <Link className="button secondary" to="/analysis">
-              분석 화면 이동
-            </Link>
-          </div>
+        <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap", gap: 8 }}>
+          {isAppliedToHealth && (
+            <>
+              <Link className="button secondary" to="/health/profile">
+                등록된 정보 확인
+              </Link>
+              <Link className="button secondary" to="/analysis">
+                분석 결과 확인
+              </Link>
+            </>
+          )}
           <button
             disabled={measurements.length === 0 || isConfirming || isAppliedToHealth}
             onClick={saveAndConfirm}
             type="button"
           >
             {isConfirming
-              ? "건강정보 반영 중..."
+              ? "검진 결과 등록 중..."
               : isAppliedToHealth
-                ? "건강정보 반영 완료 ✓"
-                : "건강정보에 반영"}
+                ? "검진 결과 등록 완료"
+                : "검진 결과 등록"}
           </button>
         </div>
       </Card>

@@ -2107,7 +2107,7 @@ pre {
 }
 
 .card h2 {
-  font-size: 18px;
+  font-size: 25px;
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -4005,6 +4005,7 @@ input:-webkit-autofill:focus {
 
 .section-heading h3 {
   margin-bottom: 4px;
+  font-size: 20px;
 }
 
 .section-heading p {

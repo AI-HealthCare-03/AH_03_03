@@ -66,7 +66,14 @@ export default function SettingsPage() {
   };
 
   return (
-    <Card title="설정">
+    <div className="page-stack">
+      <header className="dashboard-header">
+        <div>
+          <h1>설정</h1>
+          <p>알림 및 앱 환경설정을 관리합니다.</p>
+        </div>
+      </header>
+    <Card>
       {error && <ErrorMessage message={error} />}
       {notice && <div className="state-box">{notice}</div>}
       <div className="settings-list">
@@ -96,5 +103,6 @@ export default function SettingsPage() {
         </button>
       </div>
     </Card>
+    </div>
   );
 }

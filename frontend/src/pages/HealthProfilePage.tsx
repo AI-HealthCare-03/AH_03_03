@@ -158,16 +158,16 @@ const readOnlySections: Array<{
     ],
   },
   {
-    title: "정밀 검진값",
+    title: "정밀 분석 정보",
     items: [
       { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
       { key: "fasting_glucose", label: "공복혈당", unit: "mg/dL" },
-      { key: "hba1c", label: "당화혈색소", unit: "%", optional: true },
-      { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL" },
-      { key: "triglyceride", label: "중성지방", unit: "mg/dL" },
-      { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL" },
-      { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL" },
+      { key: "hba1c", label: "당화혈색소", unit: "%", referenceOnly: true },
+      { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL", referenceOnly: true },
+      { key: "triglyceride", label: "중성지방", unit: "mg/dL", referenceOnly: true },
+      { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
+      { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
     ],
   },
@@ -510,10 +510,10 @@ export default function HealthProfilePage() {
 
   return (
     <div className="page-stack">
-      <div className="page-header">
+      <header className="dashboard-header">
         <div>
-          <h1>필수 건강정보 관리</h1>
-          <p>기본 건강 정보와 정밀 건강 정보를 한 화면에서 관리합니다.</p>
+          <h1>건강 분석</h1>
+          <p>건강정보를 입력하고 만성질환 위험도를 분석합니다.</p>
         </div>
         <div className="button-row">
           {!editing && (
@@ -525,7 +525,20 @@ export default function HealthProfilePage() {
             {runningMode === "PRECISION" ? "분석 중..." : "분석하기"}
           </button>
         </div>
+      </header>
+      {/* 입력 단계 탭 */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health/profile">
+          한눈에 보기
+        </Link>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          간편 분석 정보 입력
+        </Link>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          정밀 분석 정보 입력
+        </Link>
       </div>
+
       {error && <ErrorMessage message={error} />}
       {notice && <div className="state-box">{notice}</div>}
       <div className="page-grid">
@@ -541,7 +554,7 @@ export default function HealthProfilePage() {
               />
             </div>
             <p className={missingRequiredLabels.length === 0 ? "success-text" : "warning-text"}>
-              {missingRequiredLabels.length === 0 ? "기본 분석 준비 완료" : "기본 분석에 필요한 항목을 더 입력해 주세요."}
+              {missingRequiredLabels.length === 0 ? "간편 분석 준비 완료" : "간편 분석에 필요한 항목을 더 입력해 주세요."}
             </p>
             <div className="chip-list">
               {missingRequiredLabels.map((label) => (
@@ -550,51 +563,62 @@ export default function HealthProfilePage() {
                 </span>
               ))}
               {missingRequiredLabels.length === 0 && (
-                <span className="badge badge-saved">부족한 항목 없음</span>
+                <span className="badge badge-saved">누락된 항목 없음</span>
               )}
             </div>
             <div className="state-box">
-              정밀 건강 정보 입력 {completedX2Count} / {x2Fields.length}
+              정밀 건강 정보 입력 현황 {completedX2Count} / {x2Fields.length}
               {backendMissingLabels.length > 0 && (
-                <p>기본 분석 부족 항목: {backendMissingLabels.join(", ")}</p>
+                <p>간편 분석 필요 항목: {backendMissingLabels.join(", ")}</p>
               )}
               {precisionMissingLabels.length > 0 && (
-                <p>검진/혈액검사 수치는 선택 입력입니다. 추가 입력하면 정밀 분석 정확도가 높아집니다: {precisionMissingLabels.join(", ")}</p>
+                <p>기본 정보만으로도 간편 분석이 가능하며, 혈액검사 및 검진 수치를 추가 입력하시면 예측 정확도가 더 높은 '정밀 분석'을 받아보실 수 있습니다.</p>
               )}
-              <p>당화혈색소는 선택값입니다. 입력하면 정밀 분석에 함께 반영됩니다.</p>
+              <p>(※ 선택 입력 항목: 총콜레스테롤, LDL, HDL, 중성지방, 당화혈색소)</p>
             </div>
           </div>
         </Card>
-        <Card title="저장 상태">
+        <Card title="저장된 정보">
           <div className="profile-summary-grid">
             {[
-              ["키", form.height_cm],
-              ["몸무게", form.weight_kg],
+              ["키(cm)", form.height_cm],
+              ["몸무게(kg)", form.weight_kg],
               ["BMI", bmi ? bmi.toFixed(1) : ""],
               ["직업군", displayValueMap.occupation?.[form.occupation] ?? ""],
               [
                 "가족력",
                 `${displayValueMap.family_htn?.[form.family_htn]}/${displayValueMap.family_dm?.[form.family_dm]}/${displayValueMap.family_dyslipidemia?.[form.family_dyslipidemia]}`,
               ],
-              ["혈압", form.systolic_bp && form.diastolic_bp ? `${form.systolic_bp}/${form.diastolic_bp}` : ""],
-              ["공복혈당", form.fasting_glucose],
-              ["HDL", form.hdl_cholesterol],
-              ["LDL", form.ldl_cholesterol],
+              ["혈압(mmHg)", form.systolic_bp && form.diastolic_bp ? `${form.systolic_bp}/${form.diastolic_bp}` : ""],
+              ["공복혈당(mg/dL)", form.fasting_glucose],
+              ["HDL(mg/dL)", form.hdl_cholesterol],
+              ["LDL(mg/dL)", form.ldl_cholesterol],
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>
                 <div className="value-row">
                   <strong>{value || "-"}</strong>
-                  <em className={value ? "badge badge-saved" : "badge badge-missing"}>
-                    {value ? "저장됨" : "미입력"}
-                  </em>
+                  {editing && (
+                    <em className={value ? "badge badge-saved" : "badge badge-missing"}>
+                      {value ? "저장됨" : "미입력"}
+                    </em>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </Card>
       </div>
-      <Card title={editing ? "건강정보 수정" : "저장된 건강정보"}>
+      <Card
+        title={editing ? "건강정보 수정" : "건강 정보"}
+        actions={
+          !editing && (
+            <button className="btn-secondary" onClick={() => setEditing(true)} style={{ fontSize: "13px", padding: "4px 12px" }} type="button">
+              수정
+            </button>
+          )
+        }
+      >
         {editing ? (
           <>
             <HealthProfileForm
@@ -647,8 +671,7 @@ export default function HealthProfilePage() {
         ) : (
           <div className="page-stack">
             <div className="state-box">
-              저장된 값을 읽기 전용으로 표시합니다. 변경하려면 수정하기를 눌러주세요.{" "}
-              <Link to="/health">건강 분석 입력 화면으로 이동</Link>
+              변경하려면 '수정'버튼을 눌러주세요.{" "}
             </div>
             {readOnlySections.map((section) => (
               <section className="profile-section" key={section.title}>
@@ -663,11 +686,7 @@ export default function HealthProfilePage() {
                       <div className="readonly-health-item" key={`${section.title}-${item.key}`}>
                         <div className="item-header">
                           <span>{item.label}</span>
-                          {item.optional ? (
-                            <em className="badge badge-reference">선택</em>
-                          ) : item.referenceOnly ? (
-                            <em className="badge badge-reference">참고</em>
-                          ) : (
+                          {!item.optional && !item.referenceOnly && (
                             <em className="badge badge-required">필수</em>
                           )}
                         </div>
@@ -676,9 +695,11 @@ export default function HealthProfilePage() {
                             {value || "-"}
                             {value && item.unit ? ` ${item.unit}` : ""}
                           </strong>
-                          <em className={value ? "badge badge-saved" : "badge badge-missing"}>
-                            {value ? "저장됨" : "미입력"}
-                          </em>
+                          {editing && (
+                            <em className={value ? "badge badge-saved" : "badge badge-missing"}>
+                              {value ? "저장됨" : "미입력"}
+                            </em>
+                          )}
                         </div>
                       </div>
                     );
