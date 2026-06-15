@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getLatestAnalysisResults } from "../api/analysis";
-import { listChallengeRecommendations, listChallenges, listMyChallenges } from "../api/challenges";
+import { getChallenge, listChallengeRecommendations, listChallenges, listMyChallenges } from "../api/challenges";
 import { listExams, listMeasurements } from "../api/exams";
 import { getAnalysisReadiness, getLatestHealthRecord } from "../api/health";
 import { getMainSummary } from "../api/main";
@@ -293,11 +293,34 @@ export default function MainPage() {
         setAnalysisResults(latestResults.status === "fulfilled" && Array.isArray(latestResults.value) ? latestResults.value : []);
         setLatestHealthRecord(latestHealth.status === "fulfilled" ? asRecord(latestHealth.value) : {});
         setReadiness(healthReadiness.status === "fulfilled" ? asRecord(healthReadiness.value) : {});
-        setChallenges(challengeList.status === "fulfilled" && Array.isArray(challengeList.value) ? challengeList.value : []);
-        setChallengeRecommendations(
+        const baseChallenges =
+          challengeList.status === "fulfilled" && Array.isArray(challengeList.value) ? challengeList.value : [];
+        const recommendations =
           recommendationList.status === "fulfilled" && Array.isArray(recommendationList.value)
             ? recommendationList.value
-            : [],
+            : [];
+        const recommendationChallengeIds = Array.from(
+          new Set(
+            recommendations
+              .map((recommendation) => Number(recommendation.challenge_id))
+              .filter((id) => Number.isFinite(id) && id > 0),
+          ),
+        );
+        const missingRecommendationIds = recommendationChallengeIds.filter(
+          (id) => !baseChallenges.some((challenge) => Number(challenge.id) === id),
+        );
+        const recommendationChallengeDetails = await Promise.allSettled(
+          missingRecommendationIds.map((id) => getChallenge<AnyRecord>(id)),
+        );
+        const mergedChallenges = [...baseChallenges];
+        for (const detail of recommendationChallengeDetails) {
+          if (detail.status === "fulfilled" && !mergedChallenges.some((challenge) => Number(challenge.id) === Number(detail.value.id))) {
+            mergedChallenges.push(detail.value);
+          }
+        }
+        setChallenges(mergedChallenges);
+        setChallengeRecommendations(
+          recommendations,
         );
         setMyChallenges(
           myChallengeList.status === "fulfilled" && Array.isArray(myChallengeList.value) ? myChallengeList.value : [],
@@ -650,15 +673,18 @@ export default function MainPage() {
             <div>
               <span className="viz-card-label">추천 챌린지</span>
               <div className="compact-list" style={{ marginTop: "10px" }}>
-                {recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => (
+                {recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => {
+                  const challengeId = Number(challenge.id);
+                  return (
                   <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
                     <div>
                       <strong>{getChallengeTitle(challenge)}</strong>
                       <p>{getCategoryLabel(challenge.category)} · {getChallengeDuration(challenge)}</p>
                     </div>
-                    <Link className="button secondary" to="/challenges">참여하기</Link>
+                    <Link className="button secondary" to={Number.isFinite(challengeId) ? `/challenges/${String(challengeId)}` : "/challenges"}>참여하기</Link>
                   </div>
-                )) : (
+                  );
+                }) : (
                   <div className="viz-empty">
                     <Link to="/challenges" style={{ color: "var(--color-primary)", fontWeight: 900 }}>챌린지 보기</Link>
                   </div>

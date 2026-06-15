@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysisAsync } from "../api/analysis";
-import { listChallengeRecommendations, listChallenges } from "../api/challenges";
+import { getChallenge, listChallengeRecommendations } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
@@ -45,6 +45,17 @@ type AnalysisDetailPreview = {
   factors?: AnalysisFactor[];
   explanation?: AnalysisExplanation | null;
 };
+
+function getChallengeCardDescription(value: unknown): string {
+  const cleaned = String(value ?? "")
+    .replace(/\[target_disease=[A-Z_]+\]\s*/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const fallback = cleaned || "분석 결과를 바탕으로 추천된 챌린지입니다.";
+  return fallback.length > 140 ? `${fallback.slice(0, 139).trim()}…` : fallback;
+}
+
 type Readiness = {
   is_ready: boolean;
   basic_ready?: boolean;
@@ -236,17 +247,28 @@ export default function AnalysisPage() {
     setPrecisionReady(Boolean(readiness.precision_ready));
     setMissingFields((readiness.basic_ready ?? readiness.is_ready) ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
     setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
-    const [recommendations, challenges] = await Promise.allSettled([
-      listChallengeRecommendations<AnalysisResult[]>({ limit: 4 }),
-      listChallenges<AnalysisResult[]>({ limit: 20 }),
-    ]);
-    if (recommendations.status === "fulfilled" && challenges.status === "fulfilled") {
-      const ids = recommendations.value.map((recommendation) => Number(recommendation.challenge_id));
-      setRecommendedChallenges(
-        ids
-          .map((id) => challenges.value.find((challenge) => Number(challenge.id) === id))
-          .filter((challenge): challenge is AnalysisResult => Boolean(challenge)),
+    try {
+      const recommendations = await listChallengeRecommendations<AnalysisResult[]>({ limit: 4 });
+      const ids = Array.from(
+        new Set(
+          recommendations
+            .map((recommendation) => Number(recommendation.challenge_id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+        ),
       );
+      if (ids.length > 0) {
+        const challengeDetails = await Promise.allSettled(ids.map((id) => getChallenge<AnalysisResult>(id)));
+        setRecommendedChallenges(
+          challengeDetails
+            .map((result) => (result.status === "fulfilled" ? result.value : null))
+            .filter((challenge): challenge is AnalysisResult => Boolean(challenge))
+            .slice(0, 4),
+        );
+      } else {
+        setRecommendedChallenges([]);
+      }
+    } catch {
+      setRecommendedChallenges([]);
     }
   };
 
@@ -447,7 +469,7 @@ export default function AnalysisPage() {
                   </span>
                   <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
                 </div>
-                <p className="muted">{String(challenge.description ?? "분석 결과를 바탕으로 추천된 챌린지입니다.")}</p>
+                <p className="muted">{getChallengeCardDescription(challenge.description)}</p>
                 <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
                   상세보기
                 </Link>
