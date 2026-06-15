@@ -28,9 +28,9 @@ type Step = 1 | 2 | 3 | 4;
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { label: string; num: Step }[] = [
-    { num: 1, label: "파일 업로드" },
-    { num: 2, label: "측정값 확인" },
-    { num: 3, label: "건강정보 반영" },
+    { num: 1, label: "파일 업로드 및 인식" },
+    { num: 2, label: "인식 결과 확인" },
+    { num: 3, label: "검진 결과 등록" },
   ];
   return (
     <div className="step-indicator">
@@ -254,17 +254,17 @@ export default function ExamOcrPage() {
       setMeasurements(await listMeasurements(exam.id));
       setIsAppliedToHealth(true);
       setFeedbackDialog({
-        title: "건강정보에 반영되었습니다.",
-        message: "이제 정밀분석에서 최신 검진 수치를 사용할 수 있습니다.",
+        title: "검진 결과가 반영되었습니다.",
+        message: "이제 정밀분석이 가능합니다!",
       });
     } catch (err) {
       setIsAppliedToHealth(false);
       setFeedbackDialog({
-        title: "건강정보 반영에 실패했습니다.",
+        title: "검진 결과 반영에 실패했습니다.",
         message: "잠시 후 다시 시도해 주세요.",
         tone: "danger",
       });
-      setError(err instanceof Error ? err.message : "건강정보 반영에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "검진 결과 반영에 실패했습니다.");
     } finally {
       setIsConfirming(false);
     }
@@ -393,25 +393,27 @@ export default function ExamOcrPage() {
         </div>
 
         {/* 하단 액션 영역 */}
-        <div className="button-row" style={{ marginTop: 16, justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div className="button-row" style={{ margin: 0 }}>
-            <Link className="button secondary" to="/health/profile">
-              건강정보 확인
-            </Link>
-            <Link className="button secondary" to="/analysis">
-              분석 화면 이동
-            </Link>
-          </div>
+        <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap", gap: 8 }}>
+          {isAppliedToHealth && (
+            <>
+              <Link className="button secondary" to="/health/profile">
+                등록된 정보 확인
+              </Link>
+              <Link className="button secondary" to="/analysis">
+                분석 결과 확인
+              </Link>
+            </>
+          )}
           <button
             disabled={measurements.length === 0 || isConfirming || isAppliedToHealth}
             onClick={saveAndConfirm}
             type="button"
           >
             {isConfirming
-              ? "건강정보 반영 중..."
+              ? "검진 결과 등록 중..."
               : isAppliedToHealth
-                ? "건강정보 반영 완료 ✓"
-                : "건강정보에 반영"}
+                ? "검진 결과 등록 완료"
+                : "검진 결과 등록"}
           </button>
         </div>
       </Card>
