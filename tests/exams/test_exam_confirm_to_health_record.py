@@ -11,6 +11,7 @@ from ai_runtime.ocr.checkup.extractor import parse_from_text_lines
 from app.services import exams as exam_service
 from app.services.exams import (
     build_health_record_update_from_exam_measurements,
+    merge_health_record_with_exam_missing_only,
     parse_exam_measurement_number,
 )
 
@@ -208,6 +209,45 @@ def test_invalid_or_none_values_do_not_overwrite_health_record_fields() -> None:
     )
 
     assert data == {}
+
+
+def test_merge_health_record_with_exam_missing_only_preserves_existing_values() -> None:
+    data = merge_health_record_with_exam_missing_only(
+        {
+            "systolic_bp": 160,
+            "diastolic_bp": 90,
+            "ldl_cholesterol": 150,
+            "hdl_cholesterol": None,
+            "fasting_glucose": "",
+        },
+        {
+            "systolic_bp": 111,
+            "diastolic_bp": 73,
+            "ldl_cholesterol": 100,
+            "hdl_cholesterol": 47,
+            "fasting_glucose": 108,
+        },
+    )
+
+    assert data == {
+        "hdl_cholesterol": 47,
+        "fasting_glucose": 108,
+    }
+
+
+def test_merge_health_record_with_exam_missing_only_treats_zero_as_present() -> None:
+    data = merge_health_record_with_exam_missing_only(
+        {
+            "systolic_bp": 0,
+            "diastolic_bp": None,
+        },
+        {
+            "systolic_bp": 111,
+            "diastolic_bp": 73,
+        },
+    )
+
+    assert data == {"diastolic_bp": 73}
 
 
 def test_exam_upload_key_uses_user_exam_and_unique_segment() -> None:
@@ -586,6 +626,153 @@ async def test_confirm_without_request_updates_latest_health_record_from_existin
         "ldl_cholesterol": 131,
         "hdl_cholesterol": 47,
     }
+
+
+@pytest.mark.asyncio
+async def test_confirm_preserves_existing_health_record_values_and_fills_missing_fields(monkeypatch) -> None:
+    report = SimpleNamespace(id=1, user_id=10, exam_date=None)
+    updated_payload: dict[str, object] = {}
+
+    async def fake_get_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    async def fake_list_exam_measurements(exam_report_id: int):
+        assert exam_report_id == 1
+        return [
+            _measurement("systolic_bp", "111 mmHg"),
+            _measurement("diastolic_bp", "73 mmHg"),
+            _measurement("ldl", "100 mg/dL"),
+            _measurement("hdl", "47 mg/dL"),
+        ]
+
+    async def fake_get_latest_health_record_by_user(user_id: int):
+        assert user_id == 10
+        return SimpleNamespace(
+            id=99,
+            systolic_bp=160,
+            diastolic_bp=90,
+            ldl_cholesterol=150,
+            hdl_cholesterol=None,
+        )
+
+    async def fake_update_health_record(record_id: int, data: dict):
+        assert record_id == 99
+        updated_payload.update(data)
+        return SimpleNamespace(id=record_id, **data)
+
+    async def fake_confirm_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    monkeypatch.setattr(exam_service, "get_exam_report", fake_get_exam_report)
+    monkeypatch.setattr(exam_service, "list_exam_measurements", fake_list_exam_measurements)
+    monkeypatch.setattr(
+        exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
+    )
+    monkeypatch.setattr(exam_service.health_repository, "update_health_record", fake_update_health_record)
+    monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
+
+    confirmed = await exam_service.confirm_exam_report(1)
+
+    assert confirmed is report
+    assert updated_payload == {"hdl_cholesterol": 47}
+
+
+@pytest.mark.asyncio
+async def test_confirm_skips_health_record_update_when_exam_values_are_already_present(monkeypatch) -> None:
+    report = SimpleNamespace(id=1, user_id=10, exam_date=None)
+    update_called = False
+
+    async def fake_get_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    async def fake_list_exam_measurements(exam_report_id: int):
+        assert exam_report_id == 1
+        return [
+            _measurement("systolic_bp", "111 mmHg"),
+            _measurement("diastolic_bp", "73 mmHg"),
+            _measurement("ldl", "100 mg/dL"),
+        ]
+
+    async def fake_get_latest_health_record_by_user(user_id: int):
+        assert user_id == 10
+        return SimpleNamespace(
+            id=99,
+            systolic_bp=160,
+            diastolic_bp=90,
+            ldl_cholesterol=150,
+        )
+
+    async def fake_update_health_record(record_id: int, data: dict):
+        nonlocal update_called
+        update_called = True
+        return SimpleNamespace(id=record_id, **data)
+
+    async def fake_confirm_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    monkeypatch.setattr(exam_service, "get_exam_report", fake_get_exam_report)
+    monkeypatch.setattr(exam_service, "list_exam_measurements", fake_list_exam_measurements)
+    monkeypatch.setattr(
+        exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
+    )
+    monkeypatch.setattr(exam_service.health_repository, "update_health_record", fake_update_health_record)
+    monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
+
+    confirmed = await exam_service.confirm_exam_report(1)
+
+    assert confirmed is report
+    assert update_called is False
+
+
+@pytest.mark.asyncio
+async def test_confirm_creates_health_record_from_exam_when_latest_record_is_missing(monkeypatch) -> None:
+    report = SimpleNamespace(id=1, user_id=10, exam_date=None)
+    created_payload: dict[str, object] = {}
+
+    async def fake_get_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    async def fake_list_exam_measurements(exam_report_id: int):
+        assert exam_report_id == 1
+        return [
+            _measurement("systolic_bp", "111 mmHg"),
+            _measurement("diastolic_bp", "73 mmHg"),
+            _measurement("ldl", "100 mg/dL"),
+        ]
+
+    async def fake_get_latest_health_record_by_user(user_id: int):
+        assert user_id == 10
+        return None
+
+    async def fake_create_health_record(user_id: int, data: dict):
+        assert user_id == 10
+        created_payload.update(data)
+        return SimpleNamespace(id=101, user_id=user_id, **data)
+
+    async def fake_confirm_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    monkeypatch.setattr(exam_service, "get_exam_report", fake_get_exam_report)
+    monkeypatch.setattr(exam_service, "list_exam_measurements", fake_list_exam_measurements)
+    monkeypatch.setattr(
+        exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
+    )
+    monkeypatch.setattr(exam_service.health_repository, "create_health_record", fake_create_health_record)
+    monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
+
+    confirmed = await exam_service.confirm_exam_report(1)
+
+    assert confirmed is report
+    assert created_payload["systolic_bp"] == 111
+    assert created_payload["diastolic_bp"] == 73
+    assert created_payload["ldl_cholesterol"] == 100
+    assert "measured_at" in created_payload
 
 
 def _measurement(key: str, value: object) -> SimpleNamespace:

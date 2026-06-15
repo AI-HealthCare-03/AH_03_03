@@ -746,11 +746,10 @@ async def build_precision_analysis_input_payload(
     health_record: HealthRecord,
 ) -> dict[str, Any]:
     x2_payload = _x2_feature_payload(user=user, health_record=health_record)
-    field_sources = {
-        field_name: "health_record_fallback" for field_name, value in x2_payload.items() if value is not None
-    }
+    field_sources = {field_name: "health_record" for field_name, value in x2_payload.items() if value is not None}
     selected_exam_report_id = None
     x2_measurement_source = "health_record_fallback"
+    x2_merge_policy = "health_record_first_missing_only_exam_fallback"
 
     user_id = getattr(user, "id", None) or getattr(health_record, "user_id", None)
     if user_id is not None:
@@ -759,9 +758,14 @@ async def build_precision_analysis_input_payload(
             selected_exam_report_id = int(exam_report.id)
         measurement_payload, measurement_sources = _exam_measurements_to_x2_payload_with_sources(measurements)
         if measurement_payload:
-            x2_payload.update(measurement_payload)
-            field_sources.update(measurement_sources)
-            x2_measurement_source = "exam_measurements"
+            x2_payload, field_sources, exam_values_applied = merge_x2_payload_with_exam_missing_only(
+                base_payload=x2_payload,
+                exam_payload=measurement_payload,
+                base_sources=field_sources,
+                exam_sources=measurement_sources,
+            )
+            if exam_values_applied:
+                x2_measurement_source = "exam_measurements"
 
     return {
         "selected_exam_report_id": selected_exam_report_id,
@@ -769,7 +773,31 @@ async def build_precision_analysis_input_payload(
         "x2_input_payload": x2_payload,
         "x2_measurement_source": x2_measurement_source,
         "x2_field_sources": field_sources,
+        "x2_merge_policy": x2_merge_policy,
     }
+
+
+def merge_x2_payload_with_exam_missing_only(
+    *,
+    base_payload: dict[str, Any],
+    exam_payload: dict[str, Any],
+    base_sources: dict[str, str] | None = None,
+    exam_sources: dict[str, str] | None = None,
+) -> tuple[dict[str, Any], dict[str, str], bool]:
+    merged_payload = dict(base_payload)
+    merged_sources = dict(base_sources or {})
+    applied_exam_value = False
+    for field_name, exam_value in exam_payload.items():
+        if not _is_missing_x2_payload_value(merged_payload.get(field_name)):
+            continue
+        merged_payload[field_name] = exam_value
+        merged_sources[field_name] = (exam_sources or {}).get(field_name, "exam_measurements")
+        applied_exam_value = True
+    return merged_payload, merged_sources, applied_exam_value
+
+
+def _is_missing_x2_payload_value(value: Any) -> bool:
+    return value is None or value == ""
 
 
 def exam_measurements_to_x2_payload(measurements: list[Any]) -> dict[str, Any]:
@@ -1088,6 +1116,7 @@ def _analysis_snapshot_request(
         precision_input.get("x2_measurement_source") if precision_input else "health_record_fallback"
     )
     x2_field_sources = precision_input.get("x2_field_sources") if precision_input else {}
+    x2_merge_policy = precision_input.get("x2_merge_policy") if precision_input else None
     shap_outputs = [
         {
             "factor_key": factor.factor_key,
@@ -1121,6 +1150,7 @@ def _analysis_snapshot_request(
                 "x2_input_payload": x2_input_payload,
                 "x2_measurement_source": x2_measurement_source,
                 "x2_field_sources": x2_field_sources,
+                "x2_merge_policy": x2_merge_policy,
             }
         ),
         output_payload=_to_json_value(
