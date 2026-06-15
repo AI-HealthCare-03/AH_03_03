@@ -116,3 +116,57 @@ class DietAnalyzeResponse(BaseModel):
     explanation: dict[str, Any] | None = None
     warnings: list[str] = []
     recommended_actions: list[str] = []
+
+
+class DietNutritionFindingResponse(BaseModel):
+    type: str
+    issue_key: str
+    nutrient: str | None = None
+    label: str
+    message: str
+    basis: str | None = None
+
+
+class DietDiseaseContextResponse(BaseModel):
+    disease_code: str
+    label: str
+    message: str
+
+
+class DietRecommendedChallengeResponse(BaseModel):
+    challenge_id: int
+    title: str
+    reason: str
+
+
+class DietRagDiseaseCommentResponse(BaseModel):
+    disease_code: str
+    label: str
+    comment: str
+    basis: str
+
+
+class DietRagEvidenceSourceResponse(BaseModel):
+    title: str
+    disease_code: str
+    review_status: str
+
+
+class DietRagCommentResponse(BaseModel):
+    enabled: bool
+    fallback_used: bool
+    summary: str
+    disease_comments: list[DietRagDiseaseCommentResponse]
+    evidence_sources: list[DietRagEvidenceSourceResponse]
+    safety_notice: str
+
+
+class DietHealthRecommendationResponse(BaseModel):
+    diet_record_id: int
+    nutrition_findings: list[DietNutritionFindingResponse]
+    disease_context: list[DietDiseaseContextResponse]
+    recommended_foods: list[str]
+    caution_foods: list[str]
+    recommended_challenges: list[DietRecommendedChallengeResponse]
+    safety_notice: str
+    rag_comment: DietRagCommentResponse | None = None

@@ -1,29 +1,34 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   FamilyGroup,
   FamilyInvite,
+  FamilyInvitePreview,
   FamilyMember,
   FamilyMemberRole,
   FamilyRelationType,
+  FamilySentInvite,
   FamilyShareSetting,
   acceptFamilyInvite,
-  acceptFamilyInviteByCode,
   addUnregisteredFamilyMember,
   createFamilyGroup,
   createFamilyInvite,
   deleteFamilyGroup,
   declineFamilyInvite,
   getFamilyGroup,
+  listFamilyGroupInvites,
   listFamilyGroupShareSettings,
   listFamilyGroups,
   listMyFamilyInvites,
+  previewFamilyInviteByCode,
   removeFamilyMember,
   updateFamilyGroup,
   updateFamilyShareSetting,
 } from "../api/family";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const relationOptions: Array<{ value: FamilyRelationType; label: string }> = [
   { value: "FATHER", label: "부" },
@@ -76,11 +81,18 @@ const statusLabelMap: Record<string, string> = {
   INVITED: "초대 중",
   PENDING_UNREGISTERED: "미가입 가족",
   REMOVED: "해제됨",
-  PENDING: "대기",
+  PENDING: "대기 중",
   ACCEPTED: "수락됨",
   DECLINED: "거절됨",
   EXPIRED: "만료됨",
   CANCELED: "취소됨",
+};
+
+type InviteFeedbackDialog = {
+  title: string;
+  message: string;
+  tone?: "default" | "danger";
+  isProcessing?: boolean;
 };
 
 function formatDateTime(value: string | null | undefined): string {
@@ -100,12 +112,92 @@ function normalizePhone(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+function getInviteFailureDialog(err: unknown): InviteFeedbackDialog {
+  const detail = err instanceof Error ? err.message : "";
+
+  if (detail.includes("본인")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "본인 이메일로는 가족 초대를 보낼 수 없습니다.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이미 가족") || detail.includes("이미 연결")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "이미 가족으로 연결된 사용자입니다.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이미 발송") || detail.includes("대기 중")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "이미 발송된 초대가 있습니다. 기존 초대를 확인해 주세요.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이메일") || detail.includes("입력")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "초대할 이메일을 입력해 주세요.",
+      tone: "danger",
+    };
+  }
+
+  return {
+    title: "초대할 수 없습니다.",
+    message: "가족 초대 요청에 실패했습니다. 다시 시도해 주세요.",
+    tone: "danger",
+  };
+}
+
+function getInviteCodeFailureDialog(err: unknown): InviteFeedbackDialog {
+  const detail = err instanceof Error ? err.message : "";
+
+  if (detail.includes("만료")) {
+    return {
+      title: "초대를 확인할 수 없습니다.",
+      message: "초대코드가 만료되었습니다. 초대자에게 새 코드를 요청해 주세요.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이미 처리")) {
+    return {
+      title: "초대를 확인할 수 없습니다.",
+      message: "이미 사용되었거나 처리된 초대입니다.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("사용할 수 없습니다") || detail.includes("발송된 초대")) {
+    return {
+      title: "초대를 확인할 수 없습니다.",
+      message: "로그인한 계정과 초대 대상이 일치하지 않습니다.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("찾을 수 없습니다")) {
+    return {
+      title: "초대를 확인할 수 없습니다.",
+      message: "초대코드를 찾을 수 없습니다. 가장 최근에 받은 코드를 입력해 주세요.",
+      tone: "danger",
+    };
+  }
+
+  return {
+    title: "초대를 확인할 수 없습니다.",
+    message: "가족 초대 확인에 실패했습니다. 다시 시도해 주세요.",
+    tone: "danger",
+  };
+}
+
 export default function FamilyPage() {
   const { backendUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [invites, setInvites] = useState<FamilyInvite[]>([]);
+  const [sentInvites, setSentInvites] = useState<FamilySentInvite[]>([]);
   const [shareSettings, setShareSettings] = useState<FamilyShareSetting[]>([]);
   const [groupName, setGroupName] = useState("");
   const [renameGroupName, setRenameGroupName] = useState("");
@@ -122,11 +214,13 @@ export default function FamilyPage() {
     member_role: "MEMBER" as FamilyMemberRole,
   });
   const [inviteCodeInput, setInviteCodeInput] = useState("");
+  const [invitePreview, setInvitePreview] = useState<FamilyInvitePreview | null>(null);
   const [latestInviteCode, setLatestInviteCode] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [inviteFeedback, setInviteFeedback] = useState<InviteFeedbackDialog | null>(null);
 
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
   const isSelectedGroupOwner = selectedGroup?.owner_user_id === backendUser?.id;
@@ -160,11 +254,17 @@ export default function FamilyPage() {
     if (!familyId) {
       setMembers([]);
       setShareSettings([]);
+      setSentInvites([]);
       return;
     }
-    const [detail, settings] = await Promise.all([getFamilyGroup(familyId), listFamilyGroupShareSettings(familyId)]);
+    const [detail, settings, sentInviteItems] = await Promise.all([
+      getFamilyGroup(familyId),
+      listFamilyGroupShareSettings(familyId),
+      listFamilyGroupInvites(familyId),
+    ]);
     setMembers(detail.members);
     setShareSettings(settings);
+    setSentInvites(sentInviteItems);
   };
 
   const reloadAll = async (preferredGroupId?: number | null) => {
@@ -186,6 +286,15 @@ export default function FamilyPage() {
     void reloadAll(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const inviteCode = searchParams.get("invite_code")?.trim();
+    if (inviteCode) {
+      setInviteCodeInput(inviteCode);
+      setInvitePreview(null);
+      setNotice("이메일로 받은 초대코드를 확인했습니다. 초대 확인을 눌러 내용을 확인해 주세요.");
+    }
+  }, [searchParams]);
 
   const handleSelectGroup = async (familyId: number) => {
     setSelectedGroupId(familyId);
@@ -285,34 +394,79 @@ export default function FamilyPage() {
   const handleCreateInvite = (event: FormEvent) => {
     event.preventDefault();
     if (!selectedGroup) {
-      setError("먼저 가족 그룹을 선택해주세요.");
+      setInviteFeedback({
+        title: "초대할 수 없습니다.",
+        message: "먼저 가족 그룹을 선택해 주세요.",
+        tone: "danger",
+      });
       return;
     }
-    void runAction(async () => {
-      const invite = await createFamilyInvite(selectedGroup.id, {
-        invitee_email: inviteForm.invitee_email.trim() || null,
-        invitee_phone: normalizePhone(inviteForm.invitee_phone) || null,
-        relation_type: inviteForm.relation_type,
-        member_role: inviteForm.member_role,
+    if (!inviteForm.invitee_email.trim()) {
+      setInviteFeedback({
+        title: "초대할 수 없습니다.",
+        message: "초대할 이메일을 입력해 주세요.",
+        tone: "danger",
       });
-      setLatestInviteCode(invite.invite_code ?? "");
-      setInviteForm({ invitee_email: "", invitee_phone: "", relation_type: "OTHER", member_role: "MEMBER" });
-      await reloadAll(selectedGroup.id);
-    }, "가족 초대 코드를 생성했습니다.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setInviteFeedback({
+      title: "초대 이메일 발송 중입니다...",
+      message: "입력한 이메일로 가족 초대코드를 발송하고 있습니다.",
+      isProcessing: true,
+    });
+    void (async () => {
+      try {
+        const invite = await createFamilyInvite(selectedGroup.id, {
+          invitee_email: inviteForm.invitee_email.trim() || null,
+          invitee_phone: normalizePhone(inviteForm.invitee_phone) || null,
+          relation_type: inviteForm.relation_type,
+          member_role: inviteForm.member_role,
+        });
+        setLatestInviteCode(invite.invite_code ?? "");
+        setInviteForm({ invitee_email: "", invitee_phone: "", relation_type: "OTHER", member_role: "MEMBER" });
+        await reloadAll(selectedGroup.id);
+        setNotice("가족 초대 요청이 완료되었습니다.");
+        setInviteFeedback({
+          title: "초대 요청이 완료되었습니다.",
+          message: "입력한 이메일로 가족 초대코드가 발송됩니다.",
+        });
+      } catch (err) {
+        setInviteFeedback(getInviteFailureDialog(err));
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
 
-  const handleAcceptCode = (event: FormEvent) => {
+  const handlePreviewCode = (event: FormEvent) => {
     event.preventDefault();
     const code = inviteCodeInput.trim();
     if (!code) {
-      setError("초대 코드를 입력해주세요.");
+      setInviteFeedback({
+        title: "초대를 확인할 수 없습니다.",
+        message: "초대 코드를 입력해 주세요.",
+        tone: "danger",
+      });
       return;
     }
-    void runAction(async () => {
-      await acceptFamilyInviteByCode(code);
-      setInviteCodeInput("");
-      await reloadAll(selectedGroupId);
-    }, "가족 초대를 수락했습니다.");
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setInvitePreview(null);
+    void (async () => {
+      try {
+        const preview = await previewFamilyInviteByCode(code);
+        setInvitePreview(preview);
+        setNotice("가족 초대를 확인했습니다. 내용을 확인한 뒤 수락하거나 거절해 주세요.");
+      } catch (err) {
+        setInviteFeedback(getInviteCodeFailureDialog(err));
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
 
   const handleAcceptInvite = (invite: FamilyInvite) => {
@@ -322,11 +476,77 @@ export default function FamilyPage() {
     }, "가족 초대를 수락했습니다.");
   };
 
-  const handleDeclineInvite = (invite: FamilyInvite) => {
+  const handleAcceptPreviewInvite = () => {
+    if (!invitePreview) return;
     void runAction(async () => {
-      await declineFamilyInvite(invite.id);
+      await acceptFamilyInvite(invitePreview.invite_id);
+      setInvitePreview(null);
+      setInviteCodeInput("");
+      await reloadAll(invitePreview.family_id);
+      setInviteFeedback({
+        title: "가족 연결이 완료되었습니다.",
+        message: "가족 그룹에 연결되었습니다.",
+      });
+    }, "가족 초대를 수락했습니다.");
+  };
+
+  const handleDeclinePreviewInvite = () => {
+    if (!invitePreview) return;
+    void runAction(async () => {
+      await declineFamilyInvite(invitePreview.invite_id);
+      setInvitePreview(null);
+      setInviteCodeInput("");
       await reloadAll(selectedGroupId);
+      setInviteFeedback({
+        title: "가족 초대를 거절했습니다.",
+        message: "초대가 거절 처리되었습니다.",
+      });
     }, "가족 초대를 거절했습니다.");
+  };
+
+  const handleResendInvite = (invite: FamilySentInvite) => {
+    if (!selectedGroup || !invite.invitee_email) {
+      setInviteFeedback({
+        title: "재발송할 수 없습니다.",
+        message: "이메일이 있는 초대만 재발송할 수 있습니다.",
+        tone: "danger",
+      });
+      return;
+    }
+    setInviteForm((prev) => ({
+      ...prev,
+      invitee_email: invite.invitee_email ?? "",
+      invitee_phone: invite.invitee_phone ?? "",
+      relation_type: invite.relation_type,
+      member_role: invite.member_role,
+    }));
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setInviteFeedback({
+      title: "초대 이메일 발송 중입니다...",
+      message: "입력한 이메일로 가족 초대코드를 발송하고 있습니다.",
+      isProcessing: true,
+    });
+    void (async () => {
+      try {
+        await createFamilyInvite(selectedGroup.id, {
+          invitee_email: invite.invitee_email,
+          invitee_phone: invite.invitee_phone,
+          relation_type: invite.relation_type,
+          member_role: invite.member_role,
+        });
+        await reloadAll(selectedGroup.id);
+        setInviteFeedback({
+          title: "초대 요청이 완료되었습니다.",
+          message: "기존 초대가 새 코드로 재발송되었습니다. 가장 최근 코드만 사용할 수 있습니다.",
+        });
+      } catch (err) {
+        setInviteFeedback(getInviteFailureDialog(err));
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
 
   const handleToggleShareSetting = (setting: FamilyShareSetting, key: keyof FamilyShareSetting) => {
@@ -340,6 +560,16 @@ export default function FamilyPage() {
 
   return (
     <div className="page-stack">
+      {inviteFeedback && (
+        <ConfirmDialog
+          title={inviteFeedback.title}
+          message={inviteFeedback.message}
+          tone={inviteFeedback.tone}
+          showActions={!inviteFeedback.isProcessing}
+          showCancel={false}
+          onConfirm={() => setInviteFeedback(null)}
+        />
+      )}
       <div className="page-header">
         <div>
           <span className="badge badge-reference">Family</span>
@@ -530,7 +760,7 @@ export default function FamilyPage() {
               <form className="mini-card form" onSubmit={handleCreateInvite}>
                 <span className="badge badge-reference">초대 생성</span>
                 <label>
-                  이메일
+                  이메일(필수)
                   <input
                     className="input"
                     type="email"
@@ -540,7 +770,7 @@ export default function FamilyPage() {
                   />
                 </label>
                 <label>
-                  휴대폰
+                  전화번호(선택)
                   <input
                     className="input"
                     value={inviteForm.invitee_phone}
@@ -579,23 +809,47 @@ export default function FamilyPage() {
                   </select>
                 </label>
                 <button className="btn-primary" type="submit" disabled={busy || !selectedGroup || !isSelectedGroupOwner}>
-                  초대 코드 생성
+                  이메일로 초대코드 발송
                 </button>
+                <p className="muted">초대코드는 입력한 이메일로 발송됩니다.</p>
               </form>
 
-              <form className="mini-card form" onSubmit={handleAcceptCode}>
+              <form className="mini-card form" onSubmit={handlePreviewCode}>
                 <span className="badge badge-reference">코드 입력</span>
                 <strong>초대 코드로 연결</strong>
-                <p className="muted">받은 초대 코드를 입력하면 가족 그룹에 연결됩니다.</p>
+                <p className="muted">받은 초대 코드를 입력한 뒤 초대 정보를 확인하고 수락 여부를 선택합니다.</p>
                 <input
                   className="input"
                   value={inviteCodeInput}
-                  onChange={(event) => setInviteCodeInput(event.target.value)}
+                  onChange={(event) => {
+                    setInviteCodeInput(event.target.value);
+                    setInvitePreview(null);
+                  }}
                   placeholder="초대 코드"
                 />
                 <button className="btn-secondary" type="submit" disabled={busy}>
-                  코드 수락
+                  초대 확인
                 </button>
+                {invitePreview && (
+                  <div className="state-box">
+                    <strong>{invitePreview.inviter_display_name}님이 보낸 가족 초대입니다.</strong>
+                    <p>
+                      가족 그룹: {invitePreview.family_name}
+                      <br />
+                      초대 대상: {invitePreview.invitee_email ?? "로그인한 계정"}
+                      <br />
+                      만료: {formatDateTime(invitePreview.expires_at)}
+                    </p>
+                    <div className="button-row" style={{ marginTop: 12 }}>
+                      <button className="btn-primary" type="button" disabled={busy} onClick={handleAcceptPreviewInvite}>
+                        수락하기
+                      </button>
+                      <button className="btn-danger-outline" type="button" disabled={busy} onClick={handleDeclinePreviewInvite}>
+                        거절하기
+                      </button>
+                    </div>
+                  </div>
+                )}
               </form>
 
               <div className="mini-card">
@@ -603,18 +857,55 @@ export default function FamilyPage() {
                 {latestInviteCode ? (
                   <>
                     <strong className="invite-code-box">{latestInviteCode}</strong>
-                    <p className="muted">초대 코드는 생성 직후 한 번만 표시됩니다. 필요한 곳에 안전하게 전달해주세요.</p>
+                    <p className="muted">초대 코드는 생성 직후 한 번만 표시되며, 입력한 이메일로도 발송됩니다.</p>
                   </>
                 ) : (
                   <>
-                    <strong>생성된 초대 코드가 없습니다.</strong>
-                    <p className="muted">가족 그룹 소유자가 초대를 생성하면 코드가 표시됩니다.</p>
+                    <strong>초대코드는 이메일로 발송됩니다.</strong>
+                    <p className="muted">운영 환경에서는 보안을 위해 화면에 초대코드가 표시되지 않을 수 있습니다.</p>
                   </>
                 )}
               </div>
             </div>
 
             <div className="card-list">
+              <div>
+                <h3>보낸 초대 기록</h3>
+                <p className="muted">최근 발송한 가족 초대 요청입니다. 초대코드 원문은 보안을 위해 표시하지 않습니다.</p>
+              </div>
+              {sentInvites.length === 0 ? (
+                <div className="empty-state">아직 보낸 가족 초대가 없습니다.</div>
+              ) : (
+                sentInvites.map((invite) => (
+                  <div className="family-member-card" key={invite.id}>
+                    <div>
+                      <strong>{invite.invitee_email || invite.invitee_phone || "초대 대상 미표시"}</strong>
+                      <p className="muted">
+                        {relationLabelMap[invite.relation_type]} · {roleLabelMap[invite.member_role]} ·{" "}
+                        {statusLabelMap[invite.status] ?? invite.status}
+                      </p>
+                      <p className="muted">
+                        생성 {formatDateTime(invite.created_at)} · 만료 {formatDateTime(invite.expires_at)}
+                      </p>
+                    </div>
+                    <div className="button-row">
+                      <span className="badge badge-reference">{statusLabelMap[invite.status] ?? invite.status}</span>
+                      {invite.status === "PENDING" && invite.invitee_email && isSelectedGroupOwner && (
+                        <button className="btn-secondary" type="button" disabled={busy} onClick={() => handleResendInvite(invite)}>
+                          재발송
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="card-list">
+              <div>
+                <h3>받은 초대</h3>
+                <p className="muted">이메일로 받은 초대코드나 대기 중인 초대를 연결할 수 있습니다.</p>
+              </div>
               {invites.length === 0 ? (
                 <div className="empty-state">내게 도착한 가족 초대가 없습니다.</div>
               ) : (
@@ -629,10 +920,7 @@ export default function FamilyPage() {
                     </div>
                     <div className="button-row">
                       <button className="btn-primary" type="button" disabled={busy} onClick={() => handleAcceptInvite(invite)}>
-                        수락
-                      </button>
-                      <button className="btn-secondary" type="button" disabled={busy} onClick={() => handleDeclineInvite(invite)}>
-                        거절
+                        연결
                       </button>
                     </div>
                   </div>

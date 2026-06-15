@@ -610,6 +610,8 @@ export default function ChallengeDetailPage() {
     dailyGoalCount > 1 ? `${Math.min(todayCompletedCount + 1, dailyGoalCount)}/${dailyGoalCount} 수행하기` : "오늘 수행 완료";
   const startedLabel = formatDateLabel(userChallenge?.started_date ?? userChallenge?.started_at);
   const expectedDoneLabel = formatDateLabel(userChallenge?.end_date ?? userChallenge?.expected_done_date ?? userChallenge?.expected_done_at);
+  const challengeTitle = String(challenge?.title ?? "챌린지");
+  const challengeImageSrc = challengeImageMap[challengeTitle] ?? getChallengeImagePath(challengeTitle);
 
   return (
     <div className="page-stack">
@@ -626,7 +628,7 @@ export default function ChallengeDetailPage() {
         {loading && <div className="state-box">챌린지 상세를 불러오는 중입니다.</div>}
         <div className="detail-hero">
           <span className="eyebrow">{getDisplayCategory(challenge)}</span>
-          <h1>{String(challenge?.title ?? "챌린지")}</h1>
+          <h1>{challengeTitle}</h1>
           <div
             className="challenge-icon-large"
             aria-label={`${category} challenge icon`}
@@ -634,10 +636,18 @@ export default function ChallengeDetailPage() {
           >
             {category === "EXERCISE" && challenge?.title ? (
               <img
-                src={challengeImageMap[String(challenge.title)] ?? ""}
-                alt={String(challenge.title ?? "")}
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                style={{ width: "100%", height: "auto", maxHeight: "600px", objectFit: "contain", borderRadius: "inherit" }}
+                src={challengeImageSrc}
+                alt={`${challengeTitle} 이미지`}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  maxHeight: "600px",
+                  objectFit: "contain",
+                  borderRadius: "inherit",
+                }}
               />
             ) : (
               categoryIcon[category] ?? "🌿"

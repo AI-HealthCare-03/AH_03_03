@@ -166,6 +166,19 @@ make prod-pull
 make prod-up
 ```
 
+- [ ] DB migration과 seed 명시 실행
+
+```bash
+make prod-release-db
+```
+
+명시적으로 나누어 실행하려면 아래 순서로 실행합니다.
+
+```bash
+make prod-migrate
+make prod-seed
+```
+
 - [ ] 컨테이너 상태 확인
 
 ```bash
@@ -175,7 +188,7 @@ make prod-ps
 - [ ] 서버 내부 health check
 
 ```bash
-curl -fsS http://localhost/api/v1/system/health
+make prod-health
 ```
 
 ## 6. 배포 후 기능 확인

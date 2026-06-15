@@ -23,7 +23,7 @@ type RiskStageBoardProps = {
   showCounts?: boolean;
   showEmptyStages?: boolean;
   title?: string;
-  variant?: "default" | "compact" | "preview";
+  variant?: "default" | "compact" | "preview" | "grid2x2";
 };
 
 function stageClassName(stage: RiskStageKey): string {
@@ -86,8 +86,8 @@ export default function RiskStageBoard({
   title,
   variant = "default",
 }: RiskStageBoardProps) {
-  const shouldShowCounts = showCounts ?? variant === "default";
-  const shouldShowEmptyStages = showEmptyStages ?? variant === "default";
+  const shouldShowCounts = showCounts ?? (variant === "default" || variant === "grid2x2");
+  const shouldShowEmptyStages = showEmptyStages ?? (variant === "default" || variant === "grid2x2");
   const latestDiseaseItems = dedupeLatestByDisease(items);
   const grouped = riskStageOrder.reduce<Record<RiskStageKey, DiseaseRiskItem[]>>(
     (acc, stage) => ({ ...acc, [stage]: [] }),
