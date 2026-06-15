@@ -287,8 +287,20 @@ cp envs/example.prod.env prod.env
 # prod.env 실제 운영값 수정
 make prod-pull
 make prod-up
+make prod-release-db
+make prod-health
 make prod-ps
 make prod-logs
+```
+
+DB 반영을 더 명시적으로 나누어 실행하려면 아래처럼 실행합니다.
+
+```bash
+make prod-pull
+make prod-up
+make prod-migrate
+make prod-seed
+make prod-health
 ```
 
 상세 절차는 `docs/deployment/ec2_prod_env.md`와 `docs/ops/docker_stacks.md`를 참고하세요.

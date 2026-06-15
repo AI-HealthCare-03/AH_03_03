@@ -152,7 +152,7 @@ langfuse-logs:
 
 # Prod compose convenience
 # Uses infra/docker/docker-compose.prod.yml and pulls prebuilt registry images.
-.PHONY: prod-pull prod-up prod-ps prod-logs
+.PHONY: prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed prod-health prod-release-db
 prod-pull:
 	$(PROD_COMPOSE) pull
 
@@ -164,6 +164,17 @@ prod-ps:
 
 prod-logs:
 	$(PROD_COMPOSE) logs -f
+
+prod-migrate:
+	$(PROD_COMPOSE) exec -T fastapi uv run --no-sync aerich upgrade
+
+prod-seed:
+	$(PROD_COMPOSE) exec -T fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
+
+prod-health:
+	curl -fsS http://localhost:$${NGINX_HTTP_PORT:-8080}/api/v1/system/health
+
+prod-release-db: prod-migrate prod-seed
 
 # Release image build
 # prod compose is pull-only; these targets verify the images that will be pushed separately.
