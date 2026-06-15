@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ai_runtime.llm.llm_client import record_langfuse_event
+from ai_runtime.llm.rag.retriever import RetrievedDocument
 from ai_runtime.llm.schemas import RetrievedContext
 from app.core import config
 
@@ -92,6 +93,99 @@ def trace_keyword_rag_retrieval(
             "retrieved_source_count": len(contexts),
             "retrieved_source_ids": metadata["retrieved_source_ids"],
             "fallback": metadata["fallback"],
+        },
+        metadata=metadata,
+    )
+
+
+def build_vector_rag_trace_metadata(
+    *,
+    query: str,
+    top_k: int,
+    documents: list[RetrievedDocument],
+    candidate_count: int,
+    disease_code: str | None = None,
+    source_key: str | None = None,
+    issue_keys: list[str] | None = None,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
+    embedding_dimension: int | None = None,
+    latency_ms: float | None = None,
+    fallback_reason: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "trace_version": "vector_rag_poc_v1",
+        "source": "vector_rag_poc",
+        "retriever_strategy": "vector",
+        "query_preview": _trace_query_preview(query),
+        "query_length": len(query),
+        "query_truncated": len(query) > MAX_TRACE_QUERY_LENGTH,
+        "top_k": top_k,
+        "candidate_count": candidate_count,
+        "returned_count": len(documents),
+        "disease_code": disease_code,
+        "source_key": source_key,
+        "issue_keys": issue_keys or [],
+        "embedding_provider": embedding_provider,
+        "embedding_model": embedding_model,
+        "embedding_dimension": embedding_dimension,
+        "scores": [document.score for document in documents],
+        "chunk_keys": [str(document.metadata.get("chunk_key")) for document in documents],
+        "latency_ms": latency_ms,
+        "fallback_used": fallback_reason is not None,
+        "fallback_reason": fallback_reason,
+        "vector_rag": True,
+        "embedding_search": True,
+        "retrieved_sources": [document.to_trace_metadata() for document in documents],
+    }
+
+
+def trace_vector_rag_retrieval(
+    *,
+    query: str,
+    top_k: int,
+    documents: list[RetrievedDocument],
+    candidate_count: int,
+    disease_code: str | None = None,
+    source_key: str | None = None,
+    issue_keys: list[str] | None = None,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
+    embedding_dimension: int | None = None,
+    latency_ms: float | None = None,
+    fallback_reason: str | None = None,
+) -> bool:
+    if not config.RAG_ENABLED:
+        return False
+
+    metadata = build_vector_rag_trace_metadata(
+        query=query,
+        top_k=top_k,
+        documents=documents,
+        candidate_count=candidate_count,
+        disease_code=disease_code,
+        source_key=source_key,
+        issue_keys=issue_keys,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+        embedding_dimension=embedding_dimension,
+        latency_ms=latency_ms,
+        fallback_reason=fallback_reason,
+    )
+    return record_langfuse_event(
+        name="rag.vector_retrieval",
+        input_payload={
+            "query_preview": metadata["query_preview"],
+            "query_length": metadata["query_length"],
+            "disease_code": disease_code,
+            "source_key": source_key,
+            "top_k": top_k,
+        },
+        output_payload={
+            "candidate_count": candidate_count,
+            "returned_count": len(documents),
+            "chunk_keys": metadata["chunk_keys"],
+            "fallback_used": metadata["fallback_used"],
         },
         metadata=metadata,
     )

@@ -18,6 +18,7 @@ from ai_runtime.llm.rag.source_trust import (
     source_trust_level_for_metadata,
     source_trust_level_for_type,
 )
+from ai_runtime.llm.rag.vector_retriever import VectorRagRetriever
 
 __all__ = [
     "KeywordRagRetriever",
@@ -26,6 +27,7 @@ __all__ = [
     "RagSourceDocument",
     "RagSourceMetadata",
     "RetrievedDocument",
+    "VectorRagRetriever",
     "build_retrieved_context_text",
     "build_retrieved_contexts",
     "disabled_rag_retrieval_result",
