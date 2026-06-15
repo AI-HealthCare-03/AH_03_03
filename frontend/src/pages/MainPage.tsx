@@ -25,7 +25,7 @@ const landingFeatures = [
   {
     icon: "🧭",
     title: "AI 관리 단계 확인",
-    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 관리 필요도를 확인합니다.",
+    description: "건강정보를 기반으로 당뇨, 고혈압, 이상지질혈증 관리 필요도를 확인합니다.",
     redirect: "/analysis",
   },
   {
@@ -689,7 +689,7 @@ export default function MainPage() {
                   { analyzed_at: "2026-06-01", diseaseName: "고혈압", id: 1, risk_level: "LOW" },
                   { analyzed_at: "2026-06-01", diseaseName: "비만", id: 2, risk_level: "CAUTION" },
                   { analyzed_at: "2026-06-01", diseaseName: "당뇨", id: 3, risk_level: "CAUTION" },
-                  { analyzed_at: "2026-06-01", diseaseName: "콜레스테롤·중성지방", id: 4, risk_level: "HIGH_CAUTION" },
+                  { analyzed_at: "2026-06-01", diseaseName: "이상지질혈증", id: 4, risk_level: "HIGH_CAUTION" },
                 ]}
                 maxItemsPerStage={3}
                 showCounts={false}

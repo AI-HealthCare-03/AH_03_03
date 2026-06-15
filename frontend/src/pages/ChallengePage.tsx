@@ -70,7 +70,7 @@ const targetDiseaseLabel: Record<string, string> = {
   GENERAL: "일반 건강관리",
   DIABETES: "당뇨 관리",
   HYPERTENSION: "고혈압 관리",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방 관리",
+  DYSLIPIDEMIA: "이상지질혈증 관리",
   OBESITY: "비만 관리",
 };
 

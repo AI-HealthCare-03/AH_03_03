@@ -76,7 +76,7 @@ const missingFieldLabels: Record<string, string> = {
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
-  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력 여부",
+  family_dyslipidemia: "이상지질혈증 이상 가족력 여부",
   smoking_status: "현재 흡연 여부",
   drinking_frequency: "1년간 음주 빈도",
   drinking_amount: "한 번 음주량",
@@ -333,7 +333,7 @@ export default function AnalysisPage() {
       <div className="page-header">
         <div>
           <h1>건강 분석 결과</h1>
-          <p>당뇨, 고혈압, 비만, 콜레스테롤·중성지방 이상 위험도를 한 화면에서 확인합니다.</p>
+          <p>당뇨, 고혈압, 비만, 이상지질혈증 이상 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
           <Link className="button secondary" to="/health">

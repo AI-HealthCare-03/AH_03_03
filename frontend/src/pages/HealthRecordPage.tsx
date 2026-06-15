@@ -79,7 +79,7 @@ const healthFieldLabels: Record<string, string> = {
   occupation_code: "직업군",
   family_htn: "고혈압 가족력",
   family_dm: "당뇨병 가족력",
-  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력",
+  family_dyslipidemia: "이상지질혈증 이상 가족력",
   smoking_status: "현재 흡연 여부",
   drinking_frequency: "음주 빈도",
   drinking_amount: "한 번 음주량",
@@ -515,7 +515,7 @@ export default function HealthRecordPage() {
                   </strong>
                 </div>
                 <div>
-                  <span>콜레스테롤/중성지방</span>
+                  <span>이상지질혈증</span>
                   <div className="health-record-lipid-list">
                     <span>
                       <em>총콜레스테롤</em>

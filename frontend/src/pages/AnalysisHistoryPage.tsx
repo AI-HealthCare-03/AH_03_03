@@ -46,7 +46,7 @@ const analysisTypeOptions: Record<string, string | null> = {
   "전체": null,
   "고혈압": "HYPERTENSION",
   "당뇨": "DIABETES",
-  "콜레스테롤·중성지방": "DYSLIPIDEMIA",
+  "이상지질혈증": "DYSLIPIDEMIA",
   "비만": "OBESITY",
   "복부비만": "ABDOMINAL_OBESITY",
   "지방간": "FATTY_LIVER",
