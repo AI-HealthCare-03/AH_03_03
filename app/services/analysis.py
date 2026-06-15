@@ -1379,36 +1379,20 @@ def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bo
 
 
 async def _create_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
+    active_challenges = await challenge_service.list_active_challenges(limit=100)
     target_category = {
         AnalysisType.DIABETES: ChallengeCategory.BLOOD_GLUCOSE,
         AnalysisType.OBESITY: ChallengeCategory.WEIGHT,
         AnalysisType.DYSLIPIDEMIA: ChallengeCategory.DIET,
         AnalysisType.HYPERTENSION: ChallengeCategory.BLOOD_PRESSURE,
-        AnalysisType.ANEMIA: ChallengeCategory.DIET,
-        AnalysisType.FATTY_LIVER: ChallengeCategory.DIET,
-        AnalysisType.ABDOMINAL_OBESITY: ChallengeCategory.WEIGHT,
-        AnalysisType.LIVER_FUNCTION: ChallengeCategory.HABIT,
-        AnalysisType.KIDNEY_FUNCTION: ChallengeCategory.WATER,
-        AnalysisType.CHRONIC_KIDNEY_DISEASE: ChallengeCategory.WATER,
     }.get(result.analysis_type)
     if target_category is None:
         return []
-
-    # 카테고리 맞는 ACTIVE 챌린지 직접 가져오기
-    category_challenges = await challenge_service.list_active_challenges(
-        category=target_category.value, limit=100
-    )
-
-    # 없으면 EXERCISE로 폴백
-    if not category_challenges:
-        category_challenges = await challenge_service.list_active_challenges(
-            category="EXERCISE", limit=100
-        )
-
-    if not category_challenges:
+    challenge = next((item for item in active_challenges if item.category == target_category), None)
+    if challenge is None and active_challenges:
+        challenge = active_challenges[0]
+    if challenge is None:
         return []
-
-    challenge = category_challenges[0]
 
     recommendation = await challenge_service.create_challenge_recommendation(
         user_id=user_id,
