@@ -1,7 +1,4 @@
 challenge_type,target_disease,category,title,description,duration_days,target_metric,target_value,difficulty,caution_message,contraindication_message,is_active
-COMMON,COMMON,EXERCISE,하루 30분 걷기,하루 30분 이상 걷는 기본 활동 챌린지입니다.,7,exercise_minutes,30,EASY,무리가 느껴지면 속도를 줄이세요.,흉통이 있으면 즉시 중단하세요.,true
-SPECIAL,DIABETES,DIET,당뇨 식사 관리,단 음료와 정제탄수화물을 줄이는 챌린지입니다.,7,diabetes_diet_record_count,1,NORMAL,식사를 거르지 마세요.,저혈당 위험이 있으면 개인 지침 우선.,true
-GENERAL,GENERAL,HABIT,하루 건강기록 남기기,오늘의 컨디션과 건강 습관을 간단히 기록합니다.,7,daily_health_note_count,1,EASY,,,true
 SPECIAL,DIABETES,BLOOD_GLUCOSE,공복 혈당 측정 챌린지,공복 혈당을 측정합니다.,7,,,EASY,공복 혈당은 아침 기상 직후 측정합니다.,"• 측정 전 8시간 이상 금식을 권장합니다.
 • 공복혈당이 70mg/dL 미만이면 저혈당 위험이 있습니다.
 • 공복혈당이 250mg/dL 이상이면 의료진과 상담을 권장합니다.
