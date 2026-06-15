@@ -5,9 +5,9 @@ import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAna
 import { listChallengeRecommendations, listChallenges } from "../api/challenges";
 import { getAnalysisReadiness } from "../api/health";
 import Card from "../components/Card";
-import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
+import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import {
   getAnalysisSourceBadgeLabel,
@@ -55,12 +55,6 @@ type Readiness = {
   missing_precision_fields?: string[];
   message: string;
 };
-type FeedbackDialog = {
-  message: string;
-  title: string;
-  tone?: "default" | "danger";
-};
-
 const missingFieldLabels: Record<string, string> = {
   height_cm: "키",
   weight_kg: "몸무게",
@@ -186,9 +180,9 @@ export default function AnalysisPage() {
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
+  const { clearFeedback, feedbackDialog, showFailure, showProcessing, showSuccess } = useAnalysisFeedbackDialog();
 
   const { pollingError } = useAsyncJobPolling({
     jobId: analysisJobId,
@@ -199,26 +193,15 @@ export default function AnalysisPage() {
       setRunningMode(null);
       setAnalysisJobId(null);
       await load();
-      setFeedbackDialog({
-        title: "분석이 완료되었습니다.",
-        message: "결과 화면에서 건강 관리 단계를 확인해 주세요.",
-      });
+      showSuccess({ message: "결과 화면에서 건강 관리 단계를 확인해 주세요." });
     },
     onFailure: (job) => {
-      setFeedbackDialog({
-        title: "분석에 실패했습니다.",
-        message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
-        tone: "danger",
-      });
+      showFailure({ message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "다시 시도해주세요." });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
-      setFeedbackDialog({
-        title: "분석에 실패했습니다.",
-        message: "잠시 후 다시 시도해 주세요.",
-        tone: "danger",
-      });
+      showFailure();
       setRunningMode(null);
       setAnalysisJobId(null);
     },
@@ -274,7 +257,7 @@ export default function AnalysisPage() {
   const run = async (mode: AnalysisMode) => {
     setError("");
     setNotice("");
-    setFeedbackDialog(null);
+    clearFeedback();
     setAnalysisJobId(null);
     setRunningMode(mode);
     try {
@@ -301,10 +284,12 @@ export default function AnalysisPage() {
         setRunningMode(null);
         return;
       }
+      showProcessing();
       const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);
       setAnalysisJobId(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      showFailure();
       setRunningMode(null);
     }
   };
@@ -347,16 +332,7 @@ export default function AnalysisPage() {
       {error && <ErrorMessage message={error} />}
       {pollingError && <ErrorMessage message={pollingError.message} />}
       {notice && <div className="state-box">{notice}</div>}
-      {feedbackDialog && (
-        <ConfirmDialog
-          confirmLabel="확인"
-          message={feedbackDialog.message}
-          onConfirm={() => setFeedbackDialog(null)}
-          showCancel={false}
-          title={feedbackDialog.title}
-          tone={feedbackDialog.tone}
-        />
-      )}
+      {feedbackDialog}
       {missingFields.length > 0 && (
         <Card title="분석에 필요한 정보가 부족합니다">
           <div className="readiness-card">

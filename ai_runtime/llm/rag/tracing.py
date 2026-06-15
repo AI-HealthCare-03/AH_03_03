@@ -105,6 +105,6 @@ def _fallback_reason(contexts: list[RetrievedContext]) -> str | None:
     if not contexts:
         return "no_keyword_match"
     source_ids = {str(context.metadata.get("id")) for context in contexts}
-    if source_ids == {"safety_disclaimer"}:
+    if source_ids <= {"safety_disclaimer", "diet_caution"}:
         return "safety_disclaimer_only"
     return None

@@ -7,6 +7,7 @@ from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_use
 from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.diets import (
     DietAnalyzeRequest,
+    DietHealthRecommendationResponse,
     DietPhotoResultCreateRequest,
     DietPhotoResultResponse,
     DietRecordCreateRequest,
@@ -15,6 +16,7 @@ from app.dtos.diets import (
 )
 from app.models.users import User
 from app.services import async_jobs as async_job_service
+from app.services import diet_recommendations as diet_recommendation_service
 from app.services import diets as diet_service
 
 diet_router = APIRouter(prefix="/diets", tags=["diets"])
@@ -104,6 +106,11 @@ async def get_diet_record(diet_record_id: int, user: Annotated[User, Depends(get
     record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
     ensure_owner(record.user_id, user)
     return diet_service.build_diet_record_response(record)
+
+
+@diet_router.get("/{diet_record_id}/recommendations", response_model=DietHealthRecommendationResponse)
+async def get_diet_health_recommendations(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    return await diet_recommendation_service.get_diet_health_recommendations(int(user.id), diet_record_id)
 
 
 @diet_router.patch("/{diet_record_id}", response_model=DietRecordResponse)

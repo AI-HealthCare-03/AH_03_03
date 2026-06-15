@@ -205,15 +205,16 @@ async def test_family_invite_email_job_enqueue_uses_service_stream_and_slim_payl
     await service_job_service.enqueue_family_invite_email_send(
         recipient_email="family@example.com",
         inviter_display_name="동욱",
-        invite_code="invite-token",
-        invite_url="http://localhost:8080/family/invitations/accept?code=invite-token",
+        invite_code="12345678",
+        invite_url="http://localhost:8080/family?invite_code=12345678",
         expires_at_text="2026-05-31 10:00",
     )
 
     assert calls[0][1]["job_type"] == "family.invite.email.send"
     assert calls[0][1]["stream"] == "ai_health:jobs:service"
     assert calls[0][1]["request_payload"]["recipient_email"] == "family@example.com"
-    assert calls[0][1]["request_payload"]["invite_code"] == "invite-token"
+    assert calls[0][1]["request_payload"]["invite_code"] == "12345678"
+    assert calls[0][1]["request_payload"]["invite_url"] == "http://localhost:8080/family?invite_code=12345678"
     assert calls[0][1]["stream_payload"] == {"resource_type": "family_invite_email"}
 
 
