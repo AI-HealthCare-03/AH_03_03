@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from time import perf_counter
@@ -40,6 +41,7 @@ from .state import HealthChatbotGraphState
 
 SOURCE_GRAPH = "langgraph_chatbot"
 _REAL_RECORD_LANGFUSE_EVENT = record_langfuse_event
+logger = logging.getLogger(__name__)
 MAIN_CHATBOT_RAG_MIN_KEYWORD_RESULTS = 1
 SUPPORTED_MAIN_CHATBOT_RAG_STRATEGIES = {
     HYBRID_STRATEGY_KEYWORD_ONLY,
@@ -242,8 +244,10 @@ async def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotG
             "document_ids": result.trace_metadata.get("document_ids", []),
             "strategy": result.strategy,
             "fallback_reason": result.fallback_reason,
+            **_runtime_rag_trace_summary(result.trace_metadata),
         },
     )
+    log_runtime_rag_retrieval_metadata(result.trace_metadata)
     return next_state
 
 
@@ -615,6 +619,52 @@ def trace_graph_node(
             **(metadata or {}),
         },
     )
+
+
+def log_runtime_rag_retrieval_metadata(trace_metadata: dict[str, Any]) -> bool:
+    if not _should_log_runtime_rag_metadata():
+        return False
+
+    summary = _runtime_rag_trace_summary(trace_metadata)
+    if not summary:
+        return False
+
+    logger.info(
+        "main_chatbot_rag_retrieval rag_strategy=%s keyword_returned_count=%s "
+        "vector_returned_count=%s merged_count=%s final_count=%s fallback_used=%s fallback_reason=%s",
+        summary.get("rag_strategy"),
+        summary.get("keyword_returned_count"),
+        summary.get("vector_returned_count"),
+        summary.get("merged_count"),
+        summary.get("final_count"),
+        summary.get("fallback_used"),
+        summary.get("fallback_reason"),
+        extra={"rag_retrieval": summary},
+    )
+    return True
+
+
+def _should_log_runtime_rag_metadata() -> bool:
+    env = getattr(config, "ENV", "")
+    env_value = getattr(env, "value", str(env))
+    return str(env_value).lower() in {"local", "dev"}
+
+
+def _runtime_rag_trace_summary(trace_metadata: dict[str, Any]) -> dict[str, Any]:
+    if not trace_metadata:
+        return {}
+
+    return {
+        "rag_strategy": trace_metadata.get("retriever_strategy")
+        or trace_metadata.get("strategy")
+        or trace_metadata.get("source"),
+        "keyword_returned_count": trace_metadata.get("keyword_returned_count"),
+        "vector_returned_count": trace_metadata.get("vector_returned_count"),
+        "merged_count": trace_metadata.get("merged_count"),
+        "final_count": trace_metadata.get("final_count") or trace_metadata.get("document_count"),
+        "fallback_used": trace_metadata.get("fallback_used", trace_metadata.get("fallback")),
+        "fallback_reason": trace_metadata.get("fallback_reason"),
+    }
 
 
 def sanitize_for_trace(value: str, limit: int = 80) -> str:

@@ -127,7 +127,9 @@ RAG_GROUNDED_ANSWER_PROMPT = """
 4. 정신건강 관련 키워드는 위기 키워드 여부를 먼저 고려하고, 위기 키워드에서는 챌린지 추천보다 즉시 도움 안내를 우선한다.
 5. 답변 마지막에는 "이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다."라는 의미를 포함한다.
 6. 답변은 한국어로 작성한다.
-7. 출력은 JSON 형식으로 작성한다.
+7. 출력은 JSON object만 작성한다. Markdown code fence(```), 설명 문장, 내부 필드명 노출을 추가하지 않는다.
+8. JSON의 answer 값은 사용자에게 그대로 보여줄 최종 자연어 답변만 담는다.
+9. answer 안에는 JSON, markdown code block, intent, source, is_safe 같은 내부 필드명을 넣지 않는다.
 
 허용 출처:
 - 질병관리청 국가건강정보포털
@@ -145,14 +147,13 @@ RAG_GROUNDED_ANSWER_PROMPT = """
 - 광고성 병원 글
 - 출처 불명 문서
 
-출력 JSON 예시:
+출력 JSON schema 예시:
 {{
-  "answer": "...",
-  "intent": "...",
-  "source": "rag_llm",
-  "caution_message": "...",
-  "is_safe": true
+  "answer": "사용자에게 보여줄 자연어 답변"
 }}
+
+내부 처리 참고:
+- API source 라벨은 rag_llm이지만 answer 안에 이 값을 쓰지 않는다.
 
 사용자 질문:
 {user_message}

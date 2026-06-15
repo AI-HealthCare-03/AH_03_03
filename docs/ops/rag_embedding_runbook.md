@@ -206,6 +206,51 @@ embedding trace에는 다음 정도만 남긴다.
 - embedding vector 전문
 - API key/secret
 
+## 메인 챗봇 RAG Runtime Smoke
+
+`/api/v1/chatbot/ask`에서 실제 RAG strategy와 LLM 답변 후처리를 확인할 때는 소량 요청만 실행한다.
+
+권장 확인 순서:
+
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.dev.yml exec fastapi \
+  uv run --no-sync python -c "from app.core import config; print('OPENAI_API_KEY_SET=', bool(config.OPENAI_API_KEY)); print('RAG_RETRIEVAL_STRATEGY=', config.RAG_RETRIEVAL_STRATEGY); print('RAG_EMBEDDING_ENABLED=', config.RAG_EMBEDDING_ENABLED); print('RAG_EMBEDDING_PROVIDER=', config.RAG_EMBEDDING_PROVIDER)"
+```
+
+그 다음 요청은 1~2건만 호출한다.
+
+```bash
+curl -fsS -X POST http://localhost:8080/api/v1/chatbot/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"당뇨 식단 관리는 어떻게 하면 좋나요?","context_type":"MAIN"}'
+```
+
+JWT 인증이 필요한 실제 runtime smoke는 토큰 값을 출력하지 않고 env로만 전달한다.
+
+```bash
+uv run python scripts/qa/smoke_chatbot_hybrid_rag_runtime.py \
+  --base-url http://localhost:8080 \
+  --token-env CHATBOT_SMOKE_TOKEN \
+  --confirm-openai-call \
+  --output-json reports/qa/chatbot_hybrid_rag_smoke_outputs.json \
+  --output-md reports/qa/chatbot_hybrid_rag_smoke_outputs.md
+```
+
+로컬/dev 로그에서는 `main_chatbot_rag_retrieval` 레코드의 아래 값을 확인한다.
+
+- `rag_strategy`
+- `keyword_returned_count`
+- `vector_returned_count`
+- `merged_count`
+- `final_count`
+- `fallback_used`
+- `fallback_reason`
+
+금지:
+
+- `docker compose config | grep OPENAI_API_KEY`처럼 secret 원문이 출력될 수 있는 명령을 실행하지 않는다.
+- OpenAI key, Langfuse secret, embedding vector 전문을 로그나 문서에 남기지 않는다.
+
 ## Rollback/복구
 
 embedding 저장은 RAG chunk 원문과 metadata를 바꾸지 않는다. 문제가 있으면 같은 script를 올바른 provider/model/dimension으로 다시 실행해 재생성한다.

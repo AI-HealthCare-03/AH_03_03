@@ -10,7 +10,9 @@ from ai_runtime.llm.rag.retriever import RagRetrievalResult, RetrievedDocument
 
 
 @pytest.fixture(autouse=True)
-def clear_graph_cache():
+def clear_graph_cache(monkeypatch):
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_RETRIEVAL_STRATEGY", "keyword_only")
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.MAIN_CHATBOT_RAG_STRATEGY", "keyword_only")
     build_health_chatbot_graph.cache_clear()
     yield
     build_health_chatbot_graph.cache_clear()
@@ -495,11 +497,16 @@ def test_main_chatbot_hybrid_parallel_calls_keyword_and_vector(monkeypatch) -> N
             )
 
     vector = VectorRetriever()
+    captured_logs = []
     monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
     monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_RETRIEVAL_STRATEGY", "hybrid_parallel")
     monkeypatch.setattr("ai_runtime.llm.graph.nodes._main_chatbot_vector_gate_enabled", lambda: True)
     monkeypatch.setattr("ai_runtime.llm.graph.nodes.get_default_rag_retriever", lambda: KeywordRetriever())
     monkeypatch.setattr("ai_runtime.llm.graph.nodes._build_main_chatbot_vector_retriever", lambda: vector)
+    monkeypatch.setattr(
+        "ai_runtime.llm.graph.nodes.logger.info",
+        lambda message, *args, **kwargs: captured_logs.append({"message": message, "args": args, **kwargs}),
+    )
 
     result = run_chatbot_graph(user_message="건강관리 참고", context_type="MAIN", use_real_llm=False)
 
@@ -514,6 +521,98 @@ def test_main_chatbot_hybrid_parallel_calls_keyword_and_vector(monkeypatch) -> N
     assert retrieval_trace["vector_weight"] == 0.5
     assert "chunk-vector" not in result.answer
     assert "score" not in result.answer
+    runtime_logs = [
+        entry["extra"]["rag_retrieval"]
+        for entry in captured_logs
+        if str(entry["message"]).startswith("main_chatbot_rag_retrieval")
+    ]
+    assert runtime_logs
+    assert runtime_logs[-1]["rag_strategy"] == "hybrid_parallel"
+    assert runtime_logs[-1]["keyword_returned_count"] == 1
+    assert runtime_logs[-1]["vector_returned_count"] == 1
+    assert runtime_logs[-1]["merged_count"] == 2
+    assert runtime_logs[-1]["final_count"] == 2
+
+
+def test_main_chatbot_rag_llm_json_code_fence_is_not_exposed(monkeypatch) -> None:
+    class KeywordRetriever:
+        def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):
+            return RagRetrievalResult(
+                documents=[
+                    RetrievedDocument(
+                        title="혈당 관리 문서",
+                        content="혈당 관리는 단 음료와 정제 탄수화물을 줄이는 생활습관을 참고할 수 있습니다.",
+                        source_name="질병관리청 국가건강정보포털",
+                        url="https://health.kdca.go.kr/diabetes",
+                        metadata={
+                            "id": "diabetes",
+                            "status": "reviewed",
+                            "source_type": "official_guideline",
+                            "source_trust_level": "official_guideline",
+                        },
+                    )
+                ],
+                reference_sources=[
+                    {
+                        "id": "diabetes",
+                        "title": "혈당 관리 문서",
+                        "source_org": "질병관리청 국가건강정보포털",
+                        "source_url": "https://health.kdca.go.kr/diabetes",
+                        "source_type": "official_guideline",
+                        "source_trust_level": "official_guideline",
+                        "status": "reviewed",
+                    }
+                ],
+                reference_summary="참고 정보: 혈당 관리 문서를 함께 확인했습니다.",
+                strategy="fake_keyword",
+                trace_metadata={
+                    "strategy": "fake_keyword",
+                    "document_count": 1,
+                    "document_ids": ["diabetes"],
+                    "source_types": ["질병관리청 국가건강정보포털"],
+                    "source_trust_levels": ["official_guideline"],
+                    "documents": [],
+                    "fallback": False,
+                    "fallback_reason": None,
+                },
+            )
+
+    def fake_call_llm_json(*args, **kwargs):
+        return """
+```json
+{
+  "answer": "혈당 관리가 필요한 경우 단 음료를 줄이고 식후 가벼운 활동을 참고해 보세요.",
+  "intent": "internal",
+  "source": "rag_llm",
+  "is_safe": true
+}
+```
+""".strip()
+
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.get_default_rag_retriever", lambda: KeywordRetriever())
+    monkeypatch.setattr("ai_runtime.llm.rag_generator.call_llm_json", fake_call_llm_json)
+
+    result = run_chatbot_graph(user_message="혈당 관리는 어떻게 하나요?", context_type="MAIN", use_real_llm=True)
+
+    assert result.source == "rag_llm"
+    assert "혈당 관리가 필요한 경우" in result.answer
+    forbidden_terms = [
+        '"answer":',
+        '"intent":',
+        '"source":',
+        '"is_safe":',
+        "chunk_key",
+        "score",
+        "embedding",
+        "pgvector",
+        "text-embedding",
+        "vector retriever",
+        "similarity",
+        "```",
+    ]
+    for term in forbidden_terms:
+        assert term not in result.answer
 
 
 def test_langgraph_rag_no_result_falls_back_safely(monkeypatch) -> None:
