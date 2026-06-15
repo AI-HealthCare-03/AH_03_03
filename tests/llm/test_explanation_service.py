@@ -53,7 +53,7 @@ def test_rag_ready_interface_adds_keyword_context_references(monkeypatch) -> Non
 
     source_ids = [context.metadata["id"] for context in contexts]
     assert "diabetes" in source_ids
-    assert "safety_disclaimer" in source_ids
+    assert "diet_caution" in source_ids
     assert explanation.source == "rule_based_explanation"
     assert explanation.reference_summary
     assert explanation.reference_sources
