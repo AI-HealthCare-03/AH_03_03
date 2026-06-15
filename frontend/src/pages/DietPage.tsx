@@ -179,6 +179,7 @@ export default function DietPage() {
   const [analysisMealType, setAnalysisMealType] = useState(getDefaultMealType());
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [manualMealType, setManualMealType] = useState("LUNCH");
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [manualMealTime, setManualMealTime] = useState(currentLocalDateTime());
   const [manualDescription, setManualDescription] = useState("");
   const [manualMemo, setManualMemo] = useState("");
@@ -221,6 +222,17 @@ export default function DietPage() {
       }
     };
   }, [selectedImagePreviewUrl]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      const mobileUserAgent = /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+      setIsMobileDevice(coarsePointer || mobileUserAgent);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useAsyncJobPolling({
     jobId: analysisJobId,
@@ -432,13 +444,14 @@ export default function DietPage() {
       {feedbackDialog}
       <Card
         title="식단 이미지 분석"
+        className="diet-analysis-card"
         actions={
           <Link className="button secondary" to="/diets/history">
             결과 전체
           </Link>
         }
       >
-        <form className="form" onSubmit={(event) => event.preventDefault()}>
+        <form className="form" onSubmit={(event) => event.preventDefault()} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <label>
             식사 구분
             <select value={analysisMealType} onChange={(event) => setAnalysisMealType(event.target.value)}>
@@ -456,13 +469,22 @@ export default function DietPage() {
           <div className="upload-box">
             <strong>음식 사진 선택</strong>
             <span>이미지 파일을 선택하거나, 지원되는 모바일 브라우저에서는 후면 카메라로 바로 촬영할 수 있습니다.</span>
-            <div className="button-row">
-              <label className="button secondary" htmlFor="diet-file-input">
+            <div className="upload-action-grid">
+              <label className="upload-action-button" htmlFor="diet-file-input">
                 이미지 파일 선택
               </label>
-              <label className="button secondary" htmlFor="diet-camera-input">
-                카메라로 촬영
-              </label>
+              {isMobileDevice ? (
+                <label className="upload-action-button" htmlFor="diet-camera-input">
+                  카메라로 촬영
+                </label>
+              ) : (
+                <span className="upload-action-button upload-action-button--disabled">
+                  <span style={{ fontSize: "14px", fontWeight: 600 }}>카메라 촬영</span>
+                  <span style={{ fontSize: "11px", fontWeight: 400, opacity: 0.7 }}>
+                    카메라 촬영은 모바일에서 사용할 수 있습니다.
+                  </span>
+                </span>
+              )}
             </div>
             <input
               accept="image/*,.heic,.heif"
@@ -497,7 +519,8 @@ export default function DietPage() {
             {selectedImagePreviewUrl ? (
               <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />
             ) : null}
-          </div>
+          </div>  {/* upload-box 닫힘 */}
+          <div style={{ flex: 1 }} />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button disabled={isAnalyzing} type="button" onClick={runDietAnalysis}>
               {isAnalyzing ? "식단 분석 중..." : "간편 식단 분석"}

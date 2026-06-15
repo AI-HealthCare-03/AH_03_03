@@ -28,7 +28,15 @@ function getMedicationTypeLabel(type: unknown): string {
 }
 
 export default function MedicationPage() {
-  const [name, setName] = useState("");
+  const [registerDraft, setRegisterDraft] = useState<MedicationPayload>({
+    name: "",
+    medication_type: "SUPPLEMENT",
+    dosage: "",
+    frequency: "",
+    reminder_time: null,
+    memo: "",
+    is_active: true,
+  });
   const [items, setItems] = useState<Item[]>([]);
   const [records, setRecords] = useState<Item[]>([]);
   const [error, setError] = useState("");
@@ -64,13 +72,16 @@ export default function MedicationPage() {
     setError("");
     try {
       setIsMutating(true);
-      await createMedication({
-        name,
+      await createMedication(registerDraft);
+      setRegisterDraft({
+        name: "",
         medication_type: "SUPPLEMENT",
-        frequency: "매일 1회",
+        dosage: "",
+        frequency: "",
+        reminder_time: null,
+        memo: "",
         is_active: true,
       });
-      setName("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 등록에 실패했습니다.");
@@ -162,19 +173,92 @@ export default function MedicationPage() {
       {/* ── 등록 카드 ── */}
       <Card title="등록">
         <div className="state-box" style={{ marginBottom: 12 }}>
-          복약 정보는 직접 입력해 주세요. 약물명 확인은 약학정보원/약찾기 서비스를 참고해 주세요.
-          본 서비스는 처방/복용 판단을 제공하지 않으며, 복약 관련 판단은 의사 또는 약사와 상담해 주세요.
+          <p style={{ marginBottom: 6 }}>
+            약물명 확인은 아래 사이트를 참고해 주세요.
+          </p>
+          <ul style={{ paddingLeft: 16, marginBottom: 8 }}>
+            <li>
+              <a href="https://www.health.kr" target="_blank" rel="noopener noreferrer">
+                약학정보원 (health.kr)
+              </a>
+            </li>
+            <li>
+              <a href="https://www.druginfo.co.kr" target="_blank" rel="noopener noreferrer">
+                드럭인포 (druginfo.co.kr)
+              </a>
+            </li>
+          </ul>
+          <p style={{ color: "var(--color-danger, #e53e3e)", fontWeight: 600, fontSize: "0.85rem" }}>
+            ⚠️ 본 서비스는 처방·복용 판단을 제공하지 않습니다.
+            복약 관련 결정은 반드시 의사 또는 약사와 상담하세요.
+          </p>
         </div>
+
         <form className="form" onSubmit={submit}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              placeholder="약 이름 직접 입력"
-              style={{ flex: 1 }}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <button disabled={isMutating} type="submit" style={{ whiteSpace: "nowrap" }}>
+          <div className="form two-col">
+            <label>
+              <span style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                약 이름
+                <span style={{ color: "var(--color-danger, #e53e3e)" }}>*</span>
+              </span>
+              <input
+                placeholder="약 이름 직접 입력"
+                value={String(registerDraft.name ?? "")}
+                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              구분
+              <select
+                value={String(registerDraft.medication_type ?? "SUPPLEMENT")}
+                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, medication_type: e.target.value }))}
+              >
+                <option value="MEDICATION">경구약</option>
+                <option value="SUPPLEMENT">영양제</option>
+                <option value="PRESCRIPTION">처방약</option>
+              </select>
+            </label>
+            <label>
+              용량
+              <input
+                placeholder="예: 500mg"
+                value={String(registerDraft.dosage ?? "")}
+                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, dosage: e.target.value }))}
+              />
+            </label>
+            <label>
+              복용 횟수
+              <input
+                placeholder="예: 매일 1회"
+                value={String(registerDraft.frequency ?? "")}
+                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, frequency: e.target.value }))}
+              />
+            </label>
+            <label>
+              복용 시간
+              <input
+                placeholder="예: 08:00"
+                value={String(registerDraft.reminder_time ?? "")}
+                onChange={(e) =>
+                  setRegisterDraft((prev) => ({
+                    ...prev,
+                    reminder_time: e.target.value || null,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              메모
+              <input
+                placeholder="예: 식후 복용"
+                value={String(registerDraft.memo ?? "")}
+                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, memo: e.target.value }))}
+              />
+            </label>
+          </div>
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+            <button disabled={isMutating} type="submit">
               추가
             </button>
           </div>
