@@ -2763,6 +2763,15 @@ pre {
   color: var(--color-muted);
 }
 
+.risk-stage-board-grid2x2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.risk-stage-board-grid2x2 .risk-stage-panel {
+  min-height: 96px;
+}
+
 .risk-stage-board-compact,
 .risk-stage-board-preview {
   gap: 8px;
