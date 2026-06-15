@@ -158,7 +158,7 @@ const readOnlySections: Array<{
     ],
   },
   {
-    title: "정밀 검진값",
+    title: "정밀 분석 정보",
     items: [
       { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
@@ -554,7 +554,7 @@ export default function HealthProfilePage() {
               />
             </div>
             <p className={missingRequiredLabels.length === 0 ? "success-text" : "warning-text"}>
-              {missingRequiredLabels.length === 0 ? "기본 분석 준비 완료" : "기본 분석에 필요한 항목을 더 입력해 주세요."}
+              {missingRequiredLabels.length === 0 ? "간편 분석 준비 완료" : "간편 분석에 필요한 항목을 더 입력해 주세요."}
             </p>
             <div className="chip-list">
               {missingRequiredLabels.map((label) => (
@@ -563,36 +563,36 @@ export default function HealthProfilePage() {
                 </span>
               ))}
               {missingRequiredLabels.length === 0 && (
-                <span className="badge badge-saved">부족한 항목 없음</span>
+                <span className="badge badge-saved">누락된 항목 없음</span>
               )}
             </div>
             <div className="state-box">
-              정밀 건강 정보 입력 {completedX2Count} / {x2Fields.length}
+              정밀 건강 정보 입력 현황 {completedX2Count} / {x2Fields.length}
               {backendMissingLabels.length > 0 && (
-                <p>기본 분석 부족 항목: {backendMissingLabels.join(", ")}</p>
+                <p>간편 분석 필요 항목: {backendMissingLabels.join(", ")}</p>
               )}
               {precisionMissingLabels.length > 0 && (
-                <p>검진/혈액검사 수치는 선택 입력입니다. 추가 입력하면 정밀 분석 정확도가 높아집니다: {precisionMissingLabels.join(", ")}</p>
+                <p>기본 정보만으로도 간편 분석이 가능하며, 혈액검사 및 검진 수치를 추가 입력하시면 예측 정확도가 더 높은 '정밀 분석'을 받아보실 수 있습니다.</p>
               )}
-              <p>당화혈색소는 선택값입니다. 입력하면 정밀 분석에 함께 반영됩니다.</p>
+              <p>(※ 선택 입력 항목: 총콜레스테롤, LDL, HDL, 중성지방, 당화혈색소)</p>
             </div>
           </div>
         </Card>
-        <Card title="저장 상태">
+        <Card title="저장된 정보">
           <div className="profile-summary-grid">
             {[
-              ["키", form.height_cm],
-              ["몸무게", form.weight_kg],
+              ["키(cm)", form.height_cm],
+              ["몸무게(kg)", form.weight_kg],
               ["BMI", bmi ? bmi.toFixed(1) : ""],
               ["직업군", displayValueMap.occupation?.[form.occupation] ?? ""],
               [
                 "가족력",
                 `${displayValueMap.family_htn?.[form.family_htn]}/${displayValueMap.family_dm?.[form.family_dm]}/${displayValueMap.family_dyslipidemia?.[form.family_dyslipidemia]}`,
               ],
-              ["혈압", form.systolic_bp && form.diastolic_bp ? `${form.systolic_bp}/${form.diastolic_bp}` : ""],
-              ["공복혈당", form.fasting_glucose],
-              ["HDL", form.hdl_cholesterol],
-              ["LDL", form.ldl_cholesterol],
+              ["혈압(mmHg)", form.systolic_bp && form.diastolic_bp ? `${form.systolic_bp}/${form.diastolic_bp}` : ""],
+              ["공복혈당(mg/dL)", form.fasting_glucose],
+              ["HDL(mg/dL)", form.hdl_cholesterol],
+              ["LDL(mg/dL)", form.ldl_cholesterol],
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>
@@ -609,7 +609,16 @@ export default function HealthProfilePage() {
           </div>
         </Card>
       </div>
-      <Card title={editing ? "건강정보 수정" : "저장된 건강정보"}>
+      <Card
+        title={editing ? "건강정보 수정" : "건강 정보"}
+        actions={
+          !editing && (
+            <button className="btn-secondary" onClick={() => setEditing(true)} style={{ fontSize: "13px", padding: "4px 12px" }} type="button">
+              수정
+            </button>
+          )
+        }
+      >
         {editing ? (
           <>
             <HealthProfileForm
@@ -662,8 +671,7 @@ export default function HealthProfilePage() {
         ) : (
           <div className="page-stack">
             <div className="state-box">
-              저장된 값을 읽기 전용으로 표시합니다. 변경하려면 수정하기를 눌러주세요.{" "}
-              <Link to="/health">건강 분석 입력 화면으로 이동</Link>
+              변경하려면 '수정'버튼을 눌러주세요.{" "}
             </div>
             {readOnlySections.map((section) => (
               <section className="profile-section" key={section.title}>
