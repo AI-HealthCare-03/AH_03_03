@@ -373,11 +373,11 @@ export default function MainPage() {
         to: "/health",
       },
       {
-        title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "건강 관리 단계 확인",
+        title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "만성질환 위험도 예측 결과 확인",
         description:
           effectiveAnalysisResults.length > 0
             ? "최근 분석 결과를 확인하고 다음 관리 행동을 정리해보세요."
-            : "건강정보 입력 후 관리 단계를 확인해보세요.",
+            : "건강정보 입력 후 위험도 예측 결과를 확인해보세요.",
         buttonLabel: effectiveAnalysisResults.length > 0 ? "분석 결과 보기" : "분석하러 가기",
         to: effectiveAnalysisResults.length > 0 ? "/analysis/history" : "/analysis",
       },
@@ -391,10 +391,10 @@ export default function MainPage() {
         to: "/challenges",
       },
       {
-        title: medications.length > 0 ? "오늘 복약 기록 확인" : "복약/영양제 등록",
+        title: medications.length > 0 ? "오늘 복약/영양제 기록 확인" : "복약/영양제 등록",
         description:
           medications.length > 0
-            ? "오늘 복약 기록을 확인하고 필요한 메모를 남겨보세요."
+            ? "오늘 복약/영양제 기록을 확인하고 필요한 메모를 남겨보세요."
             : "복약 정보를 등록하면 건강 관리 흐름을 함께 확인할 수 있습니다.",
         buttonLabel: "복약 관리",
         to: "/medications",
@@ -447,8 +447,8 @@ export default function MainPage() {
             <Link className="home-action-card" to="/analysis">
               <span className="home-action-card__icon"><HeartPulse size={24} /></span>
               <span>
-                <strong className="home-action-card__title">건강 관리 단계 확인하기</strong>
-                <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 질환별 결과를 확인합니다.</em>
+                <strong className="home-action-card__title">AI 만성질환 위험도 예측 결과 확인하기</strong>
+                <em className="home-action-card__description">현재 건강정보 기반 질환별 위험도 예측 결과를 확인합니다.</em>
               </span>
             </Link>
             <Link className="home-action-card" to="/diets">
@@ -468,8 +468,8 @@ export default function MainPage() {
 
         <section className="main-dashboard-section">
           <div className="section-heading compact">
-            <h2>오늘 할 일</h2>
-            <p>지금 바로 이어갈 수 있는 건강 관리 행동입니다.</p>
+            <h2>오늘의 건강 실천</h2>
+            <p>건강 변화를 위한 지금 바로 시작 가능한 항목들입니다.</p>
           </div>
           <div className="todo-card-grid">
             {todayCards.map((task) => (
@@ -484,7 +484,7 @@ export default function MainPage() {
 
         <section className="main-dashboard-section">
           <div className="section-heading compact">
-            <h2>건강 추적 요약</h2>
+            <h2>건강 리포트 요약</h2>
             <p>최근 기록된 건강 지표를 시각적으로 확인합니다.</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
@@ -614,6 +614,13 @@ export default function MainPage() {
                   ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
                   : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
               </div>
+              <Link
+                className="button secondary"
+                to="/challenges"
+                style={{ display: "block", textAlign: "center", marginTop: "12px", fontSize: "13px" }}
+              >
+                챌린지 바로가기
+              </Link>
             </div>
 
             {/* 추천 챌린지 */}
