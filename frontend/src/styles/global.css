@@ -2902,7 +2902,7 @@ pre {
 
 .landing-preview-risk-panel .muted {
   font-size: 12px;
-  margin: -2px 0 0;
+  margin: -12px 0 0;
 }
 
 .state-box,
@@ -3397,7 +3397,7 @@ pre {
 }
 
 .hero-panel h1 {
-  font-size: 46px;
+  font-size: 45px;
   letter-spacing: -0.02em;
   line-height: 1.12;
   margin: 8px 0 14px;
@@ -3426,7 +3426,7 @@ pre {
 
 .eyebrow {
   color: var(--color-primary);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
