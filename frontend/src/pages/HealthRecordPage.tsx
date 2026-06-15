@@ -390,6 +390,13 @@ export default function HealthRecordPage() {
   );
 
   return (
+    <div className="page-stack">
+      <header className="dashboard-header">
+        <div>
+          <h1>건강 분석</h1>
+          <p>기본 건강정보를 입력하고 만성질환 위험도를 분석합니다.</p>
+        </div>
+      </header>
     <div className="dashboard-grid">
       <Card className="sticky-sidebar" title="입력 단계">
         <div className="card-list">
@@ -564,6 +571,7 @@ export default function HealthRecordPage() {
           tone="danger"
         />
       )}
+    </div>
     </div>
   );
 }

@@ -428,6 +428,13 @@ export default function DietPage() {
   const hasAnyMfdsNutrition = detectedFoods.some(hasMfdsNutrition);
 
   return (
+    <div className="page-stack">
+      <header className="dashboard-header">
+        <div>
+          <h1>식단 분석</h1>
+          <p>식단 사진을 등록하고 영양 정보와 개선 포인트를 확인합니다.</p>
+        </div>
+      </header>
     <div className="page-grid">
       {error && <ErrorMessage message={error} />}
       {canRetryAnalysis ? (
@@ -850,6 +857,7 @@ export default function DietPage() {
           })}
         </div>
       </Card>
+    </div>
     </div>
   );
 }
