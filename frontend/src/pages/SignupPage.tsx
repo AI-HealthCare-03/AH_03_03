@@ -1066,7 +1066,7 @@ export default function SignupPage() {
                 </select>
               </label>
               <label>
-                콜레스테롤·중성지방 이상 가족력 여부
+                이상지질혈증 이상 가족력 여부
                 <select
                   value={extraHealth.family_dyslipidemia}
                   onChange={(event) => setExtraHealth((prev) => ({ ...prev, family_dyslipidemia: event.target.value }))}

@@ -7,7 +7,7 @@ const aboutFeatures = [
   {
     icon: "🧭",
     title: "AI 위험도 분석",
-    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 이상 위험도를 확인합니다.",
+    description: "건강정보를 기반으로 당뇨, 고혈압, 이상지질혈증 이상 위험도를 확인합니다.",
     to: "/analysis",
   },
   {

@@ -107,7 +107,7 @@ const sections: Array<{
       { key: "family_dm", label: "당뇨병 가족력 여부", type: "select", required: true, options: familyOptions },
       {
         key: "family_dyslipidemia",
-        label: "콜레스테롤·중성지방 이상 가족력 여부",
+        label: "이상지질혈증 이상 가족력 여부",
         type: "select",
         required: true,
         options: familyOptions,

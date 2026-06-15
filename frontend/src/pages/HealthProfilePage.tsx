@@ -68,7 +68,7 @@ const x1RequiredFields: Array<{ key: keyof HealthProfileFormState | "age" | "bmi
   { key: "occupation", label: "직업군" },
   { key: "family_htn", label: "고혈압 가족력 여부" },
   { key: "family_dm", label: "당뇨병 가족력 여부" },
-  { key: "family_dyslipidemia", label: "콜레스테롤·중성지방 이상 가족력 여부" },
+  { key: "family_dyslipidemia", label: "이상지질혈증 이상 가족력 여부" },
   { key: "height_cm", label: "신장" },
   { key: "weight_kg", label: "체중" },
   { key: "bmi", label: "BMI 자동 계산 가능 여부" },
@@ -105,7 +105,7 @@ const backendMissingLabelMap: Record<string, string> = {
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
-  family_dyslipidemia: "콜레스테롤·중성지방 이상 가족력 여부",
+  family_dyslipidemia: "이상지질혈증 이상 가족력 여부",
   smoking_status: "현재 흡연 여부",
   drinking_frequency: "1년간 음주 빈도",
   drinking_amount: "한 번 음주량",
@@ -136,7 +136,7 @@ const readOnlySections: Array<{
     items: [
       { key: "family_htn", label: "고혈압 가족력 여부" },
       { key: "family_dm", label: "당뇨병 가족력 여부" },
-      { key: "family_dyslipidemia", label: "콜레스테롤·중성지방 이상 가족력 여부" },
+      { key: "family_dyslipidemia", label: "이상지질혈증 이상 가족력 여부" },
     ],
   },
   {

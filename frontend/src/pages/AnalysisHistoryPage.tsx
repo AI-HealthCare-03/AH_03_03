@@ -46,7 +46,7 @@ const analysisTypeOptions: Record<string, string | null> = {
   "전체": null,
   "고혈압": "HYPERTENSION",
   "당뇨": "DIABETES",
-  "콜레스테롤·중성지방": "DYSLIPIDEMIA",
+  "이상지질혈증": "DYSLIPIDEMIA",
   "비만": "OBESITY",
   "복부비만": "ABDOMINAL_OBESITY",
   "지방간": "FATTY_LIVER",
@@ -165,7 +165,7 @@ export default function AnalysisHistoryPage() {
     return "상세보기에서 주요 요인을 확인할 수 있습니다.";
   };
   const diseaseRiskItems: DiseaseRiskItem[] = getLatestResultsByAnalysisType(
-    displayResults.filter((result) => isKnownAnalysisType(result.analysis_type)),
+    results.filter((result) => isKnownAnalysisType(result.analysis_type)),
   )
     .map((result) => ({
       analyzed_at: result.analyzed_at,

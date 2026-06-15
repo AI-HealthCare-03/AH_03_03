@@ -44,7 +44,7 @@ export const precisionAnalysisTypes = [
 export const analysisTypeLabels: Record<string, string> = {
   HYPERTENSION: "고혈압",
   DIABETES: "당뇨",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방",
+  DYSLIPIDEMIA: "이상지질혈증",
   OBESITY: "비만",
   ABDOMINAL_OBESITY: "복부비만",
   FATTY_LIVER: "지방간",
@@ -97,7 +97,7 @@ const analysisSourceLabels: Record<string, string> = {
 const x2UnavailableReasons: Record<string, string> = {
   HYPERTENSION: "혈압 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
   DIABETES: "공복혈당 또는 당화혈색소 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  DYSLIPIDEMIA: "이상지질혈증 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
   OBESITY: "BMI 또는 키/몸무게 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
   ABDOMINAL_OBESITY: "허리둘레 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
   FATTY_LIVER: "AST/ALT 등 간 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
