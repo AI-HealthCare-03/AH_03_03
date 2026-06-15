@@ -137,7 +137,7 @@ demo-health: dev-health
 
 # Langfuse stack
 # Optional self-hosted observability stack via infra/langfuse/docker-compose.yml.
-.PHONY: langfuse-up langfuse-down langfuse-ps langfuse-logs
+.PHONY: langfuse-up langfuse-down langfuse-ps langfuse-logs langfuse-health langfuse-restart
 langfuse-up:
 	./scripts/docker_stack.sh langfuse up
 
@@ -149,6 +149,13 @@ langfuse-ps:
 
 langfuse-logs:
 	./scripts/docker_stack.sh langfuse logs
+
+langfuse-health:
+	curl -fsS http://127.0.0.1:3000 > /dev/null
+	@echo "Langfuse health OK: http://127.0.0.1:3000"
+
+langfuse-restart:
+	cd infra/langfuse && docker compose restart langfuse-web langfuse-worker
 
 # Prod compose convenience
 # Uses infra/docker/docker-compose.prod.yml and pulls prebuilt registry images.
