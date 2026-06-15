@@ -4452,12 +4452,11 @@ input:-webkit-autofill:focus {
 .challenge-icon-large {
   overflow: hidden;
   align-items: center;
-
+  background: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   display: grid;
   font-size: 60px;
-
   place-items: center;
 }
 
