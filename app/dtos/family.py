@@ -85,14 +85,14 @@ class FamilyInviteResponse(BaseModel):
 
 
 class FamilyInviteAcceptCodeRequest(BaseModel):
-    code: str = Field(min_length=1)
+    code: str = Field(min_length=8, max_length=8)
 
     @field_validator("code")
     @classmethod
     def strip_code(cls, value: str) -> str:
         stripped = value.strip()
-        if not stripped:
-            raise ValueError("초대 코드를 입력해주세요.")
+        if not stripped.isdigit() or len(stripped) != 8:
+            raise ValueError("초대 코드는 8자리 숫자입니다.")
         return stripped
 
 

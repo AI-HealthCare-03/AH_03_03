@@ -52,9 +52,11 @@ async def test_password_reset_message_includes_plain_text_and_html_link(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_family_invite_message_includes_plain_text_and_html_link(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_family_invite_message_includes_numeric_code_and_family_page_link(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, MIMEMultipart] = {}
-    invite_url = "http://localhost:8080/family/invitations/accept?code=invite-token"
+    invite_url = "http://localhost:8080/family?invite_code=12345678"
 
     def fake_send_smtp(self: EmailService, message: MIMEMultipart) -> None:
         captured["message"] = message
@@ -66,15 +68,20 @@ async def test_family_invite_message_includes_plain_text_and_html_link(monkeypat
     sent = await EmailService().send_family_invite_email(
         "family@example.com",
         inviter_display_name="동욱",
-        invite_code="invite-token",
+        invite_code="12345678",
         invite_url=invite_url,
         expires_at_text="2026-05-31 10:00",
     )
 
     assert sent is True
     text_body, html_body = [part.get_payload(decode=True).decode("utf-8") for part in captured["message"].get_payload()]
-    assert "초대 코드: invite-token" in text_body
+    assert "초대 코드: 12345678" in text_body
     assert invite_url in text_body
-    assert '<p style="font-size: 20px; font-weight: 700;">초대 코드: invite-token</p>' in html_body
-    assert f'<a href="{invite_url}" target="_blank" rel="noopener noreferrer">{invite_url}</a>' in html_body
+    assert "/family/invitations/accept" not in text_body
+    assert '<p style="font-size: 20px; font-weight: 700;">초대 코드: 12345678</p>' in html_body
+    assert (
+        f'<a href="{invite_url}" target="_blank" rel="noopener noreferrer">가족 페이지에서 초대코드 입력하기</a>'
+        in html_body
+    )
+    assert "/family/invitations/accept" not in html_body
     assert "<strong>Health Ladder</strong>" in html_body

@@ -49,8 +49,16 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
     async def fake_enqueue_family_invite_email_send(**kwargs: str) -> None:
         email_jobs.append(kwargs)
 
+    async def fake_ensure_invite_target_allowed(**kwargs: object) -> None:
+        assert kwargs["invitee_email"] == "family@example.com"
+        assert kwargs["invitee_phone"] is None
+
+    async def fake_generate_unique_code() -> str:
+        return "12345678"
+
     monkeypatch.setattr(family_service, "_ensure_owner", fake_ensure_owner)
-    monkeypatch.setattr(family_service.secrets, "token_urlsafe", lambda length: "invite-token")
+    monkeypatch.setattr(family_service, "_ensure_invite_target_allowed", fake_ensure_invite_target_allowed)
+    monkeypatch.setattr(family_service, "_generate_unique_family_invite_code", fake_generate_unique_code)
     monkeypatch.setattr(family_service.FamilyInvite, "create", staticmethod(fake_create_invite))
     monkeypatch.setattr(
         family_service.service_jobs,
@@ -70,18 +78,66 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
     )
 
     assert invite.id == 3
-    assert invite_code == "invite-token"
+    assert invite_code == "12345678"
     assert create_payloads[0]["invitee_email"] == "family@example.com"
-    assert create_payloads[0]["code_hash"] == family_service._digest("invite-token")
+    assert create_payloads[0]["code_hash"] == family_service._digest("12345678")
+    assert "invite_code" not in create_payloads[0]
     assert email_jobs == [
         {
             "recipient_email": "family@example.com",
             "inviter_display_name": "동욱",
-            "invite_code": "invite-token",
-            "invite_url": "http://localhost:8080/family/invitations/accept?code=invite-token",
+            "invite_code": "12345678",
+            "invite_url": "http://localhost:8080/family?invite_code=12345678",
             "expires_at_text": invite.expires_at.astimezone(family_service.config.TIMEZONE).strftime("%Y-%m-%d %H:%M"),
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_family_invite_code_is_8_digit_numeric(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeInviteQuery:
+        async def exists(self) -> bool:
+            return False
+
+    monkeypatch.setattr(family_service.secrets, "randbelow", lambda maximum: 1234)
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    invite_code = await family_service._generate_unique_family_invite_code()
+
+    assert invite_code == "00001234"
+    assert invite_code.isdigit()
+    assert len(invite_code) == 8
+
+
+@pytest.mark.asyncio
+async def test_family_invite_code_collision_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    code_values = iter([11111111, 22222222])
+    exists_values = iter([True, False])
+
+    class FakeInviteQuery:
+        async def exists(self) -> bool:
+            return next(exists_values)
+
+    monkeypatch.setattr(family_service.secrets, "randbelow", lambda maximum: next(code_values))
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    assert await family_service._generate_unique_family_invite_code() == "22222222"
+
+
+@pytest.mark.asyncio
+async def test_family_invite_code_generation_fails_after_retry_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeInviteQuery:
+        async def exists(self) -> bool:
+            return True
+
+    monkeypatch.setattr(family_service.secrets, "randbelow", lambda maximum: 11111111)
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service._generate_unique_family_invite_code()
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "초대 코드를 생성하지 못했습니다. 잠시 후 다시 시도해주세요."
 
 
 @pytest.mark.asyncio
@@ -92,8 +148,8 @@ async def test_family_invite_email_send_is_safe_when_email_disabled(monkeypatch:
     sent = await EmailService().send_family_invite_email(
         "family@example.com",
         inviter_display_name="동욱",
-        invite_code="invite-token",
-        invite_url="http://localhost:8080/family/invitations/accept?code=invite-token",
+        invite_code="12345678",
+        invite_url="http://localhost:8080/family?invite_code=12345678",
         expires_at_text="2026-05-31 10:00",
     )
 
@@ -124,21 +180,166 @@ async def test_family_invite_email_body_does_not_include_sensitive_health_values
     sent = await EmailService().send_family_invite_email(
         "family@example.com",
         inviter_display_name="동욱",
-        invite_code="invite-token",
-        invite_url="http://localhost:8080/family/invitations/accept?code=invite-token",
+        invite_code="12345678",
+        invite_url="http://localhost:8080/family?invite_code=12345678",
         expires_at_text="2026-05-31 10:00",
     )
 
     assert sent is True
     assert captured["subject"] == "[Health Ladder] 가족 건강관리 초대 안내"
-    assert "가족 건강관리 기능에 초대되었습니다." in captured["body"]
-    assert "초대 코드: invite-token" in captured["body"]
-    assert "http://localhost:8080/family/invitations/accept?code=invite-token" in captured["body"]
-    assert '<p style="font-size: 20px; font-weight: 700;">초대 코드: invite-token</p>' in captured["html_body"]
-    assert '<a href="http://localhost:8080/family/invitations/accept?code=invite-token"' in captured["html_body"]
+    assert "가족 페이지에서 아래 초대코드를 입력해 연결을 완료해 주세요." in captured["body"]
+    assert "초대 코드: 12345678" in captured["body"]
+    assert "http://localhost:8080/family?invite_code=12345678" in captured["body"]
+    assert "/family/invitations/accept" not in captured["body"]
+    assert '<p style="font-size: 20px; font-weight: 700;">초대 코드: 12345678</p>' in captured["html_body"]
+    assert "가족 페이지에서 초대코드 입력하기" in captured["html_body"]
+    assert "/family/invitations/accept" not in captured["html_body"]
     for sensitive_value in ("120", "혈압", "혈당", "체중", "질병 위험도", "OCR"):
         assert sensitive_value not in captured["body"]
         assert sensitive_value not in captured["html_body"]
+
+
+@pytest.mark.asyncio
+async def test_family_invite_rejects_missing_target() -> None:
+    inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service._ensure_invite_target_allowed(
+            family_id=10,
+            inviter=inviter,
+            invitee_email=None,
+            invitee_phone=None,
+            invitee_user_id=None,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "초대받을 가족의 이메일 또는 전화번호를 입력해주세요."
+
+
+@pytest.mark.asyncio
+async def test_family_invite_rejects_self_invite(monkeypatch: pytest.MonkeyPatch) -> None:
+    inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
+
+    async def fake_resolve_invitee_user(**kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(family_service, "_resolve_invitee_user", fake_resolve_invitee_user)
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service._ensure_invite_target_allowed(
+            family_id=10,
+            inviter=inviter,
+            invitee_email="me@example.com",
+            invitee_phone=None,
+            invitee_user_id=None,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "본인은 가족 초대 대상이 될 수 없습니다."
+
+
+@pytest.mark.asyncio
+async def test_family_invite_rejects_existing_active_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
+    invitee = SimpleNamespace(id=2)
+
+    async def fake_resolve_invitee_user(**kwargs: object) -> SimpleNamespace:
+        return invitee
+
+    class FakeFamilyMemberQuery:
+        async def exists(self) -> bool:
+            return True
+
+    monkeypatch.setattr(family_service, "_resolve_invitee_user", fake_resolve_invitee_user)
+    monkeypatch.setattr(
+        family_service.FamilyMember, "filter", staticmethod(lambda *args, **kwargs: FakeFamilyMemberQuery())
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service._ensure_invite_target_allowed(
+            family_id=10,
+            inviter=inviter,
+            invitee_email="family@example.com",
+            invitee_phone=None,
+            invitee_user_id=None,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "이미 연결된 가족입니다."
+
+
+@pytest.mark.asyncio
+async def test_family_invite_rejects_duplicate_pending_email(monkeypatch: pytest.MonkeyPatch) -> None:
+    inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
+
+    async def fake_resolve_invitee_user(**kwargs: object) -> None:
+        return None
+
+    class FakeFamilyMemberQuery:
+        async def exists(self) -> bool:
+            return False
+
+    class FakeInviteQuery:
+        def filter(self, **kwargs: object) -> FakeInviteQuery:
+            return self
+
+        async def exists(self) -> bool:
+            return True
+
+    monkeypatch.setattr(family_service, "_resolve_invitee_user", fake_resolve_invitee_user)
+    monkeypatch.setattr(
+        family_service.FamilyMember, "filter", staticmethod(lambda *args, **kwargs: FakeFamilyMemberQuery())
+    )
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service._ensure_invite_target_allowed(
+            family_id=10,
+            inviter=inviter,
+            invitee_email="family@example.com",
+            invitee_phone=None,
+            invitee_user_id=None,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "이미 대기 중인 가족 초대가 있습니다."
+
+
+@pytest.mark.asyncio
+async def test_family_invite_rejects_duplicate_pending_phone(monkeypatch: pytest.MonkeyPatch) -> None:
+    inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
+
+    async def fake_resolve_invitee_user(**kwargs: object) -> None:
+        return None
+
+    class FakeFamilyMemberQuery:
+        async def exists(self) -> bool:
+            return False
+
+    class FakeInviteQuery:
+        def filter(self, **kwargs: object) -> FakeInviteQuery:
+            return self
+
+        async def exists(self) -> bool:
+            return True
+
+    monkeypatch.setattr(family_service, "_resolve_invitee_user", fake_resolve_invitee_user)
+    monkeypatch.setattr(
+        family_service.FamilyMember, "filter", staticmethod(lambda *args, **kwargs: FakeFamilyMemberQuery())
+    )
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service._ensure_invite_target_allowed(
+            family_id=10,
+            inviter=inviter,
+            invitee_email=None,
+            invitee_phone="01033334444",
+            invitee_user_id=None,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "이미 대기 중인 가족 초대가 있습니다."
 
 
 @pytest.mark.asyncio
@@ -203,7 +404,7 @@ def test_family_invite_api_hides_invite_code_when_debug_disabled(monkeypatch: py
                 used_at=None,
                 created_at=datetime(2026, 5, 30, 10, 0, 0, tzinfo=family_service.config.TIMEZONE),
             ),
-            "invite-token",
+            "12345678",
         )
 
     app.dependency_overrides[get_request_user] = fake_current_user
@@ -247,7 +448,7 @@ def test_family_invite_api_exposes_invite_code_only_when_local_debug_enabled(
                 used_at=None,
                 created_at=datetime(2026, 5, 30, 10, 0, 0, tzinfo=family_service.config.TIMEZONE),
             ),
-            "invite-token",
+            "12345678",
         )
 
     app.dependency_overrides[get_request_user] = fake_current_user
@@ -264,4 +465,4 @@ def test_family_invite_api_exposes_invite_code_only_when_local_debug_enabled(
         app.dependency_overrides.clear()
 
     assert response.status_code == 201
-    assert response.json()["invite_code"] == "invite-token"
+    assert response.json()["invite_code"] == "12345678"

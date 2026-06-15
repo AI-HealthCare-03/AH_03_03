@@ -3,7 +3,9 @@ import secrets
 import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import reduce
 from math import ceil
+from operator import or_
 
 from fastapi import HTTPException
 from starlette import status
@@ -40,6 +42,8 @@ from app.services import service_jobs
 from app.services.email_service import EmailService
 
 FAMILY_INVITE_TTL_HOURS = 24
+FAMILY_INVITE_CODE_LENGTH = 8
+FAMILY_INVITE_CODE_MAX_ATTEMPTS = 10
 FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE = "family_challenge_completed"
 FAMILY_CHALLENGE_MISSED_RELATED_TYPE = "family_challenge_missed"
 
@@ -86,7 +90,7 @@ def _display_name(user: User) -> str:
 def _family_invite_accept_url(invite_code: str) -> str:
     base_url = config.FRONTEND_BASE_URL.rstrip("/")
     encoded_code = urllib.parse.quote(invite_code, safe="")
-    return f"{base_url}/family/invitations/accept?code={encoded_code}"
+    return f"{base_url}/family?invite_code={encoded_code}"
 
 
 def _format_invite_expiration(expires_at: datetime) -> str:
@@ -103,6 +107,88 @@ async def _resolve_invite_recipient_email(payload: FamilyInviteCreateRequest) ->
     if invitee is None:
         _bad_request("초대받는 사용자를 찾을 수 없습니다.")
     return _normalize_email(invitee.email)
+
+
+def _generate_family_invite_code() -> str:
+    return f"{secrets.randbelow(10**FAMILY_INVITE_CODE_LENGTH):0{FAMILY_INVITE_CODE_LENGTH}d}"
+
+
+async def _generate_unique_family_invite_code() -> str:
+    for _ in range(FAMILY_INVITE_CODE_MAX_ATTEMPTS):
+        invite_code = _generate_family_invite_code()
+        exists = await FamilyInvite.filter(code_hash=_digest(invite_code)).exists()
+        if not exists:
+            return invite_code
+    _bad_request("초대 코드를 생성하지 못했습니다. 잠시 후 다시 시도해주세요.")
+
+
+async def _resolve_invitee_user(
+    *,
+    invitee_email: str | None,
+    invitee_phone: str | None,
+    invitee_user_id: int | None,
+) -> User | None:
+    if invitee_user_id is not None:
+        invitee = await User.get_or_none(id=invitee_user_id)
+        if invitee is None:
+            _bad_request("초대받는 사용자를 찾을 수 없습니다.")
+        return invitee
+    if invitee_email:
+        return await User.get_or_none(email=invitee_email)
+    if invitee_phone:
+        return await User.get_or_none(phone_number=invitee_phone)
+    return None
+
+
+async def _ensure_invite_target_allowed(
+    *,
+    family_id: int,
+    inviter: User,
+    invitee_email: str | None,
+    invitee_phone: str | None,
+    invitee_user_id: int | None,
+) -> None:
+    if not any((invitee_email, invitee_phone, invitee_user_id)):
+        _bad_request("초대받을 가족의 이메일 또는 전화번호를 입력해주세요.")
+
+    invitee_user = await _resolve_invitee_user(
+        invitee_email=invitee_email,
+        invitee_phone=invitee_phone,
+        invitee_user_id=invitee_user_id,
+    )
+    inviter_email = _normalize_email(inviter.email)
+    inviter_phone = _normalize_phone(inviter.phone_number)
+    if (
+        (invitee_user is not None and int(invitee_user.id) == int(inviter.id))
+        or (invitee_email is not None and invitee_email == inviter_email)
+        or (invitee_phone is not None and invitee_phone == inviter_phone)
+    ):
+        _bad_request("본인은 가족 초대 대상이 될 수 없습니다.")
+
+    active_filters: list[Q] = []
+    if invitee_user is not None:
+        active_filters.append(Q(user_id=invitee_user.id))
+    if invitee_email:
+        active_filters.append(Q(email=invitee_email))
+    if invitee_phone:
+        active_filters.append(Q(phone_number=invitee_phone))
+    if (
+        active_filters
+        and await FamilyMember.filter(
+            reduce(or_, active_filters),
+            family_id=family_id,
+            status=FamilyMemberStatus.ACTIVE,
+        ).exists()
+    ):
+        _bad_request("이미 연결된 가족입니다.")
+
+    pending_query = FamilyInvite.filter(family_id=family_id, status=FamilyInviteStatus.PENDING, expires_at__gte=_now())
+    if invitee_user_id is not None and await pending_query.filter(invitee_user_id=invitee_user_id).exists():
+        _bad_request("이미 대기 중인 가족 초대가 있습니다.")
+    if invitee_email and await pending_query.filter(invitee_email=invitee_email).exists():
+        _bad_request("이미 대기 중인 가족 초대가 있습니다.")
+    if invitee_phone and await pending_query.filter(invitee_phone=invitee_phone).exists():
+        _bad_request("이미 대기 중인 가족 초대가 있습니다.")
 
 
 async def _send_family_invite_email(
@@ -336,15 +422,23 @@ async def create_family_invite(
     payload: FamilyInviteCreateRequest,
 ) -> tuple[FamilyInvite, str]:
     family = await _ensure_owner(user, family_id)
-    invite_code = secrets.token_urlsafe(32)
     expires_at = _now() + timedelta(hours=FAMILY_INVITE_TTL_HOURS)
     invitee_email = await _resolve_invite_recipient_email(payload)
+    invitee_phone = _normalize_phone(payload.invitee_phone)
+    await _ensure_invite_target_allowed(
+        family_id=family_id,
+        inviter=user,
+        invitee_email=invitee_email,
+        invitee_phone=invitee_phone,
+        invitee_user_id=payload.invitee_user_id,
+    )
+    invite_code = await _generate_unique_family_invite_code()
     invite = await FamilyInvite.create(
         family=family,
         inviter_user_id=user.id,
         invitee_user_id=payload.invitee_user_id,
         invitee_email=invitee_email,
-        invitee_phone=_normalize_phone(payload.invitee_phone),
+        invitee_phone=invitee_phone,
         code_hash=_digest(invite_code),
         relation_type=payload.relation_type,
         member_role=payload.member_role,

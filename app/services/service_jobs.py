@@ -188,7 +188,7 @@ def _family_invite_code_from_payload(payload: dict[str, Any]) -> str:
     invite_url = _required_str(payload, "invite_url")
     parsed_url = urllib.parse.urlparse(invite_url)
     parsed_query = urllib.parse.parse_qs(parsed_url.query)
-    codes = parsed_query.get("code")
+    codes = parsed_query.get("invite_code") or parsed_query.get("code")
     if codes and codes[0]:
         return codes[0]
     raise ServiceJobNonRetryableError("missing_invite_code")

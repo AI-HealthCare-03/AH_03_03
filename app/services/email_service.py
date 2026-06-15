@@ -77,24 +77,26 @@ class EmailService:
         subject = "[Health Ladder] 가족 건강관리 초대 안내"
         body = (
             "안녕하세요, Health Ladder입니다.\n\n"
-            "가족 건강관리 기능에 초대되었습니다.\n\n"
-            "아래 초대 코드를 입력하여 가족 연동을 완료해 주세요.\n\n\n"
+            f"{inviter_display_name}님이 가족 건강관리 기능에 초대했습니다.\n\n"
+            "가족 페이지에서 아래 초대코드를 입력해 연결을 완료해 주세요.\n\n\n"
             f"초대 코드: {invite_code}\n\n\n"
+            f"초대 링크: {invite_url}\n\n"
+            f"초대 만료: {expires_at_text}\n\n"
             "Health Ladder에서는 가족과 함께 건강 기록과 건강관리 현황을 확인할 수 있습니다.\n\n\n"
-            "초대 확인 링크:\n"
-            f"{invite_url}\n\n"
             "Health Ladder 드림"
         )
         escaped_invite_code = escape(invite_code)
         escaped_invite_url = escape(invite_url, quote=True)
+        escaped_inviter_display_name = escape(inviter_display_name)
+        escaped_expires_at_text = escape(expires_at_text)
         html_body = (
             "<p>안녕하세요, <strong>Health Ladder</strong>입니다.</p>"
-            "<p>가족 건강관리 기능에 초대되었습니다.</p>"
-            "<p>아래 초대 코드를 입력하여 가족 연동을 완료해 주세요.</p>"
+            f"<p>{escaped_inviter_display_name}님이 가족 건강관리 기능에 초대했습니다.</p>"
+            "<p>가족 페이지에서 아래 초대코드를 입력해 연결을 완료해 주세요.</p>"
             f'<p style="font-size: 20px; font-weight: 700;">초대 코드: {escaped_invite_code}</p>'
             "<p><strong>Health Ladder</strong>에서는 가족과 함께 건강 기록과 건강관리 현황을 확인할 수 있습니다.</p>"
-            "<p>초대 확인 링크:<br>"
-            f'<a href="{escaped_invite_url}" target="_blank" rel="noopener noreferrer">{escaped_invite_url}</a></p>'
+            f'<p><a href="{escaped_invite_url}" target="_blank" rel="noopener noreferrer">가족 페이지에서 초대코드 입력하기</a></p>'
+            f"<p>초대 만료: {escaped_expires_at_text}</p>"
             "<p>감사합니다.<br><strong>Health Ladder</strong> 드림</p>"
         )
         return await self._send_email(email, subject, body, html_body=html_body)

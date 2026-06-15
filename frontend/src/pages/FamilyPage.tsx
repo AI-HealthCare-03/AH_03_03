@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   FamilyGroup,
@@ -13,7 +14,6 @@ import {
   createFamilyGroup,
   createFamilyInvite,
   deleteFamilyGroup,
-  declineFamilyInvite,
   getFamilyGroup,
   listFamilyGroupShareSettings,
   listFamilyGroups,
@@ -102,6 +102,7 @@ function normalizePhone(value: string): string {
 
 export default function FamilyPage() {
   const { backendUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -186,6 +187,14 @@ export default function FamilyPage() {
     void reloadAll(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const inviteCode = searchParams.get("invite_code")?.trim();
+    if (inviteCode) {
+      setInviteCodeInput(inviteCode);
+      setNotice("이메일로 받은 초대코드를 확인했습니다. 코드 수락을 눌러 가족 연결을 완료해 주세요.");
+    }
+  }, [searchParams]);
 
   const handleSelectGroup = async (familyId: number) => {
     setSelectedGroupId(familyId);
@@ -288,6 +297,10 @@ export default function FamilyPage() {
       setError("먼저 가족 그룹을 선택해주세요.");
       return;
     }
+    if (!inviteForm.invitee_email.trim()) {
+      setError("초대코드를 받을 이메일을 입력해주세요.");
+      return;
+    }
     void runAction(async () => {
       const invite = await createFamilyInvite(selectedGroup.id, {
         invitee_email: inviteForm.invitee_email.trim() || null,
@@ -298,7 +311,7 @@ export default function FamilyPage() {
       setLatestInviteCode(invite.invite_code ?? "");
       setInviteForm({ invitee_email: "", invitee_phone: "", relation_type: "OTHER", member_role: "MEMBER" });
       await reloadAll(selectedGroup.id);
-    }, "가족 초대 코드를 생성했습니다.");
+    }, "가족 초대코드를 이메일로 발송했습니다.");
   };
 
   const handleAcceptCode = (event: FormEvent) => {
@@ -320,13 +333,6 @@ export default function FamilyPage() {
       await acceptFamilyInvite(invite.id);
       await reloadAll(selectedGroupId);
     }, "가족 초대를 수락했습니다.");
-  };
-
-  const handleDeclineInvite = (invite: FamilyInvite) => {
-    void runAction(async () => {
-      await declineFamilyInvite(invite.id);
-      await reloadAll(selectedGroupId);
-    }, "가족 초대를 거절했습니다.");
   };
 
   const handleToggleShareSetting = (setting: FamilyShareSetting, key: keyof FamilyShareSetting) => {
@@ -530,7 +536,7 @@ export default function FamilyPage() {
               <form className="mini-card form" onSubmit={handleCreateInvite}>
                 <span className="badge badge-reference">초대 생성</span>
                 <label>
-                  이메일
+                  이메일(필수)
                   <input
                     className="input"
                     type="email"
@@ -540,7 +546,7 @@ export default function FamilyPage() {
                   />
                 </label>
                 <label>
-                  휴대폰
+                  전화번호(선택)
                   <input
                     className="input"
                     value={inviteForm.invitee_phone}
@@ -579,8 +585,9 @@ export default function FamilyPage() {
                   </select>
                 </label>
                 <button className="btn-primary" type="submit" disabled={busy || !selectedGroup || !isSelectedGroupOwner}>
-                  초대 코드 생성
+                  이메일로 초대코드 발송
                 </button>
+                <p className="muted">초대코드는 입력한 이메일로 발송됩니다.</p>
               </form>
 
               <form className="mini-card form" onSubmit={handleAcceptCode}>
@@ -603,12 +610,12 @@ export default function FamilyPage() {
                 {latestInviteCode ? (
                   <>
                     <strong className="invite-code-box">{latestInviteCode}</strong>
-                    <p className="muted">초대 코드는 생성 직후 한 번만 표시됩니다. 필요한 곳에 안전하게 전달해주세요.</p>
+                    <p className="muted">초대 코드는 생성 직후 한 번만 표시되며, 입력한 이메일로도 발송됩니다.</p>
                   </>
                 ) : (
                   <>
-                    <strong>생성된 초대 코드가 없습니다.</strong>
-                    <p className="muted">가족 그룹 소유자가 초대를 생성하면 코드가 표시됩니다.</p>
+                    <strong>초대코드는 이메일로 발송됩니다.</strong>
+                    <p className="muted">운영 환경에서는 보안을 위해 화면에 초대코드가 표시되지 않을 수 있습니다.</p>
                   </>
                 )}
               </div>
@@ -629,10 +636,7 @@ export default function FamilyPage() {
                     </div>
                     <div className="button-row">
                       <button className="btn-primary" type="button" disabled={busy} onClick={() => handleAcceptInvite(invite)}>
-                        수락
-                      </button>
-                      <button className="btn-secondary" type="button" disabled={busy} onClick={() => handleDeclineInvite(invite)}>
-                        거절
+                        연결
                       </button>
                     </div>
                   </div>
