@@ -690,23 +690,18 @@ export default function ChallengePage() {
                       <span className="challenge-icon">{categoryIcon[category] ?? "🌿"}</span>
                       <div>
                         <strong>{String(challenge.title)}</strong>
-                        <p>{getCleanDescription(challenge.description)}</p>
+                        <div className="challenge-card-meta">
+                          <span className="badge risk-low">난이도 {getDifficulty(challenge.difficulty)}</span>
+                          <span className="badge risk-medium">{String(challenge.duration_days ?? 7)}일</span>
+                          <span className="badge badge-reference">{getDisplayChallengeType(challenge)}</span>
+                          <span className="badge badge-reference">{getDisplayCategory(category)}</span>
+                          <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
+                          <span className="badge badge-reference">
+                            참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="challenge-card-meta">
-                      <span className="badge risk-low">난이도 {getDifficulty(challenge.difficulty)}</span>
-                      <span className="badge risk-medium">{String(challenge.duration_days ?? 7)}일</span>
-                      <span className="badge badge-reference">{getDisplayChallengeType(challenge)}</span>
-                      <span className="badge badge-reference">{getDisplayCategory(category)}</span>
-                      <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
-                      <span className="badge badge-reference">
-                        참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
-                      </span>
-                    </div>
-                    {Boolean(challenge.caution_message) && <div className="state-box warning-card">{String(challenge.caution_message)}</div>}
-                    {Boolean(challenge.contraindication_message) && (
-                      <div className="state-box warning-card">{String(challenge.contraindication_message)}</div>
-                    )}
                     {joinedChallenge ? (
                       <>
                         <div className="challenge-date-meta">
@@ -721,7 +716,9 @@ export default function ChallengePage() {
                         </div>
                       </>
                     ) : (
-                      <p className="muted">아직 참여 전입니다.</p>
+                      <p className="muted" style={{ overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {getCleanDescription(challenge.description) || "상세 버튼을 눌러 챌린지 내용을 확인하세요."}
+                      </p>
                     )}
                     <div className="challenge-card-actions">
                       <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
