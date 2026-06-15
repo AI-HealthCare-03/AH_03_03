@@ -407,6 +407,19 @@ export default function MainPage() {
     const weightVal = latestHealthRecord.weight_kg != null ? Number(latestHealthRecord.weight_kg) : null;
     const bmiVal = latestHealthRecord.bmi != null ? Number(latestHealthRecord.bmi) : null;
 
+    const latestDietDate = (() => {
+      const raw = recentDietRecords[0]?.recorded_at ?? recentDietRecords[0]?.created_at ?? recentDietRecords[0]?.meal_date;
+      if (!raw) return null;
+      const d = new Date(String(raw));
+      if (Number.isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      return `${y}.${mo}.${day} ${h}:${min}`;
+    })();
+
     // Diet score bars (last 5, oldest → newest left → right)
     const dietScoreBars = recentDietRecords
       .slice(0, 5)
@@ -567,7 +580,13 @@ export default function MainPage() {
                   <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
                 </div>
                 <div className="viz-stat-row">
-                  <span>{latestDietScore != null ? `${String(latestDietScore)}점` : "최근 기록 없음"}</span>
+                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                    {latestDietScore != null ? (latestDietDate ?? "식단 점수") : "최근 기록 없음"}
+                  </span>
+                  {latestDietScore != null
+                    ? <strong>{`${String(latestDietScore)}점`}</strong>
+                    : <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 900 }}>식단 분석하기</Link>
+                  }
                 </div>
               </div>
 
