@@ -59,6 +59,8 @@ export type FamilyInvite = {
   invite_code: string | null;
 };
 
+export type FamilySentInvite = Omit<FamilyInvite, "invite_code">;
+
 export type FamilyShareSetting = {
   id: number;
   family_id: number;
@@ -168,6 +170,10 @@ export function createFamilyInvite(familyId: number, payload: CreateFamilyInvite
     method: "POST",
     body: payload,
   });
+}
+
+export function listFamilyGroupInvites(familyId: number): Promise<FamilySentInvite[]> {
+  return apiRequest<FamilySentInvite[]>(`/family/groups/${familyId}/invites`);
 }
 
 export function listMyFamilyInvites(): Promise<FamilyInvite[]> {

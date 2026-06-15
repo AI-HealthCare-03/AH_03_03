@@ -7,6 +7,7 @@ import {
   FamilyMember,
   FamilyMemberRole,
   FamilyRelationType,
+  FamilySentInvite,
   FamilyShareSetting,
   acceptFamilyInvite,
   acceptFamilyInviteByCode,
@@ -15,6 +16,7 @@ import {
   createFamilyInvite,
   deleteFamilyGroup,
   getFamilyGroup,
+  listFamilyGroupInvites,
   listFamilyGroupShareSettings,
   listFamilyGroups,
   listMyFamilyInvites,
@@ -24,6 +26,7 @@ import {
 } from "../api/family";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const relationOptions: Array<{ value: FamilyRelationType; label: string }> = [
   { value: "FATHER", label: "부" },
@@ -76,11 +79,18 @@ const statusLabelMap: Record<string, string> = {
   INVITED: "초대 중",
   PENDING_UNREGISTERED: "미가입 가족",
   REMOVED: "해제됨",
-  PENDING: "대기",
+  PENDING: "대기 중",
   ACCEPTED: "수락됨",
   DECLINED: "거절됨",
   EXPIRED: "만료됨",
   CANCELED: "취소됨",
+};
+
+type InviteFeedbackDialog = {
+  title: string;
+  message: string;
+  tone?: "default" | "danger";
+  isProcessing?: boolean;
 };
 
 function formatDateTime(value: string | null | undefined): string {
@@ -100,6 +110,45 @@ function normalizePhone(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+function getInviteFailureDialog(err: unknown): InviteFeedbackDialog {
+  const detail = err instanceof Error ? err.message : "";
+
+  if (detail.includes("본인")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "본인 이메일로는 가족 초대를 보낼 수 없습니다.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이미 가족") || detail.includes("이미 연결")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "이미 가족으로 연결된 사용자입니다.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이미 발송") || detail.includes("대기 중")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "이미 발송된 초대가 있습니다. 기존 초대를 확인해 주세요.",
+      tone: "danger",
+    };
+  }
+  if (detail.includes("이메일") || detail.includes("입력")) {
+    return {
+      title: "초대할 수 없습니다.",
+      message: "초대할 이메일을 입력해 주세요.",
+      tone: "danger",
+    };
+  }
+
+  return {
+    title: "초대할 수 없습니다.",
+    message: "가족 초대 요청에 실패했습니다. 다시 시도해 주세요.",
+    tone: "danger",
+  };
+}
+
 export default function FamilyPage() {
   const { backendUser } = useAuth();
   const [searchParams] = useSearchParams();
@@ -107,6 +156,7 @@ export default function FamilyPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [invites, setInvites] = useState<FamilyInvite[]>([]);
+  const [sentInvites, setSentInvites] = useState<FamilySentInvite[]>([]);
   const [shareSettings, setShareSettings] = useState<FamilyShareSetting[]>([]);
   const [groupName, setGroupName] = useState("");
   const [renameGroupName, setRenameGroupName] = useState("");
@@ -128,6 +178,7 @@ export default function FamilyPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [inviteFeedback, setInviteFeedback] = useState<InviteFeedbackDialog | null>(null);
 
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
   const isSelectedGroupOwner = selectedGroup?.owner_user_id === backendUser?.id;
@@ -161,11 +212,17 @@ export default function FamilyPage() {
     if (!familyId) {
       setMembers([]);
       setShareSettings([]);
+      setSentInvites([]);
       return;
     }
-    const [detail, settings] = await Promise.all([getFamilyGroup(familyId), listFamilyGroupShareSettings(familyId)]);
+    const [detail, settings, sentInviteItems] = await Promise.all([
+      getFamilyGroup(familyId),
+      listFamilyGroupShareSettings(familyId),
+      listFamilyGroupInvites(familyId),
+    ]);
     setMembers(detail.members);
     setShareSettings(settings);
+    setSentInvites(sentInviteItems);
   };
 
   const reloadAll = async (preferredGroupId?: number | null) => {
@@ -294,24 +351,51 @@ export default function FamilyPage() {
   const handleCreateInvite = (event: FormEvent) => {
     event.preventDefault();
     if (!selectedGroup) {
-      setError("먼저 가족 그룹을 선택해주세요.");
+      setInviteFeedback({
+        title: "초대할 수 없습니다.",
+        message: "먼저 가족 그룹을 선택해 주세요.",
+        tone: "danger",
+      });
       return;
     }
     if (!inviteForm.invitee_email.trim()) {
-      setError("초대코드를 받을 이메일을 입력해주세요.");
+      setInviteFeedback({
+        title: "초대할 수 없습니다.",
+        message: "초대할 이메일을 입력해 주세요.",
+        tone: "danger",
+      });
       return;
     }
-    void runAction(async () => {
-      const invite = await createFamilyInvite(selectedGroup.id, {
-        invitee_email: inviteForm.invitee_email.trim() || null,
-        invitee_phone: normalizePhone(inviteForm.invitee_phone) || null,
-        relation_type: inviteForm.relation_type,
-        member_role: inviteForm.member_role,
-      });
-      setLatestInviteCode(invite.invite_code ?? "");
-      setInviteForm({ invitee_email: "", invitee_phone: "", relation_type: "OTHER", member_role: "MEMBER" });
-      await reloadAll(selectedGroup.id);
-    }, "가족 초대코드를 이메일로 발송했습니다.");
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setInviteFeedback({
+      title: "초대 이메일 발송 중입니다...",
+      message: "입력한 이메일로 가족 초대코드를 발송하고 있습니다.",
+      isProcessing: true,
+    });
+    void (async () => {
+      try {
+        const invite = await createFamilyInvite(selectedGroup.id, {
+          invitee_email: inviteForm.invitee_email.trim() || null,
+          invitee_phone: normalizePhone(inviteForm.invitee_phone) || null,
+          relation_type: inviteForm.relation_type,
+          member_role: inviteForm.member_role,
+        });
+        setLatestInviteCode(invite.invite_code ?? "");
+        setInviteForm({ invitee_email: "", invitee_phone: "", relation_type: "OTHER", member_role: "MEMBER" });
+        await reloadAll(selectedGroup.id);
+        setNotice("가족 초대 요청이 완료되었습니다.");
+        setInviteFeedback({
+          title: "초대 요청이 완료되었습니다.",
+          message: "입력한 이메일로 가족 초대코드가 발송됩니다.",
+        });
+      } catch (err) {
+        setInviteFeedback(getInviteFailureDialog(err));
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
 
   const handleAcceptCode = (event: FormEvent) => {
@@ -346,6 +430,16 @@ export default function FamilyPage() {
 
   return (
     <div className="page-stack">
+      {inviteFeedback && (
+        <ConfirmDialog
+          title={inviteFeedback.title}
+          message={inviteFeedback.message}
+          tone={inviteFeedback.tone}
+          showActions={!inviteFeedback.isProcessing}
+          showCancel={false}
+          onConfirm={() => setInviteFeedback(null)}
+        />
+      )}
       <div className="page-header">
         <div>
           <span className="badge badge-reference">Family</span>
@@ -622,6 +716,36 @@ export default function FamilyPage() {
             </div>
 
             <div className="card-list">
+              <div>
+                <h3>보낸 초대 기록</h3>
+                <p className="muted">최근 발송한 가족 초대 요청입니다. 초대코드 원문은 보안을 위해 표시하지 않습니다.</p>
+              </div>
+              {sentInvites.length === 0 ? (
+                <div className="empty-state">아직 보낸 가족 초대가 없습니다.</div>
+              ) : (
+                sentInvites.map((invite) => (
+                  <div className="family-member-card" key={invite.id}>
+                    <div>
+                      <strong>{invite.invitee_email || invite.invitee_phone || "초대 대상 미표시"}</strong>
+                      <p className="muted">
+                        {relationLabelMap[invite.relation_type]} · {roleLabelMap[invite.member_role]} ·{" "}
+                        {statusLabelMap[invite.status] ?? invite.status}
+                      </p>
+                      <p className="muted">
+                        생성 {formatDateTime(invite.created_at)} · 만료 {formatDateTime(invite.expires_at)}
+                      </p>
+                    </div>
+                    <span className="badge badge-reference">{statusLabelMap[invite.status] ?? invite.status}</span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="card-list">
+              <div>
+                <h3>받은 초대</h3>
+                <p className="muted">이메일로 받은 초대코드나 대기 중인 초대를 연결할 수 있습니다.</p>
+              </div>
               {invites.length === 0 ? (
                 <div className="empty-state">내게 도착한 가족 초대가 없습니다.</div>
               ) : (

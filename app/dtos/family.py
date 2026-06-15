@@ -84,6 +84,23 @@ class FamilyInviteResponse(BaseModel):
     invite_code: str | None = None
 
 
+class FamilySentInviteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    family_id: int
+    inviter_user_id: int
+    invitee_user_id: int | None
+    invitee_email: str | None
+    invitee_phone: str | None
+    relation_type: FamilyRelationType
+    member_role: FamilyMemberRole
+    status: FamilyInviteStatus
+    expires_at: datetime
+    used_at: datetime | None
+    created_at: datetime
+
+
 class FamilyInviteAcceptCodeRequest(BaseModel):
     code: str = Field(min_length=8, max_length=8)
 

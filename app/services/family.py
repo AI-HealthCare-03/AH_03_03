@@ -466,6 +466,11 @@ async def list_my_family_invites(user: User) -> list[FamilyInvite]:
     ).order_by("-created_at")
 
 
+async def list_family_invites(user: User, family_id: int) -> list[FamilyInvite]:
+    await _ensure_active_member(user, family_id)
+    return await FamilyInvite.filter(family_id=family_id).order_by("-created_at", "-id")
+
+
 async def accept_family_invite(user: User, invite_id: int) -> FamilyMember:
     invite = await FamilyInvite.get_or_none(id=invite_id)
     if invite is None:

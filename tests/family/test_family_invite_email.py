@@ -382,6 +382,39 @@ async def test_family_invite_rejects_reused_code() -> None:
     assert exc.value.detail == "이미 처리된 가족 초대입니다."
 
 
+@pytest.mark.asyncio
+async def test_list_family_invites_requires_member_and_orders_recent_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = SimpleNamespace(id=1)
+    invites = [SimpleNamespace(id=2), SimpleNamespace(id=1)]
+    captured: dict[str, object] = {}
+
+    async def fake_ensure_active_member(request_user: object, family_id: int) -> SimpleNamespace:
+        captured["user"] = request_user
+        captured["family_id"] = family_id
+        return SimpleNamespace(id=7)
+
+    class FakeInviteQuery:
+        def order_by(self, *fields: str) -> FakeInviteQuery:
+            captured["order_by"] = fields
+            return self
+
+        def __await__(self):
+            async def _result() -> list[SimpleNamespace]:
+                return invites
+
+            return _result().__await__()
+
+    monkeypatch.setattr(family_service, "_ensure_active_member", fake_ensure_active_member)
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    result = await family_service.list_family_invites(user, 10)
+
+    assert result == invites
+    assert captured["user"] is user
+    assert captured["family_id"] == 10
+    assert captured["order_by"] == ("-created_at", "-id")
+
+
 def test_family_invite_api_hides_invite_code_when_debug_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_current_user() -> SimpleNamespace:
         return SimpleNamespace(id=1, nickname="동욱", name="홍동욱", login_id="dongwook")
@@ -423,6 +456,48 @@ def test_family_invite_api_hides_invite_code_when_debug_disabled(monkeypatch: py
     assert response.status_code == 201
     body = response.json()
     assert "invite_code" not in body
+
+
+def test_family_invite_list_api_does_not_expose_code_or_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_current_user() -> SimpleNamespace:
+        return SimpleNamespace(id=1, nickname="동욱", name="홍동욱", login_id="dongwook")
+
+    async def fake_list_family_invites(user: object, family_id: int) -> list[SimpleNamespace]:
+        assert family_id == 10
+        expires_at = datetime(2026, 5, 31, 10, 0, 0, tzinfo=family_service.config.TIMEZONE)
+        return [
+            SimpleNamespace(
+                id=3,
+                family_id=10,
+                inviter_user_id=1,
+                invitee_user_id=None,
+                invitee_email="family@example.com",
+                invitee_phone=None,
+                relation_type=FamilyRelationType.SPOUSE,
+                member_role=FamilyMemberRole.MEMBER,
+                status=FamilyInviteStatus.PENDING,
+                expires_at=expires_at,
+                used_at=None,
+                created_at=datetime(2026, 5, 30, 10, 0, 0, tzinfo=family_service.config.TIMEZONE),
+                invite_code="12345678",
+                code_hash="secret-hash",
+            )
+        ]
+
+    app.dependency_overrides[get_request_user] = fake_current_user
+    monkeypatch.setattr(family_routers.family_service, "list_family_invites", fake_list_family_invites)
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/family/groups/10/invites")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()[0]
+    assert body["invitee_email"] == "family@example.com"
+    assert body["status"] == "PENDING"
+    assert "invite_code" not in body
+    assert "code_hash" not in body
 
 
 def test_family_invite_api_exposes_invite_code_only_when_local_debug_enabled(

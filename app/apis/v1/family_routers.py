@@ -17,6 +17,7 @@ from app.dtos.family import (
     FamilyMemberResponse,
     FamilyNotificationSettingResponse,
     FamilyNotificationSettingUpdateRequest,
+    FamilySentInviteResponse,
     FamilyShareSettingResponse,
     FamilyShareSettingUpdateRequest,
 )
@@ -44,6 +45,10 @@ def _invite_response(invite: FamilyInvite, invite_code: str | None = None) -> Fa
     response = FamilyInviteResponse.model_validate(invite)
     response.invite_code = invite_code
     return response
+
+
+def _sent_invite_response(invite: FamilyInvite) -> FamilySentInviteResponse:
+    return FamilySentInviteResponse.model_validate(invite)
 
 
 def _share_setting_response(setting: FamilyShareSetting) -> FamilyShareSettingResponse:
@@ -137,6 +142,15 @@ async def create_family_invite(
 ) -> FamilyInviteResponse:
     invite, invite_code = await family_service.create_family_invite(user, family_id, request)
     return _invite_response(invite, invite_code if _allow_family_invite_debug_response() else None)
+
+
+@family_router.get("/groups/{family_id}/invites", response_model=list[FamilySentInviteResponse])
+async def list_family_invites(
+    family_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+) -> list[FamilySentInviteResponse]:
+    invites = await family_service.list_family_invites(user, family_id)
+    return [_sent_invite_response(invite) for invite in invites]
 
 
 @family_router.get("/invites/me", response_model=list[FamilyInviteResponse])
