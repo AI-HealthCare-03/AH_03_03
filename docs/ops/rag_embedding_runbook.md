@@ -90,6 +90,21 @@ make rag-embed-apply-openai LIMIT=1
 uv run python scripts/rag/embed_rag_chunks.py --provider openai --apply --json
 ```
 
+## Vector Search 수동 검증
+
+embedding 저장 후 pgvector 검색이 동작하는지 read-only로 확인한다.
+
+```bash
+make rag-vector-query QUERY="당뇨 식단 주의사항" TOP_K=3
+```
+
+주의:
+
+- OpenAI query embedding 비용이 소량 발생할 수 있다.
+- 이 명령은 DB write를 하지 않는다.
+- 전체 embedding apply 전에는 저장된 chunk가 적어 검색 결과가 제한적일 수 있다.
+- 기본 출력은 chunk content 전문이 아니라 preview만 보여준다.
+
 실패 시 즉시 중단하려면:
 
 ```bash

@@ -16,6 +16,7 @@ FRONTEND_IMAGE = $(IMAGE_REPO):frontend-$(FRONTEND_VERSION)
 DOCKER_PLATFORM ?= linux/amd64
 VITE_API_BASE_URL ?= /api/v1
 RAG_OPENAI_LIMIT = $(if $(LIMIT),$(LIMIT),1)
+RAG_VECTOR_TOP_K = $(if $(TOP_K),$(TOP_K),3)
 
 # Legacy/minimal app stack
 # Root docker-compose.yml wrapper for backend/AI checks only.
@@ -126,7 +127,7 @@ dev-restart-nginx:
 dev-config-check:
 	$(DEV_COMPOSE) config --quiet
 
-.PHONY: rag-preview rag-ingest-dry-run rag-ingest-apply rag-embed-dry-run rag-embed-apply-openai-dry-run rag-embed-apply-openai
+.PHONY: rag-preview rag-ingest-dry-run rag-ingest-apply rag-embed-dry-run rag-embed-apply-openai-dry-run rag-embed-apply-openai rag-vector-query
 rag-preview:
 	uv run python scripts/rag/preview_rag_chunks.py --json
 
@@ -147,6 +148,10 @@ rag-embed-apply-openai-dry-run:
 # DB write + OpenAI API 비용이 발생할 수 있음: 기본 LIMIT=1, 예: make rag-embed-apply-openai LIMIT=1
 rag-embed-apply-openai:
 	$(FASTAPI_EXEC) python scripts/rag/embed_rag_chunks.py --provider openai --apply --json --limit $(RAG_OPENAI_LIMIT)
+
+# Read-only vector search check. OpenAI query embedding cost may occur.
+rag-vector-query:
+	$(FASTAPI_EXEC) python scripts/rag/query_vector_rag.py --query "$(QUERY)" --top-k $(RAG_VECTOR_TOP_K) --provider openai --json
 
 .PHONY: demo-up demo-down demo-ps demo-logs demo-health
 demo-up: dev-up
