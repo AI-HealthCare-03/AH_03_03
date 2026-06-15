@@ -376,7 +376,7 @@ export default function MainPage() {
         title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "만성질환 위험도 예측 결과 확인",
         description:
           effectiveAnalysisResults.length > 0
-            ? "최근 분석 결과를 확인하고 다음 관리 행동을 정리해보세요."
+            ? "최근 분석 결과를 확인하고 건강한 변화를 이어가보세요."
             : "건강정보 입력 후 위험도 예측 결과를 확인해보세요.",
         buttonLabel: effectiveAnalysisResults.length > 0 ? "분석 결과 보기" : "분석하러 가기",
         to: effectiveAnalysisResults.length > 0 ? "/analysis/history" : "/analysis",
@@ -568,7 +568,6 @@ export default function MainPage() {
                 </div>
                 <div className="viz-stat-row">
                   <span>{latestDietScore != null ? `${String(latestDietScore)}점` : "최근 기록 없음"}</span>
-                  <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 900 }}>식단 분석하기</Link>
                 </div>
               </div>
 
