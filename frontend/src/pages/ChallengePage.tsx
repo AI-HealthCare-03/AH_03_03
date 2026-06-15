@@ -70,7 +70,7 @@ const targetDiseaseLabel: Record<string, string> = {
   GENERAL: "일반 건강관리",
   DIABETES: "당뇨 관리",
   HYPERTENSION: "고혈압 관리",
-  DYSLIPIDEMIA: "콜레스테롤·중성지방 관리",
+  DYSLIPIDEMIA: "이상지질혈증 관리",
   OBESITY: "비만 관리",
 };
 
@@ -422,6 +422,7 @@ export default function ChallengePage() {
   const [myChallenges, setMyChallenges] = useState<Challenge[]>([]);
   const [logsByUserChallengeId, setLogsByUserChallengeId] = useState<Record<number, ChallengeLog[]>>({});
   const [activeTab, setActiveTab] = useState("전체");
+  const [activeDifficulty, setActiveDifficulty] = useState("전체");
   const [page, setPage] = useState(1);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [error, setError] = useState("");
@@ -433,9 +434,8 @@ export default function ChallengePage() {
     setLoading(true);
     setError("");
     try {
-      const category = tabToCategory[activeTab] ?? undefined;
       const [challengeItems, myChallengeItems] = await Promise.all([
-        listChallenges<Challenge[]>({ category, limit: 100, offset: 0 }),
+        listChallenges<Challenge[]>({ limit: 200, offset: 0 }),
         listMyChallenges<Challenge[]>({ limit: 100, offset: 0 }),
       ]);
       setChallenges(challengeItems);
@@ -464,15 +464,23 @@ export default function ChallengePage() {
 
   useEffect(() => {
     void load();
-  }, [activeTab]);
-
+  }, []);
+  
   const filteredChallenges = useMemo(() => {
     const category = tabToCategory[activeTab];
-    if (!category) {
-      return challenges;
+    let result: Challenge[];
+    if (activeTab === "생활습관") {
+      result = challenges.filter((challenge) => getCategory(challenge) === "HABIT" || getCategory(challenge) === "WEIGHT");
+    } else if (!category) {
+      result = challenges;
+    } else {
+      result = challenges.filter((challenge) => getCategory(challenge) === category);
     }
-    return challenges.filter((challenge) => getCategory(challenge) === category);
-  }, [activeTab, challenges]);
+    if (activeDifficulty !== "전체") {
+      result = result.filter((challenge) => String(challenge.difficulty ?? "").toUpperCase() === activeDifficulty);
+    }
+    return result;
+  }, [activeTab, activeDifficulty, challenges]);
 
   const myChallengeByMasterId = useMemo(() => {
     const mapped = new Map<number, Challenge>();
@@ -637,6 +645,20 @@ export default function ChallengePage() {
             }}
           >
             {tab}
+          </button>
+        ))}
+      </div>
+      <div className="filter-tabs" style={{ marginTop: "8px" }}>
+        {["전체", "쉬움", "보통", "어려움"].map((d) => (
+          <button
+            className={activeDifficulty === d ? "filter-tab active" : "filter-tab"}
+            key={d}
+            onClick={() => {
+              setActiveDifficulty(d === "쉬움" ? "EASY" : d === "보통" ? "NORMAL" : d === "어려움" ? "HARD" : "전체");
+              setPage(1);
+            }}
+          >
+            {d}
           </button>
         ))}
       </div>

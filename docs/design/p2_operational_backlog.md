@@ -12,8 +12,8 @@
 - OBESITY rule-based 분석
 - 식단 nutrition score와 `diet.analyze_image` async job
 - 건강검진 OCR `exam_ocr.run` async job
-- 복약 OCR `medication_ocr.run` async job
-- 이메일/비밀번호/가족초대/FCM/가족알림 service job
+- 복약 정보는 MVP에서 OCR 없이 직접 입력
+- 이메일/비밀번호/가족초대/가족알림 service job
 - 관리자 콘솔/FAQ/문의
 - Docker compose 기반 FastAPI, ai-worker, Redis, PostgreSQL 구동
 
@@ -28,7 +28,7 @@
 | 1 | Redis Stream / async_jobs / AI Worker consumer | 완료/부분 완료 | AI/service stream, 주요 job handler, retry/DLQ/pending recovery 구현 | P0에서 1차 구현 완료 | queue metrics, DLQ 재처리, worker heartbeat/운영 대시보드 고도화 필요 |
 | 2 | vector RAG / pgvector embedding search | P2 | RAG-ready interface 수준 | 신뢰 문서 수집/임베딩/검증 없이 붙이면 의료 답변 위험 증가 | 근거 기반 건강정보 답변, 출처 추적, 검색 품질 개선 필요 |
 | 3 | wearable 연동 | P2 | 요구사항 보류 | 외부 계정/OAuth/device API 범위가 크고 시연 핵심 흐름이 아님 | 연속 건강 데이터 기반 추세 분석과 리마인더 자동화에 필요 |
-| 4 | 외부 알림 worker | 부분 완료 | 이메일/FCM/family service job 구현. SMS/Kakao 미구현 | 문자/카카오 provider는 비용/인증/정책 확인 필요 | 실제 채널별 발송 품질, 실패 재시도, 수신 동의 정책 고도화 필요 |
+| 4 | 외부 알림 worker | 부분 완료 | 이메일/family service job 구현. 브라우저 Push/SMS/Kakao 미구현 | 문자/카카오 provider는 비용/인증/정책 확인 필요 | 실제 채널별 발송 품질, 실패 재시도, 수신 동의 정책 고도화 필요 |
 | 5 | Langfuse 운영 추적 | P1 | 실험/연동 구조 존재 | 실제 LLM 호출 기본값이 꺼져 있어 시연 핵심 장애 요인이 아님 | LLM 비용, prompt version, safety/fallback 관측 필요 |
 | 6 | Sentry/Datadog 등 모니터링 | P1 | DB 로그 중심 | 외부 SaaS 연동보다 현재 Docker/API 안정화가 우선 | 운영 장애 알림, trace, error aggregation 필요 |
 | 7 | rate limiting | P1 | 로그인 제한 등 일부 정책만 존재 | 시연 로컬 환경에서는 abuse 방어보다 UX 검증이 우선 | 로그인/LLM/OCR/분석 API 남용 방지 필요 |
@@ -47,10 +47,10 @@
   - `/api/v1/system/health`는 Redis 연결 상태를 확인한다.
   - `async_jobs` 모델과 `/api/v1/jobs/demo`, `/api/v1/jobs/{job_id}` 상태 조회 API가 있다.
   - `ai_runtime/main.py`는 Redis Stream consumer와 scheduler loop로 실행된다.
-  - AI stream job: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`
-  - Service stream job: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `fcm.push.send`, `family.notification.create`
+  - AI stream job: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`
+  - Service stream job: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `family.notification.create`
   - stream MAXLEN, retry/backoff, DLQ, pending recovery가 구현되어 있다.
-  - `/analysis/run-async`, `/diets/analyze`, `/exams/{exam_id}/ocr`, `/medications/ocr`는 job 생성 후 polling하는 흐름이다.
+  - `/analysis/run-async`, `/diets/analyze`, `/exams/{exam_id}/ocr`는 job 생성 후 polling하는 흐름이다.
   - 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 응답한다.
 - 남은 운영 과제:
   - worker heartbeat/metrics 노출
@@ -102,7 +102,7 @@
 - 현재 상태:
   - 알림 inbox, reminder schedule, notification log 구조가 있다.
   - email verification, password reset, family invite email은 service stream job으로 enqueue된다.
-  - FCM push는 `fcm.push.send` service job과 `user_fcm_tokens`를 사용한다.
+  - 브라우저 Push 알림은 MVP 범위에서 제외하고 서비스 내부 알림과 이메일 중심으로 운영한다.
   - 가족 챌린지 알림 생성은 `family.notification.create` service job으로 분리되어 있다.
   - SMS/Kakao provider는 아직 구현하지 않는다.
 - 남은 운영 과제:

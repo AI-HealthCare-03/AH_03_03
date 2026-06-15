@@ -1,15 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Request, status
 
-from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
-from app.dtos.async_jobs import AsyncJobResponse
 from app.dtos.medications import (
     MedicationCreateRequest,
-    MedicationOCRConfirmRequest,
-    MedicationOCRConfirmResponse,
-    MedicationOCRRequest,
     MedicationRecordCreateRequest,
     MedicationRecordResponse,
     MedicationRecordUpdateRequest,
@@ -17,7 +12,6 @@ from app.dtos.medications import (
     MedicationUpdateRequest,
 )
 from app.models.users import User
-from app.services import async_jobs as async_job_service
 from app.services import medications as medication_service
 from app.services.sensitive_access_logs import safe_record_sensitive_access
 
@@ -52,91 +46,6 @@ async def list_medications(
         limit=limit,
         offset=offset,
     )
-
-
-@medication_router.post("/ocr", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
-async def run_medication_ocr(
-    request: Request,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    payload, image_bytes, image_media_type = await _parse_medication_ocr_request(request)
-    request_payload: dict[str, object] = {
-        "source_type": payload.source_type or "PRESCRIPTION",
-    }
-    if payload.image_filename:
-        request_payload["image_filename"] = payload.image_filename
-
-    if image_bytes:
-        request_payload.update(
-            medication_service.store_medication_ocr_upload(
-                user_id=int(user.id),
-                image_bytes=image_bytes,
-                image_media_type=image_media_type,
-                filename=payload.image_filename,
-            )
-        )
-    elif payload.raw_text and payload.raw_text.strip():
-        request_payload.update(
-            medication_service.store_medication_ocr_text(
-                user_id=int(user.id),
-                text=payload.raw_text,
-            )
-        )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="복약 OCR을 실행하려면 이미지 파일 또는 인식할 텍스트가 필요합니다.",
-        )
-
-    return await async_job_service.create_medication_ocr_job(int(user.id), request_payload)
-
-
-async def _parse_medication_ocr_request(request: Request) -> tuple[MedicationOCRRequest, bytes | None, str | None]:
-    if "multipart/form-data" not in request.headers.get("content-type", ""):
-        body = await request.json()
-        return MedicationOCRRequest.model_validate(body), None, None
-
-    form = await request.form()
-    data = {
-        key: value
-        for key, value in form.items()
-        if key not in {"image", "file"} and not _is_upload(value) and value not in {"", None}
-    }
-    upload = form.get("image") or form.get("file")
-    if not _is_upload(upload):
-        return MedicationOCRRequest.model_validate(data), None, None
-
-    normalized_image = _normalize_uploaded_image(
-        await upload.read(),
-        upload.content_type,
-        getattr(upload, "filename", None),
-    )
-    image_bytes = normalized_image.data
-    image_media_type = normalized_image.media_type
-    return MedicationOCRRequest.model_validate(data), image_bytes, image_media_type
-
-
-def _is_upload(value: object) -> bool:
-    return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
-
-
-def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
-    try:
-        return normalize_upload_image(image_bytes, media_type, filename)
-    except ImageNormalizationError as exc:
-        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
-
-
-@medication_router.post(
-    "/ocr-confirm",
-    response_model=MedicationOCRConfirmResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def confirm_medication_ocr(
-    request: MedicationOCRConfirmRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await medication_service.confirm_medication_ocr(user.id, request)
 
 
 @medication_router.get("/{medication_id}", response_model=MedicationResponse)

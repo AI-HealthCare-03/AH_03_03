@@ -7,7 +7,7 @@ const aboutFeatures = [
   {
     icon: "🧭",
     title: "AI 위험도 분석",
-    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 이상 위험도를 확인합니다.",
+    description: "건강정보를 기반으로 당뇨, 고혈압, 이상지질혈증 이상 위험도를 확인합니다.",
     to: "/analysis",
   },
   {
@@ -78,7 +78,7 @@ const aboutPersonas = [
     quote: "복약, 영양제, 건강기록을 놓치지 않고 관리하고 싶어요.",
     features: ["복약 정보 등록", "복약 기록", "알림", "AI 상담"],
     flow: [
-      { icon: "💊", title: "복약 입력", description: "처방전과 약봉투를 정리합니다." },
+      { icon: "💊", title: "복약 입력", description: "복용 중인 약과 영양제를 직접 기록합니다." },
       { icon: "🔔", title: "알림 확인", description: "기록과 알림을 관리합니다." },
       { icon: "🤖", title: "AI 상담", description: "궁금한 점을 이어서 묻습니다." },
     ],

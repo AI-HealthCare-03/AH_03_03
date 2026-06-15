@@ -33,7 +33,7 @@ from app.models.family import (
     FamilyShareSetting,
     FamilyStatus,
 )
-from app.models.notifications import Notification, NotificationChannel, NotificationLogStatus, UserFCMToken
+from app.models.notifications import Notification
 from app.models.users import User
 from app.services import notifications as notification_service
 from app.services import service_jobs
@@ -516,68 +516,6 @@ async def update_family_notification_setting(
     return setting
 
 
-async def _list_active_fcm_tokens(user_id: int) -> list[str]:
-    return list(await UserFCMToken.filter(user_id=user_id, is_active=True).values_list("token", flat=True))
-
-
-async def _record_push_result(
-    *,
-    user_id: int,
-    title: str,
-    message_summary: str,
-    status_value: NotificationLogStatus,
-    provider_message_id: str | None = None,
-    error_code: str | None = None,
-    error_message: str | None = None,
-) -> None:
-    await notification_service.record_notification_log(
-        user_id=user_id,
-        notification_type="FAMILY_ALERT",
-        channel=NotificationChannel.PUSH,
-        title=title,
-        status=status_value,
-        message_summary=message_summary,
-        provider="firebase_fcm",
-        provider_message_id=provider_message_id,
-        error_code=error_code,
-        error_message=error_message[:255] if error_message else None,
-        sent_at=_now() if status_value == NotificationLogStatus.SENT else None,
-        failed_at=_now() if status_value == NotificationLogStatus.FAILED else None,
-    )
-
-
-async def _send_family_push_if_allowed(
-    *,
-    family_user_id: int,
-    setting: FamilyNotificationSetting,
-    title: str,
-    message: str,
-    data: dict[str, str],
-) -> None:
-    if not setting.channel_push:
-        return
-
-    try:
-        await service_jobs.enqueue_fcm_push_send(
-            user_id=family_user_id,
-            title=title,
-            body=message,
-            data=data,
-            notification_type="FAMILY_ALERT",
-            related_type=data.get("type"),
-            related_id=int(data["user_challenge_id"]) if data.get("user_challenge_id") else None,
-        )
-    except Exception as exc:  # noqa: BLE001 - push enqueue 실패는 내부 알림 생성을 롤백하지 않는다.
-        await _record_push_result(
-            user_id=family_user_id,
-            title=title,
-            message_summary=message,
-            status_value=NotificationLogStatus.FAILED,
-            error_code=type(exc).__name__,
-            error_message=str(exc),
-        )
-
-
 async def _create_family_alerts(
     *,
     context: FamilyChallengeAlertContext,
@@ -597,7 +535,7 @@ async def _create_family_alerts(
         )
         if notification_setting is None or not getattr(notification_setting, notify_field):
             continue
-        if not notification_setting.channel_in_app and not notification_setting.channel_push:
+        if not notification_setting.channel_in_app:
             continue
 
         existing = await Notification.filter(
@@ -620,13 +558,6 @@ async def _create_family_alerts(
             ),
         )
         created.append(notification)
-        await _send_family_push_if_allowed(
-            family_user_id=family_user_id,
-            setting=notification_setting,
-            title=title,
-            message=message,
-            data={"type": related_type, "user_challenge_id": str(context.user_challenge_id)},
-        )
     return created
 
 

@@ -226,7 +226,7 @@ def _check_deferred_provider_policy() -> CheckResult:
     return CheckResult(
         "Deferred provider policy",
         "OK",
-        "Clova OCR is excluded from official demo readiness; GPT Vision fallback remains off unless explicitly enabled",
+        "health exam OCR uses GPT Vision/PaddleOCR policy; GPT Vision fallback remains off unless explicitly enabled",
     )
 
 

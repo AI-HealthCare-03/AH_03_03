@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from app.core.providers import has_clova_ocr_config, has_langfuse_config, has_openai_config, has_smtp_config
+from app.core.providers import has_langfuse_config, has_openai_config, has_smtp_config
 
 
 def test_openai_config_requires_api_key() -> None:
@@ -51,8 +51,3 @@ def test_langfuse_config_requires_host_and_keys() -> None:
 
     assert has_langfuse_config(configured) is True
     assert has_langfuse_config(missing_secret) is False
-
-
-def test_clova_ocr_config_requires_url_and_secret() -> None:
-    assert has_clova_ocr_config(SimpleNamespace(CLOVA_OCR_API_URL="https://example.com", CLOVA_OCR_SECRET_KEY="key"))
-    assert not has_clova_ocr_config(SimpleNamespace(CLOVA_OCR_API_URL="https://example.com", CLOVA_OCR_SECRET_KEY=""))

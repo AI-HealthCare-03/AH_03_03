@@ -58,7 +58,6 @@ def _patch_family_alert_base(
     share_settings: list[SimpleNamespace],
     notification_setting: SimpleNamespace | None,
     created_notifications: list[SimpleNamespace] | None = None,
-    patch_push: bool = True,
 ) -> list[SimpleNamespace]:
     created = created_notifications if created_notifications is not None else []
 
@@ -74,9 +73,6 @@ def _patch_family_alert_base(
         notification = SimpleNamespace(id=len(created) + 1, user_id=user_id, request=request)
         created.append(notification)
         return notification
-
-    async def fake_send_family_push_if_allowed(**kwargs: object) -> None:
-        return None
 
     monkeypatch.setattr(family_service, "_get_completed_challenge_alert_context", fake_context)
     monkeypatch.setattr(
@@ -95,8 +91,6 @@ def _patch_family_alert_base(
         staticmethod(lambda **kwargs: NotificationQuery(False)),
     )
     monkeypatch.setattr(family_service.notification_service, "create_notification", fake_create_notification)
-    if patch_push:
-        monkeypatch.setattr(family_service, "_send_family_push_if_allowed", fake_send_family_push_if_allowed)
     return created
 
 
@@ -153,70 +147,39 @@ async def test_family_challenge_alert_creates_internal_notification_without_sens
 
 
 @pytest.mark.asyncio
-async def test_family_challenge_alert_sends_push_when_enabled_with_active_token(
+async def test_family_challenge_alert_uses_internal_notification_when_push_setting_remains(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     created: list[SimpleNamespace] = []
-    push_jobs: list[dict[str, object]] = []
     _patch_family_alert_base(
         monkeypatch,
         share_settings=[SimpleNamespace(viewer_user_id=2)],
         notification_setting=_setting(channel_push=True),
         created_notifications=created,
-        patch_push=False,
     )
-
-    async def fake_enqueue_fcm_push_send(**kwargs: object) -> None:
-        push_jobs.append(kwargs)
-
-    monkeypatch.setattr(family_service.service_jobs, "enqueue_fcm_push_send", fake_enqueue_fcm_push_send)
-
-    result = await family_service.notify_family_challenge_completed(77)
-
-    assert len(result) == 1
-    assert push_jobs == [
-        {
-            "user_id": 2,
-            "title": "가족 챌린지 알림",
-            "body": "동욱님이 이번 챌린지 목표를 달성했어요.",
-            "data": {"type": family_service.FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE, "user_challenge_id": "77"},
-            "notification_type": "FAMILY_ALERT",
-            "related_type": family_service.FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE,
-            "related_id": 77,
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_family_challenge_alert_keeps_internal_notification_when_push_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    created: list[SimpleNamespace] = []
-    log_calls: list[dict[str, object]] = []
-    _patch_family_alert_base(
-        monkeypatch,
-        share_settings=[SimpleNamespace(viewer_user_id=2)],
-        notification_setting=_setting(channel_push=True),
-        created_notifications=created,
-        patch_push=False,
-    )
-
-    async def fake_record_push_result(**kwargs: object) -> None:
-        log_calls.append(kwargs)
-
-    async def fake_enqueue_fcm_push_send(**kwargs: object) -> None:
-        _ = kwargs
-        raise RuntimeError("provider unavailable")
-
-    monkeypatch.setattr(family_service, "_record_push_result", fake_record_push_result)
-    monkeypatch.setattr(family_service.service_jobs, "enqueue_fcm_push_send", fake_enqueue_fcm_push_send)
 
     result = await family_service.notify_family_challenge_completed(77)
 
     assert result == created
     assert len(created) == 1
-    assert log_calls
-    assert log_calls[0]["error_code"] == "RuntimeError"
+
+
+@pytest.mark.asyncio
+async def test_family_challenge_alert_skips_when_internal_notification_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created: list[SimpleNamespace] = []
+    _patch_family_alert_base(
+        monkeypatch,
+        share_settings=[SimpleNamespace(viewer_user_id=2)],
+        notification_setting=_setting(channel_in_app=False, channel_push=True),
+        created_notifications=created,
+    )
+
+    result = await family_service.notify_family_challenge_completed(77)
+
+    assert result == []
+    assert created == []
 
 
 @pytest.mark.asyncio

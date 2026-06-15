@@ -30,7 +30,7 @@ from app.models.challenges import (  # noqa: E402
     ChallengeType,
 )
 
-CSV_PATH = ROOT_DIR / "docs" / "data" / "challenges" / "team_challenge_master.csv"
+CSV_PATH = ROOT_DIR / "docs" / "data" / "challenges" / "challenge_new.csv"
 
 
 def _clean(value: str | None) -> str:

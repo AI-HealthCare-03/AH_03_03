@@ -8,8 +8,8 @@
 | --- | --- | --- |
 | 로컬 모델 artifact | DM/HTN/DL CatBoost 3종 | FastAPI 컨테이너에 포함되어 정밀분석에서 사용 가능 |
 | Rule-based 로직 | OBESITY, ANEM 참고 분류, X2 classifier, 식단 nutrition scorer | 모델 파일 없이 규칙/점수표 기반으로 동작 |
-| 외부 provider/API 코드 | GPT Vision, Clova OCR, OpenAI LLM | GPT Vision/OpenAI는 정책과 env에 따라 활성화 후보, Clova OCR은 현재 공식 실행 경로에서 제외된 deferred provider |
-| Skeleton/parser | 약봉투 OCR parser, 건강검진 OCR 처리 구조, 처방전 OCR 준비 구조 | MVP에서는 구조와 parser 중심, 실제 provider 연결은 일부 미완성 |
+| 외부 provider/API 코드 | GPT Vision, OpenAI LLM | GPT Vision/OpenAI는 정책과 env에 따라 활성화 후보 |
+| Skeleton/parser | 건강검진 OCR 처리 구조 | 이미지 기반 복약 인식은 MVP에서 제외하고 직접 입력으로 운영 |
 | P2 보류 | 자체 식단 CV 모델, vector RAG, Redis Stream/async_jobs/consumer, LLM/RAG 운영 고도화 | 시연 전 미구현이 아니라 운영 확장 단계로 의도적 보류 |
 
 LLM/RAG의 공식 runtime 범위는 [LLM/RAG Runtime Scope](llm_runtime_scope.md)를 기준으로 설명한다. 현재 공식 API에서 직접 호출되는 LLM runtime은 분석/식단 설명 생성 중심이며, 메인 챗봇 LLM 라우터와 추천 문구 모듈은 준비됐지만 아직 공식 runtime에 직접 연결되지 않은 영역으로 구분한다.
@@ -49,20 +49,18 @@ ANEM을 공식 분석 결과에 포함하려면 `AnalysisType` enum, DB schema, 
 | 기능 | 경로 | 현재 상태 | 주의사항 |
 | --- | --- | --- | --- |
 | GPT Vision 식단 이미지 분석 후보 | `ai_runtime/cv/providers/gpt_vision.py` | provider 코드 존재 | 기본값은 off이며 `GPT_VISION_FALLBACK_ENABLED=true`와 사용자 확인 정책이 있을 때만 fallback 후보 |
-| Clova OCR provider | `ai_runtime/ocr/providers/clova_ocr/` | PoC/deferred provider로 보존 | 공식 건강검진 OCR 시연 경로에서는 호출하지 않는다 |
 | OpenAI LLM | `ai_runtime/llm/` | 챗봇, 설명 생성, fallback/rewrite 구조 존재 | 기본은 rule-based/fallback 설명이며 실제 LLM 호출은 설정에 따라 제한적으로 사용 |
 
 외부 provider는 API key, 비용, 개인정보 처리 정책이 연결되므로 기본 시연 경로에서 무조건 호출하지 않는다.
 
-건강검진 OCR 공식 시연 경로는 완성된 OCR provider 결과를 보장하는 구조가 아니라 provider/fallback 기반 측정값 후보를 만들고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조다. PaddleOCR/local OCR 1차 처리와 GPT Vision fallback은 후속 provider 후보이며, GPT Vision은 기본 off 상태를 유지한다. Clova OCR은 삭제하지 않고 legacy/PoC provider로 보존하지만, 시연 준비 검증이나 공식 API 기본 경로의 필수 조건으로 보지 않는다.
+건강검진 OCR 공식 시연 경로는 완성된 OCR provider 결과를 보장하는 구조가 아니라 provider/fallback 기반 측정값 후보를 만들고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조다. PaddleOCR/local OCR 1차 처리와 GPT Vision fallback을 유지하며, GPT Vision은 기본 off 상태를 유지한다.
 
 ## 5. Skeleton / Parser
 
 | 기능 | 경로 | 현재 상태 | 시연 설명 기준 |
 | --- | --- | --- | --- |
-| 약봉투 OCR parser | `ai_runtime/ocr/medication/` | raw text parser와 schema 중심 구조 | 실제 OCR provider 호출 없이 parser skeleton으로 준비 |
+| 복약 정보 | `/api/v1/medications` 직접 입력 API | OCR 없이 사용자가 약물명을 직접 입력 | 약물 정보 확인은 약학정보원/약찾기 서비스 참고 |
 | 건강검진 OCR 처리 구조 | `ai_runtime/ocr/checkup/`, `app/services/exams.py` | 측정값 후보 confirm 후 `HealthRecord` X2 필드 반영 흐름 존재 | provider 연결/문서 인식 품질은 별도 검증 필요 |
-| 처방전 OCR | `ai_runtime/ocr/` 및 medication domain 확장 후보 | 실제 provider 연결 미완성 | P1/P2에서 약봉투/처방전 스키마를 분리 고도화 |
 
 ## 6. P2 보류
 
@@ -91,12 +89,11 @@ uv run python scripts/audit_ai_runtime_capabilities.py
 - CatBoost predictor warmup 가능 여부
 - X2 health stage classifier import 가능 여부
 - 식단 nutrition scorer import 가능 여부와 runtime CSV record 개수
-- GPT Vision, Clova OCR, OpenAI LLM provider 코드 import 가능 여부
+- GPT Vision, OpenAI LLM provider 코드 import 가능 여부
 - `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` 설정 여부
-- Clova OCR이 deferred provider로 표시되는지 여부
 - LLM prompt 관련 코드 위치와 line number
 - LLM/RAG 공식 runtime, keyword RAG PoC, provider-only, prepared-not-wired, P2 backlog 분류
-- 약봉투 OCR parser sample parse 가능 여부
+- 복약 직접 입력 API와 기록 조회 가능 여부
 - 건강검진 OCR checkup extractor import 가능 여부
 
 주의사항:

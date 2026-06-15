@@ -29,12 +29,6 @@ def has_langfuse_config(settings: Any) -> bool:
     )
 
 
-def has_clova_ocr_config(settings: Any) -> bool:
-    return _has_value(getattr(settings, "CLOVA_OCR_API_URL", None)) and _has_value(
-        getattr(settings, "CLOVA_OCR_SECRET_KEY", None)
-    )
-
-
 def has_paddle_ocr_runtime() -> bool:
     # PaddleOCR is intentionally checked lazily because importing it can be slow
     # and may fail on platforms without the optional OCR dependency group.
