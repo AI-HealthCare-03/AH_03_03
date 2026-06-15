@@ -174,7 +174,16 @@ def test_embedding_provider_factory_rejects_unknown_provider() -> None:
         get_embedding_provider(settings)
 
 
-def test_config_embedding_defaults_are_safe() -> None:
+def test_config_embedding_defaults_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env_key in (
+        "RAG_EMBEDDING_ENABLED",
+        "RAG_EMBEDDING_PROVIDER",
+        "RAG_EMBEDDING_MODEL",
+        "RAG_EMBEDDING_DIMENSION",
+        "RAG_EMBEDDING_BATCH_SIZE",
+    ):
+        monkeypatch.delenv(env_key, raising=False)
+
     settings = Config(_env_file=None)
 
     assert settings.RAG_EMBEDDING_ENABLED is False

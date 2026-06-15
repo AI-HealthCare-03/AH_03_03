@@ -2,6 +2,9 @@ from pathlib import Path
 
 from app.models.rag import RAGChunk
 
+MIGRATION_12_PATH = (
+    Path(__file__).resolve().parents[2] / "app/core/db/migrations/models/12_20260615030000_add_rag_metadata_schema.py"
+)
 MIGRATION_PATH = (
     Path(__file__).resolve().parents[2]
     / "app/core/db/migrations/models/13_20260615031000_add_rag_chunk_embedding_vector.py"
@@ -11,6 +14,11 @@ MIGRATION_PATH = (
 def _normalized_migration_sql() -> str:
     migration_sql = MIGRATION_PATH.read_text(encoding="utf-8").lower()
     return " ".join(migration_sql.split())
+
+
+def test_recent_rag_migrations_include_aerich_models_state() -> None:
+    assert "MODELS_STATE = (" in MIGRATION_12_PATH.read_text(encoding="utf-8")
+    assert "MODELS_STATE = (" in MIGRATION_PATH.read_text(encoding="utf-8")
 
 
 def test_pgvector_migration_adds_extension_and_vector_column() -> None:
