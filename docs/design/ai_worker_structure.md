@@ -29,13 +29,12 @@
 - `analysis.run`
 - `exam_ocr.run`
 - `diet.analyze_image`
-- `medication_ocr.run`
 - `email.verification.send`
 - `password_reset.email.send`
 - `family.invite.email.send`
 - `fcm.push.send`
 - `family.notification.create`
 
-프론트 분석 화면은 `/analysis/run-async`를 사용합니다. 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 막아 긴 분석이 요청 중 직접 실행되지 않게 합니다. 건강검진 OCR, 식단 분석, 복약 OCR 업로드 경로는 202 Accepted로 job을 만들고 `/api/v1/jobs/{job_id}` polling으로 상태를 확인합니다.
+프론트 분석 화면은 `/analysis/run-async`를 사용합니다. 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 막아 긴 분석이 요청 중 직접 실행되지 않게 합니다. 건강검진 OCR과 식단 분석은 202 Accepted로 job을 만들고 `/api/v1/jobs/{job_id}` polling으로 상태를 확인합니다. 복약 정보는 MVP에서 OCR 없이 직접 입력합니다.
 
 운영 고도화 과제로는 worker heartbeat/metrics 노출, 관리자용 queue 모니터링, DLQ 재처리 도구, worker 수평 확장 정책이 남아 있습니다.

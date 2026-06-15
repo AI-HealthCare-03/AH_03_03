@@ -1,54 +1,4 @@
 import { apiRequest, type ApiValue } from "./client";
-import type { AsyncJob } from "./jobs";
-
-export type MedicationOcrItem = {
-  temp_id?: string | null;
-  name: string;
-  dosage?: string | null;
-  frequency?: string | null;
-  time_slots: string[];
-  duration_days?: number | null;
-  memo?: string | null;
-  confidence?: number | null;
-};
-
-export type MedicationOcrRequest = {
-  source_type?: "PRESCRIPTION" | "MEDICATION_BAG" | "SUPPLEMENT" | string;
-  image_filename?: string;
-  memo?: string;
-  raw_text?: string;
-};
-
-export type MedicationOcrResponse = {
-  source_type: string;
-  ocr_confidence: number;
-  items: MedicationOcrItem[];
-  message: string;
-  source?: string;
-  fallback_used?: boolean;
-  provider_message?: string | null;
-  extracted_text_preview?: string | null;
-  raw_text?: string | null;
-  parser_warnings?: string[];
-};
-
-export type MedicationOcrConfirmRequest = {
-  items: Array<{
-    name: string;
-    dosage?: string | null;
-    frequency?: string | null;
-    time_slots: string[];
-    duration_days?: number | null;
-    memo?: string | null;
-  }>;
-};
-
-export type MedicationOcrConfirmResponse = {
-  created_count: number;
-  created_medication_ids: number[];
-  skipped_count: number;
-  message: string;
-};
 
 export type MedicationPayload = Record<string, ApiValue> & {
   name?: string;
@@ -82,16 +32,6 @@ export async function deactivateMedication<T>(medicationId: number): Promise<T> 
 
 export async function deleteMedication<T>(medicationId: number): Promise<T> {
   return apiRequest<T>(`/medications/${medicationId}`, { method: "DELETE" });
-}
-
-export async function runMedicationOcr(payload: MedicationOcrRequest | FormData): Promise<AsyncJob> {
-  return apiRequest<AsyncJob>("/medications/ocr", { method: "POST", body: payload });
-}
-
-export async function confirmMedicationOcr(
-  payload: MedicationOcrConfirmRequest,
-): Promise<MedicationOcrConfirmResponse> {
-  return apiRequest<MedicationOcrConfirmResponse>("/medications/ocr-confirm", { method: "POST", body: payload });
 }
 
 export async function listMedicationRecords<T>(medicationId: number): Promise<T> {

@@ -21,7 +21,7 @@ docs/archive/ocr-compare/
 │   └── images/
 │       ├── checkup/             # 건강검진표 테스트 이미지/PDF
 │       ├── diet/                # 식단 (추후)
-│       └── prescription/        # 약봉투/처방전 (추후)
+│       └── medication/          # 복약 직접 입력 정책으로 전환 전 검토 영역
 ├── 01_tesseract/                # Tesseract.js
 ├── 02_python_ocr/               # EasyOCR / PaddleOCR
 ├── 03_naver_clova/              # Naver CLOVA OCR

@@ -560,13 +560,6 @@ def _audit_intentional_backlog() -> list[AuditRow]:
         ),
         AuditRow(
             area="backlog",
-            item="약봉투/처방전 OCR 실제 provider 연결",
-            status="P1",
-            detail="medication parser skeleton exists; real provider integration for medication/prescription OCR is not wired",
-            category="P1_BACKLOG",
-        ),
-        AuditRow(
-            area="backlog",
             item="실제 LLM/RAG 운영 연결 고도화",
             status="P2",
             detail="provider code and rule-based fallback exist; production RAG grounding/observability policy is deferred",

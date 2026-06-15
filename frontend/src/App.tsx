@@ -29,7 +29,6 @@ const InquiryPage = lazy(() => import("./pages/InquiryPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const MainPage = lazy(() => import("./pages/MainPage"));
 const MedicationPage = lazy(() => import("./pages/MedicationPage"));
-const MedicationOcrPage = lazy(() => import("./pages/MedicationOcrPage"));
 const MyPage = lazy(() => import("./pages/MyPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const NotificationPage = lazy(() => import("./pages/NotificationPage"));
@@ -71,7 +70,6 @@ export default function App() {
               <Route path="/health" element={<HealthRecordPage />} />
               <Route path="/health/profile" element={<HealthProfilePage />} />
               <Route path="/ocr/exam" element={<ExamOcrPage />} />
-              <Route path="/ocr/medication" element={<MedicationOcrPage />} />
               <Route path="/chatbot" element={<ChatbotPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/history" element={<AnalysisHistoryPage />} />

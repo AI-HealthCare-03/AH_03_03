@@ -95,9 +95,6 @@ EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=false
 PADDLE_OCR_ENABLED=false
 
-MEDICATION_OCR_PROVIDER=fallback
-MEDICATION_GPT_VISION_ENABLED=false
-
 LANGFUSE_ENABLED=false
 LANGFUSE_PUBLIC_KEY=<LANGFUSE_PUBLIC_KEY>
 LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
@@ -304,11 +301,15 @@ make prod-logs
 | RAG | `RAG_ENABLED` | 기본 off |
 | 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED` | 기본 rule/fallback |
 | 건강검진 OCR | `EXAM_OCR_PROVIDER`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED` | 기본 auto |
-| 복약 OCR | `MEDICATION_OCR_PROVIDER`, `MEDICATION_GPT_VISION_ENABLED` | 기본 fallback |
+| 복약 정보 | 별도 OCR provider 없음 | MVP에서는 사용자가 직접 입력 |
 | Langfuse | `LANGFUSE_ENABLED`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | 기본 off |
 | 이메일 | `EMAIL_ENABLED`, `SMTP_*`, `EMAIL_VERIFICATION_DEBUG` | local은 debug 또는 SMTP |
 
 provider별 상세 정책은 `docs/design/*`, `docs/ops/*` 문서를 참고하세요.
+
+복약 정보는 사용자가 직접 입력합니다. 약물 정보 확인은 약학정보원/약찾기 서비스를 참고하고,
+본 서비스는 처방, 복용량 판단, 약물 변경 안내를 제공하지 않습니다. 복약 관련 의사결정은
+의사 또는 약사와 상담해야 합니다.
 
 ## 이메일 인증 / ai-worker 주의사항
 

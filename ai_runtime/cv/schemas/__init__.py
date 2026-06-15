@@ -136,23 +136,6 @@ class DietAnalysisResponse(BaseAnalysisResponse):
     requires_user_confirmation: bool = True
 
 
-# ── 처방전 ────────────────────────────────────────────────────────────────────
-
-
-class MedicationItem(BaseModel):
-    drug_name: str
-    dosage: str | None = None
-    quantity: str | None = None
-    confidence: float = Field(ge=0.0, le=1.0)
-    raw_text: str | None = None
-
-
-class PrescriptionAnalysisResponse(BaseAnalysisResponse):
-    analysis_type: str = "prescription"
-    medications: list[MedicationItem] = Field(default_factory=list)
-    requires_manual_input: list[str] = Field(default_factory=list)
-
-
 # ── 건강검진표 ────────────────────────────────────────────────────────────────
 
 

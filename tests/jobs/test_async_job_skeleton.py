@@ -92,49 +92,6 @@ async def test_enqueue_async_job_writes_to_named_stream_with_maxlen(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_create_medication_ocr_job_enqueues_slim_stream_payload(monkeypatch) -> None:
-    calls: list[tuple[str, dict]] = []
-
-    class FakeAsyncJob:
-        id = 31
-        job_type = async_job_service.MEDICATION_OCR_JOB_TYPE
-        stream_id = None
-
-        async def save(self, update_fields):
-            _ = update_fields
-            calls.append(("save", {"stream_id": self.stream_id}))
-
-    async def fake_create(**kwargs):
-        calls.append(("create", kwargs))
-        return FakeAsyncJob()
-
-    async def fake_enqueue_async_job(**kwargs):
-        calls.append(("enqueue", kwargs))
-        return "31-0"
-
-    monkeypatch.setattr(async_job_service.AsyncJob, "create", fake_create)
-    monkeypatch.setattr(async_job_service, "enqueue_async_job", fake_enqueue_async_job)
-
-    job = await async_job_service.create_medication_ocr_job(
-        9,
-        {
-            "source_type": "PRESCRIPTION",
-            "upload_path": "/app/var/uploads/medication_ocr/9/source.jpg",
-            "image_media_type": "image/jpeg",
-        },
-    )
-
-    assert job.stream_id == "31-0"
-    assert calls[0][0] == "create"
-    assert calls[0][1]["request_payload"]["user_id"] == 9
-    assert calls[0][1]["request_payload"]["upload_path"].endswith("source.jpg")
-    assert calls[1][0] == "enqueue"
-    assert calls[1][1]["job_type"] == "medication_ocr.run"
-    assert calls[1][1]["payload"] == {"resource_type": "medication_ocr_request"}
-    assert calls[1][1]["user_id"] == 9
-
-
-@pytest.mark.asyncio
 async def test_create_diet_analyze_image_job_enqueues_slim_stream_payload(monkeypatch) -> None:
     calls: list[tuple[str, dict]] = []
 
@@ -502,69 +459,6 @@ async def test_exam_ocr_handler_rejects_missing_exam_report_id(monkeypatch) -> N
         await handlers.handle_stream_job(16, "exam_ocr.run", {})
 
     assert calls == [(16, "missing_exam_report_id")]
-
-
-@pytest.mark.asyncio
-async def test_medication_ocr_handler_runs_job_ocr_and_marks_success(monkeypatch) -> None:
-    from ai_runtime.jobs import medication_ocr_handler
-    from app.dtos.medications import MedicationOCRItem, MedicationOCRResponse
-
-    calls: list[tuple[str, int, dict | None]] = []
-
-    async def fake_mark_processing(job_id: int):
-        calls.append(("processing", job_id, None))
-
-    async def fake_run_medication_ocr_from_job(job_id: int):
-        calls.append(("ocr", job_id, None))
-        return MedicationOCRResponse(
-            source_type="PRESCRIPTION",
-            ocr_confidence=0.9,
-            items=[MedicationOCRItem(name="테스트약", time_slots=[])],
-            message="ok",
-            source="paddleocr_medication_ocr",
-            fallback_used=False,
-        )
-
-    async def fake_mark_success(job_id: int, result_payload: dict):
-        calls.append(("success", job_id, result_payload))
-
-    monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
-    monkeypatch.setattr(medication_ocr_handler, "run_medication_ocr_from_job", fake_run_medication_ocr_from_job)
-    monkeypatch.setattr(handlers.async_job_service, "mark_success", fake_mark_success)
-
-    await handlers.handle_stream_job(21, "medication_ocr.run", {})
-
-    assert calls[0] == ("processing", 21, None)
-    assert calls[1] == ("ocr", 21, None)
-    assert calls[2][0:2] == ("success", 21)
-    assert calls[2][2]["items"][0]["name"] == "테스트약"
-    assert calls[2][2]["source"] == "paddleocr_medication_ocr"
-
-
-@pytest.mark.asyncio
-async def test_medication_ocr_handler_rejects_missing_source(monkeypatch) -> None:
-    from ai_runtime.jobs import medication_ocr_handler
-
-    calls: list[tuple[int, str] | tuple[str, int]] = []
-
-    async def fake_mark_processing(job_id: int):
-        calls.append(("processing", job_id))
-
-    async def fake_run_medication_ocr_from_job(job_id: int):
-        _ = job_id
-        raise ValueError("medication_ocr_source_missing")
-
-    async def fake_mark_failed(job_id: int, error_message: str):
-        calls.append((job_id, error_message))
-
-    monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
-    monkeypatch.setattr(medication_ocr_handler, "run_medication_ocr_from_job", fake_run_medication_ocr_from_job)
-    monkeypatch.setattr(handlers.async_job_service, "mark_failed", fake_mark_failed)
-
-    with pytest.raises(handlers.NonRetryableJobError):
-        await handlers.handle_stream_job(22, "medication_ocr.run", {})
-
-    assert calls == [("processing", 22), (22, "medication_ocr_source_missing")]
 
 
 @pytest.mark.asyncio

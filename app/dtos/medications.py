@@ -1,6 +1,6 @@
 from datetime import datetime, time
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class MedicationCreateRequest(BaseModel):
@@ -42,57 +42,6 @@ class MedicationResponse(BaseModel):
 class MedicationListResponse(BaseModel):
     items: list[MedicationResponse]
     total: int
-
-
-class MedicationOCRRequest(BaseModel):
-    source_type: str | None = "PRESCRIPTION"
-    image_filename: str | None = None
-    memo: str | None = None
-    raw_text: str | None = None
-
-
-class MedicationOCRItem(BaseModel):
-    temp_id: str | None = None
-    name: str
-    dosage: str | None = None
-    frequency: str | None = None
-    time_slots: list[str] = Field(default_factory=list)
-    duration_days: int | None = None
-    memo: str | None = None
-    confidence: float | None = None
-
-
-class MedicationOCRResponse(BaseModel):
-    source_type: str
-    ocr_confidence: float
-    items: list[MedicationOCRItem]
-    message: str
-    source: str = "rule_based_medication_ocr"
-    fallback_used: bool = True
-    provider_message: str | None = None
-    extracted_text_preview: str | None = None
-    raw_text: str | None = None
-    parser_warnings: list[str] = Field(default_factory=list)
-
-
-class MedicationOCRConfirmItem(BaseModel):
-    name: str
-    dosage: str | None = None
-    frequency: str | None = None
-    time_slots: list[str] = Field(default_factory=list)
-    duration_days: int | None = None
-    memo: str | None = None
-
-
-class MedicationOCRConfirmRequest(BaseModel):
-    items: list[MedicationOCRConfirmItem]
-
-
-class MedicationOCRConfirmResponse(BaseModel):
-    created_count: int
-    created_medication_ids: list[int]
-    skipped_count: int = 0
-    message: str
 
 
 class MedicationRecordCreateRequest(BaseModel):

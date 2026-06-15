@@ -23,7 +23,7 @@
 - FastAPI의 `REDIS_HOST`, `REDIS_PORT` 기반 연결
 - `/api/v1/system/health` Redis 연결 확인
 - Compose `redis` service healthcheck
-- AI stream: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`
+- AI stream: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`
 - Service stream: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `fcm.push.send`, `family.notification.create`
 - retry/backoff, DLQ, pending recovery 기반 `ai-worker` consumer
 
@@ -73,7 +73,7 @@ P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영
 
 장기적으로 앱 `.env`는 secret, key, URL, password, host, port 같은 실행 환경값 중심으로 유지한다. provider 사용 가능 여부는 코드의 availability helper가 판단하고, key나 runtime dependency가 없으면 fallback 또는 no-op으로 처리한다.
 
-현재 1단계에서는 `OPENAI_API_KEY`, `SMTP_*`, `LANGFUSE_*`, `CLOVA_OCR_*` 설정 완성 여부를 helper로 확인한다. 다만 `EMAIL_ENABLED`, `CHATBOT_USE_REAL_LLM`, `DIET_GPT_VISION_ENABLED`, `EXAM_GPT_VISION_ENABLED`, `MEDICATION_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED`, `LANGFUSE_ENABLED`, `SCHEDULER_ENABLED`, `RAG_ENABLED`, `GPT_VISION_FALLBACK_ENABLED` 같은 기존 flag는 호환성과 비용/발송/디버그 안전장치 때문에 아직 유지한다.
+현재 1단계에서는 `OPENAI_API_KEY`, `SMTP_*`, `LANGFUSE_*`, `CLOVA_OCR_*` 설정 완성 여부를 helper로 확인한다. 다만 `EMAIL_ENABLED`, `CHATBOT_USE_REAL_LLM`, `DIET_GPT_VISION_ENABLED`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED`, `LANGFUSE_ENABLED`, `SCHEDULER_ENABLED`, `RAG_ENABLED`, `GPT_VISION_FALLBACK_ENABLED` 같은 기존 flag는 호환성과 비용/발송/디버그 안전장치 때문에 아직 유지한다.
 
 이메일은 회원가입 인증, 비밀번호 재설정, 가족 초대/비회원 가족 초대에서 공통으로 쓰는 핵심 delivery provider다. 따라서 SMTP provider availability는 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`이 모두 준비된 경우에만 true로 본다. local/dev에서 SMTP 설정이 없으면 실제 발송 대신 debug 응답 또는 로그 흐름으로 개발할 수 있지만, prod에서는 조용한 no-op으로 넘기지 않고 configuration error를 유지한다. `EMAIL_ENABLED`는 1단계 호환성 flag로 남기되, 장기적으로는 SMTP availability와 `ENV` 기준으로 대체한다. `EMAIL_VERIFICATION_DEBUG`, `PASSWORD_RESET_DEBUG`는 production에서 강제 off되는 보안 가드로 유지한다.
 
@@ -147,7 +147,7 @@ make app-clean-image # 알려진 로컬 app/test 이미지를 삭제
 
 frontend, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 올린다.
 
-`ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer와 scheduler loop를 실행한다. 처리 job은 `DEMO_ECHO`뿐 아니라 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`, 이메일/비밀번호/가족초대/FCM/가족알림 service job을 포함한다.
+`ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer와 scheduler loop를 실행한다. 처리 job은 `DEMO_ECHO`뿐 아니라 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, 이메일/비밀번호/가족초대/FCM/가족알림 service job을 포함한다.
 
 로컬 개발/시연 표준은 루트 `.env` 하나를 사용한다. 시작할 때 `envs/example.local.env`를 복사하고, 실제 secret 값은 `.env`에만 채운다.
 

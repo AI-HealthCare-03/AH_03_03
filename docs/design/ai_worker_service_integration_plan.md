@@ -59,8 +59,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 ### P1: 시연 품질을 올리는 작업
 
 - LLM/RAG 설명 생성 붙이기
-- 약봉투 OCR 구조 설계
-- 처방전 OCR 구조 설계
+- 복약 직접 입력 구조 유지
 - 모델 warm-up
 - OCR/CV/ML 결과 로그 정리
 
@@ -119,7 +118,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `app/services/exams.py`
     - `run_dummy_ocr`
   - `app/services/medications.py`
-    - `run_dummy_medication_ocr`
+    - direct medication input helpers
   - `app/services/chatbot.py`
     - `ask_dummy_chatbot`
   - `app/services/main.py`
@@ -131,7 +130,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
     - `build_stub_answer`
 - 해야 할 일:
   - 공식 API/서비스 경로에서는 `dummy` 함수명을 줄인다.
-  - 공식 함수명은 `run_analysis`, `run_diet_analysis`, `run_exam_ocr`, `run_medication_ocr`, `ask_chatbot`처럼 정리한다.
+  - 공식 함수명은 `run_analysis`, `run_diet_analysis`, `run_exam_ocr`, `ask_chatbot`처럼 정리한다. 복약은 OCR 없이 직접 입력으로 처리한다.
   - deprecated endpoint나 내부 compatibility wrapper는 유지할 수 있다.
   - 실제 구현이 없는 부분은 fake로 포장하지 않고 `provider_fallback`, `rule_based`, `pending_review`, `needs_review` 같은 source/status 표현을 사용한다.
   - `is_dummy`처럼 DB/응답 스키마 호환성이 필요한 필드는 즉시 삭제하지 않고 의미를 재정의하거나 후속 migration 계획으로 분리한다.
@@ -459,8 +458,7 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
 
 아래 항목은 명시적으로 이번 문서 작업에서 제외한다.
 
-- 약봉투 OCR 구현
-- 처방전 OCR 구현
+- 복약 직접 입력 고도화
 - Redis Stream 구현
 - async_jobs 모델/마이그레이션 생성
 - RAG vector DB 구현

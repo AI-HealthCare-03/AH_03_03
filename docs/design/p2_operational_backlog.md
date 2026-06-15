@@ -12,7 +12,7 @@
 - OBESITY rule-based 분석
 - 식단 nutrition score와 `diet.analyze_image` async job
 - 건강검진 OCR `exam_ocr.run` async job
-- 복약 OCR `medication_ocr.run` async job
+- 복약 정보는 MVP에서 OCR 없이 직접 입력
 - 이메일/비밀번호/가족초대/FCM/가족알림 service job
 - 관리자 콘솔/FAQ/문의
 - Docker compose 기반 FastAPI, ai-worker, Redis, PostgreSQL 구동
@@ -47,10 +47,10 @@
   - `/api/v1/system/health`는 Redis 연결 상태를 확인한다.
   - `async_jobs` 모델과 `/api/v1/jobs/demo`, `/api/v1/jobs/{job_id}` 상태 조회 API가 있다.
   - `ai_runtime/main.py`는 Redis Stream consumer와 scheduler loop로 실행된다.
-  - AI stream job: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`
+  - AI stream job: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`
   - Service stream job: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `fcm.push.send`, `family.notification.create`
   - stream MAXLEN, retry/backoff, DLQ, pending recovery가 구현되어 있다.
-  - `/analysis/run-async`, `/diets/analyze`, `/exams/{exam_id}/ocr`, `/medications/ocr`는 job 생성 후 polling하는 흐름이다.
+  - `/analysis/run-async`, `/diets/analyze`, `/exams/{exam_id}/ocr`는 job 생성 후 polling하는 흐름이다.
   - 기존 `/analysis/run` 동기 실행 API는 410 Gone으로 응답한다.
 - 남은 운영 과제:
   - worker heartbeat/metrics 노출

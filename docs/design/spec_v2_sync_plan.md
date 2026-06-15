@@ -83,7 +83,7 @@
   - `POST /api/v1/diets/analyze`
   - `POST /api/v1/exams/{exam_id}/ocr`
   - `POST /api/v1/exams/{exam_id}/confirm`
-  - `POST /api/v1/medications/ocr`
+  - 복약 정보는 MVP에서 OCR 없이 `/api/v1/medications` 직접 입력 API를 사용한다.
   - `POST /api/v1/chatbot/ask`
 - `analysis_mode=BASIC/PRECISION`, `model_name`, `model_version`, `risk_score`, `risk_level` 필드를 response에 반영한다.
 - 식단 분석 response에는 `disease_scores`, `food_score_details`, `scoring_source`, optional `explanation`을 반영한다.
