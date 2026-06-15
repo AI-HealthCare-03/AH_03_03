@@ -92,9 +92,9 @@ def test_retrieve_health_context_returns_empty_when_rag_loader_fails(monkeypatch
 
 
 def test_analysis_explanation_llm_rewrite_flag_default_is_false() -> None:
-    import ai_runtime.llm.explanation_service as explanation_service
+    from app.core.config import Config
 
-    assert explanation_service.config.ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED is False
+    assert Config.model_fields["ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED"].default is False
 
 
 def test_analysis_explanation_rewrite_disabled_does_not_call_openai(monkeypatch) -> None:

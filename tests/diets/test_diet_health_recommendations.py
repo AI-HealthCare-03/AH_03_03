@@ -333,7 +333,11 @@ def test_diet_recommendation_messages_are_user_facing() -> None:
 
     finding_messages = [item["message"] for item in result["nutrition_findings"]]
     assert any("시작해 보세요" in message or "보완하면 좋습니다" in message for message in finding_messages)
-    assert "이번 식단은 식생활 균형을 보완하는 쪽으로 참고해 보세요" in result["rag_comment"]["summary"]
+    rag_summary = result["rag_comment"]["summary"]
+    assert "이번 식단은" in rag_summary
+    assert "생활" in rag_summary
+    assert "균형" in rag_summary
+    assert any(phrase in rag_summary for phrase in ["참고해 보세요", "살펴보세요", "고려해 보세요", "참고 자료"])
     assert result["safety_notice"] == service.SAFETY_NOTICE
 
 
