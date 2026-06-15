@@ -19,8 +19,9 @@ async def ask_chatbot(
     payload: ChatbotAskRequest,
     user: Annotated[User, Depends(get_request_user)],
 ):
-    _ = user
-    chatbot_response, runtime_trace = await chatbot_service.ask_chatbot_with_runtime_trace(payload)
+    chatbot_response, runtime_trace = await chatbot_service.ask_chatbot_with_runtime_trace(
+        payload, user_id=int(user.id)
+    )
     if _should_include_smoke_trace_header(request) and runtime_trace:
         response.headers["X-Chatbot-Rag-Trace"] = json.dumps(runtime_trace, ensure_ascii=False, separators=(",", ":"))
     return chatbot_response

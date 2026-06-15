@@ -669,6 +669,14 @@ export default function DietResultPage() {
       </Card>
       <Card title="추천 액션">
         <div className="button-row">
+          {dietRecordId && (
+            <Link
+              className="button secondary"
+              to={`/chatbot?context_type=DIET&target_id=${dietRecordId}&initial_question=${encodeURIComponent("이 식단에서 조심할 점을 알려줘")}`}
+            >
+              이 식단에 대해 질문하기
+            </Link>
+          )}
           <button onClick={() => navigate("/diets/history")}>기록 완료</button>
           <Link className="button secondary" to="/dashboard">
             추적 대시보드 이동

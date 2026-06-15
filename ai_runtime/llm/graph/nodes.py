@@ -211,7 +211,8 @@ async def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotG
         return next_state
 
     retrieval_started_at = perf_counter()
-    result = await _retrieve_main_chatbot_rag_context(state["user_message"] or "")
+    retrieval_query = _query_with_domain_context(state["user_message"] or "", state.get("user_context") or {})
+    result = await _retrieve_main_chatbot_rag_context(retrieval_query)
     elapsed_ms = round((perf_counter() - retrieval_started_at) * 1000, 2)
     documents = [_retrieved_document_to_langchain_document(document) for document in result.documents]
     next_state = {
@@ -309,6 +310,36 @@ def _main_chatbot_vector_gate_enabled() -> bool:
     )
 
 
+def _domain_context_text(user_context: dict[str, Any]) -> str:
+    domain_context = user_context.get("domain_context")
+    if not isinstance(domain_context, dict):
+        return ""
+    text = domain_context.get("safe_context_text")
+    if not isinstance(text, str):
+        return ""
+    return sanitize_for_trace(text, limit=1000)
+
+
+def _query_with_domain_context(query: str, user_context: dict[str, Any]) -> str:
+    domain_context_text = _domain_context_text(user_context)
+    if not domain_context_text:
+        return query
+    return f"{query}\n\n사용자 도메인 요약:\n{domain_context_text}"
+
+
+def _context_text_with_domain_context(retrieved_context: str, user_context: dict[str, Any]) -> str:
+    domain_context_text = _domain_context_text(user_context)
+    if not domain_context_text:
+        return retrieved_context
+    domain_block = (
+        "사용자 데이터 요약 context입니다. 이 요약은 생활관리 참고용이며 진단/처방 판단에 사용하지 않습니다.\n"
+        f"{domain_context_text}"
+    )
+    if not retrieved_context.strip():
+        return domain_block
+    return f"{domain_block}\n\nRAG 참고 context:\n{retrieved_context}"
+
+
 async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     if state.get("safety_response"):
@@ -362,6 +393,7 @@ async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGr
 
     if state.get("retrieved_docs"):
         retrieved_context = _retrieved_docs_to_context_text(state["retrieved_docs"])
+        retrieved_context = _context_text_with_domain_context(retrieved_context, state.get("user_context") or {})
         generation_started_at = perf_counter()
         if state.get("use_real_llm", False):
             output = await asyncio.to_thread(
@@ -376,6 +408,25 @@ async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGr
                 user_message=state["user_message"],
                 retrieved_context=retrieved_context,
                 context_sources=state.get("reference_sources") or [],
+                use_real_llm=False,
+            )
+        elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)
+    elif _domain_context_text(state.get("user_context") or {}):
+        retrieved_context = _context_text_with_domain_context("", state.get("user_context") or {})
+        generation_started_at = perf_counter()
+        if state.get("use_real_llm", False):
+            output = await asyncio.to_thread(
+                generate_main_health_rag_response,
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=[],
+                use_real_llm=True,
+            )
+        else:
+            output = generate_main_health_rag_response(
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=[],
                 use_real_llm=False,
             )
         elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)

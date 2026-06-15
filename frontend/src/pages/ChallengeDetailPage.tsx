@@ -724,6 +724,14 @@ export default function ChallengeDetailPage() {
             ))}
           </div>
           <div className="challenge-detail-actions">
+            {challengeId && (
+              <Link
+                className="button secondary"
+                to={`/chatbot?context_type=CHALLENGE&target_id=${challengeId}&initial_question=${encodeURIComponent("이 챌린지를 어떻게 시작하면 좋을지 알려줘")}`}
+              >
+                이 챌린지 도움받기
+              </Link>
+            )}
             {!userChallenge && (
               <button disabled={actionLoading !== null} onClick={join} type="button">
                 {actionLoading === "join" ? "시작 중..." : "지금 수행하기"}

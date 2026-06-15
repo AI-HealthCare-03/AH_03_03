@@ -296,6 +296,23 @@ def build_diet_health_recommendation_response(
     return _finalize_diet_health_recommendation_response(response=response, rag_comment=rag_comment)
 
 
+def build_diet_health_recommendation_context_response(
+    *,
+    diet_record: Any,
+    analysis_results: Iterable[Any],
+    health_record: Any | None,
+    active_challenges: Iterable[Any],
+) -> dict[str, Any]:
+    response, issue_keys, rag_disease_codes = _build_diet_health_recommendation_base(
+        diet_record=diet_record,
+        analysis_results=analysis_results,
+        health_record=health_record,
+        active_challenges=active_challenges,
+    )
+    response["rag_comment"] = _safe_build_rag_comment(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
+    return response
+
+
 async def build_diet_health_recommendation_response_async(
     *,
     diet_record: Any,

@@ -418,6 +418,13 @@ export default function AnalysisPage() {
               <Link className="button secondary" style={{ marginTop: 8, textAlign: "center", display: "block" }} to={`/analysis/${String(result.id)}`}>
                 상세보기
               </Link>
+              <Link
+                className="button secondary"
+                style={{ marginTop: 8, textAlign: "center", display: "block" }}
+                to={`/chatbot?context_type=ANALYSIS&target_id=${String(result.id)}&initial_question=${encodeURIComponent("이 분석 결과에서 먼저 관리할 점을 알려줘")}`}
+              >
+                이 결과에 대해 질문하기
+              </Link>
             </div>
           );
         })}

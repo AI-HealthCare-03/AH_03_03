@@ -320,6 +320,10 @@ make prod-health
 
 provider별 상세 정책은 `docs/design/*`, `docs/ops/*` 문서를 참고하세요.
 
+챗봇 응답은 현재 `/api/v1/chatbot/ask`의 POST JSON 응답을 사용합니다. SSE/streaming은 아직
+미구현이며, Bearer token 인증에서는 브라우저 `EventSource`에 Authorization header를 붙이기
+어렵기 때문에 추후에는 `POST + fetch ReadableStream` 방식을 우선 검토합니다.
+
 복약 정보는 사용자가 직접 입력합니다. 약물 정보 확인은 약학정보원/약찾기 서비스를 참고하고,
 본 서비스는 처방, 복용량 판단, 약물 변경 안내를 제공하지 않습니다. 복약 관련 의사결정은
 의사 또는 약사와 상담해야 합니다.
