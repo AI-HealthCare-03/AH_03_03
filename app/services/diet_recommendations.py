@@ -209,11 +209,29 @@ FOOD_RECOMMENDATIONS = {
     "calorie_high": (("채소 반찬", "단백질 반찬"), ("야식", "과식하기 쉬운 메뉴")),
     "protein_support": (("단백질 반찬", "두부·계란·생선류"), ()),
     "fiber_support": (("채소 반찬", "잡곡밥", "해조류 반찬"), ()),
-    "iron_support": (("철분이 있는 반찬", "비타민C가 있는 과일"), ("식사 직후 진한 차나 커피")),
+    "iron_support": (("철분이 있는 반찬", "비타민C가 있는 과일"), ("식사 직후 진한 차·커피는 줄여보면 좋습니다",)),
     "late_night_or_irregular": (("규칙적인 식사", "가벼운 저녁 구성"), ("늦은 야식",)),
     "alcohol_liver_support": (("물", "담백한 단백질 반찬"), ("음주", "기름진 안주")),
-    "kidney_caution": (("식사일지",), ("검증되지 않은 고단백 보충제",)),
+    "kidney_caution": (("식사일지", "조리법 기록", "상담 전 식단 기록"), ("개인 수치 확인 전 보충제 섭취",)),
     "balanced_support": (("채소 반찬", "단백질 반찬", "잡곡밥"), ()),
+}
+
+CKD_CONSERVATIVE_RECOMMENDATIONS = (
+    "식사일지",
+    "조리법 기록",
+    "국물 줄이기",
+    "짠 소스 덜어내기",
+    "상담 전 식단 기록",
+)
+CKD_GENERAL_FOOD_EXCLUSIONS = {
+    "잡곡밥",
+    "해조류 반찬",
+    "채소 반찬",
+    "단백질 반찬",
+    "담백한 단백질 반찬",
+    "두부·계란·생선류",
+    "고단백 식품",
+    "고단백 보충제",
 }
 
 RAG_COMMENT_TEMPLATES = {
@@ -316,8 +334,8 @@ def _build_diet_health_recommendation_base(
         if issue_key in ISSUE_DEFINITIONS
     ]
     disease_context = [_disease_context_payload(code) for code in disease_codes if code in DISEASE_RULES]
-    recommended_foods, caution_foods = _food_messages(issue_keys)
-    recommended_challenges = _recommended_challenges(issue_keys, active_challenges)
+    recommended_foods, caution_foods = _food_messages(issue_keys, disease_codes=disease_codes)
+    recommended_challenges = _recommended_challenges(issue_keys, active_challenges, disease_codes=disease_codes)
     rag_disease_codes = _rag_disease_codes_from_analysis_results(analysis_results)
     response = {
         "diet_record_id": int(diet_record.id),
@@ -554,42 +572,149 @@ def _disease_context_payload(code: str) -> dict[str, str]:
     }
 
 
-def _food_messages(issue_keys: list[str]) -> tuple[list[str], list[str]]:
+def _food_messages(issue_keys: list[str], *, disease_codes: list[str] | None = None) -> tuple[list[str], list[str]]:
     recommended: list[str] = []
     caution: list[str] = []
     for issue_key in issue_keys:
         foods, cautions = FOOD_RECOMMENDATIONS.get(issue_key, ((), ()))
-        recommended.extend(foods)
-        caution.extend(cautions)
+        recommended.extend(_as_text_items(foods))
+        caution.extend(_as_text_items(cautions))
+    if "CKD" in set(disease_codes or []):
+        recommended = [item for item in recommended if item not in CKD_GENERAL_FOOD_EXCLUSIONS and "고단백" not in item]
+        recommended = list(CKD_CONSERVATIVE_RECOMMENDATIONS) + recommended
     return _dedupe(recommended)[:5], _dedupe(caution)[:5]
 
 
-def _recommended_challenges(issue_keys: list[str], active_challenges: Iterable[Any]) -> list[dict[str, Any]]:
+def _as_text_items(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Iterable):
+        return [str(item) for item in value if str(item)]
+    return []
+
+
+def _recommended_challenges(
+    issue_keys: list[str],
+    active_challenges: Iterable[Any],
+    *,
+    disease_codes: list[str] | None = None,
+) -> list[dict[str, Any]]:
     active_by_title = {str(challenge.title): challenge for challenge in active_challenges}
-    recommendations: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
     seen_ids: set[int] = set()
-    for issue_key in issue_keys:
+    seen_titles: set[str] = set()
+    for issue_key in _challenge_issue_keys(issue_keys=issue_keys, disease_codes=disease_codes or []):
         for title in DIET_CHALLENGE_RULES.get(issue_key, ()):
             challenge = active_by_title.get(title)
             if challenge is None:
                 continue
             challenge_id = int(challenge.id)
-            if challenge_id in seen_ids:
+            challenge_title = str(challenge.title)
+            if challenge_id in seen_ids or challenge_title in seen_titles:
                 continue
             seen_ids.add(challenge_id)
-            recommendations.append(
+            seen_titles.add(challenge_title)
+            candidates.append(
                 {
                     "challenge_id": challenge_id,
-                    "title": str(challenge.title),
-                    "reason": str(
-                        ISSUE_DEFINITIONS.get(issue_key, {}).get("reason")
-                        or "식단 관리 습관을 가볍게 시작하는 데 도움이 될 수 있습니다."
-                    ),
+                    "title": challenge_title,
+                    "reason": _challenge_reason(issue_key=issue_key, title=challenge_title),
+                    "purpose": _challenge_purpose(issue_key=issue_key, title=challenge_title),
                 }
             )
-            if len(recommendations) >= MAX_RECOMMENDED_CHALLENGES:
-                return recommendations
-    return recommendations
+    diversified: list[dict[str, Any]] = []
+    seen_purposes: set[str] = set()
+    seen_reasons: set[str] = set()
+    for candidate in candidates:
+        if candidate["purpose"] in seen_purposes or candidate["reason"] in seen_reasons:
+            continue
+        diversified.append(candidate)
+        seen_purposes.add(candidate["purpose"])
+        seen_reasons.add(candidate["reason"])
+        if len(diversified) >= MAX_RECOMMENDED_CHALLENGES:
+            return [_public_challenge_payload(item) for item in diversified]
+    for candidate in candidates:
+        if candidate in diversified or candidate["reason"] in seen_reasons:
+            continue
+        diversified.append(candidate)
+        seen_reasons.add(candidate["reason"])
+        if len(diversified) >= MAX_RECOMMENDED_CHALLENGES:
+            break
+    return [_public_challenge_payload(item) for item in diversified]
+
+
+def _challenge_issue_keys(*, issue_keys: list[str], disease_codes: list[str]) -> list[str]:
+    disease_primary_issues = {
+        "HTN": ("sodium_high",),
+        "DM": ("carbohydrate_high",),
+        "DL": ("fat_high", "fiber_support"),
+        "OBE": ("calorie_high",),
+        "ANEM": ("iron_support",),
+        "FL": ("alcohol_liver_support", "fat_high"),
+        "CKD": ("kidney_caution",),
+    }
+    prioritized: list[str] = []
+    for disease_code in disease_codes:
+        prioritized.extend(disease_primary_issues.get(disease_code, ()))
+    prioritized.extend(issue_keys)
+    return _dedupe(prioritized)
+
+
+def _challenge_purpose(*, issue_key: str, title: str) -> str:
+    if "식사일지" in title or "삼시세끼" in title:
+        return "meal_record"
+    if "염분" in title:
+        return "sodium"
+    if "설탕" in title or "탄수화물" in title or "채고밥" in title:
+        return "sugar_carb"
+    if "야식" in title or "폭식" in title or "2020" in title:
+        return "calorie_routine"
+    if "기름" in title:
+        return "fat"
+    if "식이섬유" in title or "건강식탁" in title:
+        return "fiber_balance"
+    if "철분" in title or "비타민C" in title:
+        return "iron_support"
+    if "금주" in title or "절주" in title or "폭음" in title:
+        return "alcohol_liver"
+    return issue_key
+
+
+def _challenge_reason(*, issue_key: str, title: str) -> str:
+    if "식사일지" in title:
+        return "식사와 조리법을 기록하면 나에게 맞는 관리 포인트를 상담할 때 정리하기 좋습니다."
+    if "염분" in title:
+        return "국물과 짠 소스를 조금 덜어내는 연습에 도움이 될 수 있습니다."
+    if "설탕" in title:
+        return "단 음료나 후식을 줄이는 작은 실천으로 시작해 볼 수 있습니다."
+    if "탄수화물" in title or "채고밥" in title:
+        return "밥과 면의 양을 살펴보고 채소나 단백질 반찬을 곁들이는 데 도움이 될 수 있습니다."
+    if "야식" in title:
+        return "늦은 식사 패턴을 줄이고 저녁 구성을 가볍게 정리하는 데 도움이 될 수 있습니다."
+    if "폭식" in title or "2020" in title:
+        return "식사량과 식사 시간을 천천히 조절하는 습관과 연결됩니다."
+    if "기름" in title:
+        return "튀김이나 기름진 소스를 줄이고 담백한 조리법을 고르는 데 도움이 될 수 있습니다."
+    if "식이섬유" in title or "건강식탁" in title:
+        return "식사 균형을 살피고 부족하기 쉬운 반찬을 보완하는 데 도움이 될 수 있습니다."
+    if "철분" in title:
+        return "철분이 있는 반찬을 식사에 자연스럽게 더하는 연습과 연결됩니다."
+    if "비타민C" in title:
+        return "철분이 있는 반찬과 함께 과일을 곁들이는 식사 구성을 참고해 볼 수 있습니다."
+    if "금주" in title or "절주" in title or "폭음" in title:
+        return "음주 빈도와 양을 기록하고 줄여보는 생활관리 실천과 연결됩니다."
+    return str(
+        ISSUE_DEFINITIONS.get(issue_key, {}).get("reason")
+        or "식단 관리 습관을 가볍게 시작하는 데 도움이 될 수 있습니다."
+    )
+
+
+def _public_challenge_payload(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "challenge_id": candidate["challenge_id"],
+        "title": candidate["title"],
+        "reason": candidate["reason"],
+    }
 
 
 def _safe_build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -> dict[str, Any]:
@@ -630,6 +755,15 @@ async def _safe_build_rag_comment_async(
 
 
 def _build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -> dict[str, Any]:
+    if not config.RAG_ENABLED:
+        return {
+            "enabled": False,
+            "fallback_used": True,
+            "summary": RAG_FALLBACK_SUMMARY,
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
     target_codes = _resolve_rag_target_codes(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
     if not target_codes:
         return {
@@ -656,6 +790,15 @@ async def _build_rag_comment_async(
     rag_disease_codes: list[str],
     vector_retriever: Any | None = None,
 ) -> dict[str, Any]:
+    if not config.RAG_ENABLED:
+        return {
+            "enabled": False,
+            "fallback_used": True,
+            "summary": RAG_FALLBACK_SUMMARY,
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
     target_codes = _resolve_rag_target_codes(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
     if not target_codes:
         return {
