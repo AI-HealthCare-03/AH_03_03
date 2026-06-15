@@ -165,7 +165,7 @@ export default function AnalysisHistoryPage() {
     return "상세보기에서 주요 요인을 확인할 수 있습니다.";
   };
   const diseaseRiskItems: DiseaseRiskItem[] = getLatestResultsByAnalysisType(
-    displayResults.filter((result) => isKnownAnalysisType(result.analysis_type)),
+    results.filter((result) => isKnownAnalysisType(result.analysis_type)),
   )
     .map((result) => ({
       analyzed_at: result.analyzed_at,
