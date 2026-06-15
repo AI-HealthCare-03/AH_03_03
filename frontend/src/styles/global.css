@@ -5212,3 +5212,14 @@ input:-webkit-autofill:focus {
   color: white;
   border-color: var(--color-primary);
 }
+
+.diet-analysis-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.diet-analysis-card .card-header ~ * {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
