@@ -214,19 +214,6 @@ def _audit_external_provider_code() -> list[AuditRow]:
         ),
         _import_row(
             area="provider",
-            item="Clova OCR client import",
-            module="ai_runtime.ocr.providers.clova_ocr.clova_client",
-            ready_category="DEFERRED_PROVIDER",
-        ),
-        AuditRow(
-            area="provider",
-            item="Clova OCR runtime status",
-            status="DEFERRED",
-            detail="preserved as PoC/deferred provider; official demo path does not call Clova OCR",
-            category="DEFERRED_PROVIDER",
-        ),
-        _import_row(
-            area="provider",
             item="OpenAI LLM client",
             module="ai_runtime.llm.llm_client",
             ready_category="READY_PROVIDER_CODE_ONLY",
@@ -557,13 +544,6 @@ def _audit_intentional_backlog() -> list[AuditRow]:
             status="P2",
             detail="DEMO_ECHO Redis Stream skeleton exists; real OCR/CV/ML/LLM jobs, retry/DLQ, heartbeat are deferred",
             category="P2_BACKLOG",
-        ),
-        AuditRow(
-            area="backlog",
-            item="약봉투/처방전 OCR 실제 provider 연결",
-            status="P1",
-            detail="medication parser skeleton exists; real provider integration for medication/prescription OCR is not wired",
-            category="P1_BACKLOG",
         ),
         AuditRow(
             area="backlog",

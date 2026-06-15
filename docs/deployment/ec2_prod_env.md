@@ -35,18 +35,15 @@ cp envs/example.prod.env prod.env
 - `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
 - `OPENAI_API_KEY` 또는 사용하는 LLM provider secret
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`를 사용하는 경우
-- `CLOVA_OCR_API_URL`, `CLOVA_OCR_SECRET_KEY`를 사용하는 경우
 - `S3_BUCKET_NAME`
-- Firebase Admin SDK를 쓰는 경우 `GOOGLE_APPLICATION_CREDENTIALS` 경로
 - `NGINX_CONF`는 기본 `../nginx/prod_https.conf`, 최초 인증서 발급 전에는 `../nginx/prod_http.conf`
 
 작성하지 말아야 하는 값:
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-- Firebase service account JSON 원문
 - SMTP password 원문을 문서/README/예시 파일에 직접 작성한 값
-- OpenAI, Langfuse, Clova secret 원문
+- OpenAI, Langfuse secret 원문
 
 ## 배포 이미지 빌드 기준
 
@@ -113,16 +110,8 @@ docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
 사용하는 build arg:
 
 - `VITE_API_BASE_URL`
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_FIREBASE_MEASUREMENT_ID`
-- `VITE_FIREBASE_VAPID_KEY`
 
-`VITE_*`에는 브라우저 public config만 넣는다. `OPENAI_API_KEY`, `SMTP_PASSWORD`, `LANGFUSE_SECRET_KEY`, `CLOVA_OCR_SECRET_KEY`, Firebase service account private key 같은 server secret은 절대 build arg로 넘기지 않는다.
+`VITE_*`에는 브라우저 public config만 넣는다. `OPENAI_API_KEY`, `SMTP_PASSWORD`, `LANGFUSE_SECRET_KEY` 같은 server secret은 절대 build arg로 넘기지 않는다.
 
 ### Secret bake-in 점검
 
@@ -142,16 +131,16 @@ docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
 
 ```bash
 docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION} \
-  sh -lc 'find /app -name ".env" -o -name "*service-account*.json" -o -name "*firebase-adminsdk*.json"'
+  sh -lc 'find /app -name ".env" -o -name "*service-account*.json"'
 docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION} \
-  sh -lc 'find /app -name ".env" -o -name "*service-account*.json" -o -name "*firebase-adminsdk*.json"'
+  sh -lc 'find /app -name ".env" -o -name "*service-account*.json"'
 ```
 
-frontend bundle에 server secret 키워드가 섞이지 않았는지도 확인한다. public Firebase config key 이름은 정상적으로 나타날 수 있지만, server secret 값이나 server secret 변수명은 없어야 한다.
+frontend bundle에 server secret 키워드가 섞이지 않았는지도 확인한다. server secret 값이나 server secret 변수명은 없어야 한다.
 
 ```bash
 docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION} \
-  sh -lc 'grep -R "OPENAI_API_KEY\\|SMTP_PASSWORD\\|LANGFUSE_SECRET_KEY\\|CLOVA_OCR_SECRET_KEY\\|PRIVATE_KEY" -n /usr/share/nginx/html || true'
+  sh -lc 'grep -R "OPENAI_API_KEY\\|SMTP_PASSWORD\\|LANGFUSE_SECRET_KEY\\|PRIVATE_KEY" -n /usr/share/nginx/html || true'
 ```
 
 ## Storage 기준
@@ -266,7 +255,7 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec 
 - `Referrer-Policy`
 - `Permissions-Policy`
 
-`Strict-Transport-Security`는 브라우저가 HTTPS를 강하게 기억하게 하므로, 도메인/인증서/HTTPS 운영이 안정화된 뒤 적용 상태를 유지하세요. Content-Security-Policy는 프론트 asset, Firebase, API endpoint를 모두 확인한 뒤 별도 강화하는 편이 안전합니다.
+`Strict-Transport-Security`는 브라우저가 HTTPS를 강하게 기억하게 하므로, 도메인/인증서/HTTPS 운영이 안정화된 뒤 적용 상태를 유지하세요. Content-Security-Policy는 프론트 asset과 API endpoint를 모두 확인한 뒤 별도 강화하는 편이 안전합니다.
 
 ## 실행 순서
 

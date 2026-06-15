@@ -31,7 +31,7 @@ docker compose logs --tail=100 fastapi
 - 확인 항목:
   - demo 계정으로 로그인 성공
   - 로그인 후 사이드바/상단바가 보임
-  - 일반 USER에게 관리자 콘솔 메뉴가 노출되지 않음
+  - 관리자 콘솔 메뉴가 사용자 화면에 노출되지 않음
 - 눌러볼 버튼:
   - 로그인
   - 아이디 찾기
@@ -266,57 +266,33 @@ docker compose logs --tail=100 fastapi
   - notification_logs, reminder_schedules seed 여부 확인
 - 상태: 부분
 
-## 13. 관리자 콘솔
+## 13. 운영자 기능
 
-- 화면 경로: `/admin`
-- API 연결:
-  - `GET /api/v1/admin/summary`
-  - `GET /api/v1/admin/users/summary`
-  - `GET /api/v1/admin/system/health`
+- 관리자 콘솔은 MVP 사용자 시연 화면에서 제외한다.
+- 백엔드 `/api/v1/admin/*` API와 role 기반 권한 체크는 내부 운영용으로 유지한다.
 - 확인 항목:
-  - 관리자 계정으로 접속 가능
-  - 일반 USER는 접근 불가
-  - MONITOR/OPERATOR/ADMIN/SUPER_ADMIN별 메뉴 노출 정책 확인
-- 눌러볼 버튼:
-  - 관리자 대시보드
-  - 모니터링
-  - 로그
-  - FAQ 관리
-  - 문의 관리
-- 실패 시:
-  - demo admin seed 여부 확인
-- 상태: 완료
+  - 사용자 화면에 관리자 메뉴가 노출되지 않음
+  - `/admin` 프론트 route가 제공되지 않음
+  - 사용자 FAQ/문의 화면은 기존대로 동작
+- 상태: MVP 사용자 시연 제외
 
 ## 14. FAQ/문의 관리
 
 - 사용자 화면:
   - `/faqs`
   - `/inquiries`
-- 관리자 화면:
-  - `/admin/faqs`
-  - `/admin/inquiries`
 - API 연결:
   - `GET /api/v1/faqs`
   - `POST /api/v1/inquiries`
   - `GET /api/v1/inquiries/my`
-  - `GET /api/v1/admin/faqs`
-  - `POST /api/v1/admin/faqs`
-  - `PATCH /api/v1/admin/faqs/{faq_id}`
-  - `DELETE /api/v1/admin/faqs/{faq_id}`
-  - `GET /api/v1/admin/inquiries`
-  - `POST /api/v1/admin/inquiries/{inquiry_id}/answer`
 - 확인 항목:
   - 사용자 FAQ/문의 화면이 기존대로 동작
-  - 관리자 FAQ 생성/수정/비활성화 동작
-  - 문의 답변 작성 가능
   - 의료 진단 단정 표현 주의 안내가 보임
 - 눌러볼 버튼:
   - 사용자 문의 등록
-  - 관리자 FAQ 생성/수정/비활성화
   - 문의 상세 보기
-  - 답변 저장
 - 실패 시:
-  - 관리자 role 확인
+  - FAQ seed와 문의 생성 API 응답 확인
 - 상태: 완료
 
 ## 15. 404/ErrorBoundary

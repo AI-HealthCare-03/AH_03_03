@@ -1,9 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 
-import AdminRoute from "./auth/AdminRoute";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import AdminLayout from "./components/AdminLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
@@ -29,7 +27,6 @@ const InquiryPage = lazy(() => import("./pages/InquiryPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const MainPage = lazy(() => import("./pages/MainPage"));
 const MedicationPage = lazy(() => import("./pages/MedicationPage"));
-const MedicationOcrPage = lazy(() => import("./pages/MedicationOcrPage"));
 const MyPage = lazy(() => import("./pages/MyPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const NotificationPage = lazy(() => import("./pages/NotificationPage"));
@@ -37,11 +34,6 @@ const PasswordResetConfirmPage = lazy(() => import("./pages/PasswordResetConfirm
 const PasswordResetRequestPage = lazy(() => import("./pages/PasswordResetRequestPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
-const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
-const AdminFaqPage = lazy(() => import("./pages/admin/AdminFaqPage"));
-const AdminInquiryPage = lazy(() => import("./pages/admin/AdminInquiryPage"));
-const AdminLogsPage = lazy(() => import("./pages/admin/AdminLogsPage"));
-const AdminMonitoringPage = lazy(() => import("./pages/admin/AdminMonitoringPage"));
 
 // Wireframe mapping:
 // public landing -> MainPage, signup 4-step -> SignupPage, login -> LoginPage,
@@ -71,7 +63,6 @@ export default function App() {
               <Route path="/health" element={<HealthRecordPage />} />
               <Route path="/health/profile" element={<HealthProfilePage />} />
               <Route path="/ocr/exam" element={<ExamOcrPage />} />
-              <Route path="/ocr/medication" element={<MedicationOcrPage />} />
               <Route path="/chatbot" element={<ChatbotPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/history" element={<AnalysisHistoryPage />} />
@@ -90,15 +81,6 @@ export default function App() {
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
-          </Route>
-          <Route element={<AdminRoute />}>
-            <Route element={<AdminLayout />}>
-              <Route path="/admin" element={<AdminDashboardPage />} />
-              <Route path="/admin/monitoring" element={<AdminMonitoringPage />} />
-              <Route path="/admin/logs" element={<AdminLogsPage />} />
-              <Route path="/admin/faqs" element={<AdminFaqPage />} />
-              <Route path="/admin/inquiries" element={<AdminInquiryPage />} />
-            </Route>
           </Route>
         </Routes>
       </Suspense>

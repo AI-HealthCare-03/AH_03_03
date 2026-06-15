@@ -21,7 +21,6 @@ from app.models.notifications import (
     NotificationLog,
     NotificationLogStatus,
     ReminderSchedule,
-    UserFCMToken,
 )
 from app.models.rag import RAGRetrievalLog
 from app.models.settings import UserSetting
@@ -110,12 +109,6 @@ class UserManageService:
         await UserConsent.filter(user_id=user_id).delete()
 
     async def _disable_notification_delivery(self, user_id: int) -> None:
-        now = datetime.now(config.TIMEZONE)
-        await UserFCMToken.filter(user_id=user_id, is_active=True).update(
-            is_active=False,
-            revoked_at=now,
-            updated_at=now,
-        )
         await ReminderSchedule.filter(user_id=user_id).update(is_active=False)
         await Notification.filter(user_id=user_id).delete()
         await NotificationLog.filter(user_id=user_id).update(

@@ -27,7 +27,7 @@
 - 건강정보 x1/x2
 - 회원가입 x1 간편 분석 정보와 x2 정밀 검진값 입력 책임 분리
 - 건강검진표 OCR
-- 복약/처방전 OCR
+- 복약 직접 입력
 - 실제 ML inference
 - `model_versions`
 - `ai_inference_logs`

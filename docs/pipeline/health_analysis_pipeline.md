@@ -121,18 +121,17 @@ uv run python -m ai_runtime.cv.food.nutrition.scoring.disease_food_scorer
 
 ## 건강검진 OCR Provider 정책
 
-건강검진 OCR 공식 실행 경로는 Clova OCR을 기본 provider로 사용하지 않는다.
+건강검진 OCR 공식 실행 경로는 GPT Vision/PaddleOCR 흐름을 사용한다.
 
 - 기본 방향: PaddleOCR/local OCR 1차
 - fallback 후보: GPT Vision
 - GPT Vision fallback 기본값: off
-- Clova OCR: PoC/deferred provider로 코드 보존, 공식 시연 경로 호출 제외
 
 설정 기준:
 
 - `GPT_VISION_FALLBACK_ENABLED=false`
 
-현재 `/api/v1/exams/{exam_id}/ocr`는 외부 Clova API를 호출하지 않고, OCR 결과 확인/confirm 후 `ExamMeasurement` 값을 `HealthRecord` X2 필드에 반영하는 서비스 흐름을 검증하는 데 초점을 둔다. Clova OCR provider 코드는 향후 provider 비교 또는 운영 전환 검토를 위한 reference로 보존한다.
+현재 `/api/v1/exams/{exam_id}/ocr`는 OCR 결과 확인/confirm 후 `ExamMeasurement` 값을 `HealthRecord` X2 필드에 반영하는 서비스 흐름을 검증하는 데 초점을 둔다.
 
 ## MVP 범위 기준
 

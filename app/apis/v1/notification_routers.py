@@ -1,13 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, status
 
 from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
 from app.dtos.notifications import (
-    FCMTokenDeleteRequest,
-    FCMTokenDeleteResponse,
-    FCMTokenRegisterRequest,
-    FCMTokenResponse,
     NotificationCreateRequest,
     NotificationLogResponse,
     NotificationResponse,
@@ -39,32 +35,6 @@ async def list_notifications(
 @notification_router.get("/unread", response_model=list[NotificationResponse])
 async def list_unread_notifications(user: Annotated[User, Depends(get_request_user)], limit: int = 20, offset: int = 0):
     return await notification_service.list_unread_notifications(user.id, limit=limit, offset=offset)
-
-
-@notification_router.post(
-    "/fcm-tokens",
-    response_model=FCMTokenResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def register_fcm_token(
-    request_data: FCMTokenRegisterRequest,
-    request: Request,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    return await notification_service.register_fcm_token(
-        user.id,
-        request_data,
-        request_user_agent=request.headers.get("user-agent"),
-    )
-
-
-@notification_router.delete("/fcm-tokens", response_model=FCMTokenDeleteResponse)
-async def deactivate_fcm_token(
-    request_data: FCMTokenDeleteRequest,
-    user: Annotated[User, Depends(get_request_user)],
-):
-    deactivated_count = await notification_service.deactivate_fcm_token(user.id, request_data)
-    return {"deactivated_count": deactivated_count}
 
 
 @notification_router.get("/reminder-schedules", response_model=list[ReminderScheduleResponse])

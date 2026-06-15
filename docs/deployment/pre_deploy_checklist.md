@@ -137,13 +137,6 @@ git check-ignore -v prod.env
 - `LANGFUSE_PUBLIC_KEY`
 - `LANGFUSE_SECRET_KEY`
 - `VITE_API_BASE_URL`
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_FIREBASE_VAPID_KEY`
 - `NGINX_CONF`
 
 ## 5. EC2 배포 순서
@@ -217,7 +210,6 @@ curl -fsS http://localhost/api/v1/system/health
 - `email.verification.send`
 - `password_reset.email.send`
 - `family.invite.email.send`
-- `fcm.push.send`
 - `family.notification.create`
 
 `SCHEDULER_ENABLED=true`이면 notification scheduler도 `ai-worker` 안에서 실행됩니다.
@@ -240,17 +232,9 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs 
   - 회원가입 이메일 인증 코드 발송을 요청한다.
   - `ai-worker` 로그에서 service job 처리 실패가 없는지 확인한다.
 
-- [ ] FCM push job 처리 확인
-  - FCM token 등록 후 push 대상 기능을 실행한다.
-  - `notification_logs` 또는 `/api/v1/notifications/logs`에서 결과를 확인한다.
-
 - [ ] `SCHEDULER_ENABLED` 값 확인
   - 예약 알림/리마인더를 운영에서 사용할 때만 `true`로 둔다.
   - 현재 구조에서는 scheduler가 `ai-worker` 내부에서 함께 실행된다.
-
-- [ ] Firebase Admin credential 확인
-  - `GOOGLE_APPLICATION_CREDENTIALS` 또는 런타임 ADC 설정이 준비되어 있는지 확인한다.
-  - service account 원문 값은 문서, 로그, PR에 남기지 않는다.
 
 ### 향후 worker 분리 후 체크
 
@@ -261,7 +245,7 @@ worker를 분리한 뒤에는 아래 항목을 별도로 확인합니다. 현재
 - [ ] `scheduler-worker` running 확인
 - [ ] 각 worker별 Redis Stream consumer group 확인
 - [ ] 각 worker별 logs 확인
-- [ ] email/FCM/scheduler job이 AI/OCR job 적체와 독립적으로 처리되는지 확인
+- [ ] email/notification/scheduler job이 AI/OCR job 적체와 독립적으로 처리되는지 확인
 
 ## 8. 자주 나는 문제
 

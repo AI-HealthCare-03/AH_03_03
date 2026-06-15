@@ -12,7 +12,7 @@ from ai_runtime.common.image_normalizer import (
     normalize_upload_image,
 )
 from ai_runtime.cv import router as cv_router
-from app.apis.v1 import diet_routers, exam_routers, medication_routers, upload_routers
+from app.apis.v1 import diet_routers, exam_routers, upload_routers
 
 checkup_router_module = importlib.import_module("ai_runtime.ocr.checkup.router")
 
@@ -145,23 +145,6 @@ async def test_exam_multipart_heic_is_normalized_but_pdf_is_not(monkeypatch: pyt
     assert pdf_bytes == b"pdf-bytes"
     assert pdf_media_type == "application/pdf"
     assert pdf_filename == "checkup.pdf"
-
-
-@pytest.mark.asyncio
-async def test_medication_multipart_heic_is_normalized_before_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(image_normalizer, "_convert_heic_to_jpeg", lambda image_bytes: b"jpeg-bytes")
-    request = FakeMultipartRequest(
-        {
-            "source_type": "MEDICATION_BAG",
-            "image": FakeUpload("medication.heif", "application/octet-stream"),
-        }
-    )
-
-    payload, image_bytes, image_media_type = await medication_routers._parse_medication_ocr_request(request)
-
-    assert payload.source_type == "MEDICATION_BAG"
-    assert image_bytes == b"jpeg-bytes"
-    assert image_media_type == "image/jpeg"
 
 
 @pytest.mark.asyncio

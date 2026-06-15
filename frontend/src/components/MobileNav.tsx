@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
 import { sidebarLinks } from "./Sidebar";
 
@@ -46,7 +45,6 @@ const drawerSections = [
 export default function MobileNav({ isOpen, onClose }: MobileNavProps) {
   const { backendUser, logout } = useAuth();
   const location = useLocation();
-  const showAdminLink = isAdminConsoleRole(backendUser?.role);
 
   useEffect(() => {
     onClose();
@@ -121,12 +119,6 @@ export default function MobileNav({ isOpen, onClose }: MobileNavProps) {
               </div>
             </section>
           ))}
-          {showAdminLink && (
-            <NavLink className="mobile-drawer-link" to="/admin">
-              <span aria-hidden="true">🛡️</span>
-              <span>관리자 콘솔</span>
-            </NavLink>
-          )}
         </div>
 
         <button className="mobile-nav-logout" onClick={handleLogout} type="button">

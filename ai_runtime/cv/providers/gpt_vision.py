@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 class AnalysisType:
     DIET = "diet"
-    PRESCRIPTION = "prescription"
     CHECKUP = "checkup"
 
 
@@ -48,29 +47,6 @@ PROMPTS: dict[str, str] = {
 - 이미지에 보이지 않는 음식은 만들지 마세요.
 - 칼로리, 탄수화물, 단백질, 지방, 나트륨, 영양성분, 섭취량, 용량은 추정하거나 반환하지 마세요.
 - 의료 진단 및 영양 처방 금지
-""",
-    AnalysisType.PRESCRIPTION: """
-이 약 봉투 또는 처방전 이미지에서 약물 정보를 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
-{
-  "medications": [
-    {
-      "drug_name": "약품명",
-      "dosage": "용량 (예: 5mg)",
-      "quantity": "수량",
-      "confidence": 0.0~1.0,
-      "raw_text": "이미지 원문 텍스트"
-    }
-  ],
-  "analysis_status": "success|partial|failed",
-  "requires_manual_input": ["인식 불확실 항목"],
-  "fail_reason": null
-}
-
-규칙:
-- 복용법(횟수, 식전/후/간)은 추출하지 말 것
-- 글자가 흐리거나 잘 안 보이면 partial로 반환
-- 처방전이 아닌 이미지면 failed로 반환하고 fail_reason 작성
-- 의료 진단 및 처방 변경 권고 금지
 """,
     AnalysisType.CHECKUP: """
 이 건강검진 결과지에서 아래 항목의 수치만 추출하세요. 반드시 아래 JSON만 응답하세요 (마크다운 금지):
@@ -221,7 +197,6 @@ def _record_vision_trace(
                 "error_type": error_type,
                 "analysis_status": output.get("analysis_status"),
                 "food_count": len(output.get("foods") or []),
-                "medication_count": len(output.get("medications") or []),
                 "extracted_field_count": len(output.get("extracted_data") or {}),
             },
         )

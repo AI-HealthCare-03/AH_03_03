@@ -6,8 +6,6 @@ from typing import Any
 
 from app.core import config
 from app.dtos.notifications import (
-    FCMTokenDeleteRequest,
-    FCMTokenRegisterRequest,
     NotificationCreateRequest,
     NotificationUpdateRequest,
     ReminderScheduleCreateRequest,
@@ -19,7 +17,6 @@ from app.models.notifications import (
     NotificationLog,
     NotificationLogStatus,
     ReminderSchedule,
-    UserFCMToken,
 )
 from app.repositories import notification_repository
 
@@ -160,35 +157,12 @@ async def _process_due_reminder_schedule(schedule: ReminderSchedule, now: dateti
         message_summary=_summary(schedule.message),
         related_type=schedule.related_type,
         related_id=schedule.related_id,
-        status=NotificationLogStatus.PENDING if channel == NotificationChannel.PUSH else NotificationLogStatus.SENT,
-        sent_at=now if channel != NotificationChannel.PUSH else None,
+        status=NotificationLogStatus.SENT,
+        sent_at=now,
     )
-
-    if channel == NotificationChannel.PUSH:
-        await _enqueue_push_for_reminder(schedule)
 
     await _advance_reminder_schedule(schedule, now)
     return True
-
-
-async def _enqueue_push_for_reminder(schedule: ReminderSchedule) -> None:
-    try:
-        from app.services import service_jobs
-
-        await service_jobs.enqueue_fcm_push_send(
-            user_id=int(schedule.user_id),
-            title=schedule.title,
-            body=schedule.message,
-            data={
-                "type": _enum_value(schedule.reminder_type),
-                "reminder_schedule_id": str(schedule.id),
-            },
-            notification_type=_enum_value(schedule.reminder_type),
-            related_type=schedule.related_type,
-            related_id=schedule.related_id,
-        )
-    except Exception:
-        logger.exception("Failed to enqueue reminder push job", extra={"reminder_schedule_id": schedule.id})
 
 
 async def _advance_reminder_schedule(schedule: ReminderSchedule, now: datetime) -> None:
@@ -306,27 +280,3 @@ async def record_notification_log(
         "failed_at": failed_at,
     }
     return await notification_repository.create_notification_log(user_id, data)
-
-
-async def register_fcm_token(
-    user_id: int,
-    request: FCMTokenRegisterRequest,
-    *,
-    request_user_agent: str | None = None,
-) -> UserFCMToken:
-    now = datetime.now(config.TIMEZONE)
-    data = request.model_dump()
-    data["user_agent"] = data.get("user_agent") or request_user_agent
-    data["is_active"] = True
-    data["last_seen_at"] = now
-    data["revoked_at"] = None
-    return await notification_repository.upsert_fcm_token(user_id, data)
-
-
-async def deactivate_fcm_token(user_id: int, request: FCMTokenDeleteRequest) -> int:
-    revoked_at = datetime.now(config.TIMEZONE)
-    return await notification_repository.deactivate_fcm_token(user_id, request.token, revoked_at)
-
-
-async def deactivate_fcm_tokens_by_user(user_id: int, revoked_at: datetime) -> int:
-    return await notification_repository.deactivate_fcm_tokens_by_user(user_id, revoked_at)
