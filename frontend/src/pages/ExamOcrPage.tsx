@@ -126,7 +126,7 @@ export default function ExamOcrPage() {
         setCanRetryOcr(false);
         setFeedbackDialog({
           title: "검진표 인식이 완료되었습니다.",
-          message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요.",
+          message: "인식 결과에 오타가 없는지 반드시 확인해 주세요. 잘못 입력된 항목은 직접 수정하실 수 있습니다.",
         });
       } catch {
         setFeedbackDialog({
@@ -275,11 +275,11 @@ export default function ExamOcrPage() {
       {/* 헤더 */}
       <div className="page-header">
         <div>
-          <h1>건강검진표 측정값 확인</h1>
-          <p>검진표 이미지/PDF를 업로드하면 측정값을 자동으로 인식합니다.</p>
+          <h1>건강검진표 사진/PDF 등록</h1>
+          <p>검진표 이미지/PDF를 업로드하면 결과값을 자동으로 인식합니다.</p>
         </div>
         <Link className="button secondary" to="/health">
-          등록 선택으로 돌아가기
+          건강 분석으로 돌아가기
         </Link>
       </div>
 
@@ -363,17 +363,17 @@ export default function ExamOcrPage() {
 
         <div className="button-row" style={{ marginTop: 12 }}>
           <button disabled={isRunningOcr || !selectedFile} onClick={startExamOcr} type="button">
-            {isRunningOcr ? "검진표 분석 중..." : "측정값 후보 생성"}
+            {isRunningOcr ? "검진표 인식 중..." : "검진표 인식 시작"}
           </button>
         </div>
       </Card>
 
       {/* ── STEP 2~3: 측정값 후보 (파일 선택 후 항상 노출) ── */}
-      <Card title="측정값 후보">
+      <Card title="검진표 인식 결과">
         <div className="ocr-result-table">
           {measurements.length === 0 ? (
             <div className="state-box">
-              아직 측정값 후보가 없습니다. 파일을 업로드하고 측정값 후보를 생성해주세요.
+              아직 인식된 검진표가 없습니다. 파일을 업로드하고 '검진표 인식 시작'버튼을 눌러주세요.
             </div>
           ) : (
             measurements.map((m) => (
