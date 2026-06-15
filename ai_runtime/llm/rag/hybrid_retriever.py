@@ -10,10 +10,14 @@ from ai_runtime.llm.rag.tracing import trace_hybrid_rag_retrieval
 
 HYBRID_STRATEGY_KEYWORD_ONLY = "keyword_only"
 HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK = "keyword_first_vector_fallback"
+HYBRID_STRATEGY_HYBRID_PARALLEL = "hybrid_parallel"
 HYBRID_STRATEGY_VECTOR_DISABLED = "vector_disabled"
+DEFAULT_KEYWORD_WEIGHT = 0.5
+DEFAULT_VECTOR_WEIGHT = 0.5
 SUPPORTED_HYBRID_STRATEGIES = {
     HYBRID_STRATEGY_KEYWORD_ONLY,
     HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
+    HYBRID_STRATEGY_HYBRID_PARALLEL,
     HYBRID_STRATEGY_VECTOR_DISABLED,
 }
 
@@ -21,9 +25,10 @@ SUPPORTED_HYBRID_STRATEGIES = {
 class HybridRagRetriever:
     """Strategy helper for keyword/vector retrieval.
 
-    This helper is intentionally not wired to product APIs yet. It lets tests and
-    future callers exercise fallback policy before vector retrieval becomes a
-    user-facing path.
+    Strategies:
+    - keyword_only: keyword retriever only.
+    - keyword_first_vector_fallback: call vector only when keyword is insufficient.
+    - hybrid_parallel: call keyword and vector, then deduplicate and rerank.
     """
 
     def __init__(
@@ -48,6 +53,8 @@ class HybridRagRetriever:
         topic_tags: list[str] | tuple[str, ...] | None = None,
         strategy: str = HYBRID_STRATEGY_KEYWORD_ONLY,
         min_keyword_results: int = 1,
+        keyword_weight: float = DEFAULT_KEYWORD_WEIGHT,
+        vector_weight: float = DEFAULT_VECTOR_WEIGHT,
         include_safety_disclaimer: bool = False,
     ) -> RagRetrievalResult:
         started_at = time.monotonic()
@@ -73,6 +80,39 @@ class HybridRagRetriever:
         elif normalized_strategy == HYBRID_STRATEGY_VECTOR_DISABLED:
             documents = keyword_result.documents
             fallback_reason = "vector_disabled"
+        elif normalized_strategy == HYBRID_STRATEGY_HYBRID_PARALLEL:
+            if self.vector_retriever is None:
+                vector_error = "vector_retriever_unavailable"
+                documents = keyword_result.documents
+                fallback_used = True
+            else:
+                try:
+                    vector_result = await _call_vector_retriever(
+                        self.vector_retriever,
+                        query=effective_query,
+                        disease_code=effective_disease_code,
+                        source_key=source_key,
+                        issue_keys=list(issue_keys or []),
+                        topic_tags=list(topic_tags or []),
+                        top_k=top_k,
+                        include_safety_disclaimer=include_safety_disclaimer,
+                    )
+                    documents = merge_and_rerank_hybrid_documents(
+                        keyword_documents=keyword_result.documents,
+                        vector_documents=vector_result.documents,
+                        top_k=top_k,
+                        disease_code=effective_disease_code,
+                        issue_keys=list(issue_keys or []),
+                        keyword_weight=keyword_weight,
+                        vector_weight=vector_weight,
+                    )
+                    if not vector_result.documents:
+                        fallback_used = True
+                        vector_error = vector_result.fallback_reason or "vector_no_result"
+                except Exception as exc:  # pragma: no cover - exact exception depends on injected retriever
+                    fallback_used = True
+                    vector_error = f"vector_retrieval_failed:{type(exc).__name__}"
+                    documents = keyword_result.documents
         elif keyword_count >= max(min_keyword_results, 0):
             documents = keyword_result.documents
             fallback_reason = None
@@ -118,6 +158,8 @@ class HybridRagRetriever:
             fallback_used=fallback_used,
             fallback_reason=vector_error or fallback_reason,
             latency_ms=latency_ms,
+            keyword_weight=keyword_weight,
+            vector_weight=vector_weight,
         )
         trace_hybrid_rag_retrieval(
             query=effective_query,
@@ -135,6 +177,8 @@ class HybridRagRetriever:
             embedding_provider=trace_metadata.get("embedding_provider") if isinstance(trace_metadata, dict) else None,
             embedding_model=trace_metadata.get("embedding_model") if isinstance(trace_metadata, dict) else None,
             embedding_dimension=trace_metadata.get("embedding_dimension") if isinstance(trace_metadata, dict) else None,
+            keyword_weight=keyword_weight,
+            vector_weight=vector_weight,
         )
         return RagRetrievalResult(
             documents=documents,
@@ -156,6 +200,52 @@ def deduplicate_retrieved_documents(documents: list[RetrievedDocument]) -> list[
         seen.add(key)
         deduplicated.append(document)
     return deduplicated
+
+
+def merge_and_rerank_hybrid_documents(
+    *,
+    keyword_documents: list[RetrievedDocument],
+    vector_documents: list[RetrievedDocument],
+    top_k: int,
+    disease_code: str | None = None,
+    issue_keys: list[str] | tuple[str, ...] | None = None,
+    keyword_weight: float = DEFAULT_KEYWORD_WEIGHT,
+    vector_weight: float = DEFAULT_VECTOR_WEIGHT,
+) -> list[RetrievedDocument]:
+    ranked: dict[str, tuple[RetrievedDocument, float, int]] = {}
+    order = 0
+    for document in keyword_documents:
+        key = retrieval_dedup_key(document)
+        score = _hybrid_document_score(
+            document,
+            keyword_score=document.score,
+            vector_score=None,
+            disease_code=disease_code,
+            issue_keys=list(issue_keys or []),
+            keyword_weight=keyword_weight,
+            vector_weight=vector_weight,
+        )
+        ranked[key] = (document, score, order)
+        order += 1
+    for document in vector_documents:
+        key = retrieval_dedup_key(document)
+        existing = ranked.get(key)
+        keyword_score = existing[0].score if existing else None
+        score = _hybrid_document_score(
+            document,
+            keyword_score=keyword_score,
+            vector_score=document.score,
+            disease_code=disease_code,
+            issue_keys=list(issue_keys or []),
+            keyword_weight=keyword_weight,
+            vector_weight=vector_weight,
+        )
+        if existing is None or score > existing[1]:
+            ranked[key] = (document if existing is None else existing[0], score, existing[2] if existing else order)
+        order += 1
+
+    sorted_documents = sorted(ranked.values(), key=lambda item: (-item[1], item[2]))
+    return [_with_hybrid_score(document, score) for document, score, _ in sorted_documents[: max(top_k, 0)]]
 
 
 def retrieval_dedup_key(document: RetrievedDocument) -> str:
@@ -181,6 +271,73 @@ def clamp_vector_score(score: float | None) -> float | None:
     return max(0.0, min(float(score), 1.0))
 
 
+def normalize_keyword_score(score: float | int | None) -> float:
+    if score is None:
+        return 0.0
+    numeric = float(score)
+    if numeric > 1:
+        numeric = numeric / 100
+    return max(0.0, min(numeric, 1.0))
+
+
+def _hybrid_document_score(
+    document: RetrievedDocument,
+    *,
+    keyword_score: float | int | None,
+    vector_score: float | int | None,
+    disease_code: str | None,
+    issue_keys: list[str],
+    keyword_weight: float,
+    vector_weight: float,
+) -> float:
+    score = normalize_keyword_score(keyword_score) * keyword_weight
+    score += (clamp_vector_score(float(vector_score)) or 0.0) * vector_weight if vector_score is not None else 0.0
+    score += _review_status_boost(document)
+    score += _disease_code_boost(document, disease_code)
+    score += _issue_key_boost(document, issue_keys)
+    return round(score, 6)
+
+
+def _review_status_boost(document: RetrievedDocument) -> float:
+    metadata = document.metadata or {}
+    status = str(metadata.get("review_status") or metadata.get("status") or "").lower()
+    if status in {"reviewed", "approved"}:
+        return 0.08
+    if status == "reference":
+        return 0.04
+    return 0.0
+
+
+def _disease_code_boost(document: RetrievedDocument, disease_code: str | None) -> float:
+    if not disease_code:
+        return 0.0
+    metadata = document.metadata or {}
+    return 0.05 if str(metadata.get("disease_code") or "").upper() == str(disease_code).upper() else 0.0
+
+
+def _issue_key_boost(document: RetrievedDocument, issue_keys: list[str]) -> float:
+    if not issue_keys:
+        return 0.0
+    metadata = document.metadata or {}
+    document_issue_keys = {str(value) for value in metadata.get("issue_keys") or []}
+    return 0.05 if document_issue_keys.intersection(map(str, issue_keys)) else 0.0
+
+
+def _with_hybrid_score(document: RetrievedDocument, hybrid_score: float) -> RetrievedDocument:
+    return RetrievedDocument(
+        content=document.content,
+        title=document.title,
+        source_name=document.source_name,
+        url=document.url,
+        metadata={
+            **(document.metadata or {}),
+            "retriever_strategy": HYBRID_STRATEGY_HYBRID_PARALLEL,
+            "hybrid_score": hybrid_score,
+        },
+        score=document.score,
+    )
+
+
 def build_hybrid_result_trace_metadata(
     *,
     query: str,
@@ -195,6 +352,8 @@ def build_hybrid_result_trace_metadata(
     fallback_used: bool,
     fallback_reason: str | None,
     latency_ms: float,
+    keyword_weight: float = DEFAULT_KEYWORD_WEIGHT,
+    vector_weight: float = DEFAULT_VECTOR_WEIGHT,
 ) -> dict[str, Any]:
     vector_trace = vector_result.trace_metadata if vector_result else {}
     return {
@@ -205,8 +364,11 @@ def build_hybrid_result_trace_metadata(
         "keyword_returned_count": len(keyword_result.documents),
         "vector_returned_count": len(vector_result.documents) if vector_result else 0,
         "merged_count": len(documents),
+        "final_count": len(documents),
         "fallback_used": fallback_used,
         "fallback_reason": fallback_reason,
+        "keyword_weight": keyword_weight,
+        "vector_weight": vector_weight,
         "disease_code": disease_code,
         "source_key": source_key,
         "issue_keys": issue_keys,

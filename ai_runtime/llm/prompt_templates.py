@@ -28,6 +28,7 @@ FALLBACK_SAFE_RESPONSE_PROMPT_VERSION = "fallback_safe_response_v1"
 RESULT_REWRITE_PROMPT_VERSION = "result_rewrite_v1"
 MAIN_REWRITE_PROMPT_VERSION = "main_rewrite_v1"
 DIET_RECOMMENDATION_REWRITE_PROMPT_VERSION = "diet_recommendation_rewrite_v1"
+ANALYSIS_EXPLANATION_REWRITE_PROMPT_VERSION = "analysis_explanation_rewrite_v1"
 MAIN_HEALTH_RAG_PROMPT_VERSION = RAG_GROUNDED_ANSWER_PROMPT_VERSION
 
 
@@ -301,5 +302,28 @@ DIET_RECOMMENDATION_REWRITE_PROMPT = """
 }}
 
 입력 데이터:
+{payload}
+"""
+
+
+# Prompt version: ANALYSIS_EXPLANATION_REWRITE_PROMPT_VERSION
+ANALYSIS_EXPLANATION_REWRITE_PROMPT = """
+너는 만성질환 분석 결과 설명 문구를 사용자 친화적으로 다듬는 도우미다.
+
+역할:
+- 너는 질환 위험도, stage, 결과를 새로 판단하지 않는다.
+- rule_based_explanation이 만든 summary, caution, recommended_action의 의미를 유지해 더 쉽게 정리한다.
+- 입력에 있는 질환명, 위험도, 위험요인, 수치만 사용한다.
+
+규칙:
+1. 진단, 확진, 치료, 처방 판단을 하지 않는다.
+2. 질병이 있다고 단정하지 않는다.
+3. 입력에 없는 질환, 약, 검사, 수치, 챌린지를 추가하지 않는다.
+4. 수치가 있으면 입력으로 제공된 수치만 사용한다.
+5. 생활관리 참고 정보이며 의료진 상담이 필요할 수 있다는 의미를 유지한다.
+6. JSON 형식으로만 출력한다.
+7. JSON은 summary, caution, recommended_action 필드만 포함한다.
+
+입력 payload:
 {payload}
 """

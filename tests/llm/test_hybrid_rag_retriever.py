@@ -3,12 +3,14 @@ from __future__ import annotations
 import pytest
 
 from ai_runtime.llm.rag.hybrid_retriever import (
+    HYBRID_STRATEGY_HYBRID_PARALLEL,
     HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
     HYBRID_STRATEGY_KEYWORD_ONLY,
     HYBRID_STRATEGY_VECTOR_DISABLED,
     HybridRagRetriever,
     clamp_vector_score,
     deduplicate_retrieved_documents,
+    merge_and_rerank_hybrid_documents,
 )
 from ai_runtime.llm.rag.retriever import RagRetrievalResult, RetrievedDocument
 from ai_runtime.llm.rag.tracing import build_hybrid_rag_trace_metadata
@@ -133,6 +135,81 @@ async def test_vector_fallback_failure_keeps_keyword_result() -> None:
     assert result.trace_metadata["fallback_reason"] == "vector_retrieval_failed:RuntimeError"
 
 
+@pytest.mark.asyncio
+async def test_hybrid_parallel_calls_keyword_and_vector_and_reranks() -> None:
+    keyword = FakeRetriever(
+        [
+            _document("kw-1", score=50, status="candidate_unreviewed"),
+            _document("shared-keyword", chunk_key="chunk-shared", score=80, status="candidate_unreviewed"),
+        ]
+    )
+    vector = FakeRetriever(
+        [
+            _document("shared-vector", chunk_key="chunk-shared", score=0.95, status="reviewed"),
+            _document("vec-1", chunk_key="chunk-vec", score=0.99, status="reviewed"),
+        ]
+    )
+    retriever = HybridRagRetriever(keyword_retriever=keyword, vector_retriever=vector)
+
+    result = await retriever.retrieve(
+        query_text="고혈압 나트륨",
+        strategy=HYBRID_STRATEGY_HYBRID_PARALLEL,
+        top_k=2,
+        disease_code="HTN",
+        issue_keys=["sodium_high"],
+    )
+
+    assert keyword.called == 1
+    assert vector.called == 1
+    assert result.strategy == HYBRID_STRATEGY_HYBRID_PARALLEL
+    assert len(result.documents) == 2
+    assert result.trace_metadata["keyword_returned_count"] == 2
+    assert result.trace_metadata["vector_returned_count"] == 2
+    assert result.trace_metadata["merged_count"] == 2
+    assert result.trace_metadata["final_count"] == 2
+    assert result.trace_metadata["keyword_weight"] == 0.5
+    assert result.trace_metadata["vector_weight"] == 0.5
+    assert result.trace_metadata["retriever_strategy"] == HYBRID_STRATEGY_HYBRID_PARALLEL
+    assert {document.metadata.get("chunk_key") for document in result.documents} <= {"chunk-shared", "chunk-vec", None}
+
+
+def test_hybrid_parallel_deduplicates_and_keeps_top_k() -> None:
+    documents = merge_and_rerank_hybrid_documents(
+        keyword_documents=[
+            _document("kw-1", chunk_key="chunk-1", score=100),
+            _document("kw-2", chunk_key="chunk-2", score=10),
+        ],
+        vector_documents=[
+            _document("vec-duplicate", chunk_key="chunk-1", score=0.95),
+            _document("vec-3", chunk_key="chunk-3", score=0.9),
+        ],
+        top_k=2,
+        keyword_weight=0.5,
+        vector_weight=0.5,
+    )
+
+    keys = [document.metadata.get("chunk_key") for document in documents]
+    assert len(keys) == 2
+    assert len(set(keys)) == 2
+    assert "chunk-1" in keys
+
+
+def test_hybrid_parallel_review_status_boost_stays_internal() -> None:
+    documents = merge_and_rerank_hybrid_documents(
+        keyword_documents=[
+            _document("doc-a", chunk_key="candidate", score=70, status="candidate_unreviewed"),
+            _document("doc-b", chunk_key="reviewed", score=70, status="reviewed"),
+        ],
+        vector_documents=[],
+        top_k=2,
+    )
+
+    assert [document.metadata["chunk_key"] for document in documents] == ["reviewed", "candidate"]
+    user_facing_text = " ".join(document.title or "" for document in documents)
+    assert "candidate_unreviewed" not in user_facing_text
+    assert "reviewed" not in user_facing_text.lower()
+
+
 def test_deduplicate_documents_prefers_chunk_key_then_id_then_fallback() -> None:
     documents = [
         _document("first", chunk_key="chunk-1"),
@@ -221,8 +298,10 @@ def _document(
     *,
     chunk_key: str | None = None,
     content: str = "retrieved document",
+    score: float | int = 0.8,
+    status: str = "candidate_unreviewed",
 ) -> RetrievedDocument:
-    metadata = {"id": document_id, "source_type": "official_society", "status": "candidate_unreviewed"}
+    metadata = {"id": document_id, "source_type": "official_society", "status": status}
     if chunk_key:
         metadata["chunk_key"] = chunk_key
     return RetrievedDocument(
@@ -231,5 +310,5 @@ def _document(
         source_name="source",
         url=f"https://example.test/{document_id}",
         metadata=metadata,
-        score=0.8,
+        score=score,
     )

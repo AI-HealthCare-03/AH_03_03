@@ -1,6 +1,12 @@
+import json
 import logging
 from typing import Any
 
+from ai_runtime.llm.llm_client import call_llm_json
+from ai_runtime.llm.prompt_templates import (
+    ANALYSIS_EXPLANATION_REWRITE_PROMPT,
+    ANALYSIS_EXPLANATION_REWRITE_PROMPT_VERSION,
+)
 from ai_runtime.llm.rag import retrieve_keyword_rag_contexts
 from ai_runtime.llm.rag.tracing import trace_keyword_rag_retrieval
 from ai_runtime.llm.schemas import (
@@ -10,9 +16,29 @@ from ai_runtime.llm.schemas import (
     RetrievedContext,
 )
 from app.core import config
+from app.core.providers import has_openai_config
 
 SAFETY_NOTICE = "이 설명은 진단이 아니며, 건강관리 참고용입니다. 정확한 진단과 치료는 의료진 상담이 필요합니다."
 logger = logging.getLogger(__name__)
+ANALYSIS_EXPLANATION_REWRITE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "summary": {"type": "string"},
+        "caution": {"type": "string"},
+        "recommended_action": {"type": "string"},
+    },
+    "required": ["summary", "caution", "recommended_action"],
+}
+FORBIDDEN_ANALYSIS_REWRITE_PHRASES = (
+    "진단되었습니다",
+    "확진",
+    "치료하세요",
+    "처방",
+    "약을 복용",
+    "약을 중단",
+    "병이 있습니다",
+)
 
 DISEASE_LABELS = {
     "DIABETES": "당뇨",
@@ -74,6 +100,37 @@ def generate_analysis_explanation(input_data: AnalysisExplanationInput) -> Expla
     )
 
 
+def rewrite_analysis_explanation(
+    *,
+    input_data: AnalysisExplanationInput,
+    explanation: ExplanationOutput,
+    use_real_llm: bool,
+) -> ExplanationOutput:
+    """Rewrite rule-based analysis explanation without changing its judgment."""
+    if not use_real_llm or not has_openai_config(config):
+        return explanation
+
+    try:
+        prompt = _build_analysis_explanation_rewrite_prompt(input_data=input_data, explanation=explanation)
+        raw_response = call_llm_json(
+            prompt,
+            schema=ANALYSIS_EXPLANATION_REWRITE_SCHEMA,
+            schema_name="analysis_explanation_rewrite",
+            metadata={
+                "prompt_version": ANALYSIS_EXPLANATION_REWRITE_PROMPT_VERSION,
+                "source": "analysis_explanation_rewrite",
+                "use_real_llm": True,
+            },
+        )
+        rewritten = _parse_analysis_explanation_rewrite(raw_response, original=explanation)
+        if not _is_safe_analysis_explanation_rewrite(rewritten):
+            return explanation
+        return rewritten
+    except Exception:
+        logger.exception("Analysis explanation LLM rewrite failed; using rule-based explanation")
+        return explanation
+
+
 def generate_diet_score_explanation(input_data: DietScoreExplanationInput) -> ExplanationOutput:
     """식단 점수 중 가장 주의가 필요한 질병군을 짧게 설명한다."""
     lowest_code, lowest_score = _lowest_diet_score(input_data.disease_scores)
@@ -98,6 +155,46 @@ def generate_diet_score_explanation(input_data: DietScoreExplanationInput) -> Ex
         safety_notice=SAFETY_NOTICE,
         source="rule_based_explanation",
     )
+
+
+def _build_analysis_explanation_rewrite_prompt(
+    *, input_data: AnalysisExplanationInput, explanation: ExplanationOutput
+) -> str:
+    payload = {
+        "analysis_input": input_data.model_dump(),
+        "rule_based_explanation": {
+            "summary": explanation.summary,
+            "caution": explanation.caution,
+            "recommended_action": explanation.recommended_action,
+            "safety_notice": explanation.safety_notice,
+        },
+    }
+    return ANALYSIS_EXPLANATION_REWRITE_PROMPT.format(payload=json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+def _parse_analysis_explanation_rewrite(raw_response: str, *, original: ExplanationOutput) -> ExplanationOutput:
+    parsed = json.loads(raw_response)
+    summary = str(parsed.get("summary") or "").strip()
+    caution = str(parsed.get("caution") or "").strip()
+    recommended_action = str(parsed.get("recommended_action") or "").strip()
+    if not summary or not caution or not recommended_action:
+        raise ValueError("Analysis explanation rewrite response must include complete fields.")
+    return original.model_copy(
+        update={
+            "summary": summary,
+            "caution": caution,
+            "recommended_action": recommended_action,
+        }
+    )
+
+
+def _is_safe_analysis_explanation_rewrite(explanation: ExplanationOutput) -> bool:
+    text = " ".join([explanation.summary, explanation.caution, explanation.recommended_action])
+    if any(phrase in text for phrase in FORBIDDEN_ANALYSIS_REWRITE_PHRASES):
+        return False
+    if "참고" not in text and "생활관리" not in text:
+        return False
+    return True
 
 
 def retrieve_health_context(query: str, disease_type: str | None = None) -> list[RetrievedContext]:
@@ -146,7 +243,7 @@ def generate_explanation_with_context(
     return run_analysis_explanation_graph(
         input_data=input_data,
         contexts=contexts or [],
-        use_real_llm=use_real_llm,
+        use_real_llm=use_real_llm or config.ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED,
     ).explanation
 
 

@@ -15,11 +15,20 @@ from ai_runtime.llm.prompt_templates import (
     MAIN_REWRITE_PROMPT_VERSION,
 )
 from ai_runtime.llm.rag import RetrievedDocument, disabled_rag_retrieval_result, get_default_rag_retriever
+from ai_runtime.llm.rag.embeddings import get_embedding_provider
+from ai_runtime.llm.rag.hybrid_retriever import (
+    HYBRID_STRATEGY_HYBRID_PARALLEL,
+    HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
+    HYBRID_STRATEGY_KEYWORD_ONLY,
+    HYBRID_STRATEGY_VECTOR_DISABLED,
+    HybridRagRetriever,
+)
 from ai_runtime.llm.rag.source_trust import (
     is_low_trust_level,
     lowest_source_trust_level,
     source_trust_level_for_metadata,
 )
+from ai_runtime.llm.rag.vector_retriever import VectorRagRetriever
 from ai_runtime.llm.rag_generator import generate_main_health_rag_response
 from ai_runtime.llm.response_router import route_main_health_chatbot_response
 from ai_runtime.llm.safety import check_medical_safety, detect_mental_health_safety
@@ -31,6 +40,13 @@ from .state import HealthChatbotGraphState
 
 SOURCE_GRAPH = "langgraph_chatbot"
 _REAL_RECORD_LANGFUSE_EVENT = record_langfuse_event
+MAIN_CHATBOT_RAG_MIN_KEYWORD_RESULTS = 1
+SUPPORTED_MAIN_CHATBOT_RAG_STRATEGIES = {
+    HYBRID_STRATEGY_KEYWORD_ONLY,
+    HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
+    HYBRID_STRATEGY_HYBRID_PARALLEL,
+    HYBRID_STRATEGY_VECTOR_DISABLED,
+}
 
 
 @dataclass(frozen=True)
@@ -171,7 +187,7 @@ def classify_intent(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     return next_state
 
 
-def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
+async def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     if not state.get("use_rag") or not config.RAG_ENABLED:
         result = disabled_rag_retrieval_result()
@@ -192,11 +208,7 @@ def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphSt
         return next_state
 
     retrieval_started_at = perf_counter()
-    result = get_default_rag_retriever().retrieve(
-        query=state["user_message"] or "",
-        top_k=2,
-        include_safety_disclaimer=True,
-    )
+    result = await _retrieve_main_chatbot_rag_context(state["user_message"] or "")
     elapsed_ms = round((perf_counter() - retrieval_started_at) * 1000, 2)
     documents = [_retrieved_document_to_langchain_document(document) for document in result.documents]
     next_state = {
@@ -233,6 +245,63 @@ def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphSt
         },
     )
     return next_state
+
+
+async def _retrieve_main_chatbot_rag_context(query: str):
+    strategy = _normalized_main_chatbot_rag_strategy()
+    if strategy == HYBRID_STRATEGY_KEYWORD_ONLY:
+        return get_default_rag_retriever().retrieve(
+            query=query,
+            top_k=2,
+            include_safety_disclaimer=True,
+        )
+
+    vector_retriever = (
+        _build_main_chatbot_vector_retriever()
+        if strategy in {HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK, HYBRID_STRATEGY_HYBRID_PARALLEL}
+        else None
+    )
+    retriever = HybridRagRetriever(
+        keyword_retriever=get_default_rag_retriever(),
+        vector_retriever=vector_retriever,
+    )
+    return await retriever.retrieve(
+        query=query,
+        top_k=2,
+        strategy=strategy,
+        min_keyword_results=MAIN_CHATBOT_RAG_MIN_KEYWORD_RESULTS,
+        include_safety_disclaimer=True,
+    )
+
+
+def _normalized_main_chatbot_rag_strategy() -> str:
+    strategy = str(getattr(config, "RAG_RETRIEVAL_STRATEGY", HYBRID_STRATEGY_KEYWORD_ONLY) or "").strip()
+    legacy_strategy = str(getattr(config, "MAIN_CHATBOT_RAG_STRATEGY", HYBRID_STRATEGY_KEYWORD_ONLY) or "").strip()
+    if strategy == HYBRID_STRATEGY_KEYWORD_ONLY and legacy_strategy != HYBRID_STRATEGY_KEYWORD_ONLY:
+        strategy = legacy_strategy
+    if strategy not in SUPPORTED_MAIN_CHATBOT_RAG_STRATEGIES:
+        return HYBRID_STRATEGY_KEYWORD_ONLY
+    return strategy
+
+
+def _build_main_chatbot_vector_retriever() -> VectorRagRetriever | None:
+    if not _main_chatbot_vector_gate_enabled():
+        return None
+    try:
+        provider = get_embedding_provider(config)
+    except Exception:
+        return None
+    if provider is None:
+        return None
+    return VectorRagRetriever(embedding_provider=provider)
+
+
+def _main_chatbot_vector_gate_enabled() -> bool:
+    return (
+        bool(getattr(config, "RAG_EMBEDDING_ENABLED", False))
+        and str(getattr(config, "RAG_EMBEDDING_PROVIDER", "") or "").strip().lower() == "openai"
+        and bool(config.OPENAI_API_KEY)
+    )
 
 
 def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:

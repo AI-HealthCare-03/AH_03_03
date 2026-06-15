@@ -87,6 +87,7 @@ PASSWORD_RESET_DEBUG=false
 OPENAI_API_KEY=<OPENAI_API_KEY>
 CHATBOT_USE_REAL_LLM=false
 RAG_ENABLED=false
+RAG_RETRIEVAL_STRATEGY=keyword_only
 
 DIET_VISION_PROVIDER=rule_based
 DIET_GPT_VISION_ENABLED=false
@@ -310,7 +311,7 @@ make prod-health
 | 기능 | 주요 flag | 기본 방향 |
 |---|---|---|
 | 챗봇 LLM | `CHATBOT_USE_REAL_LLM`, `OPENAI_API_KEY` | 기본 mock/rule, 필요 시 OpenAI |
-| RAG | `RAG_ENABLED` | 기본 off |
+| RAG | `RAG_ENABLED`, `RAG_RETRIEVAL_STRATEGY` | 기본 keyword-only, 필요 시 vector fallback/hybrid |
 | 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED` | 기본 rule/fallback |
 | 건강검진 OCR | `EXAM_OCR_PROVIDER`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED` | 기본 auto |
 | 복약 정보 | 별도 OCR provider 없음 | MVP에서는 사용자가 직접 입력 |

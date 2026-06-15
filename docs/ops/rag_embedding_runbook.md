@@ -20,6 +20,9 @@ Docker compose로 실행할 때는 `fastapi`와 `ai-worker` service의 `environm
 
 ```env
 RAG_ENABLED=true
+RAG_RETRIEVAL_STRATEGY=keyword_only
+MAIN_CHATBOT_RAG_STRATEGY=keyword_only
+ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED=false
 DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only
 RAG_EMBEDDING_ENABLED=false
 RAG_EMBEDDING_PROVIDER=disabled
@@ -31,13 +34,15 @@ RAG_EMBEDDING_BATCH_SIZE=64
 로컬에서 hybrid/vector RAG를 수동 검증할 때만 아래처럼 전환한다.
 
 ```env
+MAIN_CHATBOT_RAG_STRATEGY=keyword_first_vector_fallback
+RAG_RETRIEVAL_STRATEGY=keyword_first_vector_fallback
 DIET_RECOMMENDATION_RAG_STRATEGY=keyword_first_vector_fallback
 RAG_EMBEDDING_ENABLED=true
 RAG_EMBEDDING_PROVIDER=openai
 OPENAI_API_KEY=<openai-api-key>
 ```
 
-production 기본값은 `DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only`, `RAG_EMBEDDING_ENABLED=false`, `RAG_EMBEDDING_PROVIDER=disabled`로 유지한다. 실제 `.env`와 secret 값은 커밋하지 않는다.
+production 기본값은 `RAG_RETRIEVAL_STRATEGY=keyword_only`, `MAIN_CHATBOT_RAG_STRATEGY=keyword_only`, `DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only`, `ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED=false`, `RAG_EMBEDDING_ENABLED=false`, `RAG_EMBEDDING_PROVIDER=disabled`로 유지한다. 실제 `.env`와 secret 값은 커밋하지 않는다.
 
 Langfuse trace를 확인하려면 Langfuse 설정도 필요하다.
 
@@ -118,6 +123,28 @@ make rag-vector-query QUERY="당뇨 식단 주의사항" TOP_K=3
 
 - OpenAI query embedding 비용이 소량 발생할 수 있다.
 - 이 명령은 DB write를 하지 않는다.
+
+## 현재 서비스 연결 표현
+
+현재 구현 상태는 아래처럼 설명한다.
+
+- 메인 챗봇은 LangGraph 기반 orchestration을 사용한다.
+- RAG는 keyword retrieval을 기본으로 하며, feature flag로 `keyword_first_vector_fallback` 또는 `hybrid_parallel`을 사용할 수 있다.
+- 식단 추천의 핵심 판단은 rule-based로 유지하고 LLM은 사용자-facing 문구 보조 역할을 한다.
+- 분석 결과 설명은 rule-based 설명을 기본으로 하며, feature flag가 켜진 경우에만 LLM rewrite가 문장 정리를 보조한다.
+
+RAG retrieval strategy 이름은 아래 의미로만 사용한다.
+
+- `keyword_only`: keyword retriever만 사용한다.
+- `keyword_first_vector_fallback`: keyword 결과가 부족할 때만 vector retriever를 fallback으로 사용한다.
+- `hybrid_parallel`: keyword/vector를 모두 검색한 뒤 중복 제거와 단순 가중합 rerank로 최종 결과를 고른다.
+
+아래 표현은 피한다.
+
+- end-to-end LangChain RAG
+- 완전한 hybrid RAG
+- LLM이 식단/질환 추천을 판단
+- LangGraph 기반 식단 추천 에이전트
 - 전체 embedding apply 전에는 저장된 chunk가 적어 검색 결과가 제한적일 수 있다.
 - 기본 출력은 chunk content 전문이 아니라 preview만 보여준다.
 

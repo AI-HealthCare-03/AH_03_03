@@ -314,6 +314,208 @@ def test_langgraph_rag_node_uses_retriever_interface(monkeypatch) -> None:
     assert "근거 수준이 제한적" in result.answer
 
 
+def test_main_chatbot_rag_strategy_default_is_keyword_only() -> None:
+    from app.core import config
+
+    assert config.RAG_RETRIEVAL_STRATEGY == "keyword_only"
+    assert config.MAIN_CHATBOT_RAG_STRATEGY == "keyword_only"
+
+
+def test_main_chatbot_keyword_first_strategy_skips_vector_when_keyword_is_sufficient(monkeypatch) -> None:
+    class KeywordRetriever:
+        def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):
+            return RagRetrievalResult(
+                documents=[
+                    RetrievedDocument(
+                        title="혈당 관리 문서",
+                        content="혈당 관리는 생활습관과 함께 살펴볼 수 있습니다.",
+                        source_name="공식 기관",
+                        url="https://example.test/diabetes",
+                        metadata={"id": "diabetes", "status": "reviewed", "source_type": "official_guideline"},
+                    )
+                ],
+                reference_sources=[
+                    {
+                        "id": "diabetes",
+                        "title": "혈당 관리 문서",
+                        "source_org": "공식 기관",
+                        "source_url": "https://example.test/diabetes",
+                        "source_type": "official_guideline",
+                        "source_trust_level": "official_guideline",
+                        "status": "reviewed",
+                    }
+                ],
+                reference_summary="참고 정보: 혈당 관리 문서 후보 문서를 함께 확인했습니다.",
+                strategy="fake_keyword",
+                trace_metadata={"strategy": "fake_keyword", "document_count": 1, "documents": []},
+            )
+
+    class VectorRetriever:
+        def retrieve(self, **kwargs):
+            raise AssertionError("Vector fallback should not be called when keyword result is sufficient")
+
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+    monkeypatch.setattr(
+        "ai_runtime.llm.graph.nodes.config.MAIN_CHATBOT_RAG_STRATEGY",
+        "keyword_first_vector_fallback",
+    )
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes._main_chatbot_vector_gate_enabled", lambda: True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.get_default_rag_retriever", lambda: KeywordRetriever())
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes._build_main_chatbot_vector_retriever", lambda: VectorRetriever())
+
+    result = run_chatbot_graph(user_message="혈당 관리", context_type="MAIN", use_real_llm=False)
+
+    retrieval_trace = result.trace_metadata["retrieval"]
+    assert retrieval_trace["retriever_strategy"] == "keyword_first_vector_fallback"
+    assert retrieval_trace["keyword_returned_count"] == 1
+    assert retrieval_trace["vector_returned_count"] == 0
+    assert retrieval_trace["fallback_used"] is False
+
+
+def test_main_chatbot_keyword_first_strategy_calls_vector_when_keyword_is_empty(monkeypatch) -> None:
+    class EmptyKeywordRetriever:
+        def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):
+            return RagRetrievalResult(
+                documents=[],
+                reference_sources=[],
+                reference_summary=None,
+                strategy="empty_keyword",
+                fallback_reason="no_result",
+                trace_metadata={"strategy": "empty_keyword", "document_count": 0, "documents": []},
+            )
+
+    class VectorRetriever:
+        def __init__(self) -> None:
+            self.called = False
+
+        async def retrieve(self, **kwargs):
+            self.called = True
+            return RagRetrievalResult(
+                documents=[
+                    RetrievedDocument(
+                        title="고혈압 관리 문서",
+                        content="나트륨을 줄이는 생활습관은 혈압 관리에 참고할 수 있습니다.",
+                        source_name="공식 기관",
+                        url="https://example.test/hypertension",
+                        metadata={
+                            "id": "rag:hypertension:section:000:chunk:0000",
+                            "chunk_key": "rag:hypertension:section:000:chunk:0000",
+                            "status": "reviewed",
+                            "source_type": "official_guideline",
+                            "source_trust_level": "official_guideline",
+                            "retriever_strategy": "vector",
+                            "embedding_provider": "openai",
+                            "embedding_model": "text-embedding-3-small",
+                        },
+                        score=0.91,
+                    )
+                ],
+                reference_sources=[],
+                reference_summary=None,
+                strategy="vector",
+                trace_metadata={
+                    "embedding_provider": "openai",
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_dimension": 1536,
+                },
+            )
+
+    vector = VectorRetriever()
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+    monkeypatch.setattr(
+        "ai_runtime.llm.graph.nodes.config.MAIN_CHATBOT_RAG_STRATEGY",
+        "keyword_first_vector_fallback",
+    )
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes._main_chatbot_vector_gate_enabled", lambda: True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.get_default_rag_retriever", lambda: EmptyKeywordRetriever())
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes._build_main_chatbot_vector_retriever", lambda: vector)
+
+    result = run_chatbot_graph(user_message="혈압 나트륨", context_type="MAIN", use_real_llm=False)
+
+    assert vector.called is True
+    retrieval_trace = result.trace_metadata["retrieval"]
+    assert retrieval_trace["retriever_strategy"] == "keyword_first_vector_fallback"
+    assert retrieval_trace["keyword_returned_count"] == 0
+    assert retrieval_trace["vector_returned_count"] == 1
+    assert retrieval_trace["fallback_used"] is True
+    assert retrieval_trace["fallback_reason"] == "no_keyword_result"
+    assert "embedding" not in result.answer
+    assert "chunk_key" not in result.answer
+
+
+def test_main_chatbot_hybrid_parallel_calls_keyword_and_vector(monkeypatch) -> None:
+    class KeywordRetriever:
+        def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):
+            return RagRetrievalResult(
+                documents=[
+                    RetrievedDocument(
+                        title="키워드 문서",
+                        content="키워드 기반 건강관리 참고 문서입니다.",
+                        source_name="공식 기관",
+                        url="https://example.test/keyword",
+                        metadata={"id": "keyword", "status": "reviewed", "source_type": "official_guideline"},
+                        score=80,
+                    )
+                ],
+                strategy="fake_keyword",
+                trace_metadata={"strategy": "fake_keyword", "document_count": 1, "documents": []},
+            )
+
+    class VectorRetriever:
+        def __init__(self) -> None:
+            self.called = False
+
+        async def retrieve(self, **kwargs):
+            self.called = True
+            return RagRetrievalResult(
+                documents=[
+                    RetrievedDocument(
+                        title="벡터 문서",
+                        content="벡터 기반 건강관리 참고 문서입니다.",
+                        source_name="공식 기관",
+                        url="https://example.test/vector",
+                        metadata={
+                            "id": "vector",
+                            "chunk_key": "chunk-vector",
+                            "status": "reviewed",
+                            "source_type": "official_guideline",
+                            "source_trust_level": "official_guideline",
+                            "embedding_provider": "openai",
+                            "embedding_model": "text-embedding-3-small",
+                        },
+                        score=0.95,
+                    )
+                ],
+                strategy="vector",
+                trace_metadata={
+                    "embedding_provider": "openai",
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_dimension": 1536,
+                },
+            )
+
+    vector = VectorRetriever()
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_RETRIEVAL_STRATEGY", "hybrid_parallel")
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes._main_chatbot_vector_gate_enabled", lambda: True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.get_default_rag_retriever", lambda: KeywordRetriever())
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes._build_main_chatbot_vector_retriever", lambda: vector)
+
+    result = run_chatbot_graph(user_message="건강관리 참고", context_type="MAIN", use_real_llm=False)
+
+    assert vector.called is True
+    retrieval_trace = result.trace_metadata["retrieval"]
+    assert retrieval_trace["retriever_strategy"] == "hybrid_parallel"
+    assert retrieval_trace["keyword_returned_count"] == 1
+    assert retrieval_trace["vector_returned_count"] == 1
+    assert retrieval_trace["merged_count"] == 2
+    assert retrieval_trace["final_count"] == 2
+    assert retrieval_trace["keyword_weight"] == 0.5
+    assert retrieval_trace["vector_weight"] == 0.5
+    assert "chunk-vector" not in result.answer
+    assert "score" not in result.answer
+
+
 def test_langgraph_rag_no_result_falls_back_safely(monkeypatch) -> None:
     class EmptyRetriever:
         def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):

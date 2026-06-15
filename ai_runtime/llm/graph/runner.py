@@ -118,7 +118,6 @@ async def run_analysis_explanation_graph_async(
     analysis_type: str | None = None,
     use_real_llm: bool = False,
 ) -> AnalysisExplanationGraphResult:
-    _ = use_real_llm
     graph = build_analysis_explanation_graph()
     graph_run_id = uuid4().hex
     initial_state: HealthChatbotGraphState = {
@@ -142,7 +141,7 @@ async def run_analysis_explanation_graph_async(
         "caution_message": "",
         "is_safe": True,
         "safety_result": {},
-        "use_real_llm": False,
+        "use_real_llm": bool(use_real_llm),
         "use_rag": bool(contexts),
         "analysis_result": input_data.model_dump() if input_data is not None else None,
         "analysis_type": analysis_type,

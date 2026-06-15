@@ -80,12 +80,15 @@ class Config(BaseSettings):
     EXAM_GPT_VISION_MODEL: str = "gpt-4o"
     PADDLE_OCR_ENABLED: bool = False
     CHATBOT_USE_REAL_LLM: bool = False
+    RAG_RETRIEVAL_STRATEGY: str = "keyword_only"
+    MAIN_CHATBOT_RAG_STRATEGY: str = "keyword_only"
     RAG_ENABLED: bool = False
     RAG_EMBEDDING_ENABLED: bool = False
     RAG_EMBEDDING_PROVIDER: str = "disabled"
     RAG_EMBEDDING_MODEL: str = "text-embedding-3-small"
     RAG_EMBEDDING_DIMENSION: int = 1536
     RAG_EMBEDDING_BATCH_SIZE: int = 64
+    ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED: bool = False
     LANGFUSE_ENABLED: bool = False
     LANGFUSE_BASE_URL: str | None = None
     LANGFUSE_HOST: str | None = None

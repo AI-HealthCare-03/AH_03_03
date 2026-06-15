@@ -208,6 +208,8 @@ def build_hybrid_rag_trace_metadata(
     embedding_provider: str | None = None,
     embedding_model: str | None = None,
     embedding_dimension: int | None = None,
+    keyword_weight: float | None = None,
+    vector_weight: float | None = None,
 ) -> dict[str, Any]:
     return {
         "trace_version": "hybrid_rag_poc_v1",
@@ -220,8 +222,11 @@ def build_hybrid_rag_trace_metadata(
         "keyword_returned_count": keyword_returned_count,
         "vector_returned_count": vector_returned_count,
         "merged_count": len(documents),
+        "final_count": len(documents),
         "fallback_used": fallback_used,
         "fallback_reason": fallback_reason,
+        "keyword_weight": keyword_weight,
+        "vector_weight": vector_weight,
         "disease_code": disease_code,
         "source_key": source_key,
         "issue_keys": issue_keys or [],
@@ -255,6 +260,8 @@ def trace_hybrid_rag_retrieval(
     embedding_provider: str | None = None,
     embedding_model: str | None = None,
     embedding_dimension: int | None = None,
+    keyword_weight: float | None = None,
+    vector_weight: float | None = None,
 ) -> bool:
     if not config.RAG_ENABLED:
         return False
@@ -275,6 +282,8 @@ def trace_hybrid_rag_retrieval(
         embedding_provider=embedding_provider,
         embedding_model=embedding_model,
         embedding_dimension=embedding_dimension,
+        keyword_weight=keyword_weight,
+        vector_weight=vector_weight,
     )
     return record_langfuse_event(
         name="rag.hybrid_retrieval",
@@ -288,6 +297,7 @@ def trace_hybrid_rag_retrieval(
             "keyword_returned_count": keyword_returned_count,
             "vector_returned_count": vector_returned_count,
             "merged_count": len(documents),
+            "final_count": len(documents),
             "fallback_used": fallback_used,
         },
         metadata=metadata,
