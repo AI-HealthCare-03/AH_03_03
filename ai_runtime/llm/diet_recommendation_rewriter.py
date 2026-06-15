@@ -135,7 +135,9 @@ def _is_safe_rewrite(rag_comment: dict[str, Any]) -> bool:
     )
     if any(phrase in text for phrase in FORBIDDEN_DIET_REWRITE_PHRASES):
         return False
-    if "실제 섭취량" not in text or "참고" not in text or "진단" not in text:
+    if "실제 섭취량" not in text or "참고" not in text:
+        return False
+    if "의료적 판단" not in text and "생활관리" not in text:
         return False
     return True
 

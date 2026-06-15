@@ -20,15 +20,15 @@ from app.repositories import analysis_repository, health_repository
 from app.services import challenges as challenge_service
 from app.services import diets as diet_service
 
-SAFETY_NOTICE = (
-    "이 내용은 진단이나 처방이 아닌 생활관리 참고 정보입니다. 실제 섭취량이 확정되지 않아 영양 판단은 참고용입니다."
-)
+SAFETY_NOTICE = "이 내용은 의료적 판단이 아닌 생활관리 참고 정보입니다. 실제 섭취량이 확정되지 않아 영양 평가는 참고용으로 봐 주세요."
 
 MAX_FINDINGS = 5
 MAX_RECOMMENDED_CHALLENGES = 3
 MAX_RAG_EVIDENCE_SOURCES = 5
 GENERAL_RAG_CODES = {"DIET_NUTRITION", "DIET_CAUTION", "DIET_FAQ"}
-RAG_FALLBACK_SUMMARY = "참고 문서 기반 설명을 만들 수 없어 기존 식단 추천만 제공합니다."
+RAG_FALLBACK_SUMMARY = (
+    "이번 식단은 기본 추천을 먼저 참고해 보세요. 기록을 이어가면 더 잘 맞는 생활관리 포인트를 살펴볼 수 있습니다."
+)
 DIET_RAG_STRATEGY_KEYWORD_ONLY = "keyword_only"
 DIET_RAG_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK = "keyword_first_vector_fallback"
 DIET_RAG_STRATEGY_VECTOR_DISABLED = "vector_disabled"
@@ -74,85 +74,85 @@ ISSUE_DEFINITIONS = {
         "type": "excess_candidate",
         "nutrient": "sodium_mg",
         "label": "나트륨 주의",
-        "message": "현재 식단 후보에서 나트륨이 높은 음식이 포함된 것으로 보여 주의가 필요합니다.",
-        "reason": "나트륨 관리와 연결됩니다.",
+        "message": "이번 식단에는 나트륨이 높은 후보가 있어요. 국물이나 짠 소스는 조금 덜어내는 것부터 시작해 보세요.",
+        "reason": "짠맛을 줄이는 식습관을 가볍게 시작하는 데 도움이 될 수 있습니다.",
     },
     "carbohydrate_high": {
         "type": "excess_candidate",
         "nutrient": "carbohydrate_g",
         "label": "탄수화물 주의",
-        "message": "현재 식단 후보에서 탄수화물 비중이 높은 음식이 포함된 것으로 보여요.",
-        "reason": "탄수화물 선택과 혈당 관리 습관에 연결됩니다.",
+        "message": "탄수화물 비중이 높은 후보가 보여요. 다음 식사에는 단백질 반찬이나 채소를 함께 보완해 보세요.",
+        "reason": "탄수화물 선택을 천천히 조절하는 습관에 도움이 될 수 있습니다.",
     },
     "sugar_high": {
         "type": "excess_candidate",
         "nutrient": "sugar_g",
         "label": "당류 주의",
-        "message": "현재 식단 후보에서 당류가 높은 음식이 포함됐을 가능성이 있어요.",
-        "reason": "당류를 줄이는 식습관과 연결됩니다.",
+        "message": "당류가 높은 후보가 포함됐을 수 있어요. 단 음료나 후식은 양을 줄여보면 좋습니다.",
+        "reason": "당류를 줄이는 작은 실천과 연결됩니다.",
     },
     "fat_high": {
         "type": "excess_candidate",
         "nutrient": "fat_g",
         "label": "지방 주의",
-        "message": "현재 식단 후보에서 지방이 높은 음식이 포함된 것으로 보여요.",
-        "reason": "기름기 조절과 균형식 습관에 연결됩니다.",
+        "message": "기름진 음식 후보가 보여요. 튀김보다 구이, 삶은 음식처럼 담백한 선택을 참고해 보세요.",
+        "reason": "기름기를 줄이고 균형을 맞추는 습관에 도움이 될 수 있습니다.",
     },
     "calorie_high": {
         "type": "excess_candidate",
         "nutrient": "calories_kcal",
         "label": "열량 주의",
-        "message": "현재 식단 후보에서 열량이 높은 음식이 포함됐을 가능성이 있어요.",
-        "reason": "야식과 과식을 줄이는 생활습관과 연결됩니다.",
+        "message": "열량이 높은 후보가 포함됐을 수 있어요. 다음 끼니는 채소와 단백질 반찬을 곁들여 균형을 맞춰보세요.",
+        "reason": "과식과 야식을 줄이는 생활관리 습관에 도움이 될 수 있습니다.",
     },
     "protein_support": {
         "type": "support_candidate",
         "nutrient": "protein_g",
         "label": "단백질 보완",
-        "message": "단백질 반찬을 함께 보완하면 식사 균형에 도움이 될 수 있습니다.",
-        "reason": "균형 잡힌 반찬 구성과 연결됩니다.",
+        "message": "단백질 반찬을 조금 더 보완하면 식사 균형에 도움이 될 수 있습니다.",
+        "reason": "두부, 계란, 생선처럼 부담 없는 반찬을 더하는 실천과 연결됩니다.",
     },
     "fiber_support": {
         "type": "support_candidate",
         "nutrient": "fiber_g",
         "label": "식이섬유 보완",
-        "message": "채소, 잡곡 등 식이섬유가 있는 음식을 보완하면 좋습니다.",
-        "reason": "식이섬유 보완 습관과 연결됩니다.",
+        "message": "식이섬유를 조금 더 보완하면 좋습니다. 채소 반찬이나 잡곡밥처럼 쉽게 더할 수 있는 음식부터 시작해 보세요.",
+        "reason": "채소와 잡곡을 자연스럽게 늘리는 습관에 도움이 될 수 있습니다.",
     },
     "iron_support": {
         "type": "support_candidate",
         "nutrient": "iron_mg",
         "label": "철분 보완",
-        "message": "철분과 비타민C가 있는 반찬을 보완하면 좋습니다.",
-        "reason": "철분 보완 식습관과 연결됩니다.",
+        "message": "철분과 비타민C가 있는 반찬을 함께 챙겨보면 좋습니다.",
+        "reason": "철분이 있는 반찬을 식사에 더하는 실천과 연결됩니다.",
     },
     "late_night_or_irregular": {
         "type": "habit_candidate",
         "nutrient": None,
         "label": "식사 시간 주의",
-        "message": "식사 시간이 늦거나 불규칙한 경우라면 규칙적인 식사 습관을 우선 추천합니다.",
-        "reason": "야식과 불규칙 식사 조절에 연결됩니다.",
+        "message": "식사 시간이 늦거나 불규칙했다면 내일은 비슷한 시간에 한 끼를 챙기는 것부터 시작해 보세요.",
+        "reason": "야식과 불규칙한 식사를 줄이는 생활관리 습관에 도움이 될 수 있습니다.",
     },
     "alcohol_liver_support": {
         "type": "habit_candidate",
         "nutrient": None,
         "label": "간 건강 식습관",
-        "message": "간 건강 관리 관점에서 음주와 당류, 기름진 음식은 주의해서 살펴보는 것이 좋습니다.",
-        "reason": "절주와 간 건강 생활습관에 연결됩니다.",
+        "message": "간 건강 관리 관점에서는 음주, 당류, 기름진 안주를 함께 살펴보면 좋습니다.",
+        "reason": "절주와 간 건강 생활관리 습관에 도움이 될 수 있습니다.",
     },
     "kidney_caution": {
         "type": "medical_caution",
         "nutrient": None,
         "label": "신장 관련 주의",
-        "message": "신장 관련 수치가 걱정되는 경우 제한식을 단정하지 말고 의료진과 상담하며 식사일지를 남겨보세요.",
-        "reason": "의료진 상담 전 식사 기록 습관과 연결됩니다.",
+        "message": "신장 관련 수치가 걱정된다면 제한식을 단정하기보다 식사일지를 남기고 의료진과 상의해 보세요.",
+        "reason": "상담 전 식사 기록을 준비하는 습관에 도움이 될 수 있습니다.",
     },
     "balanced_support": {
         "type": "support_candidate",
         "nutrient": None,
         "label": "균형 유지",
-        "message": "현재 식단은 확정 평가보다 식사 기록과 균형 유지 관점에서 참고해 주세요.",
-        "reason": "균형식과 식사 기록 습관에 연결됩니다.",
+        "message": "이번 식단은 식사 기록과 균형 유지 관점에서 참고해 주세요. 지금처럼 기록을 이어가면 패턴을 보기 쉬워집니다.",
+        "reason": "균형식과 꾸준한 식사 기록 습관에 도움이 될 수 있습니다.",
     },
 }
 
@@ -160,43 +160,43 @@ DISEASE_RULES = {
     "HTN": {
         "analysis_types": {AnalysisType.HYPERTENSION},
         "label": "혈압 관리",
-        "message": "혈압 관리 관점에서 저염 식습관을 우선 추천합니다.",
+        "message": "혈압 관리가 필요한 경우 짠맛을 줄이는 식습관부터 참고해 보세요.",
         "issues": ("sodium_high",),
     },
     "DM": {
         "analysis_types": {AnalysisType.DIABETES},
         "label": "혈당 관리",
-        "message": "혈당 관리 관점에서 탄수화물과 당류 선택을 천천히 확인해 보세요.",
+        "message": "혈당 관리가 필요한 경우 탄수화물과 당류 선택을 천천히 살펴보세요.",
         "issues": ("carbohydrate_high", "sugar_high"),
     },
     "DL": {
         "analysis_types": {AnalysisType.DYSLIPIDEMIA},
         "label": "콜레스테롤·중성지방 관리",
-        "message": "지질 관리 관점에서 기름진 음식과 식이섬유 보완을 함께 살펴보세요.",
+        "message": "지질 관리 관점에서는 기름진 음식은 줄이고 식이섬유를 보완하는 방향을 참고해 보세요.",
         "issues": ("fat_high", "fiber_support"),
     },
     "OBE": {
         "analysis_types": {AnalysisType.OBESITY, AnalysisType.ABDOMINAL_OBESITY},
         "label": "체중 관리",
-        "message": "체중 관리 관점에서 열량이 높은 음식과 야식 습관을 참고해 보세요.",
+        "message": "체중 관리 관점에서는 열량이 높은 음식과 야식 습관을 함께 살펴보세요.",
         "issues": ("calorie_high", "late_night_or_irregular"),
     },
     "ANEM": {
         "analysis_types": {AnalysisType.ANEMIA},
         "label": "빈혈 관리",
-        "message": "빈혈 관리 관점에서 철분과 단백질 반찬 보완을 참고해 보세요.",
+        "message": "빈혈 관리 관점에서는 철분과 단백질 반찬을 보완하는 식사를 참고해 보세요.",
         "issues": ("iron_support", "protein_support"),
     },
     "FL": {
         "analysis_types": {AnalysisType.FATTY_LIVER, AnalysisType.LIVER_FUNCTION},
         "label": "간 건강 관리",
-        "message": "간 건강 관리 관점에서 음주, 당류, 기름진 음식과 야식 습관을 참고해 보세요.",
+        "message": "간 건강 관리 관점에서는 음주, 당류, 기름진 음식과 늦은 식사를 함께 살펴보세요.",
         "issues": ("alcohol_liver_support", "sugar_high", "fat_high", "calorie_high"),
     },
     "CKD": {
         "analysis_types": {AnalysisType.KIDNEY_FUNCTION, AnalysisType.CHRONIC_KIDNEY_DISEASE},
         "label": "신장 관리",
-        "message": "신장 관련 식사는 개인 수치에 따라 달라질 수 있어 제한식을 단정하지 말고 의료진 상담을 권장합니다.",
+        "message": "신장 관련 식사는 개인 수치에 따라 달라질 수 있어 식사일지를 바탕으로 의료진과 상의해 보세요.",
         "issues": ("kidney_caution",),
     },
 }
@@ -218,19 +218,17 @@ FOOD_RECOMMENDATIONS = {
 
 RAG_COMMENT_TEMPLATES = {
     "HTN": (
-        "혈압 관리 관점에서 저염 식습관을 우선 추천합니다. "
-        "현재 식단 후보에서 나트륨이 높은 음식이 포함된 것으로 보여 국물이나 짠 소스는 참고용으로 주의가 필요합니다."
+        "혈압 관리가 필요한 경우 저염 식습관을 먼저 참고해 보세요. "
+        "이번 식단에서 국물이나 짠 소스는 조금 덜어내는 것부터 시작해 볼 수 있습니다."
     ),
     "DM": (
-        "혈당 관리 관점에서는 탄수화물과 당류 섭취 패턴을 함께 살펴보는 것이 좋습니다. "
-        "실제 섭취량이 확정되지 않아 참고용입니다."
+        "혈당 관리가 필요한 경우 탄수화물과 당류 섭취 패턴을 함께 살펴보면 좋습니다. "
+        "실제 섭취량이 확정되지 않아 참고용으로 봐 주세요."
     ),
-    "DL": (
-        "지질 관리 관점에서는 기름진 음식과 포화지방 후보를 줄이고 식이섬유가 있는 식품을 보완하는 방향을 추천합니다."
-    ),
-    "OBE": "체중 관리 관점에서는 열량이 높은 후보와 야식/폭식 패턴을 함께 점검하는 것이 좋습니다.",
+    "DL": ("지질 관리 관점에서는 기름진 음식은 조금 줄이고 식이섬유가 있는 식품을 보완해 보세요."),
+    "OBE": "체중 관리 관점에서는 열량이 높은 후보와 야식 패턴을 함께 살펴보면 좋습니다.",
     "CKD": (
-        "신장 관련 소견이 있다면 식단 제한은 개인 상태에 따라 달라질 수 있어 의료진 상담을 권장합니다. "
+        "신장 관련 식사는 개인 상태에 따라 달라질 수 있어 의료진과 상의해 보세요. "
         "식사일지를 기록해 상담 시 참고자료로 활용해 보세요."
     ),
 }
@@ -583,7 +581,10 @@ def _recommended_challenges(issue_keys: list[str], active_challenges: Iterable[A
                 {
                     "challenge_id": challenge_id,
                     "title": str(challenge.title),
-                    "reason": str(ISSUE_DEFINITIONS.get(issue_key, {}).get("reason") or "식단 관리 습관과 연결됩니다."),
+                    "reason": str(
+                        ISSUE_DEFINITIONS.get(issue_key, {}).get("reason")
+                        or "식단 관리 습관을 가볍게 시작하는 데 도움이 될 수 있습니다."
+                    ),
                 }
             )
             if len(recommendations) >= MAX_RECOMMENDED_CHALLENGES:
@@ -634,7 +635,7 @@ def _build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -
         return {
             "enabled": False,
             "fallback_used": True,
-            "summary": "주의 이상 분석 결과와 연결된 참고 문서가 없어 기존 식단 추천만 제공합니다.",
+            "summary": "이번 식단은 기본 추천을 먼저 참고해 보세요. 식사 기록이 쌓이면 더 잘 맞는 생활관리 포인트를 살펴볼 수 있습니다.",
             "disease_comments": [],
             "evidence_sources": [],
             "safety_notice": SAFETY_NOTICE,
@@ -660,7 +661,7 @@ async def _build_rag_comment_async(
         return {
             "enabled": False,
             "fallback_used": True,
-            "summary": "주의 이상 분석 결과와 연결된 참고 문서가 없어 기존 식단 추천만 제공합니다.",
+            "summary": "이번 식단은 기본 추천을 먼저 참고해 보세요. 식사 기록이 쌓이면 더 잘 맞는 생활관리 포인트를 살펴볼 수 있습니다.",
             "disease_comments": [],
             "evidence_sources": [],
             "safety_notice": SAFETY_NOTICE,
@@ -737,9 +738,12 @@ def _build_rag_comment_from_evidence(
         target_codes=target_codes,
         evidence_sources=evidence_sources,
     )
-    summary = "주의 이상 분석 결과와 현재 식단 이슈에 맞춰 참고 문서 기반 생활관리 포인트를 정리했습니다."
+    summary = "이번 식단에서 보완하거나 줄여볼 포인트를 생활관리 관점으로 정리했어요."
     if not disease_comments:
-        summary = "현재 식단 이슈와 연결되는 일반 식생활 참고 문서를 확인했습니다."
+        summary = (
+            "이번 식단은 식생활 균형을 보완하는 쪽으로 참고해 보세요. "
+            "채소 반찬이나 잡곡밥처럼 부담 없이 더할 수 있는 선택부터 시작해 보세요."
+        )
     return {
         "enabled": True,
         "fallback_used": False,
@@ -911,8 +915,8 @@ def _basis_from_evidence(*, disease_code: str, evidence_sources: list[dict[str, 
         or (disease_code == "CKD" and source["disease_code"] == "DIET_CAUTION")
     ]
     if not titles:
-        return "참고 문서 기반"
-    return f"참고 문서 기반: {', '.join(titles[:2])}"
+        return "생활관리 참고 자료 기반"
+    return f"관련 참고: {', '.join(titles[:2])}"
 
 
 def _normalized_diet_rag_strategy() -> str:

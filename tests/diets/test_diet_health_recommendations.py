@@ -226,13 +226,13 @@ def test_diet_health_recommendation_cases(
     assert expected_challenge in challenge_titles
     assert result["safety_notice"] == service.SAFETY_NOTICE
     assert len(result["recommended_challenges"]) <= 3
-    assert "진단이나 처방이 아닌" in result["safety_notice"]
+    assert "의료적 판단이 아닌" in result["safety_notice"]
     serialized = str(result)
     assert "나트륨 과다입니다" not in serialized
     assert "단백질이 부족합니다" not in serialized
     assert "먹으면 안 됩니다" not in serialized
     if expected_issue == "kidney_caution":
-        assert "의료진 상담" in serialized
+        assert "의료진" in serialized
         assert "단백질 제한" not in serialized
         assert "칼륨 제한" not in serialized
 
@@ -287,7 +287,7 @@ def test_diet_rag_comment_for_ckd_uses_diet_caution_when_ckd_source_is_disabled(
     assert any(item["disease_code"] == "CKD" for item in rag_comment["disease_comments"])
     assert any(item["disease_code"] == "DIET_CAUTION" for item in rag_comment["evidence_sources"])
     serialized = str(rag_comment)
-    assert "의료진 상담" in serialized
+    assert "의료진" in serialized
     assert "단백질 제한" not in serialized
     assert "칼륨 제한" not in serialized
     assert "인 제한" not in serialized
@@ -313,12 +313,44 @@ def test_diet_rag_comment_does_not_use_forbidden_phrases() -> None:
         analysis_types=[AnalysisType.HYPERTENSION, AnalysisType.DIABETES, AnalysisType.DYSLIPIDEMIA],
     )
 
-    serialized = str(result["rag_comment"])
+    serialized = str(result)
     assert "나트륨 과다입니다" not in serialized
     assert "단백질이 부족합니다" not in serialized
     assert "당뇨 식단으로 부적절합니다" not in serialized
     assert "고혈압 식단입니다" not in serialized
     assert "이 음식을 먹으면 안 됩니다" not in serialized
+    assert "반드시" not in serialized
+    assert "절대" not in serialized
+    assert "치료" not in serialized
+    assert "처방" not in serialized
+    assert "진단" not in serialized
+    assert "병이 있다" not in serialized
+    assert "위험합니다" not in serialized
+
+
+def test_diet_recommendation_messages_are_user_facing() -> None:
+    result = _build(nutrition={"fiber_g": 1.0}, analysis_types=[])
+
+    finding_messages = [item["message"] for item in result["nutrition_findings"]]
+    assert any("시작해 보세요" in message or "보완하면 좋습니다" in message for message in finding_messages)
+    assert "이번 식단은 식생활 균형을 보완하는 쪽으로 참고해 보세요" in result["rag_comment"]["summary"]
+    assert result["safety_notice"] == service.SAFETY_NOTICE
+
+
+def test_disease_context_messages_keep_lifestyle_tone() -> None:
+    result = _build(
+        nutrition={"sodium_mg": 920, "carbohydrate_g": 80},
+        analysis_types=[AnalysisType.HYPERTENSION, AnalysisType.DIABETES],
+    )
+
+    messages = [item["message"] for item in result["disease_context"]]
+    assert any("혈압 관리가 필요한 경우" in message for message in messages)
+    assert any("혈당 관리가 필요한 경우" in message for message in messages)
+    serialized = str(messages)
+    assert "진단" not in serialized
+    assert "처방" not in serialized
+    assert "치료" not in serialized
+    assert "병이 있다" not in serialized
 
 
 def test_diet_rag_evidence_sources_do_not_expose_internal_review_status() -> None:
@@ -655,7 +687,7 @@ def test_diet_rag_rewrite_ckd_restriction_phrase_falls_back(monkeypatch: pytest.
     assert result["rag_comment"]["rewrite_used"] is False
     assert result["rag_comment"]["fallback_reason"] == "safety_failed"
     serialized = str(result["rag_comment"])
-    assert "의료진 상담" in serialized
+    assert "의료진" in serialized
     assert "단백질 제한하세요" not in serialized
     assert "칼륨 제한하세요" not in serialized
     assert "인 제한하세요" not in serialized
@@ -692,7 +724,7 @@ def test_diet_health_recommendation_api_response(monkeypatch: pytest.MonkeyPatch
                     "issue_key": "sodium_high",
                     "nutrient": "sodium_mg",
                     "label": "나트륨 주의",
-                    "message": "현재 식단 후보에서 나트륨이 높은 음식이 포함된 것으로 보여 주의가 필요합니다.",
+                    "message": "이번 식단에는 나트륨이 높은 후보가 있어요. 국물이나 짠 소스는 조금 덜어내는 것부터 시작해 보세요.",
                     "basis": "100g 기준",
                 }
             ],
@@ -700,7 +732,11 @@ def test_diet_health_recommendation_api_response(monkeypatch: pytest.MonkeyPatch
             "recommended_foods": ["채소 반찬"],
             "caution_foods": ["짠 소스"],
             "recommended_challenges": [
-                {"challenge_id": 1, "title": "염분 빼볼까염 챌린지", "reason": "나트륨 관리와 연결됩니다."}
+                {
+                    "challenge_id": 1,
+                    "title": "염분 빼볼까염 챌린지",
+                    "reason": "짠맛을 줄이는 식습관을 가볍게 시작하는 데 도움이 될 수 있습니다.",
+                }
             ],
             "safety_notice": service.SAFETY_NOTICE,
         }
