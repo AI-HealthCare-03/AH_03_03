@@ -23,6 +23,7 @@ from ai_runtime.llm.rag.source_loader import (  # noqa: E402
     INDEX_FILE_NAME,
     load_rag_source_index,
 )
+from ai_runtime.llm.rag.source_trust import source_trust_level_for_type  # noqa: E402
 from app.core.db.databases import TORTOISE_ORM  # noqa: E402
 from app.models.rag import RAGChunk, RAGDiseaseType, RAGDocument, RAGSource  # noqa: E402
 
@@ -309,7 +310,7 @@ async def _plan_or_apply_document(
             if apply:
                 await gateway.create_chunk(document_id, payload)
             continue
-        if getattr(chunk, "content_hash", None) == payload["content_hash"]:
+        if not _payload_changed(chunk, payload):
             summary.planned_chunk_unchanged += 1
             continue
         summary.planned_chunk_updates += 1
@@ -385,6 +386,7 @@ def _source_payload(chunk: RagChunkDraft, *, namespace: str) -> dict[str, Any]:
             "issue_keys": list(chunk.issue_keys),
             "review_status": chunk.review_status,
             "safety_level": chunk.safety_level,
+            "source_trust_level": _source_trust_level(chunk),
             "year": chunk.year,
             "filename": chunk.filename,
             "raw_source_metadata": _raw_source_metadata(chunk),
@@ -411,6 +413,7 @@ def _document_payload(chunk: RagChunkDraft, *, document_key: str, namespace: str
             "notes": chunk.notes,
             "source_org": chunk.source_org,
             "source_type": chunk.source_type,
+            "source_trust_level": _source_trust_level(chunk),
             "safety_level": chunk.safety_level,
             "year": chunk.year,
             "raw_source_metadata": _raw_source_metadata(chunk),
@@ -439,6 +442,10 @@ def _chunk_payload(chunk: RagChunkDraft, *, namespace: str) -> dict[str, Any]:
             "disease_code": chunk.disease_code,
             "review_status": chunk.review_status,
             "usage_scope": chunk.usage_scope,
+            "source_org": chunk.source_org,
+            "source_url": chunk.source_url,
+            "source_type": chunk.source_type,
+            "source_trust_level": _source_trust_level(chunk),
             "topic_tags": list(chunk.topic_tags),
             "issue_keys": list(chunk.issue_keys),
             "safety_level": chunk.safety_level,
@@ -447,6 +454,7 @@ def _chunk_payload(chunk: RagChunkDraft, *, namespace: str) -> dict[str, Any]:
                 "document_id": chunk.document_id,
                 "filename": chunk.filename,
                 "source_type": chunk.source_type,
+                "source_trust_level": _source_trust_level(chunk),
                 "year": chunk.year,
                 "enabled": chunk.enabled,
             },
@@ -463,6 +471,7 @@ def _raw_source_metadata(chunk: RagChunkDraft) -> dict[str, Any]:
         "source_org": chunk.source_org,
         "source_url": chunk.source_url,
         "source_type": chunk.source_type,
+        "source_trust_level": _source_trust_level(chunk),
         "topic_tags": list(chunk.topic_tags),
         "issue_keys": list(chunk.issue_keys),
         "usage_scope": chunk.usage_scope,
@@ -472,6 +481,10 @@ def _raw_source_metadata(chunk: RagChunkDraft) -> dict[str, Any]:
         "safety_level": chunk.safety_level,
         "year": chunk.year,
     }
+
+
+def _source_trust_level(chunk: RagChunkDraft) -> str:
+    return chunk.source_trust_level or source_trust_level_for_type(chunk.source_type)
 
 
 def _legacy_disease_type(disease_code: str) -> RAGDiseaseType:

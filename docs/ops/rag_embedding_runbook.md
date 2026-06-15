@@ -85,6 +85,51 @@ uv run python scripts/rag/embed_rag_chunks.py --provider openai --only-document-
 - `warnings`
 - `db_write_performed=false`
 
+## Source Metadata 품질 기준
+
+RAG source는 `docs/rag_sources/index.json`과 같은 디렉터리의 markdown 파일을 원천으로 관리한다.
+`scripts/rag/ingest_rag_chunks.py`는 index metadata를 `rag_sources`, `rag_documents`, `rag_chunks.metadata`에 복사한다.
+
+필수 metadata:
+
+- `id`
+- `disease_code`
+- `title`
+- `filename`
+- `source_org`
+- `source_url`
+- `source_type`
+- `source_trust_level`
+- `topic_tags`
+- `issue_keys`
+- `usage_scope`
+- `review_status`
+- `enabled`
+- `safety_level`은 CKD처럼 보수 안내가 필요한 문서에서 명시한다.
+
+출처 등급 기준:
+
+- 질병관리청, 국민건강보험공단 같은 공공기관: `source_type=public_health_agency` 또는 관련 정책 문서
+- 공식 학회 진료지침/가이드라인: `source_type=clinical_guideline`, `source_trust_level=official_guideline`
+- 공식 학회 일반 안내: `source_type=official_society`, `source_trust_level=public_health_agency`
+- 서비스 안전 정책/면책 문구: `source_type=safety_policy`, `source_trust_level=internal_policy`
+
+allowlist 도메인 추가 기준:
+
+- `ai_runtime/llm/rag_sources.py`의 `ALLOWED_RAG_DOMAINS`에 추가한다.
+- `docs/rag_sources/index.json`에 같은 출처의 `source_org`, `source_url`, `source_type`, `source_trust_level`이 먼저 정의되어 있어야 한다.
+- 공식 학회/공공기관 도메인으로 확인된 경우에만 추가한다.
+- 확실하지 않은 도메인은 TODO로 남기고 운영 RAG에서 official source처럼 취급하지 않는다.
+
+CKD source 추가 절차:
+
+1. `docs/rag_sources/index.json`에 CKD source metadata를 추가한다.
+2. `docs/rag_sources/ckd.md`에는 eGFR, 요단백, 크레아티닌, 나트륨/칼륨/단백질 조절이 개인 수치와 치료 단계에 따라 달라진다는 안전 문구를 유지한다.
+3. 원문 대조와 의료진 검토 전에는 `enabled=false`를 유지한다.
+4. 검토 후에만 `enabled=true`로 바꾸고 `make rag-preview`, `make rag-ingest-dry-run`으로 chunk 수와 metadata를 확인한다.
+5. DB 반영은 `make rag-ingest-apply`로 별도 실행한다.
+6. OpenAI embedding apply는 dry-run과 명시 확인 후 `make rag-embed-apply-openai LIMIT=1`부터 소량으로 실행한다.
+
 ## Apply
 
 dry-run 결과를 확인한 뒤에만 apply를 실행한다.

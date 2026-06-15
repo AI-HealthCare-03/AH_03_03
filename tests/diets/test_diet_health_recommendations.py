@@ -328,7 +328,8 @@ def test_diet_rag_comment_does_not_use_forbidden_phrases() -> None:
     assert "위험합니다" not in serialized
 
 
-def test_diet_recommendation_messages_are_user_facing() -> None:
+def test_diet_recommendation_messages_are_user_facing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", False)
     result = _build(nutrition={"fiber_g": 1.0}, analysis_types=[])
 
     finding_messages = [item["message"] for item in result["nutrition_findings"]]

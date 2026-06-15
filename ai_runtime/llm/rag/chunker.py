@@ -44,6 +44,7 @@ class RagChunkDraft:
     content_length: int
     filename: str
     source_type: str
+    source_trust_level: str
     year: int | None
     enabled: bool
     notes: str | None
@@ -232,6 +233,7 @@ def _chunk_document(
                     content_length=len(content),
                     filename=document.metadata.filename,
                     source_type=document.metadata.source_type,
+                    source_trust_level=document.metadata.source_trust_level or "unknown",
                     year=document.metadata.year,
                     enabled=document.metadata.enabled,
                     notes=document.metadata.notes,

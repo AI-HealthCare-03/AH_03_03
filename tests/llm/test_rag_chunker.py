@@ -30,6 +30,7 @@ def test_rag_chunker_generates_stable_metadata_and_keys() -> None:
     assert first.source_org == "대한고혈압학회"
     assert first.source_url
     assert first.source_type == "official_society"
+    assert first.source_trust_level == "public_health_agency"
     assert "나트륨" in first.topic_tags
     assert "sodium_high" in first.issue_keys
     assert first.review_status == "candidate_unreviewed"
@@ -66,6 +67,7 @@ def test_rag_chunk_dry_run_summary_contains_schema_fields() -> None:
     assert "document_id" in payload["chunk_fields"]
     assert "disease_code" in payload["chunk_fields"]
     assert "review_status" in payload["chunk_fields"]
+    assert "source_trust_level" in payload["chunk_fields"]
     assert "safety_level" in payload["chunk_fields"]
     assert "heading_path" in payload["chunk_fields"]
     assert all(source["chunk_count"] > 0 for source in payload["sources"])
@@ -75,10 +77,44 @@ def test_rag_chunker_can_include_disabled_sources_for_inspection() -> None:
     chunks = build_rag_chunk_drafts(enabled_only=False)
     source_ids = {chunk.source_id for chunk in chunks}
 
-    assert "ckd" not in source_ids
+    assert "ckd" in source_ids
     assert "anemia" not in source_ids
     assert "fatty_liver" not in source_ids
     assert "diet_faq" not in source_ids
+
+
+def test_dyslipidemia_chunks_keep_official_source_metadata() -> None:
+    chunks = [chunk for chunk in build_rag_chunk_drafts() if chunk.source_id == "dyslipidemia"]
+
+    assert len(chunks) == 4
+    assert all(chunk.source_org for chunk in chunks)
+    assert all(chunk.source_url.startswith("https://lipid.or.kr") for chunk in chunks)
+    assert all(chunk.source_type == "clinical_guideline" for chunk in chunks)
+    assert all(chunk.source_trust_level == "official_guideline" for chunk in chunks)
+    assert {"fat_high", "fiber_support", "cholesterol_management"}.issubset(set(chunks[0].issue_keys))
+    for chunk in chunks:
+        assert chunk.topic_tags == chunks[0].topic_tags
+        assert chunk.issue_keys == chunks[0].issue_keys
+        assert chunk.usage_scope == chunks[0].usage_scope
+        assert chunk.review_status == chunks[0].review_status
+        assert chunk.safety_level == chunks[0].safety_level
+
+
+def test_ckd_source_skeleton_is_disabled_but_valid_for_review() -> None:
+    chunks = [chunk for chunk in build_rag_chunk_drafts(enabled_only=False) if chunk.source_id == "ckd"]
+
+    assert chunks
+    first = chunks[0]
+    assert first.enabled is False
+    assert first.disease_code == "CKD"
+    assert first.review_status == "candidate_unreviewed"
+    assert first.safety_level == "high_caution"
+    assert first.source_type == "clinical_guideline"
+    assert first.source_trust_level == "official_guideline"
+    assert "kidney_caution" in first.issue_keys
+    combined_content = "\n".join(chunk.content for chunk in chunks)
+    assert "개인 수치" in combined_content
+    assert "의료진" in combined_content
 
 
 def test_build_rag_chunks_from_index_matches_default_chunker() -> None:

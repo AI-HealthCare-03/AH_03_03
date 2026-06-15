@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from ai_runtime.llm.rag.chunker import RagChunkDraft
+from ai_runtime.llm.rag.chunker import RagChunkDraft, build_rag_chunk_drafts
 from app.models.rag import RAGDiseaseType
 from scripts.rag.ingest_rag_chunks import (
     LEGACY_DISEASE_TYPE_BY_CODE,
@@ -181,6 +181,50 @@ async def test_apply_updates_chunk_when_content_hash_changes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dry_run_detects_metadata_only_chunk_update() -> None:
+    gateway = FakeRagGateway()
+    items = [_item("dyslipidemia", "DL")]
+
+    await ingest_rag_chunks(items, gateway=gateway, apply=True)
+    chunk = gateway.chunks["rag:dyslipidemia:section:000:chunk:0000"]
+    chunk.metadata = {
+        key: value
+        for key, value in chunk.metadata.items()
+        if key not in {"source_org", "source_url", "source_type", "source_trust_level"}
+    }
+    chunk.values["metadata"] = chunk.metadata
+
+    summary = await ingest_rag_chunks(items, gateway=gateway, apply=False)
+
+    assert summary.planned_chunk_updates == 1
+    assert summary.planned_chunk_unchanged == 0
+
+
+@pytest.mark.asyncio
+async def test_metadata_only_chunk_update_preserves_existing_embedding_payload() -> None:
+    gateway = FakeRagGateway()
+    items = [_item("dyslipidemia", "DL")]
+
+    await ingest_rag_chunks(items, gateway=gateway, apply=True)
+    chunk = gateway.chunks["rag:dyslipidemia:section:000:chunk:0000"]
+    chunk.values["embedding"] = "[0.1,0.2]"
+    chunk.values["embedding_provider"] = "openai"
+    chunk.metadata = {
+        key: value
+        for key, value in chunk.metadata.items()
+        if key not in {"source_org", "source_url", "source_type", "source_trust_level"}
+    }
+    chunk.values["metadata"] = chunk.metadata
+
+    summary = await ingest_rag_chunks(items, gateway=gateway, apply=True)
+
+    assert summary.planned_chunk_updates == 1
+    assert gateway.chunks["rag:dyslipidemia:section:000:chunk:0000"].values["embedding"] == "[0.1,0.2]"
+    assert gateway.chunks["rag:dyslipidemia:section:000:chunk:0000"].values["embedding_provider"] == "openai"
+    assert gateway.chunks["rag:dyslipidemia:section:000:chunk:0000"].metadata["source_trust_level"] == "unknown"
+
+
+@pytest.mark.asyncio
 async def test_deactivate_missing_only_affects_managed_namespace() -> None:
     gateway = FakeRagGateway()
     first_items = [_item("hypertension", "HTN"), _item("diabetes", "DM")]
@@ -236,8 +280,30 @@ def test_ingest_payload_preserves_disease_code_and_chunk_metadata() -> None:
     assert chunk_payload["metadata"]["heading_path"] == ["요약"]
     assert chunk_payload["metadata"]["source_key"] == "diet_nutrition"
     assert chunk_payload["metadata"]["disease_code"] == "DIET_NUTRITION"
+    assert chunk_payload["metadata"]["source_org"] == "테스트 기관"
+    assert chunk_payload["metadata"]["source_url"] == "https://example.com/diet_nutrition"
+    assert chunk_payload["metadata"]["source_type"] == "official"
+    assert chunk_payload["metadata"]["source_trust_level"] == "unknown"
     assert chunk_payload["metadata"]["issue_keys"] == ["fiber_support"]
     assert "fiber_support" in chunk_payload["keywords"]
+
+
+def test_ingest_payload_preserves_source_metadata_for_all_chunks_in_source() -> None:
+    dyslipidemia_chunks = [chunk for chunk in build_rag_chunk_drafts() if chunk.source_id == "dyslipidemia"]
+    item = _build_ingest_items(dyslipidemia_chunks, namespace="docs/rag_sources")[0]
+
+    assert len(item.chunk_payloads) == 4
+    for payload in item.chunk_payloads:
+        metadata = payload["metadata"]
+        assert metadata["source_org"] == "대한지질·동맥경화학회, 질병관리청 국가건강정보포털"
+        assert metadata["source_url"].startswith("https://lipid.or.kr/")
+        assert metadata["source_type"] == "clinical_guideline"
+        assert metadata["source_trust_level"] == "official_guideline"
+        assert "콜레스테롤" in metadata["topic_tags"]
+        assert "cholesterol_management" in metadata["issue_keys"]
+        assert metadata["usage_scope"]
+        assert metadata["review_status"] == "candidate_unreviewed"
+        assert metadata["safety_level"] == "normal"
 
 
 def test_ingest_script_does_not_reference_vector_or_openai_runtime_calls() -> None:
@@ -281,6 +347,7 @@ def _chunk(source_key: str, disease_code: str, *, content: str, content_hash: st
         content_length=len(content),
         filename=f"{source_key}.md",
         source_type="official",
+        source_trust_level="unknown",
         year=2026,
         enabled=True,
         notes="테스트 notes",
