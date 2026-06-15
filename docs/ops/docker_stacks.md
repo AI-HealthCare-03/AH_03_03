@@ -13,7 +13,7 @@
 
 `Makefile`은 표준 dev full stack 실행을 감싼다. `scripts/docker_stack.sh`는 legacy `app` 스택과 optional `langfuse` 스택 wrapper로 보존한다. `prod`는 이미지 태그와 운영 환경변수 확인이 필요하므로 명시적으로 compose 파일을 지정해서 실행한다.
 
-현재 표준 로컬 실행은 `make dev-up`이며 내부적으로 `infra/docker/docker-compose.dev.yml`을 사용한다. 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용으로만 유지하며, frontend, Firebase Web Push build args, storage, scheduler, 최신 dev full stack 검증에는 사용하지 않는다.
+현재 표준 로컬 실행은 `make dev-up`이며 내부적으로 `infra/docker/docker-compose.dev.yml`을 사용한다. 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용으로만 유지하며, frontend, storage, scheduler, 최신 dev full stack 검증에는 사용하지 않는다.
 
 ## 현재 Redis / async job 범위
 
@@ -23,8 +23,8 @@
 - FastAPI의 `REDIS_HOST`, `REDIS_PORT` 기반 연결
 - `/api/v1/system/health` Redis 연결 확인
 - Compose `redis` service healthcheck
-- AI stream: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`
-- Service stream: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `fcm.push.send`, `family.notification.create`
+- AI stream: `analysis.run`, `exam_ocr.run`, `diet.analyze_image`
+- Service stream: `email.verification.send`, `password_reset.email.send`, `family.invite.email.send`, `family.notification.create`
 - retry/backoff, DLQ, pending recovery 기반 `ai-worker` consumer
 
 P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영 관측, queue 지표 노출, alerting, worker 수평 확장 정책이다.
@@ -42,14 +42,13 @@ P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영
 - `email.verification.send`
 - `password_reset.email.send`
 - `family.invite.email.send`
-- `fcm.push.send`
 - `family.notification.create`
 
 또한 `SCHEDULER_ENABLED=true`일 때 notification scheduler도 `ai-worker` 프로세스 안에서 함께 실행된다.
 
 현재 구조의 리스크:
 
-- `ai-worker`가 무거운 OCR/GPT Vision/ML 작업으로 밀리면 인증 이메일, 비밀번호 재설정 이메일, FCM push, 가족 알림도 함께 지연될 수 있다.
+- `ai-worker`가 무거운 OCR/GPT Vision/ML 작업으로 밀리면 인증 이메일, 비밀번호 재설정 이메일, 가족 알림도 함께 지연될 수 있다.
 - 이메일 인증은 회원가입 UX와 직접 연결되므로 AI/OCR job 장애와 분리하는 편이 운영 안정성에 유리하다.
 - scheduler loop와 Redis Stream consumer가 같은 프로세스에 있으므로, 장기적으로 장애 격리와 스케일링 단위가 거칠다.
 
@@ -59,21 +58,21 @@ P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영
 | --- | --- |
 | `ai-worker` | OCR, GPT Vision, ML inference, analysis job |
 | `email-worker` 또는 `service-worker` | 이메일 인증 코드, 비밀번호 재설정 이메일, 가족 초대 이메일 |
-| `notification-worker` | FCM push 발송, 가족 알림 생성, `notification_logs` 기록 |
+| `notification-worker` | 가족 알림 생성, `notification_logs` 기록 |
 | `scheduler-worker` | 예약 알림, 리마인더 스케줄링, `SCHEDULER_ENABLED` 기반 주기 작업 |
 
 장기 TODO:
 
 - Redis Stream job type별 consumer group 또는 worker command 분리 정책을 정한다.
 - Compose prod/dev에 worker별 service를 추가하되, 최초 전환 시에는 기존 `ai-worker` 통합 모드와 병행 가능한 migration path를 둔다.
-- 이메일/FCM worker는 AI model dependency 없이 가벼운 image 또는 command로 분리할 수 있는지 검토한다.
+- 이메일/알림 worker는 AI model dependency 없이 가벼운 image 또는 command로 분리할 수 있는지 검토한다.
 - worker별 로그, health check, queue 지표, DLQ 확인 절차를 배포 체크리스트에 반영한다.
 
 ## Provider Availability 정리 방향
 
 장기적으로 앱 `.env`는 secret, key, URL, password, host, port 같은 실행 환경값 중심으로 유지한다. provider 사용 가능 여부는 코드의 availability helper가 판단하고, key나 runtime dependency가 없으면 fallback 또는 no-op으로 처리한다.
 
-현재 1단계에서는 `OPENAI_API_KEY`, `SMTP_*`, `LANGFUSE_*`, `CLOVA_OCR_*` 설정 완성 여부를 helper로 확인한다. 다만 `EMAIL_ENABLED`, `CHATBOT_USE_REAL_LLM`, `DIET_GPT_VISION_ENABLED`, `EXAM_GPT_VISION_ENABLED`, `MEDICATION_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED`, `LANGFUSE_ENABLED`, `SCHEDULER_ENABLED`, `RAG_ENABLED`, `GPT_VISION_FALLBACK_ENABLED` 같은 기존 flag는 호환성과 비용/발송/디버그 안전장치 때문에 아직 유지한다.
+현재 1단계에서는 `OPENAI_API_KEY`, `SMTP_*`, `LANGFUSE_*` 설정 완성 여부를 helper로 확인한다. 다만 `EMAIL_ENABLED`, `CHATBOT_USE_REAL_LLM`, `DIET_GPT_VISION_ENABLED`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED`, `LANGFUSE_ENABLED`, `SCHEDULER_ENABLED`, `RAG_ENABLED`, `GPT_VISION_FALLBACK_ENABLED` 같은 기존 flag는 호환성과 비용/발송/디버그 안전장치 때문에 아직 유지한다.
 
 이메일은 회원가입 인증, 비밀번호 재설정, 가족 초대/비회원 가족 초대에서 공통으로 쓰는 핵심 delivery provider다. 따라서 SMTP provider availability는 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`이 모두 준비된 경우에만 true로 본다. local/dev에서 SMTP 설정이 없으면 실제 발송 대신 debug 응답 또는 로그 흐름으로 개발할 수 있지만, prod에서는 조용한 no-op으로 넘기지 않고 configuration error를 유지한다. `EMAIL_ENABLED`는 1단계 호환성 flag로 남기되, 장기적으로는 SMTP availability와 `ENV` 기준으로 대체한다. `EMAIL_VERIFICATION_DEBUG`, `PASSWORD_RESET_DEBUG`는 production에서 강제 off되는 보안 가드로 유지한다.
 
@@ -90,7 +89,7 @@ P2 운영 확장 범위로 남은 항목은 대시보드/알림 수준의 운영
 
 루트 `docker-compose.yml`을 사용하는 legacy/minimal backend/AI 검증용 스택이다. FastAPI, PostgreSQL, Redis만 빠르게 띄우며 `ai-worker`, `frontend`, `nginx`는 기본으로 올리지 않는다.
 
-이 스택은 FastAPI 중심 검증용이지만 frontend, Firebase Web Push build args, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 실제 프론트 포함 비동기 UX 확인은 `dev` 스택에서 `ai-worker`, `frontend`, `nginx`까지 함께 올려 검증한다.
+이 스택은 FastAPI 중심 검증용이지만 frontend, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 실제 프론트 포함 비동기 UX 확인은 `dev` 스택에서 `ai-worker`, `frontend`, `nginx`까지 함께 올려 검증한다.
 
 ```bash
 ./scripts/docker_stack.sh app up
@@ -147,7 +146,7 @@ make app-clean-image # 알려진 로컬 app/test 이미지를 삭제
 
 frontend, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 모두 올린다.
 
-`ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer와 scheduler loop를 실행한다. 처리 job은 `DEMO_ECHO`뿐 아니라 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run`, 이메일/비밀번호/가족초대/FCM/가족알림 service job을 포함한다.
+`ai-worker` service는 `ai_runtime/main.py`를 통해 Redis Stream consumer와 scheduler loop를 실행한다. 처리 job은 `DEMO_ECHO`뿐 아니라 `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, 이메일/비밀번호/가족초대/가족알림 service job을 포함한다.
 
 로컬 개발/시연 표준은 루트 `.env` 하나를 사용한다. 시작할 때 `envs/example.local.env`를 복사하고, 실제 secret 값은 `.env`에만 채운다.
 

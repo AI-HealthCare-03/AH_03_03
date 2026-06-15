@@ -77,9 +77,6 @@ class Config(BaseSettings):
     EXAM_GPT_VISION_ENABLED: bool = False
     EXAM_GPT_VISION_MODEL: str = "gpt-4o"
     PADDLE_OCR_ENABLED: bool = False
-    MEDICATION_OCR_PROVIDER: str = "fallback"
-    MEDICATION_GPT_VISION_ENABLED: bool = False
-    MEDICATION_GPT_VISION_MODEL: str = "gpt-4o"
     CHATBOT_USE_REAL_LLM: bool = False
     RAG_ENABLED: bool = False
     LANGFUSE_ENABLED: bool = False

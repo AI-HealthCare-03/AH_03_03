@@ -1,8 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { HouseHeart, HeartPulse, ChartBar, FileText, Pill, Salad, Trophy, BotMessageSquare, User, Settings, MessageCircleQuestionMark, Shield, ActivitySquare } from "lucide-react";
-
-import { isAdminConsoleRole } from "../auth/AdminRoute";
-import { useAuth } from "../auth/AuthContext";
+import { HouseHeart, HeartPulse, ChartBar, Pill, Salad, Trophy, BotMessageSquare, User, Settings, MessageCircleQuestionMark, ActivitySquare } from "lucide-react";
 
 export type SidebarLink = {
   icon: React.ReactNode;
@@ -47,8 +44,6 @@ export const sidebarSections: SidebarSection[] = [
 export const sidebarLinks: SidebarLink[] = sidebarSections.flatMap((s) => s.links);
 
 export default function Sidebar() {
-  const { backendUser } = useAuth();
-  const showAdminLink = isAdminConsoleRole(backendUser?.role);
   const getLinkClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-link${isActive ? " sidebar-link-active" : ""}`;
 
@@ -66,13 +61,6 @@ export default function Sidebar() {
           ))}
         </div>
       ))}
-      {showAdminLink && (
-        <NavLink aria-label="관리자 콘솔" className={getLinkClass} title="관리자 콘솔" to="/admin">
-          <span aria-hidden="true" className="sidebar-active-indicator" />
-          <span className="sidebar-link-icon"><Shield size={20} /></span>
-          <span className="sidebar-link-label">관리자 콘솔</span>
-        </NavLink>
-      )}
     </aside>
   );
 }

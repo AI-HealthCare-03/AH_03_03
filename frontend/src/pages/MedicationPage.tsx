@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import {
   createMedication,
@@ -162,10 +161,9 @@ export default function MedicationPage() {
 
       {/* ── 등록 카드 ── */}
       <Card title="등록">
-        <div className="button-row" style={{ marginBottom: 12 }}>
-          <Link className="button" to="/ocr/medication">
-            처방전/약봉투로 등록
-          </Link>
+        <div className="state-box" style={{ marginBottom: 12 }}>
+          복약 정보는 직접 입력해 주세요. 약물명 확인은 약학정보원/약찾기 서비스를 참고해 주세요.
+          본 서비스는 처방/복용 판단을 제공하지 않으며, 복약 관련 판단은 의사 또는 약사와 상담해 주세요.
         </div>
         <form className="form" onSubmit={submit}>
           <div style={{ display: "flex", gap: 8 }}>

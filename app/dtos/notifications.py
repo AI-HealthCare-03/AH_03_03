@@ -2,7 +2,15 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.notifications import FCMTokenPlatform, NotificationChannel, NotificationLogStatus, ReminderType
+from app.models.notifications import NotificationChannel, NotificationLogStatus, ReminderType
+
+MVP_NOTIFICATION_CHANNELS = {NotificationChannel.IN_APP, NotificationChannel.EMAIL}
+
+
+def _validate_mvp_notification_channel(channel: NotificationChannel | None) -> NotificationChannel | None:
+    if channel is not None and channel not in MVP_NOTIFICATION_CHANNELS:
+        raise ValueError("MVP에서는 서비스 내부 알림과 이메일 알림만 사용할 수 있습니다.")
+    return channel
 
 
 class NotificationCreateRequest(BaseModel):
@@ -44,50 +52,6 @@ class NotificationListResponse(BaseModel):
     total: int
 
 
-class FCMTokenRegisterRequest(BaseModel):
-    token: str = Field(min_length=1, max_length=512)
-    platform: FCMTokenPlatform
-    device_id: str | None = Field(default=None, max_length=128)
-    user_agent: str | None = Field(default=None, max_length=500)
-
-    @field_validator("token", "device_id", "user_agent", mode="before")
-    @classmethod
-    def strip_blank_strings(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        stripped = value.strip()
-        return stripped or None
-
-
-class FCMTokenDeleteRequest(BaseModel):
-    token: str = Field(min_length=1, max_length=512)
-
-    @field_validator("token", mode="before")
-    @classmethod
-    def strip_token(cls, value: str) -> str:
-        return value.strip()
-
-
-class FCMTokenResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    user_id: int
-    token: str
-    platform: FCMTokenPlatform
-    device_id: str | None
-    user_agent: str | None
-    is_active: bool
-    last_seen_at: datetime
-    revoked_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
-
-
-class FCMTokenDeleteResponse(BaseModel):
-    deactivated_count: int
-
-
 class ReminderScheduleCreateRequest(BaseModel):
     reminder_type: ReminderType
     channel: NotificationChannel = NotificationChannel.IN_APP
@@ -100,6 +64,11 @@ class ReminderScheduleCreateRequest(BaseModel):
     timezone: str = Field(default="Asia/Seoul", min_length=1, max_length=50)
     is_active: bool = True
     next_trigger_at: datetime | None = None
+
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, channel: NotificationChannel) -> NotificationChannel:
+        return _validate_mvp_notification_channel(channel) or NotificationChannel.IN_APP
 
 
 class ReminderScheduleUpdateRequest(BaseModel):
@@ -114,6 +83,11 @@ class ReminderScheduleUpdateRequest(BaseModel):
     timezone: str | None = Field(default=None, min_length=1, max_length=50)
     is_active: bool | None = None
     next_trigger_at: datetime | None = None
+
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, channel: NotificationChannel | None) -> NotificationChannel | None:
+        return _validate_mvp_notification_channel(channel)
 
 
 class ReminderScheduleResponse(BaseModel):

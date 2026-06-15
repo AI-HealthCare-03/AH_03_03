@@ -169,7 +169,7 @@ Table users {
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: "AUTH / USER 기준 테이블. phone_number는 선택 입력이므로 nullable이다. privacy_consent_*는 신규 회원가입 시 개인정보 수집·이용 동의 시각/버전을 기록한다. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase Auth/소셜 로그인 전용 컬럼은 제거했고, FCM 토큰은 user_fcm_tokens에서 관리한다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
+  Note: "AUTH / USER 기준 테이블. phone_number는 선택 입력이므로 nullable이다. privacy_consent_*는 신규 회원가입 시 개인정보 수집·이용 동의 시각/버전을 기록한다. role 값은 USER, MONITOR, OPERATOR, ADMIN, SUPER_ADMIN을 사용한다. Firebase Auth/소셜 로그인 전용 컬럼은 제거했다. user_fcm_tokens는 과거 브라우저 Push 설계 흔적이며 MVP에서는 사용하지 않는다. 권한 판단은 role 기준이며 is_admin은 legacy 호환 필드로 유지한다. 로그인 시각 표준은 last_login_at이다."
 }
 
 Table families {
@@ -297,7 +297,7 @@ Table family_notification_settings {
     (owner_user_id, family_user_id) [unique]
   }
 
-  Note: "가족 알림 수신 설정. owner_user가 공유를 허용하고 family_user가 수신을 허용한 항목만 내부 알림/FCM push 대상으로 삼는다."
+  Note: "가족 알림 수신 설정. owner_user가 공유를 허용하고 family_user가 수신을 허용한 항목만 내부 알림 대상으로 삼는다."
 }
 
 Table health_records {
@@ -656,7 +656,7 @@ Table user_fcm_tokens {
     (last_seen_at)
   }
 
-  Note: "브라우저/모바일 FCM registration token. Firebase Auth가 아니라 Web Push/FCM 발송 대상 기기를 관리한다."
+  Note: "과거 브라우저 Push registration token 테이블. DB 호환을 위해 남아 있으나 MVP에서는 사용하지 않는다."
 }
 
 Table reminder_schedules {
@@ -685,7 +685,7 @@ Table reminder_schedules {
     (next_trigger_at)
   }
 
-  Note: "복약/챌린지/건강기록/가족/시스템 알림 예약 설정. ai-worker scheduler가 next_trigger_at 기준으로 내부 알림을 만들고, push 허용 시 service job/FCM 발송으로 이어질 수 있다."
+  Note: "복약/챌린지/건강기록/가족/시스템 알림 예약 설정. ai-worker scheduler가 next_trigger_at 기준으로 내부 알림을 만든다. 브라우저 Push 발송은 MVP 범위에서 제외한다."
 }
 
 Table notification_logs {

@@ -15,7 +15,6 @@
   - `LANGFUSE_SECRET_KEY`
   - `LANGFUSE_PUBLIC_KEY`
   - `LANGFUSE_BASE_URL` 자체는 secret은 아니지만 key와 함께 출력하면 사용 환경이 드러날 수 있으므로 공유 전 확인한다.
-  - `CLOVA_OCR_SECRET_KEY`
   - SMTP/DB password 등 외부 서비스 또는 계정 비밀값
 - 아래처럼 값을 직접 찍는 명령 금지
 
@@ -47,7 +46,7 @@ curl http://localhost:8000/api/v1/system/health
 docker compose exec fastapi sh -lc 'python - <<PY
 import os
 
-for key in ["DB_HOST", "REDIS_HOST", "REDIS_PORT", "OPENAI_API_KEY", "LANGFUSE_SECRET_KEY", "CLOVA_OCR_SECRET_KEY"]:
+for key in ["DB_HOST", "REDIS_HOST", "REDIS_PORT", "OPENAI_API_KEY", "LANGFUSE_SECRET_KEY"]:
     value = os.getenv(key)
     if value:
         print(f"{key}=<set>")
@@ -59,7 +58,7 @@ PY'
 `.env` 파일에서 키 존재 여부만 보고 싶을 때도 값을 제거한다.
 
 ```bash
-grep -E "^(OPENAI_API_KEY|LANGFUSE_SECRET_KEY|CLOVA_OCR_SECRET_KEY|DB_HOST|REDIS_HOST)=" .env \
+grep -E "^(OPENAI_API_KEY|LANGFUSE_SECRET_KEY|DB_HOST|REDIS_HOST)=" .env \
   | sed -E 's/=.*/=<masked>/'
 ```
 
@@ -74,7 +73,7 @@ docker compose config --services
 민감키가 Git 추적 파일에 들어갔는지 확인할 때는 아래 명령을 사용한다. 출력에 실제 키가 포함될 수 있으므로 공유 전 반드시 마스킹한다.
 
 ```bash
-git grep -n "sk-proj\|OPENAI_API_KEY=.*sk-\|LANGFUSE_SECRET_KEY=.*sk-\|CLOVA_OCR_SECRET_KEY=.*" -- . ':!uv.lock' || true
+git grep -n "sk-proj\|OPENAI_API_KEY=.*sk-\|LANGFUSE_SECRET_KEY=.*sk-" -- . ':!uv.lock' || true
 ```
 
 더 안전하게는 값 자체를 출력하지 않는 스캐너를 사용한다.
@@ -88,7 +87,6 @@ import subprocess
 patterns = {
     "OPENAI_API_KEY": re.compile(r"OPENAI_API_KEY\s*=\s*(.+)"),
     "LANGFUSE_SECRET_KEY": re.compile(r"LANGFUSE_SECRET_KEY\s*=\s*(.+)"),
-    "CLOVA_OCR_SECRET_KEY": re.compile(r"CLOVA_OCR_SECRET_KEY\s*=\s*(.+)"),
     "sk-": re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
     "pk-lf-": re.compile(r"pk-lf-[A-Za-z0-9_\-]{8,}"),
     "sk-lf-": re.compile(r"sk-lf-[A-Za-z0-9_\-]{8,}"),
@@ -120,7 +118,6 @@ git ls-files | grep -E '(^|/)\.env$|\.env\.|envs/.*\.env' || true
 ```bash
 git log -S "OPENAI_API_KEY" --oneline -- . ':!uv.lock'
 git log -S "LANGFUSE_SECRET_KEY" --oneline -- . ':!uv.lock'
-git log -S "CLOVA_OCR_SECRET_KEY" --oneline -- . ':!uv.lock'
 git log -S "sk-proj" --oneline -- . ':!uv.lock'
 ```
 

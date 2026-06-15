@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 
 import { listUnreadNotifications } from "../api/notifications";
-import { isAdminConsoleRole } from "../auth/AdminRoute";
 import { useAuth } from "../auth/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 
@@ -13,9 +12,8 @@ type NavbarProps = {
 };
 
 export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, showMobileMenuButton = false }: NavbarProps) {
-  const { backendUser, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
-  const showAdminLink = isAdminConsoleRole(backendUser?.role);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -57,11 +55,6 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
               알림
               {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
             </NavLink>
-            {showAdminLink && (
-              <Link className="icon-button desktop-nav-action" to="/admin" aria-label="관리자 콘솔">
-                관리자
-              </Link>
-            )}
             <button className="nav-logout-btn" type="button" onClick={logout}>
               로그아웃
             </button>

@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.models.notifications import Notification, NotificationLog, ReminderSchedule, UserFCMToken
+from app.models.notifications import Notification, NotificationLog, ReminderSchedule
 
 
 async def create_notification(user_id: int, data: dict[str, Any]) -> Notification:
@@ -102,46 +102,3 @@ async def has_notification_log_for_reminder_since(reminder_schedule_id: int, sin
         reminder_schedule_id=reminder_schedule_id,
         created_at__gte=since,
     ).exists()
-
-
-async def get_fcm_token_by_token(token: str) -> UserFCMToken | None:
-    return await UserFCMToken.get_or_none(token=token)
-
-
-async def upsert_fcm_token(user_id: int, data: dict[str, Any]) -> UserFCMToken:
-    existing = await get_fcm_token_by_token(data["token"])
-    if existing is None:
-        return await UserFCMToken.create(user_id=user_id, **data)
-
-    existing.user_id = user_id
-    for key, value in data.items():
-        setattr(existing, key, value)
-    await existing.save(
-        update_fields=[
-            "user_id",
-            "platform",
-            "device_id",
-            "user_agent",
-            "is_active",
-            "last_seen_at",
-            "revoked_at",
-            "updated_at",
-        ]
-    )
-    return existing
-
-
-async def deactivate_fcm_token(user_id: int, token: str, revoked_at) -> int:
-    return await UserFCMToken.filter(user_id=user_id, token=token).update(
-        is_active=False,
-        revoked_at=revoked_at,
-        updated_at=revoked_at,
-    )
-
-
-async def deactivate_fcm_tokens_by_user(user_id: int, revoked_at) -> int:
-    return await UserFCMToken.filter(user_id=user_id, is_active=True).update(
-        is_active=False,
-        revoked_at=revoked_at,
-        updated_at=revoked_at,
-    )

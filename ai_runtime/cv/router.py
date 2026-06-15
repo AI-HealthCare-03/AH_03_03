@@ -2,7 +2,7 @@
 ai_runtime/cv/router.py
 
 GPT Vision 분석 FastAPI 라우터.
-MVP 기준 3개 엔드포인트 제공 (식단 / 처방전·약봉투 / 건강검진표).
+MVP 기준 2개 엔드포인트 제공 (식단 / 건강검진표).
 
 팀 통합 시 app/main.py에 아래 추가:
     from ai_runtime.cv.router import router as vision_router
@@ -34,8 +34,6 @@ from .schemas import (
     DietAnalysisResponse,
     ErrorResponse,
     FoodItem,
-    MedicationItem,
-    PrescriptionAnalysisResponse,
 )
 from .settings import VisionSettings
 
@@ -190,33 +188,6 @@ async def analyze_diet(
         message=STATUS_MESSAGE.get(status, STATUS_MESSAGE["failed"]),
         foods=[FoodItem(**f) for f in raw.get("foods", [])],
         requires_user_confirmation=True,
-        raw_result=raw,
-    )
-
-
-@router.post(
-    "/prescription",
-    response_model=PrescriptionAnalysisResponse,
-    summary="처방전 / 약봉투 분석",
-    responses={
-        413: {"model": ErrorResponse},
-        415: {"model": ErrorResponse},
-        422: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-)
-async def analyze_prescription(
-    file: Annotated[UploadFile, File(description="처방전 또는 약봉투 이미지 (JPG/PNG/WEBP/HEIC)")],
-    client: Annotated[VisionClient, Depends(get_vision_client)],
-) -> PrescriptionAnalysisResponse:
-    raw = await call_vision(AnalysisType.PRESCRIPTION, file, client)
-    status = raw.get("analysis_status", "failed")
-
-    return PrescriptionAnalysisResponse(
-        analysis_status=status,
-        message=STATUS_MESSAGE.get(status, STATUS_MESSAGE["failed"]),
-        medications=[MedicationItem(**m) for m in raw.get("medications", [])],
-        requires_manual_input=raw.get("requires_manual_input", []),
         raw_result=raw,
     )
 

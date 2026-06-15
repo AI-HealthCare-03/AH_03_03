@@ -228,7 +228,7 @@
 - LLM explanation service
 - ML CatBoost predictor
 - ML feature mapper
-- Medication OCR parser
+- Medication direct input flow
 
 CI 기준:
 

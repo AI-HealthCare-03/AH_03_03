@@ -654,19 +654,21 @@ export default function DashboardPage() {
   const dashboardMedicationRecords = Array.isArray(medicationSection.recent_medication_records)
     ? (medicationSection.recent_medication_records as AnyRecord[])
     : [];
-const activeChallengesMap = Object.fromEntries(
-  (Array.isArray(challengeSection.active_challenges)
-    ? (challengeSection.active_challenges as AnyRecord[])
-    : []
-  ).map((c) => [Number(c.id), c])
-);
+  const activeChallengesMap = Object.fromEntries(
+    (Array.isArray(challengeSection.active_challenges)
+      ? (challengeSection.active_challenges as AnyRecord[])
+      : []
+    ).map((c) => [Number(c.id), c]),
+  ) as Record<number, AnyRecord | undefined>;
 
-const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
-  ? (challengeSection.user_challenges as AnyRecord[]).map((uc) => ({
-      ...uc,
-      challenge: activeChallengesMap[Number(uc.challenge_id)],
-    }))
-  : [];
+  const dashboardChallenges: AnyRecord[] = Array.isArray(challengeSection.user_challenges)
+    ? (challengeSection.user_challenges as AnyRecord[]).map(
+        (uc): AnyRecord => ({
+          ...uc,
+          challenge: activeChallengesMap[Number(uc.challenge_id)],
+        }),
+      )
+    : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
   const dietScore = dashboardDiets[0]?.diet_score ? String(dashboardDiets[0].diet_score) : latestValue(trends.diet_score);
   const bloodPressureSeries = [
@@ -1066,12 +1068,18 @@ const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
           {recommendedChallenges.length > 0 ? (
             <div className="challenge-compact-grid">
               {recommendedChallenges.map((challenge) => {
-                const nested = challenge.challenge as AnyRecord | undefined;
-                const status = String(challenge.status ?? "").toUpperCase();
+                const nested =
+                  challenge.challenge && typeof challenge.challenge === "object"
+                    ? (challenge.challenge as AnyRecord)
+                    : undefined;
+                const status = String(challenge.status ?? nested?.status ?? "").toUpperCase();
                 const progress = getChallengeProgress(challenge);
+                const challengeId = challenge.challenge_id ?? nested?.id ?? "";
+                const cardKey = challenge.id ?? challengeId;
+                const iconCategory = nested?.category ?? challenge.category;
                 return (
-                  <article className="challenge-compact-card" key={String(challenge.id)}>
-                    <div className="challenge-compact-icon">{getChallengeIcon(nested?.category ?? challenge.category)}</div>
+                  <article className="challenge-compact-card" key={String(cardKey)}>
+                    <div className="challenge-compact-icon">{getChallengeIcon(iconCategory)}</div>
                     <div>
                       <strong>{getChallengeTitle(challenge)}</strong>
                       <p>
@@ -1084,7 +1092,7 @@ const dashboardChallenges = Array.isArray(challengeSection.user_challenges)
                     </div>
                     <div className="challenge-compact-footer">
                       <span>{Math.round(progress)}%</span>
-                      <Link className="button secondary compact-button" to={`/challenges/${String(challenge.challenge_id ?? nested?.id ?? "")}`}>
+                      <Link className="button secondary compact-button" to={`/challenges/${String(challengeId)}`}>
                         {status === "ACTIVE" || status === "IN_PROGRESS" || status === "JOINED" ? "진행중" : "참여하기"}
                       </Link>
                     </div>

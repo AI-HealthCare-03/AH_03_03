@@ -62,32 +62,6 @@ async def handle_exam_ocr(job_id: int, payload: dict[str, Any]) -> None:
     )
 
 
-@register_job_handler(async_job_service.MEDICATION_OCR_JOB_TYPE)
-async def handle_medication_ocr(job_id: int, payload: dict[str, Any]) -> None:
-    _ = payload
-    await async_job_service.mark_processing(job_id)
-    from ai_runtime.jobs import medication_ocr_handler
-
-    try:
-        response = await medication_ocr_handler.run_medication_ocr_from_job(job_id)
-    except ValueError as exc:
-        error_message = str(exc)
-        if error_message in {
-            "medication_ocr_job_not_found",
-            "medication_ocr_source_missing",
-            "medication_ocr_upload_missing",
-            "medication_ocr_text_missing",
-        }:
-            await async_job_service.mark_failed(job_id, error_message)
-            raise NonRetryableJobError(error_message) from exc
-        raise
-
-    await async_job_service.mark_success(
-        job_id,
-        response.model_dump(mode="json"),
-    )
-
-
 @register_job_handler(async_job_service.DIET_ANALYZE_IMAGE_JOB_TYPE)
 async def handle_diet_analyze_image(job_id: int, payload: dict[str, Any]) -> None:
     _ = payload
@@ -198,10 +172,6 @@ def _register_service_job_handlers() -> None:
     _register_service_job_handler(
         service_job_service.FAMILY_INVITE_EMAIL_SEND_JOB_TYPE,
         service_job_service.handle_family_invite_email_send,
-    )
-    _register_service_job_handler(
-        service_job_service.FCM_PUSH_SEND_JOB_TYPE,
-        service_job_service.handle_fcm_push_send,
     )
     _register_service_job_handler(
         service_job_service.FAMILY_NOTIFICATION_CREATE_JOB_TYPE,

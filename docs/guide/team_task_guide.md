@@ -79,7 +79,7 @@ CV 담당:
 - 이미지 분석
 - 식단 OCR 또는 분류 실험
 - 건강검진표 OCR
-- 복약/처방전 OCR
+- 복약 직접 입력
 - 식단 이미지 기반 간편 분석과 사용자 보정 흐름
 
 LLM/RAG 담당:
@@ -175,7 +175,7 @@ make demo-ps
 - API Docs: `http://localhost:8080/api/docs`
 - FastAPI 직접 접근: `http://localhost:8000`
 
-루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이다. frontend, Firebase Web Push build args, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
+루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용이다. frontend, storage, scheduler까지 포함한 최신 dev full stack 검증에는 사용하지 않는다. 루트 스택에서 `http://localhost`가 404를 반환하는 것은 현재 설계상 정상이며, 프론트 포함 시연은 `http://localhost:8080`을 사용한다.
 
 로그/종료:
 
@@ -291,25 +291,18 @@ npm run dev
 - `demo@example.com` / `Demo1234!`
 - `demo_high@example.com` / `Demo1234!`
 
-관리자 콘솔 로컬 계정:
+운영자 기능:
 
-- `admin@example.com` / `Demo1234!` (`SUPER_ADMIN`)
-- `monitor@example.com` / `Demo1234!` (`MONITOR`)
-
-관리자 콘솔 진입:
-
-1. `DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py`로 로컬 seed를 실행한다.
-2. 관리자 계정으로 로그인한다.
-3. 좌측 사이드바의 “관리자 콘솔”을 클릭하거나 `/admin`에 직접 접속한다.
-4. `MONITOR` 계정은 시스템 상태와 오류 로그 조회 중심이며, 민감정보 접근 로그는 `ADMIN` 이상 정책에 따라 제한될 수 있다.
-5. `SUPER_ADMIN` 계정은 FAQ/문의/로그/모니터링 등 전체 관리자 시연 흐름 확인에 사용한다.
+- 관리자 콘솔 frontend는 MVP 사용자 화면에서 제공하지 않는다.
+- 백엔드 관리자 API와 role 기반 권한 체크는 내부 운영용으로 유지한다.
+- 사용자 FAQ/문의 화면은 `/faqs`, `/inquiries`에서 확인한다.
 
 Seed 실행 내용:
 
 - `scripts/init_local_dev_db.py`: 로컬 MVP용 Tortoise schema 생성
 - `scripts/seed_mvp_challenges.py`: 챌린지 마스터 생성
 - `scripts/seed_mvp_faqs.py`: FAQ 생성
-- `scripts/seed_demo_users.py`: 데모 사용자와 건강정보/분석/챌린지/식단/복약/알림 데이터, 로컬 관리자 콘솔 계정 생성
+- `scripts/seed_demo_users.py`: 데모 사용자와 건강정보/분석/챌린지/식단/복약/알림 데이터 생성
 - `scripts/seed_current_user_dashboard_demo.py --email <사용자 이메일>`: 특정 기존 사용자에게 대시보드용 상세 시연 데이터 보강
 - `scripts/setup_local_mvp_db.py`: 위 흐름 통합 실행
 

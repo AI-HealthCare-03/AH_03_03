@@ -273,7 +273,7 @@ Fallback 정책 후보:
 사용자 confirm 구조:
 
 - OCR 검진 수치 후보 confirm
-- 약봉투 OCR 후보 confirm
+- 복약 직접 입력/기록 관리
 - 식단 음식명/분량 confirm
 - 추천 챌린지 선택 또는 거절
 
@@ -319,7 +319,7 @@ Fallback 정책 후보:
 | --- | --- | --- | --- |
 | 구현 완료 | Redis Stream 기반 async job infrastructure | 구현 완료 | retry/backoff, DLQ, pending recovery 구조가 준비되어 있다. |
 | 구현 완료 | CatBoost 기반 DM/HTN/DL 정밀 분석 경로 | 구현 완료 | 세부 artifact와 feature mapping은 별도 모델 범위 문서를 기준으로 한다. |
-| 구현 완료 | `analysis.run`, `exam_ocr.run`, `diet.analyze_image`, `medication_ocr.run` job type | 구현 완료 | 실제 provider 활성화 여부는 env와 handler 정책에 따른다. |
+| 구현 완료 | `analysis.run`, `exam_ocr.run`, `diet.analyze_image` job type | 구현 완료 | 실제 provider 활성화 여부는 env와 handler 정책에 따른다. 복약 정보는 직접 입력으로 운영한다. |
 | 구현 완료 | 식단 질환군별 nutrition scorer | 구현 완료 | 현재 점수표/rule 기반을 사용한다. |
 | 부분 구현 | LLM/RAG 설명 생성 | 부분 구현 | rule 기반 설명과 keyword RAG/trace 보조 경로가 있으며 vector RAG는 계획 영역이다. |
 | 부분 구현 | RAG retriever interface | 부분 구현 | 현재는 keyword retriever adapter를 사용하며 embedding/vector/pgvector retriever는 후속 확장 영역이다. |

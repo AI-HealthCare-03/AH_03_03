@@ -1,16 +1,9 @@
 import { apiRequest, type ApiValue } from "./client";
 
 export type ReminderType = "MEDICATION" | "CHALLENGE" | "HEALTH_RECORD" | "FAMILY_ALERT" | "SYSTEM";
-export type NotificationChannel = "IN_APP" | "EMAIL" | "SMS" | "PUSH" | "KAKAO";
+export type KnownNotificationChannel = "IN_APP" | "EMAIL";
+export type NotificationChannel = KnownNotificationChannel | (string & {});
 export type NotificationLogStatus = "PENDING" | "SENT" | "FAILED" | "SKIPPED" | "CANCELED";
-export type FCMTokenPlatform = "web" | "android" | "ios";
-
-export type FCMTokenPayload = {
-  token: string;
-  platform: FCMTokenPlatform;
-  device_id?: string | null;
-  user_agent?: string | null;
-};
 
 export type ReminderSchedule = {
   id: number;
@@ -114,18 +107,4 @@ export async function deleteReminderSchedule(scheduleId: number): Promise<{ dele
 
 export async function listNotificationLogs(): Promise<NotificationLog[]> {
   return apiRequest<NotificationLog[]>("/notifications/logs?limit=100");
-}
-
-export async function registerFcmToken(payload: FCMTokenPayload): Promise<unknown> {
-  return apiRequest<unknown>("/notifications/fcm-tokens", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export async function deactivateFcmToken(token: string): Promise<{ deactivated_count: number }> {
-  return apiRequest<{ deactivated_count: number }>("/notifications/fcm-tokens", {
-    method: "DELETE",
-    body: { token },
-  });
 }

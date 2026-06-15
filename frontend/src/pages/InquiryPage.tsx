@@ -162,31 +162,36 @@ export default function InquiryPage() {
             {items.length === 0 && (
               <p className="placeholder">등록된 문의가 없습니다.</p>
             )}
-            {items.map((item) => (
-              <details className="mini-card" key={String(item.id)}>
-                <summary style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", listStyle: "none" }}>
-                  <span className="muted" style={{ fontSize: 12, minWidth: 64, flexShrink: 0 }}>
-                    {getInquiryCategoryLabel(item.category)}
-                  </span>
-                  <strong style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {String(item.title)}
-                  </strong>
-                  <span className={getStatusBadgeClass(item.status)} style={{ flexShrink: 0 }}>
-                    {getInquiryStatusLabel(item.status)}
-                  </span>
-                </summary>
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                  <p style={{ marginBottom: 6 }}><strong style={{ color: "var(--color-text-primary)" }}>문의 내용</strong></p>
-                  <p>{String(item.content ?? "내용 없음")}</p>
-                  {item.answer && (
-                    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--color-muted-surface)", borderRadius: "var(--border-radius-md)" }}>
-                      <p style={{ marginBottom: 4 }}><strong style={{ color: "var(--color-text-primary)" }}>답변</strong></p>
-                      <p>{String(item.answer)}</p>
-                    </div>
-                  )}
-                </div>
-              </details>
-            ))}
+            {items.map((item) => {
+              const answerText =
+                item.answer === null || item.answer === undefined ? "" : String(item.answer).trim();
+
+              return (
+                <details className="mini-card" key={String(item.id)}>
+                  <summary style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", listStyle: "none" }}>
+                    <span className="muted" style={{ fontSize: 12, minWidth: 64, flexShrink: 0 }}>
+                      {getInquiryCategoryLabel(item.category)}
+                    </span>
+                    <strong style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {String(item.title)}
+                    </strong>
+                    <span className={getStatusBadgeClass(item.status)} style={{ flexShrink: 0 }}>
+                      {getInquiryStatusLabel(item.status)}
+                    </span>
+                  </summary>
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                    <p style={{ marginBottom: 6 }}><strong style={{ color: "var(--color-text-primary)" }}>문의 내용</strong></p>
+                    <p>{String(item.content ?? "내용 없음")}</p>
+                    {answerText && (
+                      <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--color-muted-surface)", borderRadius: "var(--border-radius-md)" }}>
+                        <p style={{ marginBottom: 4 }}><strong style={{ color: "var(--color-text-primary)" }}>답변</strong></p>
+                        <p>{answerText}</p>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         )}
       </Card>
