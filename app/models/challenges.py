@@ -13,12 +13,16 @@ class ChallengeCategory(StrEnum):
     BLOOD_GLUCOSE = "BLOOD_GLUCOSE"
     WEIGHT = "WEIGHT"
     HABIT = "HABIT"
+    MONITORING = "MONITORING"
+    MENTAL = "MENTAL"
+    ORAL = "ORAL"
 
 
 class ChallengeType(StrEnum):
     SPECIAL = "SPECIAL"
     COMMON = "COMMON"
     GENERAL = "GENERAL"
+    ANEMIA = "ANEMIA"
 
 
 class ChallengeTargetDisease(StrEnum):
@@ -28,6 +32,7 @@ class ChallengeTargetDisease(StrEnum):
     OBESITY = "OBESITY"
     COMMON = "COMMON"
     GENERAL = "GENERAL"
+    ANEMIA = "ANEMIA"
 
 
 class ChallengeDifficulty(StrEnum):
