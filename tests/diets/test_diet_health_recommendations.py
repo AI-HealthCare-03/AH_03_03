@@ -9,8 +9,10 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from ai_runtime.llm.rag.retriever import RagRetrievalResult, RetrievedDocument
 from app.apis.v1 import diet_routers
 from app.apis.v1.dependencies import get_request_user
+from app.core.config import Config
 from app.main import app
 from app.models.analysis import AnalysisType, RiskLevel
 from app.services import diet_recommendations as service
@@ -40,6 +42,19 @@ ACTIVE_CHALLENGES = [
     _challenge(17, "30일 폭음 피하기 챌린지"),
     _challenge(18, "일정한 삼시세끼 챌린지"),
 ]
+
+
+class FakeVectorRetriever:
+    def __init__(self, *, documents: list[RetrievedDocument] | None = None, fail: bool = False) -> None:
+        self.documents = documents or []
+        self.fail = fail
+        self.calls: list[dict[str, Any]] = []
+
+    async def retrieve(self, **kwargs: Any) -> RagRetrievalResult:
+        self.calls.append(kwargs)
+        if self.fail:
+            raise RuntimeError("vector unavailable")
+        return RagRetrievalResult(documents=self.documents, strategy="vector")
 
 
 def _diet(
@@ -79,6 +94,27 @@ def _analysis(analysis_type: AnalysisType, risk_level: RiskLevel = RiskLevel.CAU
         analysis_type=analysis_type,
         risk_level=risk_level,
         analyzed_at=datetime(2026, 6, 15, tzinfo=UTC),
+    )
+
+
+def _vector_document(content: str = "vector chunk content") -> RetrievedDocument:
+    return RetrievedDocument(
+        content=content,
+        title="고혈압 식생활",
+        source_name="대한고혈압학회",
+        url="https://example.test/htn",
+        metadata={
+            "chunk_key": "rag:hypertension:section:000:chunk:0000",
+            "document_key": "rag:hypertension:hypertension.md",
+            "source_key": "hypertension",
+            "disease_code": "HTN",
+            "review_status": "candidate_unreviewed",
+            "status": "candidate_unreviewed",
+            "retriever_strategy": "vector",
+            "embedding_provider": "openai",
+            "embedding_model": "text-embedding-3-small",
+        },
+        score=0.88,
     )
 
 
@@ -283,6 +319,154 @@ def test_diet_rag_comment_does_not_use_forbidden_phrases() -> None:
     assert "당뇨 식단으로 부적절합니다" not in serialized
     assert "고혈압 식단입니다" not in serialized
     assert "이 음식을 먹으면 안 됩니다" not in serialized
+
+
+def test_diet_rag_strategy_config_default_is_keyword_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DIET_RECOMMENDATION_RAG_STRATEGY", raising=False)
+
+    settings = Config(_env_file=None)
+
+    assert settings.DIET_RECOMMENDATION_RAG_STRATEGY == "keyword_only"
+
+
+@pytest.mark.asyncio
+async def test_diet_rag_strategy_keyword_only_does_not_call_vector(monkeypatch: pytest.MonkeyPatch) -> None:
+    vector = FakeVectorRetriever(documents=[_vector_document()])
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_only")
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+        vector_retriever=vector,
+    )
+
+    assert vector.calls == []
+    assert any(item["disease_code"] == "HTN" for item in result["rag_comment"]["evidence_sources"])
+    assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
+
+
+@pytest.mark.asyncio
+async def test_diet_rag_strategy_vector_disabled_does_not_call_vector(monkeypatch: pytest.MonkeyPatch) -> None:
+    vector = FakeVectorRetriever(documents=[_vector_document()])
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "vector_disabled")
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+        vector_retriever=vector,
+    )
+
+    assert vector.calls == []
+    assert result["rag_comment"]["enabled"] is True
+
+
+@pytest.mark.asyncio
+async def test_diet_rag_strategy_hybrid_skips_vector_when_keyword_is_sufficient(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vector = FakeVectorRetriever(documents=[_vector_document()])
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_first_vector_fallback")
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+        vector_retriever=vector,
+    )
+
+    assert vector.calls == []
+    assert any(item["disease_code"] == "HTN" for item in result["rag_comment"]["evidence_sources"])
+
+
+@pytest.mark.asyncio
+async def test_diet_rag_strategy_hybrid_calls_vector_when_keyword_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vector = FakeVectorRetriever(documents=[_vector_document(content="chunk content must stay internal")])
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_first_vector_fallback")
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(service, "retrieve_keyword_rag_matches", lambda *args, **kwargs: [])
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+        vector_retriever=vector,
+    )
+
+    assert len(vector.calls) >= 1
+    assert result["rag_comment"]["fallback_used"] is False
+    assert any(item["title"] == "고혈압 식생활" for item in result["rag_comment"]["evidence_sources"])
+    serialized = str(result["rag_comment"])
+    assert "chunk content must stay internal" not in serialized
+    assert "candidate_unreviewed" not in serialized
+
+
+@pytest.mark.asyncio
+async def test_diet_rag_strategy_vector_failure_keeps_api_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vector = FakeVectorRetriever(fail=True)
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_first_vector_fallback")
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", True)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(service, "retrieve_keyword_rag_matches", lambda *args, **kwargs: [])
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+        vector_retriever=vector,
+    )
+
+    assert vector.calls
+    assert result["nutrition_findings"]
+    assert result["recommended_foods"]
+    assert result["safety_notice"] == service.SAFETY_NOTICE
+    assert result["rag_comment"]["fallback_used"] is True
+
+
+@pytest.mark.asyncio
+async def test_diet_rag_strategy_embedding_disabled_does_not_call_vector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vector = FakeVectorRetriever(documents=[_vector_document()])
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_first_vector_fallback")
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", False)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(service, "retrieve_keyword_rag_matches", lambda *args, **kwargs: [])
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+        vector_retriever=vector,
+    )
+
+    assert vector.calls == []
+    assert result["rag_comment"]["fallback_used"] is True
+    assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
 
 
 def test_diet_rag_rewrite_flag_off_does_not_call_llm(monkeypatch: pytest.MonkeyPatch) -> None:

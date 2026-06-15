@@ -1,4 +1,5 @@
 import re
+import time
 from collections.abc import Iterable
 from typing import Any
 
@@ -6,8 +7,12 @@ from fastapi import HTTPException
 from starlette import status
 
 from ai_runtime.llm.diet_recommendation_rewriter import rewrite_diet_rag_comment
+from ai_runtime.llm.llm_client import record_langfuse_event
 from ai_runtime.llm.rag.diet_sources import DIET_RAG_QUERY_TEMPLATES, ISSUE_TO_RAG_CODES, enabled_rag_codes
+from ai_runtime.llm.rag.embeddings import get_embedding_provider
 from ai_runtime.llm.rag.keyword_retriever import KeywordRagMatch, retrieve_keyword_rag_matches
+from ai_runtime.llm.rag.retriever import RetrievedDocument
+from ai_runtime.llm.rag.vector_retriever import VectorRagRetriever
 from app.core import config
 from app.core.providers import has_openai_config
 from app.models.analysis import AnalysisType, RiskLevel
@@ -24,6 +29,15 @@ MAX_RECOMMENDED_CHALLENGES = 3
 MAX_RAG_EVIDENCE_SOURCES = 5
 GENERAL_RAG_CODES = {"DIET_NUTRITION", "DIET_CAUTION", "DIET_FAQ"}
 RAG_FALLBACK_SUMMARY = "참고 문서 기반 설명을 만들 수 없어 기존 식단 추천만 제공합니다."
+DIET_RAG_STRATEGY_KEYWORD_ONLY = "keyword_only"
+DIET_RAG_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK = "keyword_first_vector_fallback"
+DIET_RAG_STRATEGY_VECTOR_DISABLED = "vector_disabled"
+SUPPORTED_DIET_RAG_STRATEGIES = {
+    DIET_RAG_STRATEGY_KEYWORD_ONLY,
+    DIET_RAG_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
+    DIET_RAG_STRATEGY_VECTOR_DISABLED,
+}
+DIET_RAG_MIN_KEYWORD_RESULTS = 1
 
 NUTRIENT_ALIASES = {
     "calories_kcal": ("calories_kcal", "calories", "kcal", "energy", "energy_kcal", "열량"),
@@ -232,7 +246,7 @@ async def get_diet_health_recommendations(user_id: int, diet_record_id: int) -> 
     health_record = await health_repository.get_latest_health_record_by_user(user_id)
     analysis_results = await analysis_repository.list_analysis_results_by_user(user_id, limit=20)
     active_challenges = await challenge_service.list_active_challenges(limit=500)
-    return build_diet_health_recommendation_response(
+    return await build_diet_health_recommendation_response_async(
         diet_record=record,
         analysis_results=analysis_results,
         health_record=health_record,
@@ -247,6 +261,46 @@ def build_diet_health_recommendation_response(
     health_record: Any | None,
     active_challenges: Iterable[Any],
 ) -> dict[str, Any]:
+    response, issue_keys, rag_disease_codes = _build_diet_health_recommendation_base(
+        diet_record=diet_record,
+        analysis_results=analysis_results,
+        health_record=health_record,
+        active_challenges=active_challenges,
+    )
+    rag_comment = _safe_build_rag_comment(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
+    return _finalize_diet_health_recommendation_response(response=response, rag_comment=rag_comment)
+
+
+async def build_diet_health_recommendation_response_async(
+    *,
+    diet_record: Any,
+    analysis_results: Iterable[Any],
+    health_record: Any | None,
+    active_challenges: Iterable[Any],
+    vector_retriever: Any | None = None,
+) -> dict[str, Any]:
+    response, issue_keys, rag_disease_codes = _build_diet_health_recommendation_base(
+        diet_record=diet_record,
+        analysis_results=analysis_results,
+        health_record=health_record,
+        active_challenges=active_challenges,
+    )
+    rag_comment = await _safe_build_rag_comment_async(
+        issue_keys=issue_keys,
+        rag_disease_codes=rag_disease_codes,
+        vector_retriever=vector_retriever,
+    )
+    return _finalize_diet_health_recommendation_response(response=response, rag_comment=rag_comment)
+
+
+def _build_diet_health_recommendation_base(
+    *,
+    diet_record: Any,
+    analysis_results: Iterable[Any],
+    health_record: Any | None,
+    active_challenges: Iterable[Any],
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    analysis_results = list(analysis_results)
     detected_foods = _detected_foods_as_list(getattr(diet_record, "detected_foods", None))
     nutrients_by_food = [_extract_food_nutrition(food) for food in detected_foods]
     disease_codes = _disease_codes_from_context(analysis_results, health_record)
@@ -267,7 +321,6 @@ def build_diet_health_recommendation_response(
     recommended_foods, caution_foods = _food_messages(issue_keys)
     recommended_challenges = _recommended_challenges(issue_keys, active_challenges)
     rag_disease_codes = _rag_disease_codes_from_analysis_results(analysis_results)
-    rag_comment = _safe_build_rag_comment(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
     response = {
         "diet_record_id": int(diet_record.id),
         "nutrition_findings": nutrition_findings,
@@ -276,8 +329,14 @@ def build_diet_health_recommendation_response(
         "caution_foods": caution_foods,
         "recommended_challenges": recommended_challenges,
         "safety_notice": SAFETY_NOTICE,
-        "rag_comment": rag_comment,
     }
+    return response, issue_keys, rag_disease_codes
+
+
+def _finalize_diet_health_recommendation_response(
+    *, response: dict[str, Any], rag_comment: dict[str, Any]
+) -> dict[str, Any]:
+    response["rag_comment"] = rag_comment
     response["rag_comment"] = rewrite_diet_rag_comment(
         rag_comment=rag_comment,
         recommendation_payload=response,
@@ -546,6 +605,29 @@ def _safe_build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[st
         }
 
 
+async def _safe_build_rag_comment_async(
+    *,
+    issue_keys: list[str],
+    rag_disease_codes: list[str],
+    vector_retriever: Any | None = None,
+) -> dict[str, Any]:
+    try:
+        return await _build_rag_comment_async(
+            issue_keys=issue_keys,
+            rag_disease_codes=rag_disease_codes,
+            vector_retriever=vector_retriever,
+        )
+    except Exception:
+        return {
+            "enabled": False,
+            "fallback_used": True,
+            "summary": RAG_FALLBACK_SUMMARY,
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
+
+
 def _build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -> dict[str, Any]:
     target_codes = _resolve_rag_target_codes(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
     if not target_codes:
@@ -560,7 +642,84 @@ def _build_rag_comment(*, issue_keys: list[str], rag_disease_codes: list[str]) -
 
     matches = _retrieve_diet_rag_matches(issue_keys=issue_keys, target_codes=target_codes)
     evidence_sources = _evidence_sources(matches)
-    if not matches:
+    return _build_rag_comment_from_evidence(
+        rag_disease_codes=rag_disease_codes,
+        target_codes=target_codes,
+        evidence_sources=evidence_sources,
+    )
+
+
+async def _build_rag_comment_async(
+    *,
+    issue_keys: list[str],
+    rag_disease_codes: list[str],
+    vector_retriever: Any | None = None,
+) -> dict[str, Any]:
+    target_codes = _resolve_rag_target_codes(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
+    if not target_codes:
+        return {
+            "enabled": False,
+            "fallback_used": True,
+            "summary": "주의 이상 분석 결과와 연결된 참고 문서가 없어 기존 식단 추천만 제공합니다.",
+            "disease_comments": [],
+            "evidence_sources": [],
+            "safety_notice": SAFETY_NOTICE,
+        }
+
+    started_at = time.monotonic()
+    strategy = _normalized_diet_rag_strategy()
+    matches = _retrieve_diet_rag_matches(issue_keys=issue_keys, target_codes=target_codes)
+    evidence_sources = _evidence_sources(matches)
+    vector_documents: list[RetrievedDocument] = []
+    fallback_reason: str | None = None
+    fallback_used = False
+
+    if _should_try_vector_fallback(strategy=strategy, keyword_count=len(matches)):
+        vector_retriever = vector_retriever or _build_diet_vector_retriever()
+        if vector_retriever is None:
+            fallback_reason = "vector_unavailable"
+        else:
+            fallback_used = True
+            try:
+                vector_documents = await _retrieve_diet_vector_documents(
+                    issue_keys=issue_keys,
+                    target_codes=target_codes,
+                    vector_retriever=vector_retriever,
+                )
+            except Exception as exc:  # noqa: BLE001 - RAG fallback must not break diet recommendations.
+                fallback_reason = f"vector_failed:{type(exc).__name__}"
+                vector_documents = []
+            if vector_documents:
+                evidence_sources = _evidence_sources_from_documents(vector_documents, target_codes=target_codes)
+            elif fallback_reason is None:
+                fallback_reason = "vector_no_result"
+    else:
+        fallback_reason = _strategy_skip_reason(strategy=strategy, keyword_count=len(matches))
+
+    _trace_diet_rag_strategy(
+        strategy=strategy,
+        keyword_returned_count=len(matches),
+        vector_documents=vector_documents,
+        fallback_used=fallback_used,
+        fallback_reason=fallback_reason,
+        target_codes=target_codes,
+        issue_keys=issue_keys,
+        latency_ms=round((time.monotonic() - started_at) * 1000, 3),
+    )
+    return _build_rag_comment_from_evidence(
+        rag_disease_codes=rag_disease_codes,
+        target_codes=target_codes,
+        evidence_sources=evidence_sources,
+    )
+
+
+def _build_rag_comment_from_evidence(
+    *,
+    rag_disease_codes: list[str],
+    target_codes: list[str],
+    evidence_sources: list[dict[str, str]],
+) -> dict[str, Any]:
+    if not evidence_sources:
         return {
             "enabled": True,
             "fallback_used": True,
@@ -620,6 +779,35 @@ def _retrieve_diet_rag_matches(*, issue_keys: list[str], target_codes: list[str]
     ]
 
 
+async def _retrieve_diet_vector_documents(
+    *,
+    issue_keys: list[str],
+    target_codes: list[str],
+    vector_retriever: Any,
+) -> list[RetrievedDocument]:
+    documents_by_key: dict[str, RetrievedDocument] = {}
+    for code in target_codes:
+        query = DIET_RAG_QUERY_TEMPLATES.get(code, " ".join(issue_keys))
+        result = await vector_retriever.retrieve(
+            query=query,
+            disease_code=code,
+            issue_keys=issue_keys,
+            top_k=2,
+            include_safety_disclaimer=False,
+        )
+        for document in getattr(result, "documents", []) or []:
+            metadata = document.metadata if isinstance(document.metadata, dict) else {}
+            disease_code = str(metadata.get("disease_code") or "")
+            if disease_code not in target_codes:
+                continue
+            key = str(metadata.get("chunk_key") or metadata.get("id") or f"{document.title}:{document.url}")
+            if key not in documents_by_key:
+                documents_by_key[key] = document
+            if len(documents_by_key) >= MAX_RAG_EVIDENCE_SOURCES:
+                return list(documents_by_key.values())
+    return list(documents_by_key.values())[:MAX_RAG_EVIDENCE_SOURCES]
+
+
 def _evidence_sources(matches: list[KeywordRagMatch]) -> list[dict[str, str]]:
     sources: list[dict[str, str]] = []
     for match in matches[:MAX_RAG_EVIDENCE_SOURCES]:
@@ -632,6 +820,40 @@ def _evidence_sources(matches: list[KeywordRagMatch]) -> list[dict[str, str]]:
             }
         )
     return sources
+
+
+def _evidence_sources_from_documents(
+    documents: list[RetrievedDocument],
+    *,
+    target_codes: list[str],
+) -> list[dict[str, str]]:
+    sources: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for document in documents[:MAX_RAG_EVIDENCE_SOURCES]:
+        metadata = document.metadata if isinstance(document.metadata, dict) else {}
+        disease_code = str(metadata.get("disease_code") or "")
+        if disease_code not in target_codes:
+            continue
+        title = str(document.title or metadata.get("title") or disease_code)
+        key = (title, disease_code)
+        if key in seen:
+            continue
+        seen.add(key)
+        sources.append(
+            {
+                "title": title,
+                "disease_code": disease_code,
+                "review_status": _public_review_status(metadata),
+            }
+        )
+    return sources
+
+
+def _public_review_status(metadata: dict[str, Any]) -> str:
+    raw_status = str(metadata.get("review_status") or metadata.get("status") or "reference")
+    if raw_status == "candidate_unreviewed":
+        return "reference"
+    return raw_status
 
 
 def _rag_disease_comments(
@@ -673,6 +895,106 @@ def _basis_from_evidence(*, disease_code: str, evidence_sources: list[dict[str, 
     if not titles:
         return "참고 문서 기반"
     return f"참고 문서 기반: {', '.join(titles[:2])}"
+
+
+def _normalized_diet_rag_strategy() -> str:
+    strategy = str(getattr(config, "DIET_RECOMMENDATION_RAG_STRATEGY", DIET_RAG_STRATEGY_KEYWORD_ONLY) or "").strip()
+    if strategy not in SUPPORTED_DIET_RAG_STRATEGIES:
+        return DIET_RAG_STRATEGY_KEYWORD_ONLY
+    return strategy
+
+
+def _should_try_vector_fallback(*, strategy: str, keyword_count: int) -> bool:
+    return (
+        strategy == DIET_RAG_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK
+        and keyword_count < DIET_RAG_MIN_KEYWORD_RESULTS
+        and _diet_vector_gate_enabled()
+    )
+
+
+def _diet_vector_gate_enabled() -> bool:
+    return (
+        bool(getattr(config, "RAG_EMBEDDING_ENABLED", False))
+        and str(getattr(config, "RAG_EMBEDDING_PROVIDER", "") or "").strip().lower() == "openai"
+        and has_openai_config(config)
+    )
+
+
+def _strategy_skip_reason(*, strategy: str, keyword_count: int) -> str | None:
+    if strategy == DIET_RAG_STRATEGY_VECTOR_DISABLED:
+        return "vector_disabled"
+    if strategy == DIET_RAG_STRATEGY_KEYWORD_ONLY:
+        return "keyword_only"
+    if keyword_count >= DIET_RAG_MIN_KEYWORD_RESULTS:
+        return "keyword_result_sufficient"
+    if not _diet_vector_gate_enabled():
+        return "vector_gate_disabled"
+    return None
+
+
+def _build_diet_vector_retriever() -> VectorRagRetriever | None:
+    try:
+        provider = get_embedding_provider(config)
+    except Exception:
+        return None
+    if provider is None:
+        return None
+    return VectorRagRetriever(embedding_provider=provider)
+
+
+def _trace_diet_rag_strategy(
+    *,
+    strategy: str,
+    keyword_returned_count: int,
+    vector_documents: list[RetrievedDocument],
+    fallback_used: bool,
+    fallback_reason: str | None,
+    target_codes: list[str],
+    issue_keys: list[str],
+    latency_ms: float,
+) -> None:
+    if not config.RAG_ENABLED:
+        return
+    metadata = {
+        "source": "diet_recommendation_rag",
+        "rag_strategy": strategy,
+        "keyword_returned_count": keyword_returned_count,
+        "vector_returned_count": len(vector_documents),
+        "fallback_used": fallback_used,
+        "fallback_reason": fallback_reason,
+        "disease_code": target_codes,
+        "issue_keys": issue_keys,
+        "selected_chunk_keys": [
+            str(document.metadata.get("chunk_key") or document.metadata.get("id"))
+            for document in vector_documents
+            if isinstance(document.metadata, dict)
+        ],
+        "scores": [document.score for document in vector_documents],
+        "embedding_provider": _first_metadata_value(vector_documents, "embedding_provider"),
+        "embedding_model": _first_metadata_value(vector_documents, "embedding_model"),
+        "latency_ms": latency_ms,
+    }
+    record_langfuse_event(
+        name="diet.rag_strategy",
+        input_payload={
+            "rag_strategy": strategy,
+            "target_codes": target_codes,
+            "issue_keys": issue_keys,
+        },
+        output_payload={
+            "keyword_returned_count": keyword_returned_count,
+            "vector_returned_count": len(vector_documents),
+            "fallback_used": fallback_used,
+        },
+        metadata=metadata,
+    )
+
+
+def _first_metadata_value(documents: list[RetrievedDocument], key: str) -> Any | None:
+    for document in documents:
+        if isinstance(document.metadata, dict) and document.metadata.get(key) is not None:
+            return document.metadata.get(key)
+    return None
 
 
 def _normalize_risk_level(value: Any) -> str:

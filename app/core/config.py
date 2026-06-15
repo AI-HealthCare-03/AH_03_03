@@ -70,6 +70,7 @@ class Config(BaseSettings):
     DIET_VISION_PROVIDER: str = "rule_based"
     DIET_MFDS_ENABLED: bool = False
     DIET_RECOMMENDATION_LLM_REWRITE_ENABLED: bool = False
+    DIET_RECOMMENDATION_RAG_STRATEGY: str = "keyword_only"
     MFDS_SERVICE_KEY: str | None = None
     MFDS_SERVICE_KEY_ENCODED: str | None = None
     DIET_MFDS_TIMEOUT_SECONDS: float = 5.0
