@@ -526,6 +526,19 @@ export default function HealthProfilePage() {
           </button>
         </div>
       </div>
+      {/* 입력 단계 탭 */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          기본/신체 정보
+        </Link>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          혈액/검진 정보
+        </Link>
+        <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health/profile">
+          한눈에 보기
+        </Link>
+      </div>
+
       {error && <ErrorMessage message={error} />}
       {notice && <div className="state-box">{notice}</div>}
       <div className="page-grid">
