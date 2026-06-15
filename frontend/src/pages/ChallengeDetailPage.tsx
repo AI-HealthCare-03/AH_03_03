@@ -101,66 +101,74 @@ const metricLabel: Record<string, string> = {
   morning_health_record_count: "아침 건강 지표 기록",
 };
 
-const challengeImageMap: Record<number, string> = {
-  105: "/images/challenges/72.jpg",
-  106: "/images/challenges/73.jpg",
-  107: "/images/challenges/74.jpg",
-  108: "/images/challenges/75.jpg",
-  109: "/images/challenges/76.jpg",
-  110: "/images/challenges/77.jpg",
-  111: "/images/challenges/78.jpg",
-  112: "/images/challenges/79.jpg",
-  113: "/images/challenges/80.jpg",
-  114: "/images/challenges/81.jpg",
-  115: "/images/challenges/82.jpg",
-  116: "/images/challenges/83.jpg",
-  117: "/images/challenges/84.jpg",
-  118: "/images/challenges/85.jpg",
-  119: "/images/challenges/86.jpg",
-  120: "/images/challenges/87.jpg",
-  121: "/images/challenges/88.jpg",
-  122: "/images/challenges/89.jpg",
-  123: "/images/challenges/90.jpg",
-  124: "/images/challenges/91.jpg",
-  125: "/images/challenges/92.jpg",
-  126: "/images/challenges/93.jpg",
-  127: "/images/challenges/94.jpg",
-  128: "/images/challenges/95.jpg",
-  129: "/images/challenges/96.jpg",
-  130: "/images/challenges/97.jpg",
-  131: "/images/challenges/98.jpg",
-  132: "/images/challenges/99.jpg",
-  133: "/images/challenges/100.jpg",
-  134: "/images/challenges/101.jpg",
-  135: "/images/challenges/102.jpg",
-  136: "/images/challenges/103.jpg",
-  137: "/images/challenges/104.jpg",
-  138: "/images/challenges/105.jpg",
-  139: "/images/challenges/106.jpg",
-  140: "/images/challenges/107.jpg",
-  141: "/images/challenges/108.jpg",
-  142: "/images/challenges/109.jpg",
-  143: "/images/challenges/110.jpg",
-  144: "/images/challenges/111.jpg",
-  145: "/images/challenges/112.jpg",
-  146: "/images/challenges/113.jpg",
-  147: "/images/challenges/114.jpg",
-  148: "/images/challenges/115.jpg",
-  149: "/images/challenges/116.jpg",
-  150: "/images/challenges/117.jpg",
-  151: "/images/challenges/118.jpg",
-  152: "/images/challenges/119.jpg",
-  153: "/images/challenges/120.jpg",
-  154: "/images/challenges/121.jpg",
-  155: "/images/challenges/122.jpg",
-  156: "/images/challenges/123.jpg",
-  157: "/images/challenges/124.jpg",
-  158: "/images/challenges/125.jpg",
-  159: "/images/challenges/126.jpg",
-  160: "/images/challenges/127.jpg",
-  161: "/images/challenges/128.jpg",
-  162: "/images/challenges/129.jpg",
+const challengeImageMap: Record<string, string> = {
+  "감각을 깨워 챌린지": "/images/challenges/sensory-awakening.jpg",
+  "경치보며 지루함 달래는 등산 챌린지": "/images/challenges/hiking-beginner.jpg",
+  "경치보며 지루함 달래는 찐등산 챌린지": "/images/challenges/hiking-advanced.jpg",
+  "계단 타고 지방 타고 챌린지": "/images/challenges/stair-climbing-general.jpg",
+  "계단 타고 지방 타고 챌린지(초급)": "/images/challenges/stair-climbing-beginner.jpg",
+  "굳지마 발목 챌린지": "/images/challenges/ankle-stretch.jpg",
+  "굳지마 어깨 챌린지": "/images/challenges/shoulder-stretch.jpg",
+  "굳지마 척추 챌린지": "/images/challenges/spine-stretch.jpg",
+  "굽은 어깨 펴고 당당어깨 챌린지": "/images/challenges/shoulder-posture.jpg",
+  "나비처럼 날아볼까 챌린지": "/images/challenges/butterfly-walk.jpg",
+  "나에게도 탄탄한 가슴이? 챌린지": "/images/challenges/chest-workout.jpg",
+  "나에게도 탄탄한 어깨가? 챌린지": "/images/challenges/shoulder-workout.jpg",
+  "나에게도 탄탄한 팔뚝이? 챌린지": "/images/challenges/arm-workout.jpg",
+  "내 몸을 더 가볍게! 챌린지": "/images/challenges/body-lightening.jpg",
+  "달리기 입문을 위한 인터벌 입문 챌린지": "/images/challenges/interval-running-beginner.jpg",
+  "당신을 위한 입문 스쿼트 챌린지": "/images/challenges/squat-beginner.jpg",
+  "당신을 위한 초급 스쿼트 챌린지": "/images/challenges/squat-intermediate.jpg",
+  "데드리프트 입문 챌린지": "/images/challenges/deadlift-beginner.jpg",
+  "두 번째 심장 키우기 챌린지(서서)": "/images/challenges/heart-pump-standing.jpg",
+  "두 번째 심장 키우기 챌린지(앉아서)": "/images/challenges/heart-pump-sitting.jpg",
+  "런지 입문 챌린지": "/images/challenges/lunge-beginner.jpg",
+  "맨 몸 런지보다 더 강하게 챌린지": "/images/challenges/lunge-advanced.jpg",
+  "맨 몸 스쿼트보다 더 강하게 챌린지": "/images/challenges/squat-advanced.jpg",
+  "명상 호흡 챌린지": "/images/challenges/meditation-breathing.jpg",
+  "무릎 대고 푸쉬업 챌린지": "/images/challenges/knee-pushup.jpg",
+  "벽 짚고 푸쉬업 챌린지": "/images/challenges/wall-pushup.jpg",
+  "브릿지 심화 챌린지": "/images/challenges/bridge-advanced.jpg",
+  "브릿지 입문 챌린지": "/images/challenges/bridge-beginner.jpg",
+  "브릿지 챌린지 입문 챌린지": "/images/challenges/bridge-beginner.jpg",
+  "비가오나 눈이오나 유산소는 가능해 챌린지": "/images/challenges/indoor-cardio.jpg",
+  "산뜻하게 몸 깨우기 챌린지": "/images/challenges/morning-warmup.jpg",
+  "수영 많이 좋아하세요? 챌린지": "/images/challenges/swimming-advanced.jpg",
+  "수영 좋아하세요? 챌린지": "/images/challenges/swimming-beginner.jpg",
+  "수퍼맨 챌린지": "/images/challenges/superman.jpg",
+  "스쿼트 챌린지": "/images/challenges/squat.jpg",
+  "심폐는 곧 체력 챌린지": "/images/challenges/cardio-stamina.jpg",
+  "싸이클 입문 챌린지": "/images/challenges/cycling-beginner.jpg",
+  "싸이클 중급 챌린지": "/images/challenges/cycling-advanced.jpg",
+  "싸이클 초급 챌린지": "/images/challenges/cycling-intro.jpg",
+  "아쿠아 워킹 챌린지": "/images/challenges/aqua-walking.jpg",
+  "앉아서도 건강한 다리 만들기 챌린지": "/images/challenges/leg-exercise-sitting.jpg",
+  "어깨 볼륨 up 챌린지": "/images/challenges/shoulder-volume.jpg",
+  "유산소 입문을 위한 제자리 걷기 챌린지": "/images/challenges/cardio-stepping.jpg",
+  "유산소 초급 챌린지": "/images/challenges/cardio-beginner.jpg",
+  "이제 달려볼까 챌린지": "/images/challenges/running-beginner.jpg",
+  "인터벌 초급 챌린지": "/images/challenges/interval-beginner.jpg",
+  "자! 모두 주먹! 챌린지": "/images/challenges/fist-exercise.jpg",
+  "정석 플랭크 챌린지": "/images/challenges/plank-advanced.jpg",
+  "조금 더 힘차게 걸어볼까 챌린지": "/images/challenges/brisk-walking.jpg",
+  "줄넘기로 지방 태우기 챌린지": "/images/challenges/jump-rope.jpg",
+  "차분히 걷기 챌린지": "/images/challenges/calm-walking.jpg",
+  "최고의 운동! 데드리프트 입문 챌린지": "/images/challenges/deadlift-advanced.jpg",
+  "푸쉬업 챌린지": "/images/challenges/pushup.jpg",
+  "푸쉬업 입문 챌린지": "/images/challenges/pushup-beginner.jpg",
+  "플랭크 입문 챌린지": "/images/challenges/plank-beginner.jpg",
+  "혈당 밟아주기 챌린지(서서)": "/images/challenges/blood-sugar-standing.jpg",
+  "혈당 밟아주기 챌린지(앉아서)": "/images/challenges/blood-sugar-sitting.jpg",
+  "혈당 싸이클로 밟아주기 챌린지": "/images/challenges/blood-sugar-cycling.jpg",
+  "홀로 서기 챌린지": "/images/challenges/solo-standing.jpg",
 };
+
+function getChallengeImagePath(title: string): string {
+  const normalized = title
+    .replace(/챌린지/g, '')
+    .replace(/[!?()· \s]/g, '');
+  return `/images/challenges/${normalized}.jpg`;
+}
 
 function normalizeStatus(value: unknown): string {
   return String(value ?? "").toUpperCase();
@@ -622,19 +630,20 @@ export default function ChallengeDetailPage() {
           <div
             className="challenge-icon-large"
             aria-label={`${category} challenge icon`}
-            style={challenge?.id && challengeImageMap[Number(challenge.id)] ? {} : { background: "none", border: "none" }}
+            style={category === "EXERCISE" ? {} : { background: "none", border: "none" }}
           >
-            {category === "EXERCISE" && challenge?.id ? (
+            {category === "EXERCISE" && challenge?.title ? (
               <img
-                src={challengeImageMap[Number(challenge.id)] ?? ""}
-                alt={challenge.title}
+                src={challengeImageMap[String(challenge.title)] ?? ""}
+                alt={String(challenge.title ?? "")}
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                style={{ width: "100%", height: "auto", maxHeight: "600px", objectFit: "contain", borderRadius: "inherit" }}
               />
             ) : (
               categoryIcon[category] ?? "🌿"
             )}
           </div>
-          {!(challenge?.id && challengeImageMap[Number(challenge.id)]) && (
+          {category !== "EXERCISE" && (
             <p>{getCleanDescription(challenge?.description) || "건강 습관을 작게 시작해보세요."}</p>
           )}
           <div className="metric-grid" style={{ marginTop: "16px" }}>
