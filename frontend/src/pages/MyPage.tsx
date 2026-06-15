@@ -306,8 +306,15 @@ export default function MyPage() {
   };
 
   return (
+    <div className="page-stack">
+      <header className="dashboard-header">
+        <div>
+          <h1>마이페이지</h1>
+          <p>계정 정보와 건강 분석 내역을 확인하고 관리합니다.</p>
+        </div>
+      </header>
     <div className="dashboard-grid">
-      <Card title="마이페이지">
+      <Card>
         <div className="mypage-menu">
           {myPageMenuItems.map((item) => {
             if (item.to) {
@@ -575,6 +582,7 @@ export default function MyPage() {
           </Card>
         </div>
       </div>
+    </div>
     </div>
   );
 }

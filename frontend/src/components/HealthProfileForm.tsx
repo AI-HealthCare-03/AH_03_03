@@ -53,8 +53,8 @@ const familyOptions = [
 
 export const healthProfileSectionTitles = [
   "기본 정보",
-  "가족력/생활정보",
   "신체계측",
+  "가족력/생활정보",
   "혈액/검진 정보",
 ] as const;
 
@@ -100,8 +100,17 @@ const sections: Array<{
     ],
   },
   {
+    title: "신체계측",
+    description: "신장과 체중을 입력하면 BMI가 자동으로 계산됩니다.",
+    fields: [
+      { key: "height_cm", label: "신장(cm)", type: "number", required: true, placeholder: "cm" },
+      { key: "weight_kg", label: "체중(kg)", type: "number", required: true, placeholder: "kg" },
+    ],
+    bmiAfter: true,
+  },
+  {
     title: "가족력/생활정보",
-    description: "부/모/형제자매 세부 입력 없이 질병별 있음/없음/모름으로만 입력합니다.",
+    description: "가족력 정보는 부모 또는 형제자매 중 해당 질환이 있는 경우 '있음'으로 선택해주세요.",
     fields: [
       { key: "family_htn", label: "고혈압 가족력 여부", type: "select", required: true, options: familyOptions },
       { key: "family_dm", label: "당뇨병 가족력 여부", type: "select", required: true, options: familyOptions },
@@ -149,31 +158,24 @@ const sections: Array<{
           { value: "SEVEN_PLUS", label: "7잔 이상" },
         ],
       },
-      { key: "walking_days", label: "1주일간 걷기 일수", required: true, placeholder: "0~7" },
+      { key: "walking_days",
+        label: "1주일간 걷기 일수", required: true, placeholder: "0~7" },
       { key: "strength_days", label: "1주일간 근력운동 일수", required: true, placeholder: "0~7" },
     ],
   },
   {
-    title: "신체계측",
-    fields: [
-      { key: "height_cm", label: "신장", type: "number", required: true, placeholder: "cm" },
-      { key: "weight_kg", label: "체중", type: "number", required: true, placeholder: "kg" },
-    ],
-    bmiAfter: true,
-  },
-  {
     title: "혈액/검진 정보",
-    description: "정밀 분석과 대시보드 추적에 사용하는 검진 수치입니다.",
+    description: "정밀 예측 분석을 위한 검진 수치 입력 칸입니다. 미입력 시 정밀 분석이 불가능합니다.",
     fields: [
-      { key: "systolic_bp", label: "수축기 혈압", type: "number", placeholder: "mmHg" },
-      { key: "diastolic_bp", label: "이완기 혈압", type: "number", placeholder: "mmHg" },
-      { key: "fasting_glucose", label: "공복혈당", type: "number", placeholder: "mg/dL" },
-      { key: "hba1c", label: "당화혈색소 (선택)", type: "number", placeholder: "%" },
+      { key: "systolic_bp", label: "수축기 혈압", type: "number", placeholder: "mmHg", required: true },
+      { key: "diastolic_bp", label: "이완기 혈압", type: "number", placeholder: "mmHg", required: true },
+      { key: "fasting_glucose", label: "공복혈당", type: "number", placeholder: "mg/dL", required: true },
+      { key: "hba1c", label: "당화혈색소", type: "number", placeholder: "%" },
       { key: "total_cholesterol", label: "총콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "triglyceride", label: "중성지방", type: "number", placeholder: "mg/dL" },
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
-      { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm" },
+      { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm", required: true },
     ],
   },
 ];
@@ -194,18 +196,18 @@ export default function HealthProfileForm({ form, bmi, onChange, visibleSections
           <div className="section-heading">
             <h3>{section.title}</h3>
             {section.description && <p>{section.description}</p>}
-            {section.title === "혈액/검진 정보" && (
-              <p>이 단계는 정밀 분석 정확도를 높이는 선택 입력입니다. 비워도 기본 분석은 진행할 수 있습니다.</p>
-            )}
+            {section.title === "혈액/검진 정보"}
           </div>
           <div className="form two-col">
             {section.fields.map((field) => (
               <label key={field.key}>
                 <span className="field-label-row">
                   <span>{field.label}</span>
-                  <em className={field.required ? "badge badge-required" : "badge badge-optional"}>
-                    {field.required ? "필수" : "선택"}
-                  </em>
+                  {field.required !== undefined && (
+                    <em className={field.required ? "badge badge-required" : "badge badge-optional"}>
+                      {field.required ? "필수" : "선택"}
+                    </em>
+                  )}
                   {field.key === "occupation" && (
                     <button
                       aria-label="직업군 선택 도움말 열기"
@@ -252,11 +254,13 @@ export default function HealthProfileForm({ form, bmi, onChange, visibleSections
               </label>
             ))}
             {section.bmiAfter && (
-              <div className="readonly-calculated-field">
-                <span>BMI 자동 계산 결과</span>
-                <strong>{bmi || "-"}</strong>
-                <em className="badge badge-reference">자동 계산</em>
-              </div>
+              <label>
+                <span className="field-label-row">
+                  <span>BMI</span>
+                  <em className="badge badge-reference">자동 계산</em>
+                </span>
+                <input readOnly type="text" value={bmi || "-"} />
+              </label>
             )}
           </div>
         </section>

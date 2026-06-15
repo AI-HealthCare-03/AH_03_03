@@ -62,15 +62,13 @@ const initialForm: HealthProfileFormState = {
 };
 
 const steps = [
-  "기본/신체 정보",
-  "가족력/생활정보",
-  "혈액/검진 정보",
+  "간편 분석 정보 입력",
+  "정밀 분석 정보 입력",
 ];
 
 const stepToSection: Record<number, string[]> = {
-  0: [healthProfileSectionTitles[0],healthProfileSectionTitles[2]],
-  1: [healthProfileSectionTitles[1]],
-  2: [healthProfileSectionTitles[3]],
+  0: [healthProfileSectionTitles[0], healthProfileSectionTitles[1], healthProfileSectionTitles[2]],
+  1: [healthProfileSectionTitles[3]],
 };
 
 const healthFieldLabels: Record<string, string> = {
@@ -404,62 +402,73 @@ export default function HealthRecordPage() {
   );
 
   return (
-    <div className="dashboard-grid">
-      <Card className="sticky-sidebar" title="입력 단계">
-        <div className="card-list">
-          {steps.map((step, index) => (
-            <button
-              className={index === activeStep ? "filter-tab active" : "filter-tab"}
-              key={step}
-              onClick={() => setActiveStep(index)}
-              type="button"
-            >
-              {step}
-            </button>
-          ))}
-          <Link className="filter-tab" style={{ textAlign: "center", display: "block" }} to="/health/profile">
-            한눈에 보기
-          </Link>
+    <div className="page-stack">
+      <header className="dashboard-header">
+        <div>
+          <h1>건강 분석</h1>
+          <p>건강정보를 입력하고 만성질환 위험도를 분석합니다.</p>
         </div>
+      </header>
 
-        {/* 분석 준비 상태 */}
-        <div className="analysis-readiness-panel" style={{ marginTop: 58 }}>
-          <div className={`readiness-status ${readiness?.is_ready ? "success-text" : "warning-text"}`}>
-            <strong>{readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}</strong>
-          </div>
-          <div className="chip-list readiness-chip-list">
-            {missingBasicFields.map((field) => (
-              <span className="badge badge-missing" key={field}>
-                {healthFieldLabels[field] ?? field}
+      {/* 입력 단계 탭 */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Link
+          className="filter-tab"
+          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center" }}
+          to="/health/profile"
+        >
+          한눈에 보기
+        </Link>
+        {steps.map((step, index) => (
+          <button
+            className={index === activeStep ? "filter-tab active" : "filter-tab"}
+            key={step}
+            onClick={() => setActiveStep(index)}
+            style={{ fontSize: "15px", padding: "8px 18px" }}
+            type="button"
+          >
+            {step}
+          </button>
+        ))}
+      </div>
+
+    <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
+      <Card
+        title="건강정보 입력"
+        actions={
+          activeStep === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+              <span className={readiness?.is_ready ? "success-text" : "warning-text"} style={{ fontWeight: 700 }}>
+                {readiness?.is_ready ? "기본 분석 준비 완료" : "정보 부족"}
               </span>
-            ))}
-            {missingBasicFields.length === 0 && <span className="badge badge-saved">부족 항목 없음</span>}
-          </div>
-          <div className="state-box readiness-note">
-            <p>검진/혈액검사 수치를 입력하면 정밀 분석 정확도가 높아집니다.</p>
-            <div className="chip-list readiness-chip-list">
-              {missingPrecisionFields.map((field) => (
-                <span className="badge badge-reference" key={field}>
-                  {healthFieldLabels[field] ?? field}
-                </span>
-              ))}
-              {missingPrecisionFields.length === 0 && <span className="badge badge-saved">정밀 보강값 입력 완료</span>}
+              <span style={{ color: "var(--color-border)" }}>|</span>
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {missingBasicFields.length === 0
+                  ? <span className="badge badge-saved">누락 항목 없음</span>
+                  : missingBasicFields.map((field) => (
+                      <span className="badge badge-missing" key={field}>
+                        {healthFieldLabels[field] ?? field}
+                      </span>
+                    ))
+                }
+              </div>
             </div>
-          </div>
-        </div>
-      </Card>
-      <Card title="건강정보 입력">
+          ) : undefined
+        }
+      >
         {error && <ErrorMessage message={error} />}
         {notice && <div className="state-box">{notice}</div>}
         {activeStep < 4 && (
-          <div className="state-box" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <p>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.</p>
-              <p>혈압, 혈당, 콜레스테롤 수치는 정밀 분석 정확도를 높이는 선택 입력입니다.</p>
+          <div className="state-box" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 12px" }}>
+            <div style={{ lineHeight: "1.4" }}>
+              <p style={{ margin: 0 }}>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 간편 분석을 진행할 수 있습니다.</p>
+              <p style={{ margin: "2px 0 0" }}>정밀 분석 정보를 추가로 입력하시면 예측 정확도가 높아집니다.</p>
             </div>
-            <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">
-              검진표로 입력
-            </Link>
+            {activeStep === 1 && (
+              <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">
+                검진표로 입력
+              </Link>
+            )}
           </div>
         )}
         <form className="form" onSubmit={submit}>
@@ -473,7 +482,7 @@ export default function HealthRecordPage() {
             <button className="secondary" type="submit">
               저장
             </button>
-            {activeStep === 1 && (
+            {activeStep === 0 && (
               <button
                 disabled={runningMode !== null}
                 onClick={() => void runAnalysis("BASIC")}
@@ -482,7 +491,7 @@ export default function HealthRecordPage() {
                 {runningMode === "BASIC" ? "분석 중..." : "간편 분석 실행"}
               </button>
             )}
-            {activeStep === 2 && (
+            {activeStep === 1 && (
               <button
                 disabled={runningMode !== null}
                 onClick={() => void runAnalysis("PRECISION")}
@@ -494,79 +503,6 @@ export default function HealthRecordPage() {
           </div>
         </form>
       </Card>
-      <div style={{ gridColumn: "2" }}>
-      <Card title="최근 건강정보">
-        <div className="card-list">
-          {records.length === 0 && <div className="state-box">최근 건강정보가 없습니다.</div>}
-          {records.slice(0, 3).map((record, index) => (
-            <div className="health-record-summary-card" key={String(record.id ?? index)}>
-              <div className="health-record-summary-header">
-                <div>
-                  <span className="muted">측정일</span>
-                  <strong>{formatDate(record.measured_at ?? record.created_at)}</strong>
-                </div>
-                <span className="badge badge-reference">최근 기록 {index + 1}</span>
-              </div>
-              <div className="health-record-summary-grid">
-                <div>
-                  <span>키/몸무게/BMI</span>
-                  <strong>
-                    {getValue(record, "height_cm", "cm")} / {getValue(record, "weight_kg", "kg")} /{" "}
-                    {getValue(record, "bmi")}
-                  </strong>
-                </div>
-                <div>
-                  <span>가족력/생활</span>
-                  <strong>
-                    {getDisplayValue(record, "family_htn")} · {getDisplayValue(record, "smoking_status")} ·{" "}
-                    {getValue(record, "walking_days_per_week", "일 걷기")}
-                  </strong>
-                </div>
-                <div>
-                  <span>혈압</span>
-                  <strong>
-                    {getValue(record, "systolic_bp")} / {getValue(record, "diastolic_bp")} mmHg
-                  </strong>
-                </div>
-                <div>
-                  <span>이상지질혈증</span>
-                  <div className="health-record-lipid-list">
-                    <span>
-                      <em>총콜레스테롤</em>
-                      <strong>{getValue(record, "total_cholesterol")}</strong>
-                    </span>
-                    <span>
-                      <em>LDL</em>
-                      <strong>{getValue(record, "ldl_cholesterol")}</strong>
-                    </span>
-                    <span>
-                      <em>HDL</em>
-                      <strong>{getValue(record, "hdl_cholesterol")}</strong>
-                    </span>
-                    <span>
-                      <em>중성지방</em>
-                      <strong>{getValue(record, "triglyceride")}</strong>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              {Boolean(record.id) && (
-                <div className="button-row" style={{ justifyContent: "flex-end" }}>
-                  <button
-                    className="danger-ghost"
-                    disabled={isDeleting}
-                    onClick={() => setDeleteTargetId(Number(record.id))}
-                    type="button"
-                  >
-                    삭제
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Card>
-      </div>
       {deleteTargetId && (
         <ConfirmDialog
           cancelLabel="취소"
@@ -579,6 +515,7 @@ export default function HealthRecordPage() {
         />
       )}
       {analysisFeedbackDialog}
+    </div>
     </div>
   );
 }
