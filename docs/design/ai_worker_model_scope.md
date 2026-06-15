@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 로컬 모델 artifact | DM/HTN/DL CatBoost 3종 | FastAPI 컨테이너에 포함되어 정밀분석에서 사용 가능 |
 | Rule-based 로직 | OBESITY, ANEM 참고 분류, X2 classifier, 식단 nutrition scorer | 모델 파일 없이 규칙/점수표 기반으로 동작 |
-| 외부 provider/API 코드 | GPT Vision, Clova OCR, OpenAI LLM | GPT Vision/OpenAI는 정책과 env에 따라 활성화 후보, Clova OCR은 현재 공식 실행 경로에서 제외된 deferred provider |
+| 외부 provider/API 코드 | GPT Vision, OpenAI LLM | GPT Vision/OpenAI는 정책과 env에 따라 활성화 후보 |
 | Skeleton/parser | 건강검진 OCR 처리 구조 | 이미지 기반 복약 인식은 MVP에서 제외하고 직접 입력으로 운영 |
 | P2 보류 | 자체 식단 CV 모델, vector RAG, Redis Stream/async_jobs/consumer, LLM/RAG 운영 고도화 | 시연 전 미구현이 아니라 운영 확장 단계로 의도적 보류 |
 
@@ -49,12 +49,11 @@ ANEM을 공식 분석 결과에 포함하려면 `AnalysisType` enum, DB schema, 
 | 기능 | 경로 | 현재 상태 | 주의사항 |
 | --- | --- | --- | --- |
 | GPT Vision 식단 이미지 분석 후보 | `ai_runtime/cv/providers/gpt_vision.py` | provider 코드 존재 | 기본값은 off이며 `GPT_VISION_FALLBACK_ENABLED=true`와 사용자 확인 정책이 있을 때만 fallback 후보 |
-| Clova OCR provider | `ai_runtime/ocr/providers/clova_ocr/` | PoC/deferred provider로 보존 | 공식 건강검진 OCR 시연 경로에서는 호출하지 않는다 |
 | OpenAI LLM | `ai_runtime/llm/` | 챗봇, 설명 생성, fallback/rewrite 구조 존재 | 기본은 rule-based/fallback 설명이며 실제 LLM 호출은 설정에 따라 제한적으로 사용 |
 
 외부 provider는 API key, 비용, 개인정보 처리 정책이 연결되므로 기본 시연 경로에서 무조건 호출하지 않는다.
 
-건강검진 OCR 공식 시연 경로는 완성된 OCR provider 결과를 보장하는 구조가 아니라 provider/fallback 기반 측정값 후보를 만들고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조다. PaddleOCR/local OCR 1차 처리와 GPT Vision fallback은 후속 provider 후보이며, GPT Vision은 기본 off 상태를 유지한다. Clova OCR은 삭제하지 않고 legacy/PoC provider로 보존하지만, 시연 준비 검증이나 공식 API 기본 경로의 필수 조건으로 보지 않는다.
+건강검진 OCR 공식 시연 경로는 완성된 OCR provider 결과를 보장하는 구조가 아니라 provider/fallback 기반 측정값 후보를 만들고, 사용자가 confirm한 값만 `HealthRecord` X2 필드에 반영하는 구조다. PaddleOCR/local OCR 1차 처리와 GPT Vision fallback을 유지하며, GPT Vision은 기본 off 상태를 유지한다.
 
 ## 5. Skeleton / Parser
 
@@ -90,9 +89,8 @@ uv run python scripts/audit_ai_runtime_capabilities.py
 - CatBoost predictor warmup 가능 여부
 - X2 health stage classifier import 가능 여부
 - 식단 nutrition scorer import 가능 여부와 runtime CSV record 개수
-- GPT Vision, Clova OCR, OpenAI LLM provider 코드 import 가능 여부
+- GPT Vision, OpenAI LLM provider 코드 import 가능 여부
 - `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` 설정 여부
-- Clova OCR이 deferred provider로 표시되는지 여부
 - LLM prompt 관련 코드 위치와 line number
 - LLM/RAG 공식 runtime, keyword RAG PoC, provider-only, prepared-not-wired, P2 backlog 분류
 - 복약 직접 입력 API와 기록 조회 가능 여부

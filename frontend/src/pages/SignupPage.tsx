@@ -148,7 +148,7 @@ export default function SignupPage() {
         nextErrors.email_verification = "이메일 인증을 완료해야 다음 단계로 이동할 수 있습니다.";
       }
       if (hasPhoneInput && (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4)) {
-        nextErrors.phone_number = "휴대폰 번호를 올바르게 입력해주세요.";
+        nextErrors.phone_number = "전화번호를 올바르게 입력해주세요.";
       }
       if (
         hasPhoneInput &&
@@ -157,7 +157,7 @@ export default function SignupPage() {
         phoneParts.third.length === 4 &&
         (!phoneCheck || phoneCheck.checkedValue !== normalizedPhoneNumber || !phoneCheck.available)
       ) {
-        nextErrors.phone_number_check = "휴대폰 번호 중복확인을 해주세요.";
+        nextErrors.phone_number_check = "전화번호 중복확인을 해주세요.";
       }
       if (!isPasswordValid(password)) {
         nextErrors.password = passwordPolicyMessage;
@@ -312,7 +312,7 @@ export default function SignupPage() {
       setPhoneCheck({
         checkedValue: "",
         available: true,
-        message: "휴대폰 번호는 선택 입력입니다.",
+        message: "전화번호는 선택 입력입니다.",
       });
       setFieldErrors((prev) => {
         const { phone_number, phone_number_check, ...rest } = prev;
@@ -321,7 +321,7 @@ export default function SignupPage() {
       return;
     }
     if (phoneParts.first.length < 2 || phoneParts.second.length < 3 || phoneParts.third.length !== 4) {
-      setFieldErrors((prev) => ({ ...prev, phone_number: "휴대폰 번호를 올바르게 입력해주세요." }));
+      setFieldErrors((prev) => ({ ...prev, phone_number: "전화번호를 올바르게 입력해주세요." }));
       return;
     }
 
@@ -332,7 +332,7 @@ export default function SignupPage() {
         checkedValue: normalizedPhoneNumber,
         available: result.available,
         message:
-          result.message ?? (result.available ? "사용 가능한 휴대폰 번호입니다." : "이미 사용중인 휴대폰 번호입니다."),
+          result.message ?? (result.available ? "사용 가능한 전화번호입니다." : "이미 사용중인 전화번호입니다."),
       });
       setFieldErrors((prev) => {
         const { phone_number, phone_number_check, ...rest } = prev;
@@ -340,7 +340,7 @@ export default function SignupPage() {
       });
     } catch (err) {
       setPhoneCheck(null);
-      setError(err instanceof Error ? err.message : "휴대폰 번호 중복확인에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "전화번호 중복확인에 실패했습니다.");
     } finally {
       setCheckingField(null);
     }
@@ -662,7 +662,7 @@ export default function SignupPage() {
                 )}
               </div>
               <label>
-                휴대폰 번호 <span className="muted">(선택)</span>
+                전화번호 <span className="muted">(선택)</span>
                 <div className="phone-input-grid">
                   <input
                     inputMode="numeric"
@@ -692,7 +692,7 @@ export default function SignupPage() {
                 type="button"
                 onClick={() => void handleCheckPhone()}
               >
-                {checkingField === "phone" ? "확인 중..." : "휴대폰 번호 중복확인"}
+                {checkingField === "phone" ? "확인 중..." : "전화번호 중복확인"}
               </button>
               {phoneCheck && <div className={phoneCheck.available ? "success-text" : "warning-text"}>{phoneCheck.message}</div>}
               {fieldErrors.phone_number_check && <span className="field-error">{fieldErrors.phone_number_check}</span>}
@@ -768,7 +768,7 @@ export default function SignupPage() {
                       <h3>수집 항목</h3>
                       <ul>
                         <li>필수 계정 정보: 이름, 닉네임, 이메일, 비밀번호</li>
-                        <li>선택 계정 정보: 휴대폰 번호</li>
+                        <li>선택 계정 정보: 전화번호</li>
                         <li>건강관리 정보: 건강검진 결과, OCR 업로드 이미지/PDF에서 추출된 항목, 복약 정보, 식단 기록, 챌린지 수행 기록</li>
                         <li>서비스 이용 정보: 로그인 기록, 알림 수신 설정, 가족 연동 설정, 기기/브라우저 정보</li>
                       </ul>

@@ -200,4 +200,4 @@ uv run python scripts/verify_demo_ready.py
 
 - `.env` 파일을 화면에 띄우지 않는다.
 - `docker compose config` 전체 출력은 공유하지 않는다.
-- 실제 OpenAI/CLOVA/Langfuse/SMTP 키는 출력하지 않는다.
+- 실제 OpenAI/Langfuse/SMTP 키는 출력하지 않는다.

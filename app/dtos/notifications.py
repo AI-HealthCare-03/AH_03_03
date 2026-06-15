@@ -1,8 +1,16 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.notifications import NotificationChannel, NotificationLogStatus, ReminderType
+
+MVP_NOTIFICATION_CHANNELS = {NotificationChannel.IN_APP, NotificationChannel.EMAIL}
+
+
+def _validate_mvp_notification_channel(channel: NotificationChannel | None) -> NotificationChannel | None:
+    if channel is not None and channel not in MVP_NOTIFICATION_CHANNELS:
+        raise ValueError("MVP에서는 서비스 내부 알림과 이메일 알림만 사용할 수 있습니다.")
+    return channel
 
 
 class NotificationCreateRequest(BaseModel):
@@ -57,6 +65,11 @@ class ReminderScheduleCreateRequest(BaseModel):
     is_active: bool = True
     next_trigger_at: datetime | None = None
 
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, channel: NotificationChannel) -> NotificationChannel:
+        return _validate_mvp_notification_channel(channel) or NotificationChannel.IN_APP
+
 
 class ReminderScheduleUpdateRequest(BaseModel):
     reminder_type: ReminderType | None = None
@@ -70,6 +83,11 @@ class ReminderScheduleUpdateRequest(BaseModel):
     timezone: str | None = Field(default=None, min_length=1, max_length=50)
     is_active: bool | None = None
     next_trigger_at: datetime | None = None
+
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, channel: NotificationChannel | None) -> NotificationChannel | None:
+        return _validate_mvp_notification_channel(channel)
 
 
 class ReminderScheduleResponse(BaseModel):

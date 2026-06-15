@@ -11,7 +11,7 @@
 | 경로 | 현재 역할 |
 | --- | --- |
 | `ai_runtime/ml/` | CatBoost/XGBoost 학습/추론, X2 룰 기반 분류, 모델 artifact, 학습 config |
-| `ai_runtime/ocr/` | 건강검진표 OCR, OCR extractor/parser, Clova OCR PoC/deferred provider 후보 영역 |
+| `ai_runtime/ocr/` | 건강검진표 OCR, OCR extractor/parser, GPT Vision/PaddleOCR 기반 checkup OCR |
 | `ai_runtime/cv/` | 음식 이미지 분석, CV provider, 품질 판정, CV schema 후보 영역 |
 | `ai_runtime/llm/` | LLM 호출, GPT Vision 호출 계층, 프롬프트, RAG 준비, 상담/해설 생성 |
 | `ai_runtime/common/` | AI 영역 공통 유틸, 공통 schema 후보 영역 |
@@ -272,7 +272,6 @@ uv run python -c "from app.main import app; print(app.title); print(len(app.open
   - `app/services/analysis.py`
   - `ai_runtime/ml/inference/disease_risk_service.py`
   - `ai_runtime/ocr/checkup/`
-  - `ai_runtime/ocr/providers/clova_ocr/`
   - `app/apis/v1/analysis_routers.py`
   - `app/apis/v1/exam_routers.py`
 - 완료 기준:

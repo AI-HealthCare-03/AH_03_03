@@ -86,8 +86,7 @@ export default function SettingsPage() {
           요청해주세요.
         </div>
         <div className="state-box">
-          알림은 서비스 내부 알림과 이메일 중심으로 제공됩니다. 브라우저 푸시 알림과 SMS 알림은 MVP 범위에서
-          제외됩니다.
+          알림은 서비스 내부 알림과 이메일 중심으로 제공됩니다.
         </div>
       </div>
       <div style={{ marginTop: "32px", paddingTop: "20px", borderTop: "1px solid var(--color-border)" }}>

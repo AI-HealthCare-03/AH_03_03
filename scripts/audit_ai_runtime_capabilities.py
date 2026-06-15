@@ -214,19 +214,6 @@ def _audit_external_provider_code() -> list[AuditRow]:
         ),
         _import_row(
             area="provider",
-            item="Clova OCR client import",
-            module="ai_runtime.ocr.providers.clova_ocr.clova_client",
-            ready_category="DEFERRED_PROVIDER",
-        ),
-        AuditRow(
-            area="provider",
-            item="Clova OCR runtime status",
-            status="DEFERRED",
-            detail="preserved as PoC/deferred provider; official demo path does not call Clova OCR",
-            category="DEFERRED_PROVIDER",
-        ),
-        _import_row(
-            area="provider",
             item="OpenAI LLM client",
             module="ai_runtime.llm.llm_client",
             ready_category="READY_PROVIDER_CODE_ONLY",
