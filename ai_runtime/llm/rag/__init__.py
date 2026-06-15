@@ -1,3 +1,4 @@
+from ai_runtime.llm.rag.hybrid_retriever import HybridRagRetriever
 from ai_runtime.llm.rag.keyword_retriever import retrieve_keyword_rag_contexts
 from ai_runtime.llm.rag.rag_context_builder import (
     build_retrieved_context_text,
@@ -21,6 +22,7 @@ from ai_runtime.llm.rag.source_trust import (
 from ai_runtime.llm.rag.vector_retriever import VectorRagRetriever
 
 __all__ = [
+    "HybridRagRetriever",
     "KeywordRagRetriever",
     "RagRetrievalResult",
     "RagRetriever",

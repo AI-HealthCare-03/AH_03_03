@@ -191,6 +191,109 @@ def trace_vector_rag_retrieval(
     )
 
 
+def build_hybrid_rag_trace_metadata(
+    *,
+    query: str,
+    strategy: str,
+    top_k: int,
+    documents: list[RetrievedDocument],
+    keyword_returned_count: int,
+    vector_returned_count: int,
+    fallback_used: bool,
+    fallback_reason: str | None,
+    disease_code: str | None = None,
+    source_key: str | None = None,
+    issue_keys: list[str] | None = None,
+    latency_ms: float | None = None,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
+    embedding_dimension: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "trace_version": "hybrid_rag_poc_v1",
+        "source": "hybrid_rag_poc",
+        "retriever_strategy": strategy,
+        "query_preview": _trace_query_preview(query),
+        "query_length": len(query),
+        "query_truncated": len(query) > MAX_TRACE_QUERY_LENGTH,
+        "top_k": top_k,
+        "keyword_returned_count": keyword_returned_count,
+        "vector_returned_count": vector_returned_count,
+        "merged_count": len(documents),
+        "fallback_used": fallback_used,
+        "fallback_reason": fallback_reason,
+        "disease_code": disease_code,
+        "source_key": source_key,
+        "issue_keys": issue_keys or [],
+        "selected_chunk_keys": [
+            str(document.metadata.get("chunk_key") or document.metadata.get("id")) for document in documents
+        ],
+        "latency_ms": latency_ms,
+        "embedding_provider": embedding_provider,
+        "embedding_model": embedding_model,
+        "embedding_dimension": embedding_dimension,
+        "vector_rag": vector_returned_count > 0,
+        "embedding_search": vector_returned_count > 0,
+        "retrieved_sources": [document.to_trace_metadata() for document in documents],
+    }
+
+
+def trace_hybrid_rag_retrieval(
+    *,
+    query: str,
+    strategy: str,
+    top_k: int,
+    documents: list[RetrievedDocument],
+    keyword_returned_count: int,
+    vector_returned_count: int,
+    fallback_used: bool,
+    fallback_reason: str | None,
+    disease_code: str | None = None,
+    source_key: str | None = None,
+    issue_keys: list[str] | None = None,
+    latency_ms: float | None = None,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
+    embedding_dimension: int | None = None,
+) -> bool:
+    if not config.RAG_ENABLED:
+        return False
+
+    metadata = build_hybrid_rag_trace_metadata(
+        query=query,
+        strategy=strategy,
+        top_k=top_k,
+        documents=documents,
+        keyword_returned_count=keyword_returned_count,
+        vector_returned_count=vector_returned_count,
+        fallback_used=fallback_used,
+        fallback_reason=fallback_reason,
+        disease_code=disease_code,
+        source_key=source_key,
+        issue_keys=issue_keys,
+        latency_ms=latency_ms,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+        embedding_dimension=embedding_dimension,
+    )
+    return record_langfuse_event(
+        name="rag.hybrid_retrieval",
+        input_payload={
+            "query_preview": metadata["query_preview"],
+            "query_length": metadata["query_length"],
+            "strategy": strategy,
+            "top_k": top_k,
+        },
+        output_payload={
+            "keyword_returned_count": keyword_returned_count,
+            "vector_returned_count": vector_returned_count,
+            "merged_count": len(documents),
+            "fallback_used": fallback_used,
+        },
+        metadata=metadata,
+    )
+
+
 def _trace_query_preview(query: str) -> str:
     return query[:MAX_TRACE_QUERY_LENGTH]
 
