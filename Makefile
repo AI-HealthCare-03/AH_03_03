@@ -3,6 +3,7 @@ PROD_ENV ?= prod.env
 DEV_COMPOSE = docker compose --env-file $(DEV_ENV) -f infra/docker/docker-compose.dev.yml
 PROD_COMPOSE = docker compose --env-file $(PROD_ENV) -f infra/docker/docker-compose.prod.yml
 COMPOSE_DEV = $(DEV_COMPOSE)
+FASTAPI_EXEC = $(DEV_COMPOSE) exec fastapi uv run --no-sync
 DOCKER_USER ?= kdu0312
 DOCKER_REPOSITORY ?= ai-health
 APP_VERSION ?= v1.0.0
@@ -14,6 +15,7 @@ AI_WORKER_IMAGE = $(IMAGE_REPO):ai-$(AI_WORKER_VERSION)
 FRONTEND_IMAGE = $(IMAGE_REPO):frontend-$(FRONTEND_VERSION)
 DOCKER_PLATFORM ?= linux/amd64
 VITE_API_BASE_URL ?= /api/v1
+RAG_OPENAI_LIMIT = $(if $(LIMIT),$(LIMIT),1)
 
 # Legacy/minimal app stack
 # Root docker-compose.yml wrapper for backend/AI checks only.
@@ -123,6 +125,28 @@ dev-restart-nginx:
 
 dev-config-check:
 	$(DEV_COMPOSE) config --quiet
+
+.PHONY: rag-preview rag-ingest-dry-run rag-ingest-apply rag-embed-dry-run rag-embed-apply-openai-dry-run rag-embed-apply-openai
+rag-preview:
+	uv run python scripts/rag/preview_rag_chunks.py --json
+
+rag-ingest-dry-run:
+	$(FASTAPI_EXEC) python scripts/rag/ingest_rag_chunks.py --json
+
+# DB write 발생: dry-run 결과 확인 후 명시적으로 실행하세요.
+rag-ingest-apply:
+	$(FASTAPI_EXEC) python scripts/rag/ingest_rag_chunks.py --apply --json
+
+rag-embed-dry-run:
+	$(FASTAPI_EXEC) python scripts/rag/embed_rag_chunks.py --provider disabled --json
+
+# OpenAI API 비용이 발생할 수 있음: 기본 LIMIT=1, 예: make rag-embed-apply-openai-dry-run LIMIT=1
+rag-embed-apply-openai-dry-run:
+	$(FASTAPI_EXEC) python scripts/rag/embed_rag_chunks.py --provider openai --json --limit $(RAG_OPENAI_LIMIT)
+
+# DB write + OpenAI API 비용이 발생할 수 있음: 기본 LIMIT=1, 예: make rag-embed-apply-openai LIMIT=1
+rag-embed-apply-openai:
+	$(FASTAPI_EXEC) python scripts/rag/embed_rag_chunks.py --provider openai --apply --json --limit $(RAG_OPENAI_LIMIT)
 
 .PHONY: demo-up demo-down demo-ps demo-logs demo-health
 demo-up: dev-up

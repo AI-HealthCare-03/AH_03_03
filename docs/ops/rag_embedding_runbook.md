@@ -36,6 +36,14 @@ LANGFUSE_SECRET_KEY=<langfuse-secret-key>
 
 먼저 DB write 없이 대상 chunk와 예상 작업량을 확인한다.
 
+FastAPI Docker image에는 `scripts/rag` 폴더가 포함되어 있어야 한다. dev compose 컨테이너에서 운영 스크립트를 실행할 때는 Makefile target을 우선 사용한다.
+
+```bash
+make rag-preview
+make rag-ingest-dry-run
+make rag-embed-dry-run
+```
+
 ```bash
 uv run python scripts/rag/embed_rag_chunks.py --provider openai --json
 ```
@@ -59,6 +67,24 @@ uv run python scripts/rag/embed_rag_chunks.py --provider openai --only-document-
 ## Apply
 
 dry-run 결과를 확인한 뒤에만 apply를 실행한다.
+
+RAG chunk를 DB에 저장하려면:
+
+```bash
+make rag-ingest-apply
+```
+
+OpenAI embedding 대상과 비용을 소량으로 먼저 확인하려면:
+
+```bash
+make rag-embed-apply-openai-dry-run LIMIT=1
+```
+
+확인 후 실제 vector 저장을 소량 적용하려면:
+
+```bash
+make rag-embed-apply-openai LIMIT=1
+```
 
 ```bash
 uv run python scripts/rag/embed_rag_chunks.py --provider openai --apply --json
@@ -92,10 +118,14 @@ uv run python scripts/rag/embed_rag_chunks.py --provider openai --apply --force 
 ## 운영 주의
 
 - 운영 환경에서 `--provider mock --apply`는 금지한다.
+- `make rag-ingest-apply`는 DB write를 수행한다.
+- `make rag-embed-apply-openai`는 DB write와 OpenAI API 비용이 발생할 수 있다.
+- OpenAI apply target은 기본 `LIMIT=1`로 동작한다. 대량 적용 전에는 반드시 소량 검증과 로그 확인을 먼저 한다.
 - 비용과 rate limit을 고려해 batch size를 조절한다.
 - OpenAI key가 없으면 OpenAI provider 생성은 실패해야 한다.
 - pgvector index는 별도 단계다. chunk 수가 커지면 vector search 성능을 재검토한다.
 - vector/hybrid retriever를 서비스 API에 연결하는 작업은 embedding 저장과 검색 품질 확인 이후에 진행한다.
+- `.env`, API key, Langfuse secret은 커밋하지 않는다.
 
 ## Langfuse 확인
 
