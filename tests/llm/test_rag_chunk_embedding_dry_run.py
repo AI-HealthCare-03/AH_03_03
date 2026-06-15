@@ -6,9 +6,12 @@ import pytest
 
 from ai_runtime.llm.rag.embeddings import MockEmbeddingProvider, OpenAIEmbeddingProvider
 from scripts.rag.embed_rag_chunks import (
+    OrmEmbeddingWriteGateway,
     RagChunkEmbeddingCandidate,
+    _vector_to_pgvector_literal,
     build_embedding_provider_from_options,
     dry_run_embed_rag_chunks,
+    embed_rag_chunks,
 )
 
 
@@ -16,10 +19,16 @@ from scripts.rag.embed_rag_chunks import (
 class FakeChunkRow:
     chunk_key: str
     content: str
+    content_hash: str | None = "hash-1"
     source_key: str = "hypertension"
     document_key: str = "rag:hypertension:hypertension.md"
     is_active: bool = True
     document_active: bool = True
+    embedding_is_null: bool = True
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_dimension: int | None = None
+    embedding_content_hash: str | None = None
 
 
 class FakeEmbeddingGateway:
@@ -48,6 +57,12 @@ class FakeEmbeddingGateway:
                 RagChunkEmbeddingCandidate(
                     chunk_key=row.chunk_key,
                     content=row.content,
+                    content_hash=row.content_hash,
+                    embedding_is_null=row.embedding_is_null,
+                    embedding_provider=row.embedding_provider,
+                    embedding_model=row.embedding_model,
+                    embedding_dimension=row.embedding_dimension,
+                    embedding_content_hash=row.embedding_content_hash,
                     document_key=row.document_key,
                     source_key=row.source_key,
                     metadata={"source_key": row.source_key},
@@ -56,6 +71,42 @@ class FakeEmbeddingGateway:
             if limit is not None and len(candidates) >= limit:
                 break
         return candidates
+
+
+class FakeEmbeddingWriter:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def write_embedding(
+        self,
+        *,
+        chunk_key: str,
+        vector: list[float],
+        provider: str,
+        model: str,
+        dimension: int,
+    ) -> int:
+        self.calls.append(
+            {
+                "chunk_key": chunk_key,
+                "vector": vector,
+                "provider": provider,
+                "model": model,
+                "dimension": dimension,
+            }
+        )
+        return 1
+
+
+class FakeConnection:
+    def __init__(self) -> None:
+        self.query: str | None = None
+        self.values: list[object] | None = None
+
+    async def execute_query(self, query: str, values: list[object]) -> tuple[int, list[dict[str, object]]]:
+        self.query = query
+        self.values = values
+        return 1, []
 
 
 @pytest.mark.asyncio
@@ -212,6 +263,186 @@ async def test_openai_provider_does_not_call_external_api_and_reports_failure() 
     assert "NotImplementedError" in summary.warnings[0]
 
 
+@pytest.mark.asyncio
+async def test_apply_with_mock_provider_calls_fake_writer() -> None:
+    gateway = FakeEmbeddingGateway([_row("chunk-1")])
+    writer = FakeEmbeddingWriter()
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+        writer=writer,
+        apply=True,
+    )
+
+    assert summary.planned_embedding_writes == 1
+    assert summary.embedding_writes == 1
+    assert summary.db_write_performed is True
+    assert len(writer.calls) == 1
+    assert writer.calls[0]["chunk_key"] == "chunk-1"
+    assert writer.calls[0]["provider"] == "mock"
+
+
+@pytest.mark.asyncio
+async def test_current_embedding_is_skipped_by_default() -> None:
+    gateway = FakeEmbeddingGateway(
+        [
+            _row(
+                "chunk-1",
+                embedding_is_null=False,
+                embedding_provider="mock",
+                embedding_model="mock-model",
+                embedding_dimension=8,
+                embedding_content_hash="hash-1",
+            )
+        ]
+    )
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+    )
+
+    assert summary.total_candidate_chunks == 1
+    assert summary.planned_embedding_writes == 0
+    assert summary.embedded_chunks == 0
+    assert summary.skipped_existing_embeddings == 1
+    assert summary.skipped_chunks == 1
+
+
+@pytest.mark.asyncio
+async def test_stale_embedding_content_hash_is_regenerated() -> None:
+    gateway = FakeEmbeddingGateway(
+        [
+            _row(
+                "chunk-1",
+                embedding_is_null=False,
+                embedding_provider="mock",
+                embedding_model="mock-model",
+                embedding_dimension=8,
+                embedding_content_hash="old-hash",
+            )
+        ]
+    )
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+    )
+
+    assert summary.planned_embedding_writes == 1
+    assert summary.stale_embeddings == 1
+    assert summary.embedded_chunks == 1
+
+
+@pytest.mark.asyncio
+async def test_force_regenerates_current_embedding() -> None:
+    gateway = FakeEmbeddingGateway(
+        [
+            _row(
+                "chunk-1",
+                embedding_is_null=False,
+                embedding_provider="mock",
+                embedding_model="mock-model",
+                embedding_dimension=8,
+                embedding_content_hash="hash-1",
+            )
+        ]
+    )
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+        force=True,
+    )
+
+    assert summary.planned_embedding_writes == 1
+    assert summary.forced_embeddings == 1
+    assert summary.embedded_chunks == 1
+
+
+@pytest.mark.asyncio
+async def test_missing_content_hash_is_skipped_with_warning() -> None:
+    gateway = FakeEmbeddingGateway([_row("chunk-1", content_hash=None)])
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+    )
+
+    assert summary.total_candidate_chunks == 1
+    assert summary.planned_embedding_writes == 0
+    assert summary.skipped_chunks == 1
+    assert "content_hash is missing" in summary.warnings[0]
+
+
+def test_vector_literal_uses_pgvector_array_format() -> None:
+    assert _vector_to_pgvector_literal([0.1, -0.2, 1.0]) == "[0.1,-0.2,1]"
+
+
+@pytest.mark.asyncio
+async def test_raw_sql_writer_uses_parameter_binding_payload() -> None:
+    connection = FakeConnection()
+    writer = OrmEmbeddingWriteGateway(connection)
+
+    affected = await writer.write_embedding(
+        chunk_key="chunk-1",
+        vector=[0.1, -0.2],
+        provider="mock",
+        model="mock-model",
+        dimension=2,
+    )
+
+    assert affected == 1
+    assert connection.query is not None
+    assert "$1::vector" in connection.query
+    assert "0.1" not in connection.query
+    assert connection.values == ["[0.1,-0.2]", "mock", "mock-model", 2, "chunk-1"]
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_apply_is_blocked_without_api_call() -> None:
+    gateway = FakeEmbeddingGateway([_row("chunk-1")])
+    writer = FakeEmbeddingWriter()
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=OpenAIEmbeddingProvider(),
+        provider_name="openai",
+        model_name="text-embedding-3-small",
+        dimension=1536,
+        batch_size=64,
+        writer=writer,
+        apply=True,
+    )
+
+    assert summary.total_candidate_chunks == 0
+    assert summary.embedding_writes == 0
+    assert summary.db_write_performed is False
+    assert writer.calls == []
+    assert summary.warnings == ["OpenAI embedding apply is disabled in this stage"]
+
+
 def test_provider_override_mock_enables_embedding_without_env() -> None:
     provider, provider_name, model_name, dimension = build_embedding_provider_from_options(
         provider_override="mock",
@@ -238,16 +469,28 @@ def _row(
     chunk_key: str,
     *,
     content: str = "테스트 chunk 내용",
+    content_hash: str | None = "hash-1",
     source_key: str = "hypertension",
     document_key: str = "rag:hypertension:hypertension.md",
     is_active: bool = True,
     document_active: bool = True,
+    embedding_is_null: bool = True,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
+    embedding_dimension: int | None = None,
+    embedding_content_hash: str | None = None,
 ) -> FakeChunkRow:
     return FakeChunkRow(
         chunk_key=chunk_key,
         content=content,
+        content_hash=content_hash,
         source_key=source_key,
         document_key=document_key,
         is_active=is_active,
         document_active=document_active,
+        embedding_is_null=embedding_is_null,
+        embedding_provider=embedding_provider,
+        embedding_model=embedding_model,
+        embedding_dimension=embedding_dimension,
+        embedding_content_hash=embedding_content_hash,
     )
