@@ -617,8 +617,10 @@ export default function ChallengeDetailPage() {
               categoryIcon[category] ?? "🌿"
             )}
           </div>
-          <p>{getCleanDescription(challenge?.description) || "건강 습관을 작게 시작해보세요."}</p>
-          <div className="metric-grid">
+          {!(challenge?.id && challengeImageMap[Number(challenge.id)]) && (
+            <p>{getCleanDescription(challenge?.description) || "건강 습관을 작게 시작해보세요."}</p>
+          )}
+          <div className="metric-grid" style={{ marginTop: "16px" }}>
             <div>
               <span>기간</span>
               <strong>{getDurationDays(challenge, userChallenge)}일</strong>
@@ -725,21 +727,6 @@ export default function ChallengeDetailPage() {
           {buildExpectedEffects(challenge).map((item) => (
             <div key={item}>{item}</div>
           ))}
-        </div>
-      </Card>
-      <Card title="주의사항">
-        <div className="timeline-list">
-          {challenge?.caution_message ? <div>{String(challenge.caution_message)}</div> : null}
-          {challenge?.contraindication_message ? <div>{String(challenge.contraindication_message)}</div> : null}
-          {!challenge?.caution_message && !challenge?.contraindication_message ? (
-            <div>컨디션이 좋지 않거나 불편감이 있으면 강도를 낮추고, 필요한 경우 의료진과 상담하세요.</div>
-          ) : null}
-        </div>
-      </Card>
-      <Card title="추천 이유">
-        <div className="timeline-list">
-          <div>혈당/혈압 추적 결과와 생활습관 입력을 바탕으로 추천되는 챌린지입니다.</div>
-          <div>오늘 수행 완료와 참여 취소 처리는 내 챌린지 기록에 바로 반영됩니다.</div>
         </div>
       </Card>
     </div>
