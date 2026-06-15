@@ -41,7 +41,7 @@ from app.services import notifications as notification_service
 from app.services import service_jobs
 from app.services.email_service import EmailService
 
-FAMILY_INVITE_TTL_HOURS = 24
+FAMILY_INVITE_TTL_MINUTES = 30
 FAMILY_INVITE_CODE_LENGTH = 8
 FAMILY_INVITE_CODE_MAX_ATTEMPTS = 10
 FAMILY_CHALLENGE_COMPLETED_RELATED_TYPE = "family_challenge_completed"
@@ -53,6 +53,17 @@ class FamilyChallengeAlertContext:
     owner_user_id: int
     owner_display_name: str
     user_challenge_id: int
+
+
+@dataclass(frozen=True)
+class FamilyInvitePreview:
+    invite_id: int
+    family_id: int
+    family_name: str
+    inviter_display_name: str
+    invitee_email: str | None
+    status: FamilyInviteStatus
+    expires_at: datetime
 
 
 def _normalize_email(email: str | None) -> str | None:
@@ -182,14 +193,6 @@ async def _ensure_invite_target_allowed(
     ):
         _bad_request("이미 연결된 가족입니다.")
 
-    pending_query = FamilyInvite.filter(family_id=family_id, status=FamilyInviteStatus.PENDING, expires_at__gte=_now())
-    if invitee_user_id is not None and await pending_query.filter(invitee_user_id=invitee_user_id).exists():
-        _bad_request("이미 대기 중인 가족 초대가 있습니다.")
-    if invitee_email and await pending_query.filter(invitee_email=invitee_email).exists():
-        _bad_request("이미 대기 중인 가족 초대가 있습니다.")
-    if invitee_phone and await pending_query.filter(invitee_phone=invitee_phone).exists():
-        _bad_request("이미 대기 중인 가족 초대가 있습니다.")
-
 
 async def _send_family_invite_email(
     *,
@@ -277,6 +280,72 @@ async def _ensure_invite_usable(invite: FamilyInvite) -> None:
     if invite.expires_at < now:
         await FamilyInvite.filter(id=invite.id).update(status=FamilyInviteStatus.EXPIRED)
         _bad_request("만료된 가족 초대입니다.")
+
+
+def _invite_target_filters(
+    *,
+    invitee_user_id: int | None,
+    invitee_email: str | None,
+    invitee_phone: str | None,
+) -> list[Q]:
+    filters: list[Q] = []
+    if invitee_user_id is not None:
+        filters.append(Q(invitee_user_id=invitee_user_id))
+    if invitee_email:
+        filters.append(Q(invitee_email=invitee_email))
+    if invitee_phone:
+        filters.append(Q(invitee_phone=invitee_phone))
+    return filters
+
+
+async def _expire_stale_pending_invites(
+    *,
+    family_id: int,
+    invitee_user_id: int | None,
+    invitee_email: str | None,
+    invitee_phone: str | None,
+    now: datetime,
+) -> None:
+    filters = _invite_target_filters(
+        invitee_user_id=invitee_user_id,
+        invitee_email=invitee_email,
+        invitee_phone=invitee_phone,
+    )
+    if not filters:
+        return
+    await FamilyInvite.filter(
+        reduce(or_, filters),
+        family_id=family_id,
+        status=FamilyInviteStatus.PENDING,
+        expires_at__lt=now,
+    ).update(status=FamilyInviteStatus.EXPIRED)
+
+
+async def _find_existing_pending_invite(
+    *,
+    family_id: int,
+    invitee_user_id: int | None,
+    invitee_email: str | None,
+    invitee_phone: str | None,
+    now: datetime,
+) -> FamilyInvite | None:
+    filters = _invite_target_filters(
+        invitee_user_id=invitee_user_id,
+        invitee_email=invitee_email,
+        invitee_phone=invitee_phone,
+    )
+    if not filters:
+        return None
+    return (
+        await FamilyInvite.filter(
+            reduce(or_, filters),
+            family_id=family_id,
+            status=FamilyInviteStatus.PENDING,
+            expires_at__gte=now,
+        )
+        .order_by("-created_at", "-id")
+        .first()
+    )
 
 
 async def _create_default_share_settings(family_id: int, new_user_id: int) -> None:
@@ -422,7 +491,8 @@ async def create_family_invite(
     payload: FamilyInviteCreateRequest,
 ) -> tuple[FamilyInvite, str]:
     family = await _ensure_owner(user, family_id)
-    expires_at = _now() + timedelta(hours=FAMILY_INVITE_TTL_HOURS)
+    now = _now()
+    expires_at = now + timedelta(minutes=FAMILY_INVITE_TTL_MINUTES)
     invitee_email = await _resolve_invite_recipient_email(payload)
     invitee_phone = _normalize_phone(payload.invitee_phone)
     await _ensure_invite_target_allowed(
@@ -433,18 +503,58 @@ async def create_family_invite(
         invitee_user_id=payload.invitee_user_id,
     )
     invite_code = await _generate_unique_family_invite_code()
-    invite = await FamilyInvite.create(
-        family=family,
-        inviter_user_id=user.id,
+    await _expire_stale_pending_invites(
+        family_id=family_id,
         invitee_user_id=payload.invitee_user_id,
         invitee_email=invitee_email,
         invitee_phone=invitee_phone,
-        code_hash=_digest(invite_code),
-        relation_type=payload.relation_type,
-        member_role=payload.member_role,
-        expires_at=expires_at,
-        status=FamilyInviteStatus.PENDING,
+        now=now,
     )
+    invite = await _find_existing_pending_invite(
+        family_id=family_id,
+        invitee_user_id=payload.invitee_user_id,
+        invitee_email=invitee_email,
+        invitee_phone=invitee_phone,
+        now=now,
+    )
+    if invite is None:
+        invite = await FamilyInvite.create(
+            family=family,
+            inviter_user_id=user.id,
+            invitee_user_id=payload.invitee_user_id,
+            invitee_email=invitee_email,
+            invitee_phone=invitee_phone,
+            code_hash=_digest(invite_code),
+            relation_type=payload.relation_type,
+            member_role=payload.member_role,
+            expires_at=expires_at,
+            status=FamilyInviteStatus.PENDING,
+        )
+    else:
+        invite.inviter_user_id = user.id
+        invite.invitee_user_id = payload.invitee_user_id
+        invite.invitee_email = invitee_email
+        invite.invitee_phone = invitee_phone
+        invite.code_hash = _digest(invite_code)
+        invite.relation_type = payload.relation_type
+        invite.member_role = payload.member_role
+        invite.expires_at = expires_at
+        invite.used_at = None
+        invite.status = FamilyInviteStatus.PENDING
+        await invite.save(
+            update_fields=[
+                "inviter_user_id",
+                "invitee_user_id",
+                "invitee_email",
+                "invitee_phone",
+                "code_hash",
+                "relation_type",
+                "member_role",
+                "expires_at",
+                "used_at",
+                "status",
+            ]
+        )
     if invitee_email:
         await service_jobs.enqueue_family_invite_email_send(
             recipient_email=invitee_email,
@@ -469,6 +579,24 @@ async def list_my_family_invites(user: User) -> list[FamilyInvite]:
 async def list_family_invites(user: User, family_id: int) -> list[FamilyInvite]:
     await _ensure_active_member(user, family_id)
     return await FamilyInvite.filter(family_id=family_id).order_by("-created_at", "-id")
+
+
+async def preview_family_invite_by_code(user: User, code: str) -> FamilyInvitePreview:
+    invite = await FamilyInvite.filter(code_hash=_digest(code.strip())).select_related("family", "inviter_user").first()
+    if invite is None:
+        _not_found("가족 초대를 찾을 수 없습니다.")
+    if not _invite_matches_user(invite, user, allow_open_code=True):
+        _forbidden("이 초대 코드를 사용할 수 없습니다.")
+    await _ensure_invite_usable(invite)
+    return FamilyInvitePreview(
+        invite_id=int(invite.id),
+        family_id=int(invite.family_id),
+        family_name=invite.family.name,
+        inviter_display_name=_display_name(invite.inviter_user),
+        invitee_email=invite.invitee_email,
+        status=invite.status,
+        expires_at=invite.expires_at,
+    )
 
 
 async def accept_family_invite(user: User, invite_id: int) -> FamilyMember:

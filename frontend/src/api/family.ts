@@ -61,6 +61,16 @@ export type FamilyInvite = {
 
 export type FamilySentInvite = Omit<FamilyInvite, "invite_code">;
 
+export type FamilyInvitePreview = {
+  invite_id: number;
+  family_id: number;
+  family_name: string;
+  inviter_display_name: string;
+  invitee_email: string | null;
+  status: FamilyInviteStatus;
+  expires_at: string;
+};
+
 export type FamilyShareSetting = {
   id: number;
   family_id: number;
@@ -196,6 +206,13 @@ export function acceptFamilyInviteByCode(code: string): Promise<FamilyMember> {
   return apiRequest<FamilyMember>("/family/invites/code/accept", {
     method: "POST",
     body: { code },
+  });
+}
+
+export function previewFamilyInviteByCode(inviteCode: string): Promise<FamilyInvitePreview> {
+  return apiRequest<FamilyInvitePreview>("/family/invites/code/preview", {
+    method: "POST",
+    body: { invite_code: inviteCode },
   });
 }
 

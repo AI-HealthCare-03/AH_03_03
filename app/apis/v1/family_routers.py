@@ -12,6 +12,8 @@ from app.dtos.family import (
     FamilyGroupUpdateRequest,
     FamilyInviteAcceptCodeRequest,
     FamilyInviteCreateRequest,
+    FamilyInvitePreviewCodeRequest,
+    FamilyInvitePreviewResponse,
     FamilyInviteResponse,
     FamilyMemberCreateUnregisteredRequest,
     FamilyMemberResponse,
@@ -49,6 +51,18 @@ def _invite_response(invite: FamilyInvite, invite_code: str | None = None) -> Fa
 
 def _sent_invite_response(invite: FamilyInvite) -> FamilySentInviteResponse:
     return FamilySentInviteResponse.model_validate(invite)
+
+
+def _invite_preview_response(preview: family_service.FamilyInvitePreview) -> FamilyInvitePreviewResponse:
+    return FamilyInvitePreviewResponse(
+        invite_id=preview.invite_id,
+        family_id=preview.family_id,
+        family_name=preview.family_name,
+        inviter_display_name=preview.inviter_display_name,
+        invitee_email=preview.invitee_email,
+        status=preview.status,
+        expires_at=preview.expires_at,
+    )
 
 
 def _share_setting_response(setting: FamilyShareSetting) -> FamilyShareSettingResponse:
@@ -166,6 +180,15 @@ async def accept_family_invite_by_code(
 ) -> FamilyMemberResponse:
     member = await family_service.accept_family_invite_by_code(user, request.code)
     return _member_response(member)
+
+
+@family_router.post("/invites/code/preview", response_model=FamilyInvitePreviewResponse)
+async def preview_family_invite_by_code(
+    request: FamilyInvitePreviewCodeRequest,
+    user: Annotated[User, Depends(get_request_user)],
+) -> FamilyInvitePreviewResponse:
+    preview = await family_service.preview_family_invite_by_code(user, request.invite_code)
+    return _invite_preview_response(preview)
 
 
 @family_router.post("/invites/{invite_id}/accept", response_model=FamilyMemberResponse)

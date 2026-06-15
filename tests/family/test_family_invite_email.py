@@ -17,6 +17,10 @@ from app.services import family as family_service
 from app.services.email_service import EmailService
 
 
+def test_family_invite_ttl_is_30_minutes() -> None:
+    assert family_service.FAMILY_INVITE_TTL_MINUTES == 30
+
+
 @pytest.mark.asyncio
 async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: pytest.MonkeyPatch) -> None:
     email_jobs: list[dict[str, str]] = []
@@ -56,9 +60,18 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
     async def fake_generate_unique_code() -> str:
         return "12345678"
 
+    async def fake_expire_stale_pending_invites(**kwargs: object) -> None:
+        assert kwargs["invitee_email"] == "family@example.com"
+
+    async def fake_find_existing_pending_invite(**kwargs: object) -> None:
+        assert kwargs["invitee_email"] == "family@example.com"
+        return None
+
     monkeypatch.setattr(family_service, "_ensure_owner", fake_ensure_owner)
     monkeypatch.setattr(family_service, "_ensure_invite_target_allowed", fake_ensure_invite_target_allowed)
     monkeypatch.setattr(family_service, "_generate_unique_family_invite_code", fake_generate_unique_code)
+    monkeypatch.setattr(family_service, "_expire_stale_pending_invites", fake_expire_stale_pending_invites)
+    monkeypatch.setattr(family_service, "_find_existing_pending_invite", fake_find_existing_pending_invite)
     monkeypatch.setattr(family_service.FamilyInvite, "create", staticmethod(fake_create_invite))
     monkeypatch.setattr(
         family_service.service_jobs,
@@ -82,6 +95,7 @@ async def test_family_invite_creation_sends_email_with_invite_link(monkeypatch: 
     assert create_payloads[0]["invitee_email"] == "family@example.com"
     assert create_payloads[0]["code_hash"] == family_service._digest("12345678")
     assert "invite_code" not in create_payloads[0]
+    assert invite.expires_at - family_service._now() <= timedelta(minutes=30, seconds=1)
     assert email_jobs == [
         {
             "recipient_email": "family@example.com",
@@ -190,9 +204,15 @@ async def test_family_invite_email_body_does_not_include_sensitive_health_values
     assert "가족 페이지에서 아래 초대코드를 입력해 연결을 완료해 주세요." in captured["body"]
     assert "초대 코드: 12345678" in captured["body"]
     assert "http://localhost:8080/family?invite_code=12345678" in captured["body"]
+    assert "30분 동안 유효" in captured["body"]
+    assert "가장 최근에 발송된 초대코드만 사용할 수 있습니다." in captured["body"]
+    assert "회원가입 또는 로그인 후 가족 페이지에서 아래 초대코드를 입력해 주세요." in captured["body"]
     assert "/family/invitations/accept" not in captured["body"]
     assert '<p style="font-size: 20px; font-weight: 700;">초대 코드: 12345678</p>' in captured["html_body"]
     assert "가족 페이지에서 초대코드 입력하기" in captured["html_body"]
+    assert "30분 동안 유효" in captured["html_body"]
+    assert "가장 최근에 발송된 초대코드만 사용할 수 있습니다." in captured["html_body"]
+    assert "회원가입 또는 로그인 후 가족 페이지에서 초대코드를 입력해 주세요." in captured["html_body"]
     assert "/family/invitations/accept" not in captured["html_body"]
     for sensitive_value in ("120", "혈압", "혈당", "체중", "질병 위험도", "OCR"):
         assert sensitive_value not in captured["body"]
@@ -269,7 +289,7 @@ async def test_family_invite_rejects_existing_active_member(monkeypatch: pytest.
 
 
 @pytest.mark.asyncio
-async def test_family_invite_rejects_duplicate_pending_email(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_family_invite_allows_duplicate_pending_target_for_resend(monkeypatch: pytest.MonkeyPatch) -> None:
     inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
 
     async def fake_resolve_invitee_user(**kwargs: object) -> None:
@@ -279,67 +299,102 @@ async def test_family_invite_rejects_duplicate_pending_email(monkeypatch: pytest
         async def exists(self) -> bool:
             return False
 
-    class FakeInviteQuery:
-        def filter(self, **kwargs: object) -> FakeInviteQuery:
-            return self
-
-        async def exists(self) -> bool:
-            return True
-
     monkeypatch.setattr(family_service, "_resolve_invitee_user", fake_resolve_invitee_user)
     monkeypatch.setattr(
         family_service.FamilyMember, "filter", staticmethod(lambda *args, **kwargs: FakeFamilyMemberQuery())
     )
-    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
 
-    with pytest.raises(HTTPException) as exc:
-        await family_service._ensure_invite_target_allowed(
-            family_id=10,
-            inviter=inviter,
-            invitee_email="family@example.com",
-            invitee_phone=None,
-            invitee_user_id=None,
-        )
-
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "이미 대기 중인 가족 초대가 있습니다."
+    await family_service._ensure_invite_target_allowed(
+        family_id=10,
+        inviter=inviter,
+        invitee_email="family@example.com",
+        invitee_phone=None,
+        invitee_user_id=None,
+    )
 
 
 @pytest.mark.asyncio
-async def test_family_invite_rejects_duplicate_pending_phone(monkeypatch: pytest.MonkeyPatch) -> None:
-    inviter = SimpleNamespace(id=1, email="me@example.com", phone_number="01011112222")
-
-    async def fake_resolve_invitee_user(**kwargs: object) -> None:
-        return None
-
-    class FakeFamilyMemberQuery:
-        async def exists(self) -> bool:
-            return False
-
-    class FakeInviteQuery:
-        def filter(self, **kwargs: object) -> FakeInviteQuery:
-            return self
-
-        async def exists(self) -> bool:
-            return True
-
-    monkeypatch.setattr(family_service, "_resolve_invitee_user", fake_resolve_invitee_user)
-    monkeypatch.setattr(
-        family_service.FamilyMember, "filter", staticmethod(lambda *args, **kwargs: FakeFamilyMemberQuery())
+async def test_family_invite_resends_existing_pending_email_invite(monkeypatch: pytest.MonkeyPatch) -> None:
+    fixed_now = datetime(2026, 5, 30, 10, 0, 0, tzinfo=family_service.config.TIMEZONE)
+    email_jobs: list[dict[str, str]] = []
+    inviter = SimpleNamespace(id=1, nickname="동욱", name="홍동욱", login_id="dongwook")
+    family = SimpleNamespace(id=10)
+    existing_invite = SimpleNamespace(
+        id=7,
+        family_id=10,
+        inviter_user_id=1,
+        invitee_user_id=None,
+        invitee_email="family@example.com",
+        invitee_phone=None,
+        code_hash=family_service._digest("11111111"),
+        relation_type=FamilyRelationType.OTHER,
+        member_role=FamilyMemberRole.MEMBER,
+        status=FamilyInviteStatus.PENDING,
+        expires_at=fixed_now + timedelta(minutes=3),
+        used_at=None,
+        created_at=fixed_now - timedelta(minutes=1),
+        saved_fields=[],
     )
-    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
 
-    with pytest.raises(HTTPException) as exc:
-        await family_service._ensure_invite_target_allowed(
-            family_id=10,
-            inviter=inviter,
-            invitee_email=None,
-            invitee_phone="01033334444",
-            invitee_user_id=None,
-        )
+    async def fake_save(update_fields: list[str]) -> None:
+        existing_invite.saved_fields = update_fields
 
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "이미 대기 중인 가족 초대가 있습니다."
+    existing_invite.save = fake_save
+
+    async def fake_ensure_owner(user: object, family_id: int) -> SimpleNamespace:
+        assert user is inviter
+        assert family_id == 10
+        return family
+
+    async def fake_ensure_invite_target_allowed(**kwargs: object) -> None:
+        assert kwargs["invitee_email"] == "family@example.com"
+
+    async def fake_generate_unique_code() -> str:
+        return "22222222"
+
+    async def fake_expire_stale_pending_invites(**kwargs: object) -> None:
+        assert kwargs["now"] == fixed_now
+
+    async def fake_find_existing_pending_invite(**kwargs: object) -> SimpleNamespace:
+        assert kwargs["invitee_email"] == "family@example.com"
+        return existing_invite
+
+    async def fake_enqueue_family_invite_email_send(**kwargs: str) -> None:
+        email_jobs.append(kwargs)
+
+    monkeypatch.setattr(family_service, "_now", lambda: fixed_now)
+    monkeypatch.setattr(family_service, "_ensure_owner", fake_ensure_owner)
+    monkeypatch.setattr(family_service, "_ensure_invite_target_allowed", fake_ensure_invite_target_allowed)
+    monkeypatch.setattr(family_service, "_generate_unique_family_invite_code", fake_generate_unique_code)
+    monkeypatch.setattr(family_service, "_expire_stale_pending_invites", fake_expire_stale_pending_invites)
+    monkeypatch.setattr(family_service, "_find_existing_pending_invite", fake_find_existing_pending_invite)
+    monkeypatch.setattr(
+        family_service.service_jobs,
+        "enqueue_family_invite_email_send",
+        fake_enqueue_family_invite_email_send,
+    )
+
+    invite, invite_code = await family_service.create_family_invite(
+        inviter,
+        10,
+        FamilyInviteCreateRequest(
+            invitee_email="family@example.com",
+            relation_type=FamilyRelationType.SPOUSE,
+            member_role=FamilyMemberRole.GUARDIAN,
+        ),
+    )
+
+    assert invite is existing_invite
+    assert invite_code == "22222222"
+    assert existing_invite.code_hash != family_service._digest("11111111")
+    assert existing_invite.code_hash == family_service._digest("22222222")
+    assert existing_invite.expires_at == fixed_now + timedelta(minutes=30)
+    assert existing_invite.relation_type == FamilyRelationType.SPOUSE
+    assert existing_invite.member_role == FamilyMemberRole.GUARDIAN
+    assert "code_hash" in existing_invite.saved_fields
+    assert "expires_at" in existing_invite.saved_fields
+    assert email_jobs[0]["invite_code"] == "22222222"
+    assert email_jobs[0]["invite_url"].endswith("/family?invite_code=22222222")
 
 
 @pytest.mark.asyncio
@@ -380,6 +435,78 @@ async def test_family_invite_rejects_reused_code() -> None:
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "이미 처리된 가족 초대입니다."
+
+
+@pytest.mark.asyncio
+async def test_family_invite_preview_returns_invite_info_without_accepting(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = SimpleNamespace(id=2, email="family@example.com", phone_number=None)
+    invite = SimpleNamespace(
+        id=9,
+        family_id=10,
+        family=SimpleNamespace(id=10, name="우리 가족"),
+        inviter_user=SimpleNamespace(id=1, nickname="동욱", name="홍동욱", login_id="dongwook"),
+        invitee_user_id=None,
+        invitee_email="family@example.com",
+        invitee_phone=None,
+        status=FamilyInviteStatus.PENDING,
+        used_at=None,
+        expires_at=family_service._now() + timedelta(minutes=5),
+    )
+    calls: list[str] = []
+
+    class FakeInviteQuery:
+        def select_related(self, *args: str) -> FakeInviteQuery:
+            calls.extend(args)
+            return self
+
+        async def first(self) -> SimpleNamespace:
+            return invite
+
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    preview = await family_service.preview_family_invite_by_code(user, "12345678")
+
+    assert calls == ["family", "inviter_user"]
+    assert preview.invite_id == 9
+    assert preview.family_id == 10
+    assert preview.family_name == "우리 가족"
+    assert preview.inviter_display_name == "동욱"
+    assert preview.invitee_email == "family@example.com"
+    assert preview.status == FamilyInviteStatus.PENDING
+    assert invite.status == FamilyInviteStatus.PENDING
+    assert invite.used_at is None
+
+
+@pytest.mark.asyncio
+async def test_family_invite_preview_rejects_wrong_target(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = SimpleNamespace(id=2, email="other@example.com", phone_number=None)
+    invite = SimpleNamespace(
+        id=9,
+        family_id=10,
+        family=SimpleNamespace(id=10, name="우리 가족"),
+        inviter_user=SimpleNamespace(id=1, nickname="동욱", name="홍동욱", login_id="dongwook"),
+        invitee_user_id=None,
+        invitee_email="family@example.com",
+        invitee_phone=None,
+        status=FamilyInviteStatus.PENDING,
+        used_at=None,
+        expires_at=family_service._now() + timedelta(minutes=5),
+    )
+
+    class FakeInviteQuery:
+        def select_related(self, *args: str) -> FakeInviteQuery:
+            return self
+
+        async def first(self) -> SimpleNamespace:
+            return invite
+
+    monkeypatch.setattr(family_service.FamilyInvite, "filter", staticmethod(lambda **kwargs: FakeInviteQuery()))
+
+    with pytest.raises(HTTPException) as exc:
+        await family_service.preview_family_invite_by_code(user, "12345678")
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "이 초대 코드를 사용할 수 없습니다."
 
 
 @pytest.mark.asyncio
@@ -496,6 +623,41 @@ def test_family_invite_list_api_does_not_expose_code_or_hash(monkeypatch: pytest
     body = response.json()[0]
     assert body["invitee_email"] == "family@example.com"
     assert body["status"] == "PENDING"
+    assert "invite_code" not in body
+    assert "code_hash" not in body
+
+
+def test_family_invite_preview_api_does_not_expose_code_or_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_current_user() -> SimpleNamespace:
+        return SimpleNamespace(id=2, email="family@example.com", nickname="가족")
+
+    async def fake_preview_family_invite_by_code(user: object, code: str) -> family_service.FamilyInvitePreview:
+        assert code == "12345678"
+        return family_service.FamilyInvitePreview(
+            invite_id=3,
+            family_id=10,
+            family_name="우리 가족",
+            inviter_display_name="동욱",
+            invitee_email="family@example.com",
+            status=FamilyInviteStatus.PENDING,
+            expires_at=datetime(2026, 5, 31, 10, 0, 0, tzinfo=family_service.config.TIMEZONE),
+        )
+
+    app.dependency_overrides[get_request_user] = fake_current_user
+    monkeypatch.setattr(
+        family_routers.family_service, "preview_family_invite_by_code", fake_preview_family_invite_by_code
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/family/invites/code/preview", json={"invite_code": "12345678"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["invite_id"] == 3
+    assert body["family_name"] == "우리 가족"
+    assert body["inviter_display_name"] == "동욱"
     assert "invite_code" not in body
     assert "code_hash" not in body
 

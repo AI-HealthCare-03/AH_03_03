@@ -32,14 +32,14 @@ class EmailService:
             "안녕하세요, Health Ladder입니다.\n\n"
             "아래 인증 코드를 입력하여 이메일 인증을 완료해 주세요.\n\n\n"
             f"인증 코드: {code}\n\n"
-            "이 코드는 일정 시간 동안만 유효합니다.\n\n\n"
+            "이 코드는 10분 동안만 유효합니다.\n\n\n"
             "Health Ladder 드림"
         )
         html_body = (
             "<p>안녕하세요, <strong>Health Ladder</strong>입니다.</p>"
             "<p>아래 인증 코드를 입력하여 이메일 인증을 완료해 주세요.</p>"
             f'<p style="font-size: 20px; font-weight: 700;">인증 코드: {escape(code)}</p>'
-            "<p>이 코드는 일정 시간 동안만 유효합니다.</p>"
+            "<p>이 코드는 10분 동안만 유효합니다.</p>"
             "<p>감사합니다.<br><strong>Health Ladder</strong> 드림</p>"
         )
         return await self._send_email(email, subject, body, html_body=html_body)
@@ -51,6 +51,7 @@ class EmailService:
             "비밀번호 재설정을 요청하셨습니다.\n\n"
             "아래 링크를 눌러 새 비밀번호를 설정해 주세요.\n\n\n"
             f"{reset_url}\n\n"
+            "이 링크는 10분 동안만 유효합니다.\n\n"
             "계정 보호를 위해 비밀번호를 타인에게 공유하지 마세요.\n\n\n"
             "Health Ladder 드림"
         )
@@ -60,6 +61,7 @@ class EmailService:
             "<p>비밀번호 재설정을 요청하셨습니다.</p>"
             "<p>아래 링크를 눌러 새 비밀번호를 설정해 주세요.</p>"
             f'<p><a href="{escaped_reset_url}" target="_blank" rel="noopener noreferrer">비밀번호 재설정하기</a></p>'
+            "<p>이 링크는 10분 동안만 유효합니다.</p>"
             "<p>계정 보호를 위해 비밀번호를 타인에게 공유하지 마세요.</p>"
             "<p>감사합니다.<br><strong>Health Ladder</strong> 드림</p>"
         )
@@ -82,6 +84,9 @@ class EmailService:
             f"초대 코드: {invite_code}\n\n\n"
             f"초대 링크: {invite_url}\n\n"
             f"초대 만료: {expires_at_text}\n\n"
+            "초대코드는 발송 시점부터 30분 동안 유효합니다.\n"
+            "가장 최근에 발송된 초대코드만 사용할 수 있습니다.\n"
+            "회원이 아니신 경우 회원가입 또는 로그인 후 가족 페이지에서 아래 초대코드를 입력해 주세요.\n\n"
             "Health Ladder에서는 가족과 함께 건강 기록과 건강관리 현황을 확인할 수 있습니다.\n\n\n"
             "Health Ladder 드림"
         )
@@ -97,6 +102,9 @@ class EmailService:
             "<p><strong>Health Ladder</strong>에서는 가족과 함께 건강 기록과 건강관리 현황을 확인할 수 있습니다.</p>"
             f'<p><a href="{escaped_invite_url}" target="_blank" rel="noopener noreferrer">가족 페이지에서 초대코드 입력하기</a></p>'
             f"<p>초대 만료: {escaped_expires_at_text}</p>"
+            "<p>초대코드는 발송 시점부터 30분 동안 유효합니다.</p>"
+            "<p>가장 최근에 발송된 초대코드만 사용할 수 있습니다.</p>"
+            "<p>회원이 아니신 경우 회원가입 또는 로그인 후 가족 페이지에서 초대코드를 입력해 주세요.</p>"
             "<p>감사합니다.<br><strong>Health Ladder</strong> 드림</p>"
         )
         return await self._send_email(email, subject, body, html_body=html_body)

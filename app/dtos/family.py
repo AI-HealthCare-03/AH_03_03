@@ -113,6 +113,28 @@ class FamilyInviteAcceptCodeRequest(BaseModel):
         return stripped
 
 
+class FamilyInvitePreviewCodeRequest(BaseModel):
+    invite_code: str = Field(min_length=8, max_length=8)
+
+    @field_validator("invite_code")
+    @classmethod
+    def strip_invite_code(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped.isdigit() or len(stripped) != 8:
+            raise ValueError("초대 코드는 8자리 숫자입니다.")
+        return stripped
+
+
+class FamilyInvitePreviewResponse(BaseModel):
+    invite_id: int
+    family_id: int
+    family_name: str
+    inviter_display_name: str
+    invitee_email: str | None
+    status: FamilyInviteStatus
+    expires_at: datetime
+
+
 class FamilyShareSettingUpdateRequest(BaseModel):
     share_health_records: bool | None = None
     share_analysis_results: bool | None = None
