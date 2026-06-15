@@ -14,14 +14,30 @@
 
 예시 이름만 참고한다. 실제 값은 로컬 `.env` 또는 운영 secret store에만 둔다.
 
+Docker compose로 실행할 때는 `fastapi`와 `ai-worker` service의 `environment`에 아래 값들이 전달되어야 한다. compose에 빠져 있으면 컨테이너 안의 `app.core.config` module-level 상수는 안전 기본값만 보게 된다.
+
+기본 운영값은 keyword RAG를 유지하고 embedding/vector는 비활성화한다.
+
 ```env
-RAG_EMBEDDING_ENABLED=true
-RAG_EMBEDDING_PROVIDER=openai
+RAG_ENABLED=true
+DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only
+RAG_EMBEDDING_ENABLED=false
+RAG_EMBEDDING_PROVIDER=disabled
 RAG_EMBEDDING_MODEL=text-embedding-3-small
 RAG_EMBEDDING_DIMENSION=1536
 RAG_EMBEDDING_BATCH_SIZE=64
+```
+
+로컬에서 hybrid/vector RAG를 수동 검증할 때만 아래처럼 전환한다.
+
+```env
+DIET_RECOMMENDATION_RAG_STRATEGY=keyword_first_vector_fallback
+RAG_EMBEDDING_ENABLED=true
+RAG_EMBEDDING_PROVIDER=openai
 OPENAI_API_KEY=<openai-api-key>
 ```
+
+production 기본값은 `DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only`, `RAG_EMBEDDING_ENABLED=false`, `RAG_EMBEDDING_PROVIDER=disabled`로 유지한다. 실제 `.env`와 secret 값은 커밋하지 않는다.
 
 Langfuse trace를 확인하려면 Langfuse 설정도 필요하다.
 
