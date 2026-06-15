@@ -79,6 +79,7 @@ export default function ExamOcrPage() {
   const [error, setError] = useState("");
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryOcr, setCanRetryOcr] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // 현재 스텝 계산
   const currentStep: Step = isAppliedToHealth ? 4 : measurements.length > 0 ? 3 : selectedFile ? 2 : 1;
@@ -286,6 +287,64 @@ export default function ExamOcrPage() {
       {/* 스텝 인디케이터 */}
       <StepIndicator current={currentStep} />
 
+      {/* 파일 업로드 도움말 모달 */}
+      {isHelpOpen && (
+        <div
+          onClick={() => setIsHelpOpen(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--color-surface)", borderRadius: "var(--radius-lg)",
+              padding: "28px", maxWidth: "560px", width: "100%",
+              maxHeight: "80vh", overflowY: "auto",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h2 style={{ margin: 0, fontSize: "18px" }}>건강검진 결과 PDF 다운로드 방법</h2>
+              <button
+                onClick={() => setIsHelpOpen(false)}
+                type="button"
+                style={{
+                  background: "none", border: "none", fontSize: "20px",
+                  cursor: "pointer", color: "var(--color-text-secondary)", lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <ol style={{ paddingLeft: "20px", lineHeight: "2", margin: "0 0 16px" }}>
+              <li>
+                <a
+                  href="https://www.nhis.or.kr/nhis/etc/personalLoginPage.do"
+                  rel="noreferrer"
+                  style={{ color: "var(--color-primary)", wordBreak: "break-all" }}
+                  target="_blank"
+                >
+                  https://www.nhis.or.kr/nhis/etc/personalLoginPage.do
+                </a>
+                {" "}(국민건강보험) 사이트에 접속합니다.
+              </li>
+              <li>건강모아 → 건강검진 결과조회</li>
+              <li>
+                <img
+                  alt="건강검진 결과조회 화면"
+                  src="/images/nhis-guide.png"
+                  style={{ marginTop: "8px", width: "100%", borderRadius: "8px", border: "1px solid var(--color-border)" }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </li>
+            </ol>
+          </div>
+        </div>
+      )}
+
       {/* 에러 / 재시도 */}
       {error && <ErrorMessage message={error} />}
       {canRetryOcr && (
@@ -309,7 +368,29 @@ export default function ExamOcrPage() {
       )}
 
       {/* ── STEP 1: 파일 업로드 ── */}
-      <Card title="파일 업로드">
+      <Card>
+        <div className="card-header" style={{ marginBottom: "4px" }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            파일 업로드
+            <button
+              aria-label="파일 업로드 도움말"
+              onClick={() => setIsHelpOpen(true)}
+              type="button"
+              style={{
+                width: "20px", height: "20px", borderRadius: "50%",
+                border: "none", background: "var(--color-primary)",
+                color: "#fff", fontSize: "12px", fontWeight: 800,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, lineHeight: 1,
+              }}
+            >
+              ?
+            </button>
+          </h2>
+        </div>
+        <p className="muted" style={{ marginBottom: "12px", fontSize: "14px" }}>
+          국민건강보험공단 웹사이트의 [건강검진 결과조회] 메뉴에서 최근 검진 내역을 <strong>'PDF로 저장'</strong>하여 다운로드하실 수 있습니다. (자세한 방법은 우측의 ? 버튼을 참고해 주세요.)
+        </p>
         <div className="upload-box">
           <div className="upload-action-grid">
             <label className="upload-action-button">
@@ -369,7 +450,16 @@ export default function ExamOcrPage() {
       </Card>
 
       {/* ── STEP 2~3: 측정값 후보 (파일 선택 후 항상 노출) ── */}
-      <Card title="검진표 인식 결과">
+      <Card>
+        <div className="card-header" style={{ marginBottom: "4px" }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            검진표 인식 결과
+            {measurements.length > 0 && !isAppliedToHealth && (
+              <em className="badge badge-required">확인 필요</em>
+            )}
+          </h2>
+        </div>
+        <p className="muted" style={{ marginBottom: "12px", fontSize: "16px" }}>인식된 결과는 반드시 직접 확인해 주세요.</p>
         <div className="ocr-result-table">
           {measurements.length === 0 ? (
             <div className="state-box">
@@ -380,7 +470,6 @@ export default function ExamOcrPage() {
               <label className="ocr-result-row" key={m.id}>
                 <span>
                   {m.measurement_name}
-                  <em className="badge badge-required">확인 필요</em>
                 </span>
                 <input
                   onChange={(e) => updateLocalMeasurement(m.id, e.target.value)}

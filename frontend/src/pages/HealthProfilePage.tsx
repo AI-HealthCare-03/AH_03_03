@@ -163,11 +163,11 @@ const readOnlySections: Array<{
       { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
       { key: "fasting_glucose", label: "공복혈당", unit: "mg/dL" },
-      { key: "hba1c", label: "당화혈색소", unit: "%", optional: true },
-      { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL" },
-      { key: "triglyceride", label: "중성지방", unit: "mg/dL" },
-      { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL" },
-      { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL" },
+      { key: "hba1c", label: "당화혈색소", unit: "%", referenceOnly: true },
+      { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL", referenceOnly: true },
+      { key: "triglyceride", label: "중성지방", unit: "mg/dL", referenceOnly: true },
+      { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
+      { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
     ],
   },
@@ -510,10 +510,10 @@ export default function HealthProfilePage() {
 
   return (
     <div className="page-stack">
-      <div className="page-header">
+      <header className="dashboard-header">
         <div>
-          <h1>필수 건강정보 관리</h1>
-          <p>기본 건강 정보와 정밀 건강 정보를 한 화면에서 관리합니다.</p>
+          <h1>건강 분석</h1>
+          <p>건강정보를 입력하고 만성질환 위험도를 분석합니다.</p>
         </div>
         <div className="button-row">
           {!editing && (
@@ -525,17 +525,17 @@ export default function HealthProfilePage() {
             {runningMode === "PRECISION" ? "분석 중..." : "분석하기"}
           </button>
         </div>
-      </div>
+      </header>
       {/* 입력 단계 탭 */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
-          기본/신체 정보
-        </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
-          혈액/검진 정보
-        </Link>
         <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health/profile">
           한눈에 보기
+        </Link>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          간편 분석 정보 입력
+        </Link>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          정밀 분석 정보 입력
         </Link>
       </div>
 
@@ -598,9 +598,11 @@ export default function HealthProfilePage() {
                 <span>{label}</span>
                 <div className="value-row">
                   <strong>{value || "-"}</strong>
-                  <em className={value ? "badge badge-saved" : "badge badge-missing"}>
-                    {value ? "저장됨" : "미입력"}
-                  </em>
+                  {editing && (
+                    <em className={value ? "badge badge-saved" : "badge badge-missing"}>
+                      {value ? "저장됨" : "미입력"}
+                    </em>
+                  )}
                 </div>
               </div>
             ))}
@@ -676,11 +678,7 @@ export default function HealthProfilePage() {
                       <div className="readonly-health-item" key={`${section.title}-${item.key}`}>
                         <div className="item-header">
                           <span>{item.label}</span>
-                          {item.optional ? (
-                            <em className="badge badge-reference">선택</em>
-                          ) : item.referenceOnly ? (
-                            <em className="badge badge-reference">참고</em>
-                          ) : (
+                          {!item.optional && !item.referenceOnly && (
                             <em className="badge badge-required">필수</em>
                           )}
                         </div>
@@ -689,9 +687,11 @@ export default function HealthProfilePage() {
                             {value || "-"}
                             {value && item.unit ? ` ${item.unit}` : ""}
                           </strong>
-                          <em className={value ? "badge badge-saved" : "badge badge-missing"}>
-                            {value ? "저장됨" : "미입력"}
-                          </em>
+                          {editing && (
+                            <em className={value ? "badge badge-saved" : "badge badge-missing"}>
+                              {value ? "저장됨" : "미입력"}
+                            </em>
+                          )}
                         </div>
                       </div>
                     );

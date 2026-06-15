@@ -165,17 +165,17 @@ const sections: Array<{
   },
   {
     title: "혈액/검진 정보",
-    description: "정밀 예측 분석을 위한 검진 수치 입력 칸입니다. 미입력 시 기본 정보 기반측의 간편 분석으로 진행됩니다.",
+    description: "정밀 예측 분석을 위한 검진 수치 입력 칸입니다. 미입력 시 정밀 분석이 불가능합니다.",
     fields: [
-      { key: "systolic_bp", label: "수축기 혈압", type: "number", placeholder: "mmHg" },
-      { key: "diastolic_bp", label: "이완기 혈압", type: "number", placeholder: "mmHg" },
-      { key: "fasting_glucose", label: "공복혈당", type: "number", placeholder: "mg/dL" },
+      { key: "systolic_bp", label: "수축기 혈압", type: "number", placeholder: "mmHg", required: true },
+      { key: "diastolic_bp", label: "이완기 혈압", type: "number", placeholder: "mmHg", required: true },
+      { key: "fasting_glucose", label: "공복혈당", type: "number", placeholder: "mg/dL", required: true },
       { key: "hba1c", label: "당화혈색소", type: "number", placeholder: "%" },
       { key: "total_cholesterol", label: "총콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "triglyceride", label: "중성지방", type: "number", placeholder: "mg/dL" },
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
-      { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm" },
+      { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm", required: true },
     ],
   },
 ];
@@ -203,9 +203,11 @@ export default function HealthProfileForm({ form, bmi, onChange, visibleSections
               <label key={field.key}>
                 <span className="field-label-row">
                   <span>{field.label}</span>
-                  <em className={field.required ? "badge badge-required" : "badge badge-optional"}>
-                    {field.required ? "필수" : "선택"}
-                  </em>
+                  {field.required !== undefined && (
+                    <em className={field.required ? "badge badge-required" : "badge badge-optional"}>
+                      {field.required ? "필수" : "선택"}
+                    </em>
+                  )}
                   {field.key === "occupation" && (
                     <button
                       aria-label="직업군 선택 도움말 열기"

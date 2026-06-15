@@ -61,8 +61,8 @@ const initialForm: HealthProfileFormState = {
 };
 
 const steps = [
-  "간편 분석 정보",
-  "정밀 분석 정보",
+  "간편 분석 정보 입력",
+  "정밀 분석 정보 입력",
 ];
 
 const stepToSection: Record<number, string[]> = {
@@ -398,6 +398,13 @@ export default function HealthRecordPage() {
 
       {/* 입력 단계 탭 */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Link
+          className="filter-tab"
+          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center" }}
+          to="/health/profile"
+        >
+          한눈에 보기
+        </Link>
         {steps.map((step, index) => (
           <button
             className={index === activeStep ? "filter-tab active" : "filter-tab"}
@@ -409,13 +416,6 @@ export default function HealthRecordPage() {
             {step}
           </button>
         ))}
-        <Link
-          className="filter-tab"
-          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center" }}
-          to="/health/profile"
-        >
-          한눈에 보기
-        </Link>
       </div>
 
     <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
