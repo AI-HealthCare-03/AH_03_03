@@ -238,7 +238,7 @@ def build_qa_cases() -> list[DietQaCase]:
             diet_issue="열량/야식/과식",
             rag_strategy="keyword_only",
             title="RAG disabled 경로",
-            expected_focus="RAG trace가 꺼져 있어도 API 응답이 성공하는지 확인",
+            expected_focus="RAG가 비활성화되어도 기본 식단 추천 응답이 안전하게 유지되는지 확인",
             rag_enabled=False,
         ),
         _case(

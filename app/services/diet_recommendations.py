@@ -81,7 +81,7 @@ ISSUE_DEFINITIONS = {
         "type": "excess_candidate",
         "nutrient": "carbohydrate_g",
         "label": "탄수화물 주의",
-        "message": "탄수화물 비중이 높은 후보가 보여요. 다음 식사에는 단백질 반찬이나 채소를 함께 보완해 보세요.",
+        "message": "탄수화물 비중이 높은 후보가 보여요. 다음 식사는 반찬 구성을 곁들여 균형을 맞춰보세요.",
         "reason": "탄수화물 선택을 천천히 조절하는 습관에 도움이 될 수 있습니다.",
     },
     "sugar_high": {
@@ -116,7 +116,7 @@ ISSUE_DEFINITIONS = {
         "type": "support_candidate",
         "nutrient": "fiber_g",
         "label": "식이섬유 보완",
-        "message": "식이섬유를 조금 더 보완하면 좋습니다. 채소 반찬이나 잡곡밥처럼 쉽게 더할 수 있는 음식부터 시작해 보세요.",
+        "message": "식이섬유를 조금 더 보완하면 좋습니다. 평소 식사에서 부담 없이 더할 수 있는 반찬부터 살펴보세요.",
         "reason": "채소와 잡곡을 자연스럽게 늘리는 습관에 도움이 될 수 있습니다.",
     },
     "iron_support": {
@@ -208,7 +208,7 @@ FOOD_RECOMMENDATIONS = {
     "fat_high": (("채소 반찬", "담백한 단백질 반찬"), ("튀김류", "기름진 소스")),
     "calorie_high": (("채소 반찬", "단백질 반찬"), ("야식", "과식하기 쉬운 메뉴")),
     "protein_support": (("단백질 반찬", "두부·계란·생선류"), ()),
-    "fiber_support": (("채소 반찬", "잡곡밥", "해조류 반찬"), ()),
+    "fiber_support": (("채소 반찬", "잡곡밥", "식이섬유가 있는 반찬"), ()),
     "iron_support": (("철분이 있는 반찬", "비타민C가 있는 과일"), ("식사 직후 진한 차·커피는 줄여보면 좋습니다",)),
     "late_night_or_irregular": (("규칙적인 식사", "가벼운 저녁 구성"), ("늦은 야식",)),
     "alcohol_liver_support": (("물", "담백한 단백질 반찬"), ("음주", "기름진 안주")),
@@ -233,6 +233,14 @@ CKD_GENERAL_FOOD_EXCLUSIONS = {
     "고단백 식품",
     "고단백 보충제",
 }
+CKD_BLOCKED_CHALLENGE_TITLES = {"식이섬유 먹어유 챌린지", "건강식탁 챌린지"}
+CKD_FINDING_MESSAGE = (
+    "신장 관련 식사는 개인 수치에 따라 달라질 수 있어요. "
+    "식사일지를 남기고 검사 수치를 바탕으로 의료진과 함께 조정해 보세요."
+)
+CKD_NUTRIENT_SUPPORT_MESSAGE = (
+    "식이섬유나 단백질 보완도 개인 수치에 따라 달라질 수 있어 식사 기록을 바탕으로 상담해 보세요."
+)
 
 RAG_COMMENT_TEMPLATES = {
     "HTN": (
@@ -329,7 +337,7 @@ def _build_diet_health_recommendation_base(
 
     basis_by_issue = _basis_by_issue(nutrients_by_food, issue_keys)
     nutrition_findings = [
-        _finding_payload(issue_key, basis_by_issue.get(issue_key))
+        _finding_payload(issue_key, basis_by_issue.get(issue_key), disease_codes=disease_codes)
         for issue_key in issue_keys
         if issue_key in ISSUE_DEFINITIONS
     ]
@@ -551,14 +559,19 @@ def _basis_by_issue(nutrients_by_food: list[dict[str, Any]], issue_keys: list[st
     return basis
 
 
-def _finding_payload(issue_key: str, basis: str | None) -> dict[str, Any]:
+def _finding_payload(issue_key: str, basis: str | None, *, disease_codes: list[str] | None = None) -> dict[str, Any]:
     definition = ISSUE_DEFINITIONS[issue_key]
+    message = str(definition["message"])
+    if "CKD" in set(disease_codes or []):
+        message = (
+            CKD_NUTRIENT_SUPPORT_MESSAGE if issue_key in {"fiber_support", "protein_support"} else CKD_FINDING_MESSAGE
+        )
     return {
         "type": definition["type"],
         "issue_key": issue_key,
         "nutrient": definition["nutrient"],
         "label": definition["label"],
-        "message": definition["message"],
+        "message": message,
         "basis": basis or "MFDS 기준 영양성분 후보",
     }
 
@@ -582,6 +595,8 @@ def _food_messages(issue_keys: list[str], *, disease_codes: list[str] | None = N
     if "CKD" in set(disease_codes or []):
         recommended = [item for item in recommended if item not in CKD_GENERAL_FOOD_EXCLUSIONS and "고단백" not in item]
         recommended = list(CKD_CONSERVATIVE_RECOMMENDATIONS) + recommended
+    if "HTN" in set(disease_codes or []) or "sodium_high" in issue_keys:
+        recommended = ["국물 적은 반찬" if item == "해조류 반찬" else item for item in recommended]
     return _dedupe(recommended)[:5], _dedupe(caution)[:5]
 
 
@@ -610,6 +625,8 @@ def _recommended_challenges(
                 continue
             challenge_id = int(challenge.id)
             challenge_title = str(challenge.title)
+            if "CKD" in set(disease_codes or []) and challenge_title in CKD_BLOCKED_CHALLENGE_TITLES:
+                continue
             if challenge_id in seen_ids or challenge_title in seen_titles:
                 continue
             seen_ids.add(challenge_id)

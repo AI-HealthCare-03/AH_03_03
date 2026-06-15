@@ -123,10 +123,34 @@ async def test_diet_recommendation_qa_ckd_food_recommendations_are_conservative(
     outputs = await qa.generate_outputs(cases)
 
     blocked_foods = {"잡곡밥", "해조류 반찬", "고단백 보충제"}
+    blocked_messages = ("채소 반찬이나 잡곡밥처럼 쉽게", "단백질 반찬이나 채소를 함께")
     for output in outputs:
         recommended_foods = set(output["response"]["recommended_foods"])
+        serialized_response = json.dumps(output["response"], ensure_ascii=False)
         assert recommended_foods.isdisjoint(blocked_foods)
         assert any(item in recommended_foods for item in {"식사일지", "조리법 기록", "상담 전 식단 기록"})
+        for blocked_message in blocked_messages:
+            assert blocked_message not in serialized_response
+
+
+@pytest.mark.asyncio
+async def test_diet_recommendation_qa_ckd_challenges_are_conservative() -> None:
+    cases = [case for case in qa.build_qa_cases() if "CKD" in case.disease_groups]
+    outputs = await qa.generate_outputs(cases)
+
+    blocked_titles = {"식이섬유 먹어유 챌린지", "건강식탁 챌린지"}
+    for output in outputs:
+        challenge_titles = {item["title"] for item in output["response"]["recommended_challenges"]}
+        assert challenge_titles.isdisjoint(blocked_titles)
+
+
+@pytest.mark.asyncio
+async def test_diet_recommendation_qa_htn_and_sodium_cases_do_not_recommend_seaweed() -> None:
+    cases = [case for case in qa.build_qa_cases() if "HTN" in case.disease_groups or case.diet_issue == "나트륨 주의"]
+    outputs = await qa.generate_outputs(cases)
+
+    for output in outputs:
+        assert "해조류 반찬" not in output["response"]["recommended_foods"]
 
 
 @pytest.mark.asyncio
@@ -171,6 +195,7 @@ async def test_diet_recommendation_qa_rag_disabled_case_has_no_evidence_sources(
     case = next(case for case in qa.build_qa_cases() if case.case_id == "C06")
     output = (await qa.generate_outputs([case]))[0]
 
+    assert "trace" not in case.expected_focus.lower()
     assert output["response"]["rag_comment"]["enabled"] is False
     assert output["response"]["rag_comment"]["evidence_sources"] == []
 
