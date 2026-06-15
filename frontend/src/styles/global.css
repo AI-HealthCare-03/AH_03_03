@@ -4292,8 +4292,8 @@ input:-webkit-autofill:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px 12px;
 }
 
 .challenge-list-card {

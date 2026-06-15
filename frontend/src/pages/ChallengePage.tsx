@@ -17,7 +17,7 @@ import { Salad, Dumbbell, Moon, Pill, Droplets, Droplet, Activity, Medal, Leaf, 
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
 
 const tabToCategory: Record<string, string | null> = {
   전체: null,
@@ -465,7 +465,6 @@ export default function ChallengePage() {
   useEffect(() => {
     void load();
   }, []);
-  
   const filteredChallenges = useMemo(() => {
     const category = tabToCategory[activeTab];
     let result: Challenge[];
@@ -648,25 +647,28 @@ export default function ChallengePage() {
           </button>
         ))}
       </div>
-      <div className="filter-tabs" style={{ marginTop: "8px" }}>
-        {["전체", "쉬움", "보통", "어려움"].map((d) => (
-          <button
-            className={activeDifficulty === d ? "filter-tab active" : "filter-tab"}
-            key={d}
-            onClick={() => {
-              setActiveDifficulty(d === "쉬움" ? "EASY" : d === "보통" ? "NORMAL" : d === "어려움" ? "HARD" : "전체");
-              setPage(1);
-            }}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
       {error && <div className="state-box">{error}</div>}
       {message && <div className="state-box">{message}</div>}
       <div className="challenge-page-layout">
         <main className="challenge-main-list">
-          <Card title="챌린지 목록">
+          <Card
+            title="챌린지 목록"
+            actions={
+              <select
+                value={activeDifficulty}
+                onChange={(e) => {
+                  setActiveDifficulty(e.target.value);
+                  setPage(1);
+                }}
+                style={{ padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--color-border)", background: "var(--color-surface)", cursor: "pointer", fontSize: "14px", width: "fit-content" }}
+              >
+                <option value="전체">난이도 전체</option>
+                <option value="EASY">쉬움</option>
+                <option value="NORMAL">보통</option>
+                <option value="HARD">어려움</option>
+              </select>
+            }
+          >
             <div className="challenge-list">
               {loading && <div className="state-box">챌린지 목록을 불러오는 중입니다.</div>}
               {!loading && filteredChallenges.length === 0 && (
@@ -688,23 +690,18 @@ export default function ChallengePage() {
                       <span className="challenge-icon">{categoryIcon[category] ?? "🌿"}</span>
                       <div>
                         <strong>{String(challenge.title)}</strong>
-                        <p>{getCleanDescription(challenge.description)}</p>
+                        <div className="challenge-card-meta">
+                          <span className="badge risk-low">난이도 {getDifficulty(challenge.difficulty)}</span>
+                          <span className="badge risk-medium">{String(challenge.duration_days ?? 7)}일</span>
+                          <span className="badge badge-reference">{getDisplayChallengeType(challenge)}</span>
+                          <span className="badge badge-reference">{getDisplayCategory(category)}</span>
+                          <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
+                          <span className="badge badge-reference">
+                            참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="challenge-card-meta">
-                      <span className="badge risk-low">난이도 {getDifficulty(challenge.difficulty)}</span>
-                      <span className="badge risk-medium">{String(challenge.duration_days ?? 7)}일</span>
-                      <span className="badge badge-reference">{getDisplayChallengeType(challenge)}</span>
-                      <span className="badge badge-reference">{getDisplayCategory(category)}</span>
-                      <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
-                      <span className="badge badge-reference">
-                        참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
-                      </span>
-                    </div>
-                    {Boolean(challenge.caution_message) && <div className="state-box warning-card">{String(challenge.caution_message)}</div>}
-                    {Boolean(challenge.contraindication_message) && (
-                      <div className="state-box warning-card">{String(challenge.contraindication_message)}</div>
-                    )}
                     {joinedChallenge ? (
                       <>
                         <div className="challenge-date-meta">
@@ -719,7 +716,9 @@ export default function ChallengePage() {
                         </div>
                       </>
                     ) : (
-                      <p className="muted">아직 참여 전입니다.</p>
+                      <p className="muted" style={{ overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {getCleanDescription(challenge.description) || "상세 버튼을 눌러 챌린지 내용을 확인하세요."}
+                      </p>
                     )}
                     <div className="challenge-card-actions">
                       <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
