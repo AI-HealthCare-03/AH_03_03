@@ -5,8 +5,11 @@ from typing import Any
 from fastapi import HTTPException
 from starlette import status
 
+from ai_runtime.llm.diet_recommendation_rewriter import rewrite_diet_rag_comment
 from ai_runtime.llm.rag.diet_sources import DIET_RAG_QUERY_TEMPLATES, ISSUE_TO_RAG_CODES, enabled_rag_codes
 from ai_runtime.llm.rag.keyword_retriever import KeywordRagMatch, retrieve_keyword_rag_matches
+from app.core import config
+from app.core.providers import has_openai_config
 from app.models.analysis import AnalysisType, RiskLevel
 from app.repositories import analysis_repository, health_repository
 from app.services import challenges as challenge_service
@@ -265,7 +268,7 @@ def build_diet_health_recommendation_response(
     recommended_challenges = _recommended_challenges(issue_keys, active_challenges)
     rag_disease_codes = _rag_disease_codes_from_analysis_results(analysis_results)
     rag_comment = _safe_build_rag_comment(issue_keys=issue_keys, rag_disease_codes=rag_disease_codes)
-    return {
+    response = {
         "diet_record_id": int(diet_record.id),
         "nutrition_findings": nutrition_findings,
         "disease_context": disease_context,
@@ -275,6 +278,12 @@ def build_diet_health_recommendation_response(
         "safety_notice": SAFETY_NOTICE,
         "rag_comment": rag_comment,
     }
+    response["rag_comment"] = rewrite_diet_rag_comment(
+        rag_comment=rag_comment,
+        recommendation_payload=response,
+        use_real_llm=config.DIET_RECOMMENDATION_LLM_REWRITE_ENABLED and has_openai_config(config),
+    )
+    return response
 
 
 def _detected_foods_as_list(value: Any) -> list[dict[str, Any]]:

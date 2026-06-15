@@ -554,6 +554,7 @@ export default function DietResultPage() {
           {recommendation?.rag_comment && (
             <div className="mini-card">
               <strong>참고 문서 기반 코멘트</strong>
+              {recommendation.rag_comment.rewrite_used && <span className="badge badge-reference">문장 다듬기 적용</span>}
               <span>{recommendation.rag_comment.summary}</span>
               {recommendation.rag_comment.disease_comments.length > 0 && (
                 <div className="card-list">

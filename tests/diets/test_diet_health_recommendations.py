@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -282,6 +283,154 @@ def test_diet_rag_comment_does_not_use_forbidden_phrases() -> None:
     assert "당뇨 식단으로 부적절합니다" not in serialized
     assert "고혈압 식단입니다" not in serialized
     assert "이 음식을 먹으면 안 됩니다" not in serialized
+
+
+def test_diet_rag_rewrite_flag_off_does_not_call_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_if_called(*args: Any, **kwargs: Any) -> str:
+        raise AssertionError("LLM must not be called when diet rewrite flag is off")
+
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", False)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", fail_if_called)
+
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    assert result["rag_comment"]["rewrite_used"] is False
+    assert result["rag_comment"]["fallback_reason"] == "rewrite_disabled"
+    assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
+
+
+def test_diet_rag_rewrite_without_openai_key_does_not_call_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_if_called(*args: Any, **kwargs: Any) -> str:
+        raise AssertionError("LLM must not be called without OpenAI config")
+
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", None)
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", fail_if_called)
+
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    assert result["rag_comment"]["rewrite_used"] is False
+    assert result["rag_comment"]["fallback_reason"] == "rewrite_disabled"
+    assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
+
+
+def test_diet_rag_rewrite_success_with_mocked_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def fake_call_llm_json(*args: Any, **kwargs: Any) -> str:
+        calls.append({"args": args, "kwargs": kwargs})
+        return json.dumps(
+            {
+                "summary": "실제 섭취량이 확정되지 않아 참고용입니다. 혈압 관리 관점에서 저염 식습관을 살펴보세요.",
+                "disease_comments": [
+                    {
+                        "disease_code": "HTN",
+                        "label": "혈압 관리",
+                        "comment": "나트륨이 높은 후보로 보여 국물과 짠 소스는 참고용으로 주의가 필요합니다.",
+                        "basis": "서비스 내 참고 문서 기반",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", fake_call_llm_json)
+
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    assert calls
+    assert result["rag_comment"]["rewrite_used"] is True
+    assert result["rag_comment"]["fallback_reason"] is None
+    assert "저염 식습관" in result["rag_comment"]["summary"]
+    assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
+
+
+def test_diet_rag_rewrite_llm_failure_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+
+    def fail_call(*args: Any, **kwargs: Any) -> str:
+        raise RuntimeError("mock LLM unavailable")
+
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", fail_call)
+
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    assert result["rag_comment"]["rewrite_used"] is False
+    assert result["rag_comment"]["fallback_reason"] == "llm_rewrite_failed"
+    assert any(item["disease_code"] == "HTN" for item in result["rag_comment"]["disease_comments"])
+    assert result["nutrition_findings"]
+    assert result["recommended_foods"]
+
+
+def test_diet_rag_rewrite_forbidden_phrase_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+
+    def unsafe_call(*args: Any, **kwargs: Any) -> str:
+        return json.dumps(
+            {
+                "summary": "나트륨 과다입니다. 실제 섭취량이 확정되지 않아 참고용입니다.",
+                "disease_comments": [
+                    {
+                        "disease_code": "HTN",
+                        "label": "혈압 관리",
+                        "comment": "고혈압 식단입니다.",
+                        "basis": "서비스 내 참고 문서 기반",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", unsafe_call)
+
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    assert result["rag_comment"]["rewrite_used"] is False
+    assert result["rag_comment"]["fallback_reason"] == "safety_failed"
+    serialized = str(result["rag_comment"])
+    assert "나트륨 과다입니다" not in serialized
+    assert "고혈압 식단입니다" not in serialized
+
+
+def test_diet_rag_rewrite_ckd_restriction_phrase_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+
+    def unsafe_ckd_call(*args: Any, **kwargs: Any) -> str:
+        return json.dumps(
+            {
+                "summary": "실제 섭취량이 확정되지 않아 참고용입니다.",
+                "disease_comments": [
+                    {
+                        "disease_code": "CKD",
+                        "label": "신장 관리",
+                        "comment": "단백질 제한하세요. 칼륨 제한하세요. 인 제한하세요.",
+                        "basis": "서비스 내 참고 문서 기반",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", unsafe_ckd_call)
+
+    result = _build(
+        nutrition={"protein_g": 35, "potassium_mg": 900},
+        analysis_types=[AnalysisType.CHRONIC_KIDNEY_DISEASE],
+    )
+
+    assert result["rag_comment"]["rewrite_used"] is False
+    assert result["rag_comment"]["fallback_reason"] == "safety_failed"
+    serialized = str(result["rag_comment"])
+    assert "의료진 상담" in serialized
+    assert "단백질 제한하세요" not in serialized
+    assert "칼륨 제한하세요" not in serialized
+    assert "인 제한하세요" not in serialized
 
 
 @pytest.mark.asyncio

@@ -69,6 +69,7 @@ class Config(BaseSettings):
     DIET_GPT_VISION_MODEL: str = "gpt-4o"
     DIET_VISION_PROVIDER: str = "rule_based"
     DIET_MFDS_ENABLED: bool = False
+    DIET_RECOMMENDATION_LLM_REWRITE_ENABLED: bool = False
     MFDS_SERVICE_KEY: str | None = None
     MFDS_SERVICE_KEY_ENCODED: str | None = None
     DIET_MFDS_TIMEOUT_SECONDS: float = 5.0
