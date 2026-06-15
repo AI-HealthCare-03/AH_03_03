@@ -814,9 +814,9 @@ def _evidence_sources(matches: list[KeywordRagMatch]) -> list[dict[str, str]]:
         metadata = match.document.metadata
         sources.append(
             {
-                "title": metadata.title,
+                "title": _public_source_title(metadata.title),
                 "disease_code": metadata.disease_code,
-                "review_status": metadata.review_status,
+                "review_status": _public_review_status(metadata.review_status),
             }
         )
     return sources
@@ -834,7 +834,7 @@ def _evidence_sources_from_documents(
         disease_code = str(metadata.get("disease_code") or "")
         if disease_code not in target_codes:
             continue
-        title = str(document.title or metadata.get("title") or disease_code)
+        title = _public_source_title(document.title or metadata.get("title") or disease_code)
         key = (title, disease_code)
         if key in seen:
             continue
@@ -849,11 +849,26 @@ def _evidence_sources_from_documents(
     return sources
 
 
-def _public_review_status(metadata: dict[str, Any]) -> str:
-    raw_status = str(metadata.get("review_status") or metadata.get("status") or "reference")
+def _public_review_status(value: Any) -> str:
+    if isinstance(value, dict):
+        raw_status = str(value.get("review_status") or value.get("status") or "reference")
+    else:
+        raw_status = str(value or "reference")
     if raw_status == "candidate_unreviewed":
         return "reference"
+    if raw_status == "missing_source":
+        return "unavailable"
+    if raw_status == "approved":
+        return "approved"
+    if raw_status == "reviewed":
+        return "reviewed"
     return raw_status
+
+
+def _public_source_title(value: Any) -> str:
+    title = str(value or "").strip()
+    title = title.replace(" 후보 지식", "").replace("후보 지식", "").strip()
+    return title or "참고 문서"
 
 
 def _rag_disease_comments(

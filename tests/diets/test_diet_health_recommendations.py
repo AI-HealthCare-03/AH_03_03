@@ -321,6 +321,28 @@ def test_diet_rag_comment_does_not_use_forbidden_phrases() -> None:
     assert "이 음식을 먹으면 안 됩니다" not in serialized
 
 
+def test_diet_rag_evidence_sources_do_not_expose_internal_review_status() -> None:
+    result = _build(nutrition={"sodium_mg": 920}, analysis_types=[AnalysisType.HYPERTENSION])
+
+    evidence_sources = result["rag_comment"]["evidence_sources"]
+    assert evidence_sources
+    assert any(source["review_status"] == "reference" for source in evidence_sources)
+
+    serialized = json.dumps(result["rag_comment"], ensure_ascii=False)
+    assert "candidate_unreviewed" not in serialized
+    assert "missing_source" not in serialized
+    assert "후보 지식" not in serialized
+    assert "status:" not in serialized
+
+
+def test_public_review_status_maps_internal_values() -> None:
+    assert service._public_review_status("candidate_unreviewed") == "reference"
+    assert service._public_review_status({"status": "candidate_unreviewed"}) == "reference"
+    assert service._public_review_status("missing_source") == "unavailable"
+    assert service._public_review_status("reviewed") == "reviewed"
+    assert service._public_review_status("approved") == "approved"
+
+
 def test_diet_rag_strategy_config_default_is_keyword_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DIET_RECOMMENDATION_RAG_STRATEGY", raising=False)
 
@@ -414,6 +436,7 @@ async def test_diet_rag_strategy_hybrid_calls_vector_when_keyword_is_empty(
     assert len(vector.calls) >= 1
     assert result["rag_comment"]["fallback_used"] is False
     assert any(item["title"] == "고혈압 식생활" for item in result["rag_comment"]["evidence_sources"])
+    assert any(item["review_status"] == "reference" for item in result["rag_comment"]["evidence_sources"])
     serialized = str(result["rag_comment"])
     assert "chunk content must stay internal" not in serialized
     assert "candidate_unreviewed" not in serialized
