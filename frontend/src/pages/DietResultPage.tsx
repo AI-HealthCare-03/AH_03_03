@@ -1,12 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { getDietRecord, getDietRecordImageByUrl, listDietPhotoResults, type DietCandidateFood } from "../api/diets";
+import {
+  getDietHealthRecommendations,
+  getDietRecord,
+  getDietRecordImageByUrl,
+  listDietPhotoResults,
+  type DietCandidateFood,
+  type DietHealthRecommendation,
+} from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
 
 type Item = Record<string, unknown>;
+
+const DEFAULT_DIET_RECOMMENDATION_NOTICE =
+  "이 내용은 진단이나 처방이 아닌 생활관리 참고 정보입니다. 실제 섭취량이 확정되지 않아 영양 판단은 참고용입니다.";
 
 function analysisMethodLabel(value: unknown): string {
   const method = String(value ?? "").toUpperCase();
@@ -145,12 +155,28 @@ function imageUrlFromPayload(payload: Record<string, unknown> | null | undefined
   return publicImageUrlFromPayloads(payload);
 }
 
+function hasDietRecommendationContent(recommendation: DietHealthRecommendation | null): boolean {
+  if (!recommendation) {
+    return false;
+  }
+  return [
+    recommendation.nutrition_findings,
+    recommendation.disease_context,
+    recommendation.recommended_foods,
+    recommendation.caution_foods,
+    recommendation.recommended_challenges,
+  ].some((items) => Array.isArray(items) && items.length > 0);
+}
+
 export default function DietResultPage() {
   const { dietRecordId } = useParams();
   const navigate = useNavigate();
   const [record, setRecord] = useState<Item | null>(null);
   const [photoResults, setPhotoResults] = useState<Item[]>([]);
   const [error, setError] = useState("");
+  const [recommendation, setRecommendation] = useState<DietHealthRecommendation | null>(null);
+  const [recommendationError, setRecommendationError] = useState("");
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [detailImageFailed, setDetailImageFailed] = useState(false);
   const [detailImageObjectUrl, setDetailImageObjectUrl] = useState("");
 
@@ -212,6 +238,30 @@ export default function DietResultPage() {
       }
     };
     void load();
+  }, [dietRecordId]);
+
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      const numericDietRecordId = Number(dietRecordId);
+      if (!Number.isFinite(numericDietRecordId) || numericDietRecordId <= 0) {
+        setRecommendation(null);
+        return;
+      }
+      setRecommendationLoading(true);
+      setRecommendationError("");
+      try {
+        setRecommendation(await getDietHealthRecommendations(numericDietRecordId));
+      } catch (err) {
+        setRecommendation(null);
+        setRecommendationError(
+          err instanceof Error ? err.message : "식단 건강관리 추천을 불러오지 못했습니다.",
+        );
+      } finally {
+        setRecommendationLoading(false);
+      }
+    };
+
+    void loadRecommendations();
   }, [dietRecordId]);
 
   useEffect(() => {
@@ -498,6 +548,97 @@ export default function DietResultPage() {
           </div>
         </Card>
       )}
+      <Card title="건강관리 추천">
+        <div className="card-list">
+          <div className="state-box">{recommendation?.safety_notice || DEFAULT_DIET_RECOMMENDATION_NOTICE}</div>
+          {recommendationLoading && <div className="state-box">식단 기반 건강관리 추천을 불러오는 중입니다.</div>}
+          {recommendationError && (
+            <div className="state-box">
+              추천 정보를 불러오지 못했습니다. 기존 식단 분석 결과는 계속 확인할 수 있습니다.
+            </div>
+          )}
+          {!recommendationLoading && !recommendationError && !hasDietRecommendationContent(recommendation) && (
+            <div className="state-box">
+              표시할 건강관리 추천이 아직 없습니다. 식단 사진의 음식명과 영양성분 후보가 확인되면 참고용 추천이 표시됩니다.
+            </div>
+          )}
+          {recommendation && recommendation.nutrition_findings.length > 0 && (
+            <div className="mini-card">
+              <strong>영양 참고 포인트</strong>
+              <div className="card-list">
+                {recommendation.nutrition_findings.map((finding) => (
+                  <div className="mini-card" key={`${finding.issue_key}-${finding.label}`}>
+                    <span className="badge badge-reference">{finding.label}</span>
+                    <span>{finding.message}</span>
+                    {finding.basis && <span className="muted">{finding.basis}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {recommendation && recommendation.disease_context.length > 0 && (
+            <div className="mini-card">
+              <strong>건강상태 참고</strong>
+              <div className="card-list">
+                {recommendation.disease_context.map((context) => (
+                  <div className="mini-card" key={context.disease_code}>
+                    <span className="badge badge-reference">{context.label}</span>
+                    <span>{context.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {recommendation &&
+            (recommendation.recommended_foods.length > 0 || recommendation.caution_foods.length > 0) && (
+              <div className="mini-card">
+                <strong>음식 선택 참고</strong>
+                {recommendation.recommended_foods.length > 0 && (
+                  <>
+                    <span className="muted">보완하면 좋은 음식</span>
+                    <div className="chip-list">
+                      {recommendation.recommended_foods.map((food) => (
+                        <span className="badge risk-low" key={`recommended-${food}`}>
+                          {food}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {recommendation.caution_foods.length > 0 && (
+                  <>
+                    <span className="muted">주의해서 살펴볼 음식</span>
+                    <div className="chip-list">
+                      {recommendation.caution_foods.map((food) => (
+                        <span className="badge badge-reference" key={`caution-${food}`}>
+                          {food}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          {recommendation && recommendation.recommended_challenges.length > 0 && (
+            <div className="mini-card">
+              <strong>추천 챌린지</strong>
+              <div className="card-list">
+                {recommendation.recommended_challenges.map((challenge) => (
+                  <div className="mini-card" key={challenge.challenge_id}>
+                    <strong>{challenge.title}</strong>
+                    <span className="muted">{challenge.reason}</span>
+                    {challenge.challenge_id ? (
+                      <Link className="button secondary compact-button" to={`/challenges/${challenge.challenge_id}`}>
+                        챌린지 보기
+                      </Link>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
       <Card title="추천 액션">
         <div className="button-row">
           <button onClick={() => navigate("/diets/history")}>기록 완료</button>
