@@ -60,7 +60,7 @@ docker compose exec fastapi uv run --no-sync python scripts/seed_current_user_da
 
 기대 결과:
 
-- demo/admin/monitor 계정 로그인 가능
+- demo 계정 로그인 가능
 - 챌린지/FAQ/대시보드 시연 데이터 존재
 
 ## 4. 로그인 확인
@@ -73,7 +73,6 @@ docker compose exec fastapi uv run --no-sync python scripts/seed_current_user_da
 확인:
 
 - demo 계정 로그인
-- admin 또는 monitor 계정 로그인
 - 로그인 실패 시 FastAPI 로그와 브라우저 Network 탭 확인
 
 주의:
@@ -151,20 +150,15 @@ uv run python scripts/verify_precision_analysis_api.py --warmup-ml
 - 분석 결과가 없을 때 결과처럼 보이는 fallback 위험도 미노출
 - 식단/챌린지/건강 팁 영역이 깨지지 않음
 
-## 9. 관리자 콘솔
+## 9. 운영자 기능
 
-화면:
-
-- 관리자 콘솔
-- FAQ 관리
-- 문의 관리
-- 모니터링/로그
+MVP 사용자 시연에서는 관리자 콘솔을 노출하지 않는다.
 
 확인:
 
-- admin/monitor 계정 role에 따라 접근 가능 메뉴가 다름
-- OPERATOR 이상에서 FAQ/문의 관리 가능
-- USER 계정에서는 관리자 메뉴 미노출
+- 일반 사용자 화면에서 관리자 메뉴가 보이지 않음
+- 사용자 FAQ/문의 화면은 `/faqs`, `/inquiries`에서 정상 동작
+- 백엔드 관리자 API와 role 기반 권한 체크는 내부 운영용으로 유지
 
 ## 10. 마지막 화면 점검
 
@@ -181,7 +175,6 @@ uv run python scripts/verify_precision_analysis_api.py --warmup-ml
 - 알림/리마인더
 - 가족 기능
 - FAQ/문의
-- 관리자 콘솔
 - 존재하지 않는 경로 404
 - ErrorBoundary fallback
 
