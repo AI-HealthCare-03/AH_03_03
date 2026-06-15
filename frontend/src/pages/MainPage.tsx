@@ -355,7 +355,10 @@ export default function MainPage() {
     const diseaseRiskItems: DiseaseRiskItem[] = displayAnalysisResults.map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
-      diseaseName: getAnalysisTypeLabel(result.analysis_type),
+      diseaseName: (() => {
+        const label = getAnalysisTypeLabel(result.analysis_type);
+        return label === "콜레스테롤·중성지방" ? "이상지질혈증" : label;
+      })(),
       id: result.id,
       risk_level: result.risk_level,
       service_band: result.service_band,
@@ -510,7 +513,9 @@ export default function MainPage() {
                 </span>
               </div>
               {displayAnalysisResults.length > 0 ? (
-                <RiskStageBoard items={diseaseRiskItems} variant="preview" showEmptyStages />
+                <div style={{ marginTop: "-4px" }}>
+                  <RiskStageBoard items={diseaseRiskItems} variant="grid2x2" />
+                </div>
               ) : (
                 <div className="viz-empty">
                   아직 분석 결과가 없습니다.<br />
@@ -644,7 +649,7 @@ export default function MainPage() {
             {/* 추천 챌린지 */}
             <div>
               <span className="viz-card-label">추천 챌린지</span>
-              <div className="compact-list" style={{ marginTop: "8px" }}>
+              <div className="compact-list" style={{ marginTop: "10px" }}>
                 {recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => (
                   <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
                     <div>
