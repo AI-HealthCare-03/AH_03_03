@@ -20,6 +20,7 @@ import HealthProfileForm, {
   healthProfileSectionTitles,
   type HealthProfileFormState,
 } from "../components/HealthProfileForm";
+import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 
 type HealthRecord = Record<string, unknown>;
 type Readiness = {
@@ -275,6 +276,13 @@ export default function HealthRecordPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
+  const {
+    clearFeedback,
+    feedbackDialog: analysisFeedbackDialog,
+    showFailure,
+    showProcessing,
+    showSuccess,
+  } = useAnalysisFeedbackDialog();
 
   const bmi = useMemo(() => {
     const height = parseNumber(form.height_cm);
@@ -290,15 +298,18 @@ export default function HealthRecordPage() {
     onSuccess: async () => {
       setRunningMode(null);
       setAnalysisJobId(null);
-      navigate("/analysis");
+      showSuccess({ message: "결과 화면에서 건강 관리 단계를 확인해 주세요." });
+      window.setTimeout(() => navigate("/analysis"), 900);
     },
     onFailure: () => {
       setError("분석에 실패했습니다. 다시 시도해주세요.");
+      showFailure();
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
       setError("분석 시간이 초과됐습니다. 다시 시도해주세요.");
+      showFailure();
       setRunningMode(null);
       setAnalysisJobId(null);
     },
@@ -345,6 +356,7 @@ export default function HealthRecordPage() {
   const runAnalysis = async (mode: AnalysisMode) => {
     setError("");
     setNotice("");
+    clearFeedback();
     try {
       await save();
       const latestReadiness = await getAnalysisReadiness<Readiness>();
@@ -357,10 +369,12 @@ export default function HealthRecordPage() {
         return;
       }
       setRunningMode(mode);
+      showProcessing();
       const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, mode);
       setAnalysisJobId(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      showFailure();
       setRunningMode(null);
     }
   };
@@ -564,6 +578,7 @@ export default function HealthRecordPage() {
           tone="danger"
         />
       )}
+      {analysisFeedbackDialog}
     </div>
   );
 }
