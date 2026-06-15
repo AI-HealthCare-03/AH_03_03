@@ -258,6 +258,7 @@ export default function MainPage() {
   const [readiness, setReadiness] = useState<AnyRecord>({});
   const [challenges, setChallenges] = useState<AnyRecord[]>([]);
   const [challengeRecommendations, setChallengeRecommendations] = useState<AnyRecord[]>([]);
+  const [challengeRecommendationsLoading, setChallengeRecommendationsLoading] = useState(false);
   const [myChallenges, setMyChallenges] = useState<AnyRecord[]>([]);
   const [medications, setMedications] = useState<AnyRecord[]>([]);
   const [sectionError, setSectionError] = useState("");
@@ -309,9 +310,17 @@ export default function MainPage() {
         const missingRecommendationIds = recommendationChallengeIds.filter(
           (id) => !baseChallenges.some((challenge) => Number(challenge.id) === id),
         );
+        setChallenges(baseChallenges);
+        setChallengeRecommendations(recommendations);
+        setChallengeRecommendationsLoading(missingRecommendationIds.length > 0);
         const recommendationChallengeDetails = await Promise.allSettled(
           missingRecommendationIds.map((id) => getChallenge<AnyRecord>(id)),
         );
+        recommendationChallengeDetails.forEach((result, index) => {
+          if (result.status === "rejected") {
+            console.warn("추천 챌린지 상세를 불러오지 못했습니다.", { challenge_id: missingRecommendationIds[index] });
+          }
+        });
         const mergedChallenges = [...baseChallenges];
         for (const detail of recommendationChallengeDetails) {
           if (detail.status === "fulfilled" && !mergedChallenges.some((challenge) => Number(challenge.id) === Number(detail.value.id))) {
@@ -319,9 +328,7 @@ export default function MainPage() {
           }
         }
         setChallenges(mergedChallenges);
-        setChallengeRecommendations(
-          recommendations,
-        );
+        setChallengeRecommendationsLoading(false);
         setMyChallenges(
           myChallengeList.status === "fulfilled" && Array.isArray(myChallengeList.value) ? myChallengeList.value : [],
         );
@@ -349,6 +356,7 @@ export default function MainPage() {
         setReadiness({});
         setChallenges([]);
         setChallengeRecommendations([]);
+        setChallengeRecommendationsLoading(false);
         setMyChallenges([]);
         setMedications([]);
         setSectionError("");
@@ -673,7 +681,9 @@ export default function MainPage() {
             <div>
               <span className="viz-card-label">추천 챌린지</span>
               <div className="compact-list" style={{ marginTop: "10px" }}>
-                {recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => {
+                {challengeRecommendationsLoading ? (
+                  <div className="viz-empty">추천 챌린지를 불러오는 중입니다...</div>
+                ) : recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => {
                   const challengeId = Number(challenge.id);
                   return (
                   <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
@@ -686,6 +696,7 @@ export default function MainPage() {
                   );
                 }) : (
                   <div className="viz-empty">
+                    <strong>추천 챌린지가 아직 없습니다.</strong>
                     <Link to="/challenges" style={{ color: "var(--color-primary)", fontWeight: 900 }}>챌린지 보기</Link>
                   </div>
                 )}

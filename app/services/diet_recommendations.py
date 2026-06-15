@@ -473,7 +473,7 @@ def _nutrition_basis(nutrition: dict[str, Any]) -> str:
         value = str(nutrition.get(key) or "").strip()
         if value:
             return value
-    return "MFDS 기준 영양성분 후보"
+    return "식품영양성분 데이터 기준 후보"
 
 
 def _food_display_name(food: dict[str, Any]) -> str:
@@ -593,7 +593,7 @@ def _basis_by_issue(nutrients_by_food: list[dict[str, Any]], issue_keys: list[st
         nutrient = ISSUE_DEFINITIONS.get(issue_key, {}).get("nutrient")
         for food in nutrients_by_food:
             if nutrient is None or nutrient in food.get("values", {}):
-                basis[issue_key] = str(food.get("basis") or "MFDS 기준 영양성분 후보")
+                basis[issue_key] = str(food.get("basis") or "식품영양성분 데이터 기준 후보")
                 break
     return basis
 
@@ -611,7 +611,7 @@ def _finding_payload(issue_key: str, basis: str | None, *, disease_codes: list[s
         "nutrient": definition["nutrient"],
         "label": definition["label"],
         "message": message,
-        "basis": basis or "MFDS 기준 영양성분 후보",
+        "basis": basis or "식품영양성분 데이터 기준 후보",
     }
 
 

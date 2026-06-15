@@ -35,6 +35,12 @@ type DialogState =
   | { type: "reset-second"; title: string; message: string }
   | null;
 
+type MissingInfoDialog = {
+  inputPath: string;
+  message: string;
+  title: string;
+};
+
 const emptyForm: HealthProfileFormState = {
   gender: "MALE",
   birth_date: "",
@@ -346,6 +352,11 @@ function validateForm(form: HealthProfileFormState): string | null {
   return null;
 }
 
+function readableMissingFields(fields: string[]): string {
+  const text = fields.map((field) => backendMissingLabelMap[field] ?? field).filter(Boolean).join(", ");
+  return text || "필수 항목";
+}
+
 function getAge(birthDate: string): number | null {
   if (!birthDate) {
     return null;
@@ -381,6 +392,7 @@ export default function HealthProfilePage() {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [editing, setEditing] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [missingInfoDialog, setMissingInfoDialog] = useState<MissingInfoDialog | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
@@ -440,15 +452,15 @@ export default function HealthProfilePage() {
     void load().catch(() => setError("건강정보를 불러오지 못했습니다."));
   }, [backendUser?.id]);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     const validationError = validateForm(form);
     if (validationError) {
       setError(validationError);
-      return;
+      return false;
     }
     if (!hasMeaningfulHealthData(form)) {
       setError("저장할 건강정보를 먼저 입력해주세요.");
-      return;
+      return false;
     }
     const payload = buildHealthPayload(form, bmi);
     if (latestRecord?.id) {
@@ -459,24 +471,58 @@ export default function HealthProfilePage() {
     await load();
     setEditing(false);
     setNotice("건강정보가 저장되었습니다. 이후 분석에 반영됩니다.");
+    return true;
   };
 
-  const analyze = async () => {
+  const runAnalysis = async (mode: AnalysisMode) => {
     setError("");
+    setNotice("");
+    setMissingInfoDialog(null);
     try {
+      if (editing) {
+        const saved = await save();
+        if (!saved) {
+          return;
+        }
+      }
       const latestReadiness = await getAnalysisReadiness<Readiness>();
       setReadiness(latestReadiness);
+      const currentBasicReady = Boolean(latestReadiness.basic_ready ?? latestReadiness.is_ready);
+      const currentBasicMissingFields = currentBasicReady
+        ? []
+        : latestReadiness.missing_basic_fields ?? latestReadiness.missing_fields;
+      const currentPrecisionMissingFields = latestReadiness.missing_precision_fields ?? [];
+      const currentPrecisionReady =
+        Boolean(latestReadiness.precision_ready) && currentPrecisionMissingFields.length === 0;
       if (!latestReadiness.latest_health_record_id) {
-        setError("저장된 건강정보가 없습니다.");
+        setMissingInfoDialog({
+          inputPath: mode === "PRECISION" ? "/health?step=precision" : "/health?step=basic",
+          message:
+            mode === "PRECISION"
+              ? "정밀 분석을 실행하려면 기본 건강정보와 검진/혈액 정보를 먼저 저장해 주세요."
+              : "간편 분석을 실행하려면 기본 건강정보를 먼저 저장해 주세요.",
+          title: "건강정보가 필요합니다.",
+        });
         return;
       }
-      if (!latestReadiness.is_ready) {
-        setError("기본 분석에 필요한 정보가 부족합니다.");
-        setEditing(true);
+      if (!currentBasicReady) {
+        setMissingInfoDialog({
+          inputPath: "/health?step=basic",
+          message: `간편 분석에 필요한 기본 건강 정보가 부족합니다. 누락 항목: ${readableMissingFields(currentBasicMissingFields)}. 입력한 뒤 다시 분석해 주세요.`,
+          title: "간편 분석 정보가 부족합니다.",
+        });
         return;
       }
-      setRunningMode("PRECISION");
-      const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, "PRECISION");
+      if (mode === "PRECISION" && !currentPrecisionReady) {
+        setMissingInfoDialog({
+          inputPath: "/health?step=precision",
+          message: `정밀 분석에 필요한 검진/혈액 정보가 부족합니다. 누락 항목: ${readableMissingFields(currentPrecisionMissingFields)}. 총콜레스테롤, LDL, HDL, 중성지방, 혈압 등 필요한 정보를 입력해 주세요.`,
+          title: "정밀 분석 정보가 부족합니다.",
+        });
+        return;
+      }
+      setRunningMode(mode);
+      const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, mode);
       setAnalysisJobId(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
@@ -521,8 +567,11 @@ export default function HealthProfilePage() {
               수정하기
             </button>
           )}
-          <button className="btn-secondary" disabled={runningMode !== null} onClick={analyze} type="button">
-            {runningMode === "PRECISION" ? "분석 중..." : "분석하기"}
+          <button className="btn-secondary" disabled={runningMode !== null} onClick={() => void runAnalysis("BASIC")} type="button">
+            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석하기"}
+          </button>
+          <button className="btn-secondary" disabled={runningMode !== null} onClick={() => void runAnalysis("PRECISION")} type="button">
+            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석하기"}
           </button>
         </div>
       </header>
@@ -531,10 +580,10 @@ export default function HealthProfilePage() {
         <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health/profile">
           한눈에 보기
         </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=basic">
           간편 분석 정보 입력
         </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=precision">
           정밀 분석 정보 입력
         </Link>
       </div>
@@ -710,6 +759,20 @@ export default function HealthProfilePage() {
           </div>
         )}
       </Card>
+      {missingInfoDialog && (
+        <ConfirmDialog
+          cancelLabel="닫기"
+          confirmLabel="정보 입력하러 가기"
+          message={missingInfoDialog.message}
+          onCancel={() => setMissingInfoDialog(null)}
+          onConfirm={() => {
+            const targetPath = missingInfoDialog.inputPath;
+            setMissingInfoDialog(null);
+            navigate(targetPath);
+          }}
+          title={missingInfoDialog.title}
+        />
+      )}
       {dialog && (
         <ConfirmDialog
           message={dialog.message}

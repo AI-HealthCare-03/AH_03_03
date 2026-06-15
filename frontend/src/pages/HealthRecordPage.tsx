@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AnalysisMode, runAnalysisAsync } from "../api/analysis";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
@@ -262,6 +262,7 @@ function getDisplayValue(record: HealthRecord, key: string, unit = ""): string {
 
 export default function HealthRecordPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { backendUser } = useAuth();
   const [form, setForm] = useState(initialForm);
   const [latestRecord, setLatestRecord] = useState<HealthRecord | null>(null);
@@ -328,6 +329,16 @@ export default function HealthRecordPage() {
   useEffect(() => {
     void load().catch(() => setError("건강정보를 불러오지 못했습니다."));
   }, [backendUser?.id]);
+
+  useEffect(() => {
+    const step = searchParams.get("step");
+    if (step === "precision") {
+      setActiveStep(1);
+    }
+    if (step === "basic") {
+      setActiveStep(0);
+    }
+  }, [searchParams]);
 
   const save = async () => {
     setError("");
