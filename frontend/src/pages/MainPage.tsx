@@ -18,44 +18,44 @@ type AnyRecord = Record<string, unknown>;
 
 const publicFallback = {
   service_title: "Health Ladder",
-  service_description: "AI 기반 건강 분석, 검진표 등록, 식단 분석, 챌린지 기능을 한 곳에서 제공합니다.",
+  service_description: "간편한 입력과 검진표 분석으로 AI 질병 위험도를 예측하고, 식단부터 생활습관 챌린지까지 한 곳에서 스마트하게 케어하세요.",
 };
 
 const landingFeatures = [
   {
     icon: "🧭",
-    title: "AI 관리 단계 확인",
-    description: "건강정보를 기반으로 당뇨, 고혈압, 콜레스테롤·중성지방 관리 필요도를 확인합니다.",
+    title: "AI 만성질환 위험 예측도 확인",
+    description: "건강정보를 기반으로 만성질환 발병 위험도를 예측합니다.",
     redirect: "/analysis",
   },
   {
     icon: "📄",
     title: "검진표 등록",
-    description: "검진표 이미지나 PDF에서 주요 건강 수치를 빠르게 입력합니다.",
+    description: "검진표 이미지 혹은 PDF로 주요 건강 수치를 빠르게 입력합니다.",
     redirect: "/ocr/exam",
   },
   {
     icon: "🥗",
     title: "식단 이미지 분석",
-    description: "식단 사진을 기록하고 영양 요약과 개선 포인트를 확인합니다.",
+    description: "식단 사진을 등록하고 영양 정보와 개선 포인트를 확인합니다.",
     redirect: "/diets",
   },
   {
     icon: "🚶",
     title: "맞춤 챌린지",
-    description: "관리 단계와 생활습관에 맞춘 작은 건강 습관을 실천합니다.",
+    description: "건강한 변화로 이어지는 작은 실천을 시작합니다.",
     redirect: "/challenges",
   },
   {
     icon: "💊",
     title: "복약/영양제 관리",
-    description: "복약 정보와 기록을 한 곳에서 관리합니다.",
+    description: "복약 정보와 기록을 관리합니다.",
     redirect: "/medications",
   },
   {
     icon: "💬",
     title: "AI 건강 상담",
-    description: "건강 분석, 식단, 운동, 복약 관련 질문을 편하게 남깁니다.",
+    description: "건강 관리와 생활습관에 대한 궁금증을 AI가 답변해드립니다.",
     redirect: "/chatbot",
   },
 ];
@@ -64,13 +64,13 @@ const landingPersonas = [
   {
     id: "exam",
     icon: "📋",
-    title: "검진 결과가 걱정되는 직장인",
-    quote: "검진표는 받았는데 수치가 뭘 의미하는지 모르겠어요.",
-    features: ["검진표 등록", "관리 단계 확인", "AI 코멘트"],
+    title: "건강 위험도를 예측해보고 싶은 사용자",
+    quote: "내 건강 상태를 확인하고 건강 관리 방법을 알고 싶어요.",
+    features: ["건강정보 등록", "위험도 예측", "AI 코멘트"],
     flow: [
-      { icon: "📄", title: "검진표 업로드", description: "촬영하거나 파일로 올립니다." },
-      { icon: "📊", title: "관리 단계 확인", description: "주요 질환 관리 필요도를 확인합니다." },
-      { icon: "✅", title: "챌린지 추천", description: "생활습관 액션을 이어갑니다." },
+      { icon: "📄", title: "간단 정보입력 혹은 검진표 업로드", description: "촬영하거나 파일로 올립니다." },
+      { icon: "📊", title: "위험도 예측", description: "만성질환 발병 위험도를 확인합니다." },
+      { icon: "✅", title: "챌린지 추천", description: "생활습관 관리를 이어갑니다." },
     ],
   },
   {
@@ -81,8 +81,8 @@ const landingPersonas = [
     features: ["식단 분석", "챌린지", "건강 리포트"],
     flow: [
       { icon: "🥗", title: "식단 기록", description: "사진과 기본 정보를 입력합니다." },
-      { icon: "📈", title: "변화 추적", description: "건강 점수와 추이를 봅니다." },
-      { icon: "🚶", title: "챌린지 실천", description: "추천 습관을 시작합니다." },
+      { icon: "🚶", title: "챌린지 실천", description: "생활 습관 관리를 시작합니다." },
+      { icon: "📈", title: "변화 추적", description: "위험도 예측 변화와 건강 지표 추이를 확인합니다." },
     ],
   },
   {
@@ -92,9 +92,9 @@ const landingPersonas = [
     quote: "복약, 영양제, 건강기록을 놓치지 않고 관리하고 싶어요.",
     features: ["복약 정보 등록", "복약 기록", "알림", "AI 상담"],
     flow: [
-      { icon: "💊", title: "복약 입력", description: "처방전과 약봉투를 정리합니다." },
-      { icon: "🔔", title: "알림 확인", description: "기록과 알림을 관리합니다." },
-      { icon: "🤖", title: "AI 상담", description: "궁금한 점을 이어서 묻습니다." },
+      { icon: "💊", title: "복약 입력", description: "현재 복용 중인 약 혹은 영양제의 정보를 입력합니다." },
+      { icon: "🔔", title: "알림 확인", description: "복약 기록과 알림을 관리합니다." },
+      { icon: "🤖", title: "AI 상담", description: "궁금한 점을 묻습니다." },
     ],
   },
 ];
@@ -648,9 +648,9 @@ export default function MainPage() {
     <div className="landing-page">
       <section className="hero-panel">
         <div>
-          <span className="eyebrow">Health Ladder</span>
-          <h1>건강검진표부터 생활습관까지, 내 건강 관리 단계를 쉽게 확인하세요</h1>
-          <p>{String(data.service_description)}</p>
+          <span className="eyebrow">건강한 삶으로 오르는 가장 쉬운 방법, Health Ladder</span>
+          <h1>AI 만성질환 예측과 생활습관 관리까지, 나를 위한 건강 사다리를 시작하세요</h1>
+          <p>만성질환 위험도를 예측하고 식단 관리, 복약, 생활습관 챌린지를 스마트하게 케어하세요.</p>
           <div className="button-row">
             <Link className="button" to="/signup">
               무료로 시작하기
@@ -679,28 +679,27 @@ export default function MainPage() {
       </section>
 
       <section className="landing-section">
-        <Card title="예시 대시보드 미리보기">
+        <Card title="건강 분석 화면 미리보기">
           <div className="landing-preview-dashboard">
             <div className="landing-preview-risk-panel">
-              <span className="viz-card-label">질환별 관리 필요도</span>
-              <p className="muted">건강검진 결과를 4단계 관리 항목으로 정리해 보여줍니다.</p>
+              <span className="viz-card-label">질환별 위험도 예측 결과</span>
+              <p className="muted">예측 결과를 4단계로 정리해 보여줍니다.</p>
               <RiskStageBoard
                 items={[
                   { analyzed_at: "2026-06-01", diseaseName: "고혈압", id: 1, risk_level: "LOW" },
                   { analyzed_at: "2026-06-01", diseaseName: "비만", id: 2, risk_level: "CAUTION" },
                   { analyzed_at: "2026-06-01", diseaseName: "당뇨", id: 3, risk_level: "CAUTION" },
-                  { analyzed_at: "2026-06-01", diseaseName: "콜레스테롤·중성지방", id: 4, risk_level: "HIGH_CAUTION" },
+                  { analyzed_at: "2026-06-01", diseaseName: "이상지질혈증", id: 4, risk_level: "HIGH_CAUTION" },
                 ]}
                 maxItemsPerStage={3}
                 showCounts={false}
                 showEmptyStages
-                title="예시 관리 단계"
                 variant="preview"
               />
             </div>
             <div className="landing-preview-vitals-panel">
               <div>
-                <span className="viz-card-label">최근 검진표</span>
+                <span className="viz-card-label">최근 건강검진 결과</span>
                 <div className="viz-stat-row" style={{ marginTop: "8px" }}><span>공복혈당</span><strong>132 mg/dL</strong></div>
                 <div className="viz-stat-row"><span>혈압</span><strong>132/84 mmHg</strong></div>
                 <div className="viz-stat-row"><span>총콜레스테롤</span><strong>198 mg/dL</strong></div>
@@ -723,8 +722,8 @@ export default function MainPage() {
 
       <section className="landing-section">
         <div className="section-heading">
-          <h2>내 상황에 맞는 시작 방법</h2>
-          <p>가장 가까운 상황을 선택하면 어떤 흐름으로 서비스를 쓰면 적절한지 보여드립니다.</p>
+          <h2>나에게 맞는 건강 관리 시작하기</h2>
+          <p>현재 나의 상황과 가장 비슷한 항목을 선택하면 추천 흐름을 안내해드립니다.</p>
         </div>
         <div className="persona-grid">
           {landingPersonas.map((persona) => (
@@ -778,7 +777,7 @@ export default function MainPage() {
       <section className="landing-section" id="features">
         <div className="section-heading">
           <h2>기능 미리보기</h2>
-          <p>아이콘을 눌러 관심 기능을 확인하고 로그인 후 바로 이어갈 수 있습니다.</p>
+          <p>다양한 건강 관리 기능을 확인하고 로그인 후 이용해보세요</p>
         </div>
 
         <div className="landing-feature-grid">
@@ -791,7 +790,6 @@ export default function MainPage() {
               <span className="landing-feature-icon">{featureIcons[feature.icon] ?? feature.icon}</span>
               <strong>{feature.title}</strong>
               <p>{feature.description}</p>
-              <em className="badge badge-reference">로그인 후 이용</em>
             </Link>
           ))}
         </div>
@@ -799,7 +797,7 @@ export default function MainPage() {
       <section className="landing-cta">
         <div>
           <h2>내 건강 데이터를 입력하고 맞춤 분석을 받아보세요.</h2>
-          <p>회원가입 후 기본 건강정보를 입력하면 건강 관리 단계와 맞춤 챌린지를 바로 확인할 수 있습니다.</p>
+          <p>회원가입 후 기본 건강정보를 입력하면 만성질환 위험도 예측과 건강 챌린지 서비스를 바로 이용할 수 있습니다.</p>
         </div>
         <div className="button-row">
           <Link className="button" to="/signup">
