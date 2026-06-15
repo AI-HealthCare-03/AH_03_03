@@ -17,7 +17,7 @@ import { Salad, Dumbbell, Moon, Pill, Droplets, Droplet, Activity, Medal, Leaf, 
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
 
 const tabToCategory: Record<string, string | null> = {
   전체: null,
