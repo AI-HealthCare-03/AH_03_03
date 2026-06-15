@@ -355,7 +355,10 @@ export default function MainPage() {
     const diseaseRiskItems: DiseaseRiskItem[] = displayAnalysisResults.map((result) => ({
       analyzed_at: result.analyzed_at,
       created_at: result.created_at,
-      diseaseName: getAnalysisTypeLabel(result.analysis_type),
+      diseaseName: (() => {
+        const label = getAnalysisTypeLabel(result.analysis_type);
+        return label === "콜레스테롤·중성지방" ? "이상지질혈증" : label;
+      })(),
       id: result.id,
       risk_level: result.risk_level,
       service_band: result.service_band,
@@ -373,11 +376,11 @@ export default function MainPage() {
         to: "/health",
       },
       {
-        title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "건강 관리 단계 확인",
+        title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "만성질환 위험도 예측 결과 확인",
         description:
           effectiveAnalysisResults.length > 0
-            ? "최근 분석 결과를 확인하고 다음 관리 행동을 정리해보세요."
-            : "건강정보 입력 후 관리 단계를 확인해보세요.",
+            ? "최근 분석 결과를 확인하고 건강한 변화를 이어가보세요."
+            : "건강정보 입력 후 위험도 예측 결과를 확인해보세요.",
         buttonLabel: effectiveAnalysisResults.length > 0 ? "분석 결과 보기" : "분석하러 가기",
         to: effectiveAnalysisResults.length > 0 ? "/analysis/history" : "/analysis",
       },
@@ -391,10 +394,10 @@ export default function MainPage() {
         to: "/challenges",
       },
       {
-        title: medications.length > 0 ? "오늘 복약 기록 확인" : "복약/영양제 등록",
+        title: medications.length > 0 ? "오늘 복약/영양제 기록 확인" : "복약/영양제 등록",
         description:
           medications.length > 0
-            ? "오늘 복약 기록을 확인하고 필요한 메모를 남겨보세요."
+            ? "오늘 복약/영양제 기록을 확인하고 필요한 메모를 남겨보세요."
             : "복약 정보를 등록하면 건강 관리 흐름을 함께 확인할 수 있습니다.",
         buttonLabel: "복약 관리",
         to: "/medications",
@@ -406,6 +409,19 @@ export default function MainPage() {
     const diastolicVal = latestHealthRecord.diastolic_bp != null ? Number(latestHealthRecord.diastolic_bp) : null;
     const weightVal = latestHealthRecord.weight_kg != null ? Number(latestHealthRecord.weight_kg) : null;
     const bmiVal = latestHealthRecord.bmi != null ? Number(latestHealthRecord.bmi) : null;
+
+    const latestDietDate = (() => {
+      const raw = recentDietRecords[0]?.recorded_at ?? recentDietRecords[0]?.created_at ?? recentDietRecords[0]?.meal_date;
+      if (!raw) return null;
+      const d = new Date(String(raw));
+      if (Number.isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      return `${y}.${mo}.${day} ${h}:${min}`;
+    })();
 
     // Diet score bars (last 5, oldest → newest left → right)
     const dietScoreBars = recentDietRecords
@@ -447,8 +463,8 @@ export default function MainPage() {
             <Link className="home-action-card" to="/analysis">
               <span className="home-action-card__icon"><HeartPulse size={24} /></span>
               <span>
-                <strong className="home-action-card__title">건강 관리 단계 확인하기</strong>
-                <em className="home-action-card__description">간편 분석으로 현재 건강정보 기반 질환별 결과를 확인합니다.</em>
+                <strong className="home-action-card__title">AI 만성질환 위험도 예측 결과 확인하기</strong>
+                <em className="home-action-card__description">현재 건강정보 기반 질환별 위험도 예측 결과를 확인합니다.</em>
               </span>
             </Link>
             <Link className="home-action-card" to="/diets">
@@ -468,8 +484,8 @@ export default function MainPage() {
 
         <section className="main-dashboard-section">
           <div className="section-heading compact">
-            <h2>오늘 할 일</h2>
-            <p>지금 바로 이어갈 수 있는 건강 관리 행동입니다.</p>
+            <h2>오늘의 건강 실천</h2>
+            <p>건강 변화를 위한 지금 바로 시작 가능한 항목들입니다.</p>
           </div>
           <div className="todo-card-grid">
             {todayCards.map((task) => (
@@ -484,7 +500,7 @@ export default function MainPage() {
 
         <section className="main-dashboard-section">
           <div className="section-heading compact">
-            <h2>건강 추적 요약</h2>
+            <h2>건강 리포트 요약</h2>
             <p>최근 기록된 건강 지표를 시각적으로 확인합니다.</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
@@ -497,7 +513,9 @@ export default function MainPage() {
                 </span>
               </div>
               {displayAnalysisResults.length > 0 ? (
-                <RiskStageBoard items={diseaseRiskItems} variant="preview" showEmptyStages />
+                <div style={{ marginTop: "-4px" }}>
+                  <RiskStageBoard items={diseaseRiskItems} variant="grid2x2" />
+                </div>
               ) : (
                 <div className="viz-empty">
                   아직 분석 결과가 없습니다.<br />
@@ -567,8 +585,13 @@ export default function MainPage() {
                   <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
                 </div>
                 <div className="viz-stat-row">
-                  <span>{latestDietScore != null ? `${String(latestDietScore)}점` : "최근 기록 없음"}</span>
-                  <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 900 }}>식단 분석하기</Link>
+                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                    {latestDietScore != null ? (latestDietDate ?? "식단 점수") : "최근 기록 없음"}
+                  </span>
+                  {latestDietScore != null
+                    ? <strong>{`${String(latestDietScore)}점`}</strong>
+                    : <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 900 }}>식단 분석하기</Link>
+                  }
                 </div>
               </div>
 
@@ -614,12 +637,19 @@ export default function MainPage() {
                   ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
                   : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
               </div>
+              <Link
+                className="button secondary"
+                to="/challenges"
+                style={{ display: "block", textAlign: "center", marginTop: "12px", fontSize: "13px" }}
+              >
+                챌린지 바로가기
+              </Link>
             </div>
 
             {/* 추천 챌린지 */}
             <div>
               <span className="viz-card-label">추천 챌린지</span>
-              <div className="compact-list" style={{ marginTop: "8px" }}>
+              <div className="compact-list" style={{ marginTop: "10px" }}>
                 {recommendedChallenges.length > 0 ? recommendedChallenges.map((challenge) => (
                   <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
                     <div>
