@@ -224,3 +224,5 @@ experiment/ml/kdu/reports/
 experiment/ml/kdu/reports/**
 experiment/ai/ocr/checkup/eval/pdfs/
 experiment/ai/ocr/checkup/eval/results/
+
+experiment/ai/ocr/checkup/eval/images/
