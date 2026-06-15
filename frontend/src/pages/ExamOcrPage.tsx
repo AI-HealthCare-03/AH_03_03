@@ -12,16 +12,10 @@ import {
 } from "../api/exams";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
-import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import { isHeicFile } from "../utils/files";
-
-type FeedbackDialog = {
-  message: string;
-  title: string;
-  tone?: "default" | "danger";
-};
 
 // 스텝 인디케이터
 type Step = 1 | 2 | 3 | 4;
@@ -77,8 +71,9 @@ export default function ExamOcrPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isAppliedToHealth, setIsAppliedToHealth] = useState(false);
   const [error, setError] = useState("");
-  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryOcr, setCanRetryOcr] = useState(false);
+  const { clearFeedback, feedbackDialog, showFailure, showFeedback, showProcessing, showSuccess } =
+    useAnalysisFeedbackDialog();
 
   // 현재 스텝 계산
   const currentStep: Step = isAppliedToHealth ? 4 : measurements.length > 0 ? 3 : selectedFile ? 2 : 1;
@@ -113,49 +108,29 @@ export default function ExamOcrPage() {
       setIsRunningOcr(false);
       setOcrJobId(null);
       if (!exam) {
-        setFeedbackDialog({
-          title: "검진표 인식에 실패했습니다.",
-          message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
-          tone: "danger",
-        });
+        showFailure({ message: "이미지를 다시 확인한 뒤 업로드해 주세요." });
         return;
       }
       try {
         const latestMeasurements = await listMeasurements(exam.id);
         setMeasurements(latestMeasurements);
         setCanRetryOcr(false);
-        setFeedbackDialog({
-          title: "검진표 인식이 완료되었습니다.",
-          message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요.",
-        });
+        showSuccess({ message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요." });
       } catch {
-        setFeedbackDialog({
-          title: "검진표 인식에 실패했습니다.",
-          message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
-          tone: "danger",
-        });
+        showFailure({ message: "이미지를 다시 확인한 뒤 업로드해 주세요." });
         setCanRetryOcr(true);
       }
     },
     onFailure: (job) => {
-      setFeedbackDialog({
-        title: "검진표 인식에 실패했습니다.",
-        message:
-          job.status === "CANCELED"
-            ? "검진표 인식 작업이 취소되었습니다."
-            : "이미지를 다시 확인한 뒤 업로드해 주세요.",
-        tone: "danger",
+      showFailure({
+        message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "이미지를 다시 확인한 뒤 업로드해 주세요.",
       });
       setCanRetryOcr(true);
       setIsRunningOcr(false);
       setOcrJobId(null);
     },
     onTimeout: () => {
-      setFeedbackDialog({
-        title: "검진표 인식에 실패했습니다.",
-        message: "이미지를 다시 확인한 뒤 업로드해 주세요.",
-        tone: "danger",
-      });
+      showFailure({ message: "이미지를 다시 확인한 뒤 업로드해 주세요." });
       setCanRetryOcr(true);
       setIsRunningOcr(false);
       setOcrJobId(null);
@@ -170,6 +145,7 @@ export default function ExamOcrPage() {
     setExam(null);
     setMeasurements([]);
     setError("");
+    clearFeedback();
     if (!file) {
       setSelectedFile(null);
       setSelectedFileName("");
@@ -198,7 +174,7 @@ export default function ExamOcrPage() {
 
   const startExamOcr = async () => {
     setError("");
-    setFeedbackDialog(null);
+    clearFeedback();
     setMeasurements([]);
     setCanRetryOcr(false);
     setIsAppliedToHealth(false);
@@ -207,6 +183,7 @@ export default function ExamOcrPage() {
       return;
     }
     setIsRunningOcr(true);
+    showProcessing();
     try {
       const report =
         exam ??
@@ -220,6 +197,7 @@ export default function ExamOcrPage() {
       setOcrJobId(job.id);
     } catch {
       setError("분석 요청을 시작하지 못했습니다. 파일을 확인한 뒤 다시 시도해주세요.");
+      showFailure();
       setCanRetryOcr(true);
       setIsRunningOcr(false);
     }
@@ -253,16 +231,15 @@ export default function ExamOcrPage() {
       setExam(confirmedExam);
       setMeasurements(await listMeasurements(exam.id));
       setIsAppliedToHealth(true);
-      setFeedbackDialog({
+      showFeedback("success", {
         title: "건강정보에 반영되었습니다.",
         message: "이제 정밀분석에서 최신 검진 수치를 사용할 수 있습니다.",
       });
     } catch (err) {
       setIsAppliedToHealth(false);
-      setFeedbackDialog({
+      showFeedback("error", {
         title: "건강정보 반영에 실패했습니다.",
         message: "잠시 후 다시 시도해 주세요.",
-        tone: "danger",
       });
       setError(err instanceof Error ? err.message : "건강정보 반영에 실패했습니다.");
     } finally {
@@ -297,16 +274,7 @@ export default function ExamOcrPage() {
       )}
 
       {/* 피드백 다이얼로그 */}
-      {feedbackDialog && (
-        <ConfirmDialog
-          confirmLabel="확인"
-          message={feedbackDialog.message}
-          onConfirm={() => setFeedbackDialog(null)}
-          showCancel={false}
-          title={feedbackDialog.title}
-          tone={feedbackDialog.tone}
-        />
-      )}
+      {feedbackDialog}
 
       {/* ── STEP 1: 파일 업로드 ── */}
       <Card title="파일 업로드">

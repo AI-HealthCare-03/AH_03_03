@@ -701,7 +701,7 @@ P1 이후 이상 수치 감지/알림을 worker로 분리할 경우:
 - `family_invites`
 - `family_share_settings`
 
-`family_invites`는 초대 코드 원문을 저장하지 않고 `code_hash`만 저장합니다. 초대 코드 원문은 생성 응답에서 1회만 반환합니다. 기본 만료 시간은 24시간입니다.
+`family_invites`는 초대 코드 원문을 저장하지 않고 `code_hash`만 저장합니다. 초대 코드 원문은 생성 응답에서 1회만 반환합니다. MVP 기본 만료 시간은 30분입니다.
 
 ### 구현된 API
 

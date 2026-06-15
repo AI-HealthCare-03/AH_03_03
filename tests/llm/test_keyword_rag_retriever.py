@@ -28,7 +28,7 @@ def test_retrieve_food_nutrition_api_keywords() -> None:
     matches = retrieve_keyword_rag_matches(user_message="식품영양성분 API로 음식 영양성분을 확인하고 싶어요")
     source_ids = [match.source_id for match in matches]
 
-    assert "food_nutrition_api" in source_ids
+    assert "food_nutrition_api" not in source_ids
 
 
 def test_include_safety_disclaimer() -> None:
@@ -39,7 +39,7 @@ def test_include_safety_disclaimer() -> None:
     source_ids = [context.metadata["id"] for context in contexts]
 
     assert "diabetes" in source_ids
-    assert "safety_disclaimer" in source_ids
+    assert "diet_caution" in source_ids
 
 
 def test_keyword_retriever_adapter_returns_interface_result() -> None:
@@ -115,7 +115,7 @@ def test_unknown_keyword_can_return_safety_only() -> None:
     )
 
     assert len(contexts) == 1
-    assert contexts[0].metadata["id"] == "safety_disclaimer"
+    assert contexts[0].metadata["id"] == "diet_caution"
 
 
 def test_keyword_rag_trace_metadata_contains_source_metadata() -> None:
@@ -234,7 +234,7 @@ def test_keyword_rag_trace_metadata_marks_safety_only_fallback() -> None:
         include_safety_disclaimer=True,
     )
 
-    assert metadata["retrieved_source_ids"] == ["safety_disclaimer"]
-    assert metadata["source_status"]["safety_disclaimer"] == "candidate_unreviewed"
+    assert metadata["retrieved_source_ids"] == ["diet_caution"]
+    assert metadata["source_status"]["diet_caution"] == "candidate_unreviewed"
     assert metadata["fallback"] is True
     assert metadata["fallback_reason"] == "safety_disclaimer_only"

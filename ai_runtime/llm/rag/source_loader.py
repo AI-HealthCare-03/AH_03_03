@@ -13,30 +13,52 @@ INDEX_FILE_NAME = "index.json"
 @dataclass(frozen=True)
 class RagSourceMetadata:
     id: str
-    disease_type: str
+    disease_code: str
     title: str
+    filename: str
     source_org: str
     source_url: str
     year: int | None
     source_type: str
-    runtime_use: str
-    status: str
+    topic_tags: tuple[str, ...]
+    issue_keys: tuple[str, ...]
+    usage_scope: str
+    review_status: str
+    enabled: bool
     notes: str | None = None
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> RagSourceMetadata:
+        disease_code = str(payload.get("disease_code") or payload.get("disease_type") or "")
+        review_status = str(payload.get("review_status") or payload.get("status") or "")
         return cls(
             id=str(payload["id"]),
-            disease_type=str(payload["disease_type"]),
+            disease_code=disease_code,
             title=str(payload["title"]),
+            filename=str(payload.get("filename") or f"{payload['id']}.md"),
             source_org=str(payload["source_org"]),
             source_url=str(payload["source_url"]),
             year=payload.get("year"),
             source_type=str(payload["source_type"]),
-            runtime_use=str(payload["runtime_use"]),
-            status=str(payload["status"]),
+            topic_tags=tuple(str(item) for item in payload.get("topic_tags", [])),
+            issue_keys=tuple(str(item) for item in payload.get("issue_keys", [])),
+            usage_scope=str(payload.get("usage_scope") or payload.get("runtime_use") or ""),
+            review_status=review_status,
+            enabled=bool(payload.get("enabled", True)),
             notes=payload.get("notes"),
         )
+
+    @property
+    def disease_type(self) -> str:
+        return self.disease_code
+
+    @property
+    def runtime_use(self) -> str:
+        return self.usage_scope
+
+    @property
+    def status(self) -> str:
+        return self.review_status
 
 
 @dataclass(frozen=True)
@@ -77,11 +99,19 @@ def load_rag_source_document(
     if metadata is None:
         raise KeyError(f"Unknown RAG source id: {source_id}")
 
-    source_path = source_dir / f"{source_id}.md"
+    source_path = source_dir / metadata.filename
     content = source_path.read_text(encoding="utf-8")
     return RagSourceDocument(metadata=metadata, content=content, path=source_path)
 
 
-def load_all_rag_source_documents(source_dir: Path = DEFAULT_RAG_SOURCE_DIR) -> list[RagSourceDocument]:
+def load_all_rag_source_documents(
+    source_dir: Path = DEFAULT_RAG_SOURCE_DIR,
+    *,
+    enabled_only: bool = True,
+) -> list[RagSourceDocument]:
     index = load_rag_source_index(source_dir)
-    return [load_rag_source_document(metadata.id, source_dir=source_dir, index=index) for metadata in index]
+    return [
+        load_rag_source_document(metadata.id, source_dir=source_dir, index=index)
+        for metadata in index
+        if not enabled_only or metadata.enabled
+    ]

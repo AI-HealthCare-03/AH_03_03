@@ -31,7 +31,7 @@ from app.services.email_service import EmailService
 from app.services.jwt import JwtService
 
 VERIFICATION_CODE_TTL_MINUTES = 10
-PASSWORD_RESET_TOKEN_TTL_MINUTES = 30
+PASSWORD_RESET_TOKEN_TTL_MINUTES = 10
 ACCOUNT_NOT_FOUND_MESSAGE = "가입되지 않은 아이디 또는 이메일입니다."
 INVALID_LOGIN_MESSAGE = "비밀번호가 올바르지 않습니다."
 ACCOUNT_LOCKED_MESSAGE = "로그인 시도가 여러 번 실패했습니다. 잠시 후 다시 시도하거나 추가 확인을 진행해주세요."

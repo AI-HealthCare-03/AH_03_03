@@ -4,6 +4,7 @@ type ConfirmDialogProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   showCancel?: boolean;
+  showActions?: boolean;
   tone?: "default" | "danger";
   onCancel?: () => void;
   onConfirm: () => void;
@@ -14,6 +15,7 @@ export default function ConfirmDialog({
   message,
   confirmLabel = "확인",
   cancelLabel = "취소",
+  showActions = true,
   showCancel = true,
   tone = "default",
   onCancel,
@@ -24,16 +26,18 @@ export default function ConfirmDialog({
       <div aria-modal="true" className="confirm-dialog" role="dialog">
         <h2>{title}</h2>
         <p>{message}</p>
-        <div className="button-row">
-          {showCancel && (
-            <button className="btn-secondary" onClick={onCancel} type="button">
-              {cancelLabel}
+        {showActions && (
+          <div className="button-row">
+            {showCancel && (
+              <button className="btn-secondary" onClick={onCancel} type="button">
+                {cancelLabel}
+              </button>
+            )}
+            <button className={tone === "danger" ? "btn-danger" : "btn-primary"} onClick={onConfirm} type="button">
+              {confirmLabel}
             </button>
-          )}
-          <button className={tone === "danger" ? "btn-danger" : "btn-primary"} onClick={onConfirm} type="button">
-            {confirmLabel}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

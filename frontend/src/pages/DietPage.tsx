@@ -13,8 +13,8 @@ import {
 } from "../api/diets";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
-import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
+import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import { isHeicFile } from "../utils/files";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
@@ -33,11 +33,6 @@ type NutritionDraft = {
   protein_g: string;
   fat_g: string;
   sodium_mg: string;
-};
-type FeedbackDialog = {
-  message: string;
-  title: string;
-  tone?: "default" | "danger";
 };
 
 const mealTypeOptions = [
@@ -199,8 +194,9 @@ export default function DietPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [canRetryAnalysis, setCanRetryAnalysis] = useState(false);
+  const { clearFeedback, feedbackDialog, showFailure, showFeedback, showProcessing, showSuccess } =
+    useAnalysisFeedbackDialog();
   const analysisRequestInFlightRef = useRef(false);
   const analysisStartedAtRef = useRef<number | null>(null);
   const handledAnalysisJobIdsRef = useRef<Set<number>>(new Set());
@@ -253,17 +249,10 @@ export default function DietPage() {
         }
         setAnalysisResult(result as unknown as Record<string, unknown>);
         setCanRetryAnalysis(false);
-        setFeedbackDialog({
-          title: "식단 분석이 완료되었습니다.",
-          message: "저장된 식단 분석 결과를 확인해 주세요.",
-        });
+        showSuccess({ message: "저장된 식단 분석 결과를 확인해 주세요." });
         await load();
       } catch {
-        setFeedbackDialog({
-          title: "식단 분석에 실패했습니다.",
-          message: "잠시 후 다시 시도해 주세요.",
-          tone: "danger",
-        });
+        showFailure();
         setCanRetryAnalysis(true);
       }
     },
@@ -273,22 +262,14 @@ export default function DietPage() {
       }
       handledAnalysisJobIdsRef.current.add(job.id);
       analysisRequestInFlightRef.current = false;
-      setFeedbackDialog({
-        title: "식단 분석에 실패했습니다.",
-        message: job.status === "CANCELED" ? "식단 분석 작업이 취소되었습니다." : "잠시 후 다시 시도해 주세요.",
-        tone: "danger",
-      });
+      showFailure({ message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "다시 시도해주세요." });
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
       analysisRequestInFlightRef.current = false;
-      setFeedbackDialog({
-        title: "식단 분석에 실패했습니다.",
-        message: "잠시 후 다시 시도해 주세요.",
-        tone: "danger",
-      });
+      showFailure();
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
       setAnalysisJobId(null);
@@ -302,6 +283,7 @@ export default function DietPage() {
     }
     setImagePreviewMessage("");
     setDetectedFoodsImagePreviewFailed(false);
+    clearFeedback();
     if (!file) {
       setSelectedImageFile(null);
       setSelectedImagePreviewUrl("");
@@ -385,9 +367,9 @@ export default function DietPage() {
     }
     setError("");
     setMessage("");
-    setFeedbackDialog(null);
+    clearFeedback();
     if (!selectedImageFile) {
-      setFeedbackDialog({
+      showFeedback("info", {
         title: "이미지를 선택해 주세요",
         message: "식단 분석을 진행하려면 먼저 식단 사진을 업로드해 주세요.",
       });
@@ -398,6 +380,7 @@ export default function DietPage() {
     analysisRequestInFlightRef.current = true;
     analysisStartedAtRef.current = Date.now();
     setIsAnalyzing(true);
+    showProcessing();
     try {
       const payload = buildDietAnalysisFormData(selectedImageFile, analysisDescription, analysisMealType);
       const job = await analyzeDiet(payload);
@@ -408,6 +391,7 @@ export default function DietPage() {
     } catch (err) {
       analysisRequestInFlightRef.current = false;
       setError("분석 요청을 시작하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해주세요.");
+      showFailure();
       setCanRetryAnalysis(true);
       setIsAnalyzing(false);
     }
@@ -438,16 +422,7 @@ export default function DietPage() {
         </div>
       ) : null}
       {message && <div className="state-box">{message}</div>}
-      {feedbackDialog && (
-        <ConfirmDialog
-          confirmLabel="확인"
-          message={feedbackDialog.message}
-          onConfirm={() => setFeedbackDialog(null)}
-          showCancel={false}
-          title={feedbackDialog.title}
-          tone={feedbackDialog.tone}
-        />
-      )}
+      {feedbackDialog}
       <Card
         title="식단 이미지 분석"
         actions={

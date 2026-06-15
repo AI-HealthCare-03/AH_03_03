@@ -158,6 +158,6 @@ def _fallback_reason(documents: list[RetrievedDocument]) -> str | None:
     if not documents:
         return "no_result"
     source_ids = {str(document.metadata.get("id")) for document in documents}
-    if source_ids == {"safety_disclaimer"}:
+    if source_ids <= {"safety_disclaimer", "diet_caution"}:
         return "safety_disclaimer_only"
     return None
