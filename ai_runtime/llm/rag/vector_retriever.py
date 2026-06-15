@@ -57,7 +57,9 @@ class VectorRagRetriever:
                 fallback_reason="embedding_disabled",
                 latency_ms=_elapsed_ms(started_at),
             )
-        if provider.provider_name != "mock":
+        try:
+            query_vector = provider.embed_text(query)
+        except Exception as exc:  # noqa: BLE001 - retrieval should degrade to keyword/rule fallback later.
             return self._fallback_result(
                 query=query,
                 top_k=top_k,
@@ -65,13 +67,12 @@ class VectorRagRetriever:
                 source_key=source_key,
                 issue_keys=issue_keys,
                 provider=provider,
-                fallback_reason="openai_embedding_disabled",
+                fallback_reason=f"embedding_query_failed:{type(exc).__name__}",
                 latency_ms=_elapsed_ms(started_at),
             )
-
-        query_vector = provider.embed_text(query)
         rows = await self._search_rows(
             query_vector=query_vector,
+            provider=provider,
             top_k=max(top_k, 0),
             disease_code=effective_disease_code,
             source_key=source_key,
@@ -122,6 +123,7 @@ class VectorRagRetriever:
         self,
         *,
         query_vector: list[float],
+        provider: EmbeddingProvider,
         top_k: int,
         disease_code: str | None,
         source_key: str | None,
@@ -135,7 +137,19 @@ class VectorRagRetriever:
             "c.embedding IS NOT NULL",
             "c.embedding_content_hash = c.content_hash",
         ]
-        values: list[Any] = [_vector_to_pgvector_literal(query_vector)]
+        values: list[Any] = [
+            _vector_to_pgvector_literal(query_vector),
+            provider.provider_name,
+            provider.model_name,
+            provider.dimension,
+        ]
+        conditions.extend(
+            [
+                "c.embedding_provider = $2",
+                "c.embedding_model = $3",
+                "c.embedding_dimension = $4",
+            ]
+        )
         if disease_code:
             values.append(str(disease_code).upper())
             conditions.append(f"UPPER(d.disease_code) = ${len(values)}")

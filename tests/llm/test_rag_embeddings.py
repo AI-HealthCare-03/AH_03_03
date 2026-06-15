@@ -93,11 +93,73 @@ def test_embedding_provider_factory_openai_is_skeleton_without_api_call() -> Non
         RAG_EMBEDDING_DIMENSION=1536,
     )
 
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        get_embedding_provider(settings)
+
+
+def test_openai_embedding_provider_uses_fake_client_and_preserves_batch_order() -> None:
+    client = FakeOpenAIEmbeddingClient(
+        embeddings=[
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6],
+            [0.7, 0.8, 0.9],
+        ]
+    )
+    provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-small", dimension=3, client=client)
+
+    vectors = provider.embed_texts(["첫 번째", "두 번째", ""])
+
+    assert vectors == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]]
+    assert client.calls == [
+        {
+            "model": "text-embedding-3-small",
+            "input": ["첫 번째", "두 번째", " "],
+        }
+    ]
+
+
+def test_openai_embedding_provider_embed_text_returns_first_vector() -> None:
+    client = FakeOpenAIEmbeddingClient(embeddings=[[0.1, 0.2]])
+    provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-small", dimension=2, client=client)
+
+    assert provider.embed_text("단일 문장") == [0.1, 0.2]
+
+
+def test_openai_embedding_provider_reorders_by_response_index() -> None:
+    client = FakeOpenAIEmbeddingClient(
+        entries=[
+            {"index": 1, "embedding": [0.4, 0.5]},
+            {"index": 0, "embedding": [0.1, 0.2]},
+        ]
+    )
+    provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-small", dimension=2, client=client)
+
+    assert provider.embed_texts(["첫 번째", "두 번째"]) == [[0.1, 0.2], [0.4, 0.5]]
+
+
+def test_openai_embedding_provider_rejects_dimension_mismatch() -> None:
+    client = FakeOpenAIEmbeddingClient(embeddings=[[0.1, 0.2]])
+    provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-small", dimension=3, client=client)
+
+    with pytest.raises(RuntimeError, match="dimension mismatch"):
+        provider.embed_text("차원 불일치")
+
+
+def test_embedding_provider_factory_returns_openai_provider_when_key_is_configured() -> None:
+    settings = SimpleNamespace(
+        RAG_EMBEDDING_ENABLED=True,
+        RAG_EMBEDDING_PROVIDER="openai",
+        RAG_EMBEDDING_MODEL="text-embedding-3-small",
+        RAG_EMBEDDING_DIMENSION=1536,
+        OPENAI_API_KEY="test-key",
+    )
+
     provider = get_embedding_provider(settings)
 
     assert isinstance(provider, OpenAIEmbeddingProvider)
-    with pytest.raises(NotImplementedError):
-        provider.embed_text("외부 API를 호출하면 안 됩니다.")
+    assert provider.provider_name == "openai"
+    assert provider.model_name == "text-embedding-3-small"
+    assert provider.dimension == 1536
 
 
 def test_embedding_provider_factory_rejects_unknown_provider() -> None:
@@ -121,3 +183,26 @@ def test_config_embedding_defaults_are_safe() -> None:
     assert settings.RAG_EMBEDDING_DIMENSION == 1536
     assert settings.RAG_EMBEDDING_BATCH_SIZE == 64
     assert get_embedding_provider(settings) is None
+
+
+class FakeOpenAIEmbeddingClient:
+    def __init__(self, *, embeddings: list[list[float]] | None = None, entries: list[dict] | None = None) -> None:
+        self.embeddings = embeddings or []
+        self.entries = entries
+        self.calls: list[dict] = []
+        self.embeddings_api = self
+
+    @property
+    def embeddings(self):
+        return self.embeddings_api
+
+    @embeddings.setter
+    def embeddings(self, value):
+        self._embeddings = value
+
+    def create(self, *, model: str, input: list[str]):
+        self.calls.append({"model": model, "input": input})
+        data = self.entries
+        if data is None:
+            data = [{"index": index, "embedding": embedding} for index, embedding in enumerate(self._embeddings)]
+        return {"data": data}

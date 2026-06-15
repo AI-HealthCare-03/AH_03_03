@@ -294,6 +294,37 @@ def trace_hybrid_rag_retrieval(
     )
 
 
+def build_embedding_rag_trace_metadata(
+    *,
+    provider: str,
+    model: str | None,
+    dimension: int | None,
+    batch_size: int,
+    chunk_count: int,
+    failed_count: int,
+    estimated_char_count: int,
+    apply: bool,
+    latency_ms: float | None = None,
+    fallback_reason: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "trace_version": "rag_embedding_apply_v1",
+        "source": "rag_embedding",
+        "provider": provider,
+        "model": model,
+        "dimension": dimension,
+        "batch_size": batch_size,
+        "chunk_count": chunk_count,
+        "failed_count": failed_count,
+        "estimated_char_count": estimated_char_count,
+        "apply": apply,
+        "latency_ms": latency_ms,
+        "fallback_reason": fallback_reason,
+        "embedding_vector_logged": False,
+        "chunk_content_logged": False,
+    }
+
+
 def _trace_query_preview(query: str) -> str:
     return query[:MAX_TRACE_QUERY_LENGTH]
 

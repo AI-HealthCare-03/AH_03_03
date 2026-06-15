@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai_runtime.llm.rag.embeddings import MockEmbeddingProvider, OpenAIEmbeddingProvider
+from ai_runtime.llm.rag.embeddings import MockEmbeddingProvider
 from scripts.rag.embed_rag_chunks import (
     OrmEmbeddingWriteGateway,
     RagChunkEmbeddingCandidate,
@@ -96,6 +96,20 @@ class FakeEmbeddingWriter:
             }
         )
         return 1
+
+
+class FakeOpenAIEmbeddingProvider:
+    provider_name = "openai"
+    model_name = "text-embedding-3-small"
+
+    def __init__(self, *, dimension: int) -> None:
+        self.dimension = dimension
+
+    def embed_text(self, text: str) -> list[float]:
+        return self.embed_texts([text])[0]
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [[float(index + 1) / 10 for _ in range(self.dimension)] for index, _ in enumerate(texts)]
 
 
 class FakeConnection:
@@ -244,23 +258,22 @@ async def test_only_document_key_filter_is_applied() -> None:
 
 
 @pytest.mark.asyncio
-async def test_openai_provider_does_not_call_external_api_and_reports_failure() -> None:
+async def test_openai_provider_dry_run_uses_injected_fake_provider() -> None:
     gateway = FakeEmbeddingGateway([_row("chunk-1")])
 
     summary = await dry_run_embed_rag_chunks(
         gateway=gateway,
-        provider=OpenAIEmbeddingProvider(),
+        provider=FakeOpenAIEmbeddingProvider(dimension=3),
         provider_name="openai",
         model_name="text-embedding-3-small",
-        dimension=1536,
+        dimension=3,
         batch_size=64,
     )
 
     assert summary.total_candidate_chunks == 1
-    assert summary.embedded_chunks == 0
-    assert summary.failed_chunks == 1
+    assert summary.embedded_chunks == 1
+    assert summary.failed_chunks == 0
     assert summary.db_write_performed is False
-    assert "NotImplementedError" in summary.warnings[0]
 
 
 @pytest.mark.asyncio
@@ -421,26 +434,79 @@ async def test_raw_sql_writer_uses_parameter_binding_payload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_openai_provider_apply_is_blocked_without_api_call() -> None:
+async def test_openai_provider_apply_uses_fake_provider_and_writer() -> None:
     gateway = FakeEmbeddingGateway([_row("chunk-1")])
     writer = FakeEmbeddingWriter()
 
     summary = await embed_rag_chunks(
         gateway=gateway,
-        provider=OpenAIEmbeddingProvider(),
+        provider=FakeOpenAIEmbeddingProvider(dimension=3),
         provider_name="openai",
         model_name="text-embedding-3-small",
-        dimension=1536,
+        dimension=3,
         batch_size=64,
         writer=writer,
         apply=True,
+    )
+
+    assert summary.total_candidate_chunks == 1
+    assert summary.embedding_writes == 1
+    assert summary.db_write_performed is True
+    assert writer.calls[0]["provider"] == "openai"
+    assert writer.calls[0]["model"] == "text-embedding-3-small"
+
+
+@pytest.mark.asyncio
+async def test_production_mock_apply_is_blocked() -> None:
+    gateway = FakeEmbeddingGateway([_row("chunk-1")])
+    writer = FakeEmbeddingWriter()
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+        writer=writer,
+        apply=True,
+        is_production=True,
     )
 
     assert summary.total_candidate_chunks == 0
     assert summary.embedding_writes == 0
     assert summary.db_write_performed is False
     assert writer.calls == []
-    assert summary.warnings == ["OpenAI embedding apply is disabled in this stage"]
+    assert summary.warnings == ["Mock embedding apply is disabled in production"]
+
+
+@pytest.mark.asyncio
+async def test_mock_row_is_stale_for_openai_provider() -> None:
+    gateway = FakeEmbeddingGateway(
+        [
+            _row(
+                "chunk-1",
+                embedding_is_null=False,
+                embedding_provider="mock",
+                embedding_model="mock-model",
+                embedding_dimension=8,
+                embedding_content_hash="hash-1",
+            )
+        ]
+    )
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=FakeOpenAIEmbeddingProvider(dimension=3),
+        provider_name="openai",
+        model_name="text-embedding-3-small",
+        dimension=3,
+        batch_size=64,
+    )
+
+    assert summary.planned_embedding_writes == 1
+    assert summary.stale_embeddings == 1
+    assert summary.embedded_chunks == 1
 
 
 def test_provider_override_mock_enables_embedding_without_env() -> None:

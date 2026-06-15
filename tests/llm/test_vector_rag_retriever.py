@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ai_runtime.llm.rag.embeddings import MockEmbeddingProvider, OpenAIEmbeddingProvider
-from ai_runtime.llm.rag.tracing import build_vector_rag_trace_metadata
+from ai_runtime.llm.rag.tracing import build_embedding_rag_trace_metadata, build_vector_rag_trace_metadata
 from ai_runtime.llm.rag.vector_retriever import VectorRagRetriever, _vector_to_pgvector_literal
 
 
@@ -39,14 +39,17 @@ async def test_vector_retriever_uses_pgvector_cosine_sql_and_binding() -> None:
     assert "d.is_active = true" in sql
     assert "c.embedding IS NOT NULL" in sql
     assert "c.embedding_content_hash = c.content_hash" in sql
-    assert "UPPER(d.disease_code) = $2" in sql
-    assert "d.source_key = $3" in sql
-    assert "LIMIT $4" in sql
+    assert "c.embedding_provider = $2" in sql
+    assert "c.embedding_model = $3" in sql
+    assert "c.embedding_dimension = $4" in sql
+    assert "UPPER(d.disease_code) = $5" in sql
+    assert "d.source_key = $6" in sql
+    assert "LIMIT $7" in sql
     assert connection.values is not None
     assert isinstance(connection.values[0], str)
     assert connection.values[0].startswith("[")
     assert connection.values[0].endswith("]")
-    assert connection.values[1:] == ["HTN", "hypertension", 3]
+    assert connection.values[1:] == ["mock", "mock-model", 8, "HTN", "hypertension", 3]
 
 
 @pytest.mark.asyncio
@@ -98,20 +101,26 @@ async def test_vector_retriever_filters_issue_keys_from_metadata_without_extra_d
 
 
 @pytest.mark.asyncio
-async def test_vector_retriever_blocks_openai_provider_without_api_call() -> None:
+async def test_vector_retriever_supports_openai_provider_with_injected_fake_client() -> None:
     connection = FakeVectorConnection([_row("chunk-1")])
     retriever = VectorRagRetriever(
-        embedding_provider=OpenAIEmbeddingProvider(model_name="text-embedding-3-small", dimension=1536),
+        embedding_provider=OpenAIEmbeddingProvider(
+            model_name="text-embedding-3-small",
+            dimension=3,
+            client=FakeOpenAIEmbeddingClient([[0.1, 0.2, 0.3]]),
+        ),
         connection=connection,
     )
 
-    result = await retriever.retrieve(query="외부 API를 호출하면 안 됩니다.", top_k=2)
+    result = await retriever.retrieve(query="fake client만 사용합니다.", top_k=2)
 
-    assert result.documents == []
-    assert result.fallback_reason == "openai_embedding_disabled"
-    assert connection.query is None
+    assert result.documents
+    assert result.fallback_reason is None
+    assert connection.query is not None
+    assert connection.values is not None
+    assert connection.values[1:4] == ["openai", "text-embedding-3-small", 3]
     assert result.trace_metadata["embedding_provider"] == "openai"
-    assert result.trace_metadata["fallback_used"] is True
+    assert result.trace_metadata["fallback_used"] is False
 
 
 @pytest.mark.asyncio
@@ -125,6 +134,19 @@ async def test_vector_retriever_returns_fallback_when_embedding_disabled() -> No
     assert result.fallback_reason == "embedding_disabled"
     assert connection.query is None
     assert result.trace_metadata["embedding_search"] is True
+
+
+@pytest.mark.asyncio
+async def test_vector_retriever_returns_fallback_when_embedding_provider_fails() -> None:
+    connection = FakeVectorConnection([_row("chunk-1")])
+    retriever = VectorRagRetriever(embedding_provider=FailingEmbeddingProvider(), connection=connection)
+
+    result = await retriever.retrieve(query="혈압", top_k=2)
+
+    assert result.documents == []
+    assert result.fallback_reason == "embedding_query_failed:RuntimeError"
+    assert connection.query is None
+    assert result.trace_metadata["embedding_provider"] == "openai"
 
 
 def test_vector_literal_uses_pgvector_format() -> None:
@@ -167,6 +189,29 @@ def test_vector_trace_metadata_does_not_include_chunk_content() -> None:
     assert "content" not in metadata["retrieved_sources"][0]
 
 
+def test_embedding_trace_metadata_does_not_include_content_vector_or_api_key() -> None:
+    metadata = build_embedding_rag_trace_metadata(
+        provider="openai",
+        model="text-embedding-3-small",
+        dimension=1536,
+        batch_size=64,
+        chunk_count=24,
+        failed_count=0,
+        estimated_char_count=1234,
+        apply=True,
+        latency_ms=10.5,
+        fallback_reason=None,
+    )
+
+    serialized = str(metadata)
+    assert "sk-" not in serialized
+    assert "embedding_vector" not in metadata
+    assert "content" not in metadata
+    assert metadata["embedding_vector_logged"] is False
+    assert metadata["chunk_content_logged"] is False
+    assert metadata["provider"] == "openai"
+
+
 def _row(chunk_key: str, *, score: float = 0.82, issue_keys: list[str] | None = None) -> dict:
     return {
         "chunk_key": chunk_key,
@@ -190,3 +235,26 @@ def _row(chunk_key: str, *, score: float = 0.82, issue_keys: list[str] | None = 
         "document_url": "https://example.test/htn",
         "score": score,
     }
+
+
+class FakeOpenAIEmbeddingClient:
+    def __init__(self, embeddings: list[list[float]]) -> None:
+        self._embeddings = embeddings
+        self.embeddings = self
+        self.calls: list[dict] = []
+
+    def create(self, *, model: str, input: list[str]) -> dict:
+        self.calls.append({"model": model, "input": input})
+        return {"data": [{"index": index, "embedding": embedding} for index, embedding in enumerate(self._embeddings)]}
+
+
+class FailingEmbeddingProvider:
+    provider_name = "openai"
+    model_name = "text-embedding-3-small"
+    dimension = 1536
+
+    def embed_text(self, text: str) -> list[float]:
+        raise RuntimeError("embedding unavailable")
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        raise RuntimeError("embedding unavailable")

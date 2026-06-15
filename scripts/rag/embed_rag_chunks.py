@@ -57,6 +57,7 @@ class RagChunkEmbeddingDryRunSummary:
     sample_chunk_keys: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     db_write_performed: bool = False
+    estimated_char_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -178,6 +179,7 @@ async def embed_rag_chunks(
     only_source_key: str | None = None,
     only_document_key: str | None = None,
     fail_fast: bool = False,
+    is_production: bool = False,
 ) -> RagChunkEmbeddingDryRunSummary:
     normalized_batch_size = max(1, batch_size)
     summary = RagChunkEmbeddingDryRunSummary(
@@ -190,8 +192,10 @@ async def embed_rag_chunks(
     if provider is None:
         summary.warnings.append("embedding disabled")
         return summary
-    if apply and provider.provider_name != "mock":
-        summary.warnings.append("OpenAI embedding apply is disabled in this stage")
+    if apply and is_production and provider.provider_name == "mock":
+        summary.warnings.append("Mock embedding apply is disabled in production")
+        if fail_fast:
+            raise ValueError(summary.warnings[-1])
         return summary
     if apply and writer is None:
         summary.warnings.append("embedding apply requested but no writer was provided")
@@ -205,6 +209,7 @@ async def embed_rag_chunks(
         only_document_key=only_document_key,
     )
     summary.total_candidate_chunks = len(candidates)
+    summary.estimated_char_count = sum(len(candidate.content) for candidate in candidates)
     summary.sample_chunk_keys = [candidate.chunk_key for candidate in candidates[:5]]
     targets = _select_embedding_targets(
         candidates,
@@ -282,6 +287,7 @@ def build_embedding_provider_from_options(
         RAG_EMBEDDING_PROVIDER=provider_name,
         RAG_EMBEDDING_MODEL=model_override or config.RAG_EMBEDDING_MODEL,
         RAG_EMBEDDING_DIMENSION=dimension_override or config.RAG_EMBEDDING_DIMENSION,
+        OPENAI_API_KEY=config.OPENAI_API_KEY,
     )
     provider = get_embedding_provider(settings)
     if provider is None:
@@ -385,6 +391,7 @@ def _print_summary(summary: RagChunkEmbeddingDryRunSummary, *, as_json: bool) ->
     print(f"- forced_embeddings: {summary.forced_embeddings}")
     print(f"- failed_embedding_writes: {summary.failed_embedding_writes}")
     print(f"- sample_chunk_keys: {summary.sample_chunk_keys}")
+    print(f"- estimated_char_count: {summary.estimated_char_count}")
     print(f"- db_write_performed: {summary.db_write_performed}")
     if summary.warnings:
         print("- warnings:")
@@ -399,17 +406,6 @@ async def _run_cli(args: argparse.Namespace) -> RagChunkEmbeddingDryRunSummary:
         dimension_override=args.dimension,
     )
     batch_size = args.batch_size or config.RAG_EMBEDDING_BATCH_SIZE
-    if args.apply and provider_name != "mock":
-        return await embed_rag_chunks(
-            gateway=OrmRagChunkEmbeddingGateway(),
-            provider=provider,
-            provider_name=provider_name,
-            model_name=model_name,
-            dimension=dimension,
-            batch_size=batch_size,
-            apply=True,
-            fail_fast=args.fail_fast,
-        )
     if provider is None:
         return await embed_rag_chunks(
             gateway=OrmRagChunkEmbeddingGateway(),
@@ -418,6 +414,7 @@ async def _run_cli(args: argparse.Namespace) -> RagChunkEmbeddingDryRunSummary:
             model_name=model_name,
             dimension=dimension,
             batch_size=batch_size,
+            is_production=config.is_production,
         )
 
     await Tortoise.init(config=TORTOISE_ORM)
@@ -439,6 +436,7 @@ async def _run_cli(args: argparse.Namespace) -> RagChunkEmbeddingDryRunSummary:
                     only_source_key=args.only_source_key,
                     only_document_key=args.only_document_key,
                     fail_fast=args.fail_fast,
+                    is_production=config.is_production,
                 )
         return await embed_rag_chunks(
             gateway=OrmRagChunkEmbeddingGateway(),
@@ -453,14 +451,15 @@ async def _run_cli(args: argparse.Namespace) -> RagChunkEmbeddingDryRunSummary:
             only_source_key=args.only_source_key,
             only_document_key=args.only_document_key,
             fail_fast=args.fail_fast,
+            is_production=config.is_production,
         )
     finally:
         await Tortoise.close_connections()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Dry-run embedding generation for active RAG chunks.")
-    parser.add_argument("--apply", action="store_true", help="Write mock embeddings to rag_chunks. Default is dry-run.")
+    parser = argparse.ArgumentParser(description="Dry-run or apply embedding generation for active RAG chunks.")
+    parser.add_argument("--apply", action="store_true", help="Write embeddings to rag_chunks. Default is dry-run.")
     parser.add_argument("--force", action="store_true", help="Regenerate embeddings even if current metadata matches.")
     parser.add_argument(
         "--skip-existing",
