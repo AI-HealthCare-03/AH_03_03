@@ -12,21 +12,34 @@ import {
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
+import {
+  UtensilsCrossed,
+  SportShoe,
+  Bed,
+  Pill,
+  GlassWater,
+  Droplet,
+  HeartPulse,
+  ListTodo,
+  Leaf,
+  Gauge,
+} from "lucide-react";
+
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const categoryIcon: Record<string, string> = {
-  DIET: "🥗",
-  EXERCISE: "🚶",
-  SLEEP: "🌙",
-  MEDICATION: "💊",
-  WATER: "💧",
-  BLOOD_SUGAR: "🩸",
-  BLOOD_GLUCOSE: "🩸",
-  BLOOD_PRESSURE: "🩺",
-  HABIT: "✅",
-  COMMON: "🌿",
-  WEIGHT: "⚖️",
+const categoryIcon: Record<string, React.ReactNode> = {
+  DIET: <UtensilsCrossed size={40} />,
+  EXERCISE: <SportShoe size={40} />,
+  SLEEP: <Bed size={40} />,
+  MEDICATION: <Pill size={40} />,
+  WATER: <GlassWater size={40} />,
+  BLOOD_SUGAR: <Droplet size={40} />,
+  BLOOD_GLUCOSE: <Droplet size={40} />,
+  BLOOD_PRESSURE: <HeartPulse size={40} />,
+  HABIT: <ListTodo size={40} />,
+  COMMON: <Leaf size={40} />,
+  WEIGHT: <Gauge size={40} />,
 };
 
 const categoryLabel: Record<string, string> = {
@@ -606,7 +619,11 @@ export default function ChallengeDetailPage() {
         <div className="detail-hero">
           <span className="eyebrow">{getDisplayCategory(challenge)}</span>
           <h1>{String(challenge?.title ?? "챌린지")}</h1>
-          <div className="challenge-icon-large" aria-label={`${category} challenge icon`}>
+          <div
+            className="challenge-icon-large"
+            aria-label={`${category} challenge icon`}
+            style={challenge?.id && challengeImageMap[Number(challenge.id)] ? {} : { background: "none", border: "none" }}
+          >
             {category === "EXERCISE" && challenge?.id ? (
               <img
                 src={challengeImageMap[Number(challenge.id)] ?? ""}
