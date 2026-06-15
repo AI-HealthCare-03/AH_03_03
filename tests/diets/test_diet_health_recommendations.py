@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
+
+from app.apis.v1 import diet_routers
+from app.apis.v1.dependencies import get_request_user
+from app.main import app
+from app.models.analysis import AnalysisType, RiskLevel
+from app.services import diet_recommendations as service
+
+
+def _challenge(challenge_id: int, title: str) -> SimpleNamespace:
+    return SimpleNamespace(id=challenge_id, title=title)
+
+
+ACTIVE_CHALLENGES = [
+    _challenge(1, "염분 빼볼까염 챌린지"),
+    _challenge(2, "식사일지 작성 챌린지"),
+    _challenge(3, "추가설탕 안녕이당 챌린지"),
+    _challenge(4, "탄수화물 체인지 챌린지"),
+    _challenge(5, "밥최고NO 채고밥YES 챌린지"),
+    _challenge(6, "기름기 쫙빼기 챌린지"),
+    _challenge(7, "건강식탁 챌린지"),
+    _challenge(8, "Goodbye 야식 챌린지"),
+    _challenge(9, "Goodbye 폭식 챌린지"),
+    _challenge(10, "2020 식사 챌린지"),
+    _challenge(11, "철분 반찬 추가 챌린지"),
+    _challenge(12, "식이섬유 먹어유 챌린지"),
+    _challenge(13, "비타민C 함께 먹기 챌린지"),
+    _challenge(14, "철분 흡수 방해 식품 줄이기 챌린지"),
+    _challenge(15, "30일, 금주 챌린지"),
+    _challenge(16, "30일, 하루 두 잔 절주 챌린지"),
+    _challenge(17, "30일 폭음 피하기 챌린지"),
+    _challenge(18, "일정한 삼시세끼 챌린지"),
+]
+
+
+def _diet(
+    nutrition: dict[str, Any],
+    *,
+    food_name: str = "테스트 식단",
+    description: str | None = None,
+    meal_type: str | None = "LUNCH",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=100,
+        user_id=10,
+        meal_type=meal_type,
+        description=description,
+        memo=None,
+        detected_foods=[
+            {
+                "name": food_name,
+                "original_name": food_name,
+                "query_name": food_name,
+                "match_metadata": {
+                    "provider": "mfds",
+                    "status": "matched",
+                    "nutrition": {
+                        **nutrition,
+                        "basis_label": nutrition.get("basis_label", "100g 기준"),
+                    },
+                },
+            }
+        ],
+    )
+
+
+def _analysis(analysis_type: AnalysisType, risk_level: RiskLevel = RiskLevel.CAUTION) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=1,
+        analysis_type=analysis_type,
+        risk_level=risk_level,
+        analyzed_at=datetime(2026, 6, 15, tzinfo=UTC),
+    )
+
+
+def _build(
+    *,
+    nutrition: dict[str, Any],
+    analysis_types: list[AnalysisType],
+    food_name: str = "테스트 식단",
+    description: str | None = None,
+    meal_type: str | None = "LUNCH",
+    active_challenges: list[SimpleNamespace] | None = None,
+) -> dict[str, Any]:
+    return service.build_diet_health_recommendation_response(
+        diet_record=_diet(nutrition, food_name=food_name, description=description, meal_type=meal_type),
+        analysis_results=[_analysis(item) for item in analysis_types],
+        health_record=None,
+        active_challenges=active_challenges or ACTIVE_CHALLENGES,
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "nutrition", "analysis_types", "expected_issue", "expected_challenge"),
+    [
+        (
+            "고혈압 + 나트륨 높은 식단",
+            {"sodium_mg": "920 mg", "calories_kcal": 350},
+            [AnalysisType.HYPERTENSION],
+            "sodium_high",
+            "염분 빼볼까염 챌린지",
+        ),
+        (
+            "당뇨 + 탄수화물 높은 식단",
+            {"carbohydrate_g": "78 g", "sugar_g": 18},
+            [AnalysisType.DIABETES],
+            "carbohydrate_high",
+            "탄수화물 체인지 챌린지",
+        ),
+        (
+            "이상지질혈증 + 지방 높은 식단",
+            {"fat_g": 28, "fiber_g": 1.2},
+            [AnalysisType.DYSLIPIDEMIA],
+            "fat_high",
+            "기름기 쫙빼기 챌린지",
+        ),
+        (
+            "비만 + 고열량 식단",
+            {"kcal": "650 kcal", "fat": 18},
+            [AnalysisType.OBESITY],
+            "calorie_high",
+            "Goodbye 야식 챌린지",
+        ),
+        (
+            "빈혈 + 철분/단백질 보완 필요",
+            {"protein_g": 6, "iron_mg": 0.8},
+            [AnalysisType.ANEMIA],
+            "iron_support",
+            "철분 반찬 추가 챌린지",
+        ),
+        (
+            "지방간 + 음주/당류/지방 관리",
+            {"sugar": 20, "fat": 24},
+            [AnalysisType.FATTY_LIVER],
+            "alcohol_liver_support",
+            "30일, 금주 챌린지",
+        ),
+        (
+            "신장질환 의심",
+            {"protein_g": 35, "potassium_mg": 900},
+            [AnalysisType.CHRONIC_KIDNEY_DISEASE],
+            "kidney_caution",
+            "식사일지 작성 챌린지",
+        ),
+        (
+            "정상군 + 균형 유지",
+            {"calories_kcal": 350, "protein_g": 18, "fiber_g": 4, "sodium_mg": 250},
+            [],
+            "balanced_support",
+            "건강식탁 챌린지",
+        ),
+        (
+            "HTN+DM 복합질환",
+            {"sodium_mg": 880, "carbohydrate": 82},
+            [AnalysisType.HYPERTENSION, AnalysisType.DIABETES],
+            "sodium_high",
+            "염분 빼볼까염 챌린지",
+        ),
+        (
+            "OBE+DL 복합질환",
+            {"calories": 720, "fat_g": 31},
+            [AnalysisType.OBESITY, AnalysisType.DYSLIPIDEMIA],
+            "calorie_high",
+            "기름기 쫙빼기 챌린지",
+        ),
+    ],
+)
+def test_diet_health_recommendation_cases(
+    name: str,
+    nutrition: dict[str, Any],
+    analysis_types: list[AnalysisType],
+    expected_issue: str,
+    expected_challenge: str,
+) -> None:
+    description = "맥주와 안주" if "지방간" in name else None
+    result = _build(nutrition=nutrition, analysis_types=analysis_types, description=description)
+    issue_keys = [item["issue_key"] for item in result["nutrition_findings"]]
+    challenge_titles = [item["title"] for item in result["recommended_challenges"]]
+
+    assert expected_issue in issue_keys
+    assert expected_challenge in challenge_titles
+    assert result["safety_notice"] == service.SAFETY_NOTICE
+    assert len(result["recommended_challenges"]) <= 3
+    assert "진단이나 처방이 아닌" in result["safety_notice"]
+    serialized = str(result)
+    assert "나트륨 과다입니다" not in serialized
+    assert "단백질이 부족합니다" not in serialized
+    assert "먹으면 안 됩니다" not in serialized
+    if expected_issue == "kidney_caution":
+        assert "의료진 상담" in serialized
+        assert "단백질 제한" not in serialized
+        assert "칼륨 제한" not in serialized
+
+
+def test_diet_health_recommendation_keeps_only_active_title_matches() -> None:
+    result = _build(
+        nutrition={"sodium_mg": 900},
+        analysis_types=[AnalysisType.HYPERTENSION],
+        active_challenges=[_challenge(2, "식사일지 작성 챌린지")],
+    )
+
+    challenge_titles = [item["title"] for item in result["recommended_challenges"]]
+    assert challenge_titles == ["식사일지 작성 챌린지"]
+    assert "염분 빼볼까염 챌린지" not in challenge_titles
+
+
+@pytest.mark.asyncio
+async def test_diet_health_recommendation_forbids_other_user_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_get_diet_record(diet_record_id: int) -> SimpleNamespace:
+        assert diet_record_id == 100
+        return SimpleNamespace(id=100, user_id=99)
+
+    monkeypatch.setattr(service.diet_service, "get_diet_record", fake_get_diet_record)
+
+    with pytest.raises(HTTPException) as exc:
+        await service.get_diet_health_recommendations(user_id=10, diet_record_id=100)
+
+    assert exc.value.status_code == 403
+
+
+def test_diet_health_recommendation_api_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, int] = {}
+
+    async def fake_current_user() -> SimpleNamespace:
+        return SimpleNamespace(id=10)
+
+    async def fake_get_recommendations(user_id: int, diet_record_id: int) -> dict[str, Any]:
+        captured["user_id"] = user_id
+        captured["diet_record_id"] = diet_record_id
+        return {
+            "diet_record_id": diet_record_id,
+            "nutrition_findings": [
+                {
+                    "type": "excess_candidate",
+                    "issue_key": "sodium_high",
+                    "nutrient": "sodium_mg",
+                    "label": "나트륨 주의",
+                    "message": "현재 식단 후보에서 나트륨이 높은 음식이 포함된 것으로 보여 주의가 필요합니다.",
+                    "basis": "100g 기준",
+                }
+            ],
+            "disease_context": [],
+            "recommended_foods": ["채소 반찬"],
+            "caution_foods": ["짠 소스"],
+            "recommended_challenges": [
+                {"challenge_id": 1, "title": "염분 빼볼까염 챌린지", "reason": "나트륨 관리와 연결됩니다."}
+            ],
+            "safety_notice": service.SAFETY_NOTICE,
+        }
+
+    app.dependency_overrides[get_request_user] = fake_current_user
+    monkeypatch.setattr(
+        diet_routers.diet_recommendation_service, "get_diet_health_recommendations", fake_get_recommendations
+    )
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/diets/123/recommendations")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert captured == {"user_id": 10, "diet_record_id": 123}
+    body = response.json()
+    assert body["diet_record_id"] == 123
+    assert body["nutrition_findings"][0]["issue_key"] == "sodium_high"
+    assert body["recommended_challenges"][0]["title"] == "염분 빼볼까염 챌린지"
+    assert body["safety_notice"] == service.SAFETY_NOTICE
