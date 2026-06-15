@@ -113,14 +113,15 @@ class FakeOpenAIEmbeddingProvider:
 
 
 class FakeConnection:
-    def __init__(self) -> None:
+    def __init__(self, rows: list[dict[str, object]] | None = None) -> None:
         self.query: str | None = None
         self.values: list[object] | None = None
+        self.rows = rows if rows is not None else [{"chunk_key": "chunk-1"}]
 
     async def execute_query(self, query: str, values: list[object]) -> tuple[int, list[dict[str, object]]]:
         self.query = query
         self.values = values
-        return 1, []
+        return 0, self.rows
 
 
 @pytest.mark.asyncio
@@ -429,8 +430,74 @@ async def test_raw_sql_writer_uses_parameter_binding_payload() -> None:
     assert affected == 1
     assert connection.query is not None
     assert "$1::vector" in connection.query
+    assert "RETURNING chunk_key" in connection.query
     assert "0.1" not in connection.query
     assert connection.values == ["[0.1,-0.2]", "mock", "mock-model", 2, "chunk-1"]
+
+
+@pytest.mark.asyncio
+async def test_raw_sql_writer_returns_zero_when_returning_has_no_rows() -> None:
+    connection = FakeConnection(rows=[])
+    writer = OrmEmbeddingWriteGateway(connection)
+
+    affected = await writer.write_embedding(
+        chunk_key="missing-chunk",
+        vector=[0.1, -0.2],
+        provider="mock",
+        model="mock-model",
+        dimension=2,
+    )
+
+    assert affected == 0
+    assert connection.query is not None
+    assert "RETURNING chunk_key" in connection.query
+    assert connection.values == ["[0.1,-0.2]", "mock", "mock-model", 2, "missing-chunk"]
+
+
+@pytest.mark.asyncio
+async def test_apply_with_raw_sql_writer_success_counts_returning_row() -> None:
+    gateway = FakeEmbeddingGateway([_row("chunk-1")])
+    writer = OrmEmbeddingWriteGateway(FakeConnection(rows=[{"chunk_key": "chunk-1"}]))
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+        writer=writer,
+        apply=True,
+    )
+
+    assert summary.planned_embedding_writes == 1
+    assert summary.embedding_writes == 1
+    assert summary.failed_embedding_writes == 0
+    assert summary.db_write_performed is True
+    assert summary.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_apply_with_raw_sql_writer_empty_returning_row_counts_failure() -> None:
+    gateway = FakeEmbeddingGateway([_row("chunk-1")])
+    writer = OrmEmbeddingWriteGateway(FakeConnection(rows=[]))
+
+    summary = await embed_rag_chunks(
+        gateway=gateway,
+        provider=MockEmbeddingProvider(model_name="mock-model", dimension=8),
+        provider_name="mock",
+        model_name="mock-model",
+        dimension=8,
+        batch_size=64,
+        writer=writer,
+        apply=True,
+    )
+
+    assert summary.planned_embedding_writes == 1
+    assert summary.embedding_writes == 0
+    assert summary.failed_embedding_writes == 1
+    assert summary.db_write_performed is False
+    assert summary.warnings == ["chunk-1: embedding write affected 0 rows"]
 
 
 @pytest.mark.asyncio

@@ -140,7 +140,7 @@ class OrmEmbeddingWriteGateway:
         dimension: int,
     ) -> int:
         vector_payload = _vector_to_pgvector_literal(vector)
-        affected_rows, _ = await self.connection.execute_query(
+        _, rows = await self.connection.execute_query(
             """
             UPDATE rag_chunks
             SET
@@ -151,10 +151,11 @@ class OrmEmbeddingWriteGateway:
                 embedding_content_hash = content_hash,
                 embedded_at = NOW()
             WHERE chunk_key = $5
+            RETURNING chunk_key
             """,
             [vector_payload, provider, model, dimension, chunk_key],
         )
-        return int(affected_rows or 0)
+        return len(rows or [])
 
 
 async def dry_run_embed_rag_chunks(
