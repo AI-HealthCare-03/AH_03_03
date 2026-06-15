@@ -612,6 +612,47 @@ def test_diet_rag_rewrite_success_with_mocked_llm(monkeypatch: pytest.MonkeyPatc
     assert result["rag_comment"]["safety_notice"] == service.SAFETY_NOTICE
 
 
+@pytest.mark.asyncio
+async def test_diet_async_rewrite_real_llm_path_is_thread_offloaded(monkeypatch: pytest.MonkeyPatch) -> None:
+    offloaded: list[str] = []
+
+    async def fake_to_thread(func, /, *args: Any, **kwargs: Any):
+        offloaded.append(func.__name__)
+        return func(*args, **kwargs)
+
+    def fake_call_llm_json(*args: Any, **kwargs: Any) -> str:
+        return json.dumps(
+            {
+                "summary": "실제 섭취량이 확정되지 않아 참고용입니다. 혈압 관리 관점에서 저염 식습관을 살펴보세요.",
+                "disease_comments": [
+                    {
+                        "disease_code": "HTN",
+                        "label": "혈압 관리",
+                        "comment": "나트륨이 높은 후보로 보여 국물과 짠 소스는 참고용으로 주의가 필요합니다.",
+                        "basis": "서비스 내 참고 문서 기반",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(service.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr("ai_runtime.llm.diet_recommendation_rewriter.call_llm_json", fake_call_llm_json)
+
+    result = await service.build_diet_health_recommendation_response_async(
+        diet_record=_diet({"sodium_mg": 920}),
+        analysis_results=[_analysis(AnalysisType.HYPERTENSION)],
+        health_record=None,
+        active_challenges=ACTIVE_CHALLENGES,
+    )
+
+    assert "rewrite_diet_rag_comment" in offloaded
+    assert result["rag_comment"]["rewrite_used"] is True
+    assert "저염 식습관" in result["rag_comment"]["summary"]
+
+
 def test_diet_rag_rewrite_llm_failure_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", True)
     monkeypatch.setattr(service.config, "OPENAI_API_KEY", "test-key")

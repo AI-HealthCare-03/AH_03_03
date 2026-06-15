@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai_runtime.llm.graph import run_chatbot_graph
+from ai_runtime.llm.graph import run_chatbot_graph, run_chatbot_graph_async
 from ai_runtime.llm.graph.builder import build_health_chatbot_graph
 from ai_runtime.llm.graph.nodes import sanitize_for_trace, trace_graph_node
 from ai_runtime.llm.prompt_templates import FALLBACK_SAFE_RESPONSE_PROMPT_VERSION, RAG_GROUNDED_ANSWER_PROMPT_VERSION
@@ -313,7 +313,8 @@ def test_langgraph_rag_node_uses_retriever_interface(monkeypatch) -> None:
     assert result.trace_metadata["retrieval"]["documents"][0]["score"] == 0.87
     assert result.trace_metadata["grounding"]["grounding_status"] == "weak_reference"
     assert result.trace_metadata["grounding"]["source_trust_levels"] == ["unknown"]
-    assert "근거 수준이 제한적" in result.answer
+    assert "근거 수준이 제한적" not in result.answer
+    assert "건강관리 참고용" in result.caution_message
 
 
 def test_main_chatbot_rag_strategy_default_is_keyword_only() -> None:
@@ -615,6 +616,75 @@ def test_main_chatbot_rag_llm_json_code_fence_is_not_exposed(monkeypatch) -> Non
         assert term not in result.answer
 
 
+@pytest.mark.asyncio
+async def test_langgraph_real_llm_generation_is_thread_offloaded(monkeypatch) -> None:
+    offloaded: list[str] = []
+
+    async def fake_to_thread(func, /, *args, **kwargs):
+        offloaded.append(func.__name__)
+        return func(*args, **kwargs)
+
+    class KeywordRetriever:
+        def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):
+            return RagRetrievalResult(
+                documents=[
+                    RetrievedDocument(
+                        title="혈당 관리 문서",
+                        content="혈당 관리는 단 음료와 정제 탄수화물을 줄이는 생활습관을 참고할 수 있습니다.",
+                        source_name="질병관리청 국가건강정보포털",
+                        url="https://health.kdca.go.kr/diabetes",
+                        metadata={
+                            "id": "diabetes",
+                            "status": "reviewed",
+                            "source_type": "official_guideline",
+                            "source_trust_level": "official_guideline",
+                        },
+                    )
+                ],
+                reference_sources=[
+                    {
+                        "id": "diabetes",
+                        "title": "혈당 관리 문서",
+                        "source_org": "질병관리청 국가건강정보포털",
+                        "source_url": "https://health.kdca.go.kr/diabetes",
+                        "source_type": "official_guideline",
+                        "source_trust_level": "official_guideline",
+                        "status": "reviewed",
+                    }
+                ],
+                reference_summary="참고 정보: 혈당 관리 문서를 함께 확인했습니다.",
+                strategy="fake_keyword",
+                trace_metadata={
+                    "strategy": "fake_keyword",
+                    "document_count": 1,
+                    "document_ids": ["diabetes"],
+                    "source_types": ["질병관리청 국가건강정보포털"],
+                    "source_trust_levels": ["official_guideline"],
+                    "documents": [],
+                    "fallback": False,
+                    "fallback_reason": None,
+                },
+            )
+
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.config.RAG_ENABLED", True)
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.get_default_rag_retriever", lambda: KeywordRetriever())
+    monkeypatch.setattr("ai_runtime.llm.graph.nodes.asyncio.to_thread", fake_to_thread)
+    monkeypatch.setattr(
+        "ai_runtime.llm.rag_generator.call_llm_json",
+        lambda *args, **kwargs: '{"answer":"단 음료를 줄이고 식후 가벼운 활동을 참고해 보세요."}',
+    )
+
+    result = await run_chatbot_graph_async(
+        user_message="혈당 관리는 어떻게 하나요?",
+        context_type="MAIN",
+        use_real_llm=True,
+    )
+
+    assert "generate_main_health_rag_response" in offloaded
+    assert result.source == "rag_llm"
+    assert "단 음료" in result.answer
+
+
 def test_langgraph_rag_no_result_falls_back_safely(monkeypatch) -> None:
     class EmptyRetriever:
         def retrieve(self, *, query, disease_type=None, top_k=3, include_safety_disclaimer=False):
@@ -654,7 +724,8 @@ def test_langgraph_rag_no_result_falls_back_safely(monkeypatch) -> None:
     assert result.trace_metadata["retrieval"]["fallback"] is True
     assert result.trace_metadata["grounding"]["grounding_status"] == "no_reference"
     assert result.trace_metadata["grounding"]["reference_source_ids"] == []
-    assert "근거 문서를 찾지 못했습니다" in result.answer
+    assert "현재 준비된 참고자료만으로는 이 주제에 대해 구체적으로 안내하기 어렵습니다" in result.answer
+    assert "근거 문서를 찾지 못했습니다" not in result.answer
 
 
 def test_langgraph_node_exception_records_fallback_state(monkeypatch) -> None:
@@ -740,7 +811,7 @@ def test_langgraph_rag_low_trust_source_uses_conservative_grounding_copy(monkeyp
     )
 
     assert result.source == "rag_llm"
-    assert "근거 수준이 제한적" in result.answer
+    assert "근거 수준이 제한적" not in result.answer
     assert result.trace_metadata["grounding"]["grounding_status"] == "weak_reference"
     assert result.trace_metadata["grounding"]["fallback_reason"] == "rag_weak_reference"
 

@@ -71,6 +71,33 @@ def test_rag_response_sanitizes_nested_answer_json() -> None:
     assert "```" not in answer
 
 
+def test_rag_response_removes_limited_evidence_prefix_from_llm_answer(monkeypatch) -> None:
+    monkeypatch.setattr(
+        rag_generator,
+        "call_llm_json",
+        lambda *args, **kwargs: """
+{"answer": "근거 수준이 제한적이므로 단정하지 않고 참고용으로 안내드립니다. 고혈압 관리에서는 국물과 짠 소스를 줄이는 방법부터 참고해 보세요."}
+""".strip(),
+    )
+
+    output = rag_generator.generate_main_health_rag_response(
+        user_message="고혈압 식단은 어떻게 보면 좋나요?",
+        retrieved_context="고혈압 식생활 관리는 나트륨 섭취를 줄이는 생활습관을 참고할 수 있습니다.",
+        context_sources=[
+            {
+                "title": "고혈압 식생활",
+                "source_org": "질병관리청 국가건강정보포털",
+                "source_url": "https://health.kdca.go.kr/hypertension",
+            }
+        ],
+        use_real_llm=True,
+    )
+
+    assert output.answer.startswith("고혈압 관리에서는")
+    assert "근거 수준이 제한적" not in output.answer
+    assert "건강관리 참고용" in output.caution_message
+
+
 def test_rag_generator_uses_json_llm_and_returns_public_answer(monkeypatch) -> None:
     captured = {}
 

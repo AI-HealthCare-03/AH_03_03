@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from time import perf_counter
 from typing import Any
 
@@ -16,7 +17,7 @@ from .nodes import _metadata_with_node, trace_graph_node
 from .state import HealthChatbotGraphState
 
 
-def build_analysis_explanation(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
+async def build_analysis_explanation(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     """Build safe analysis-result explanation without changing API contracts."""
     node_started_at = perf_counter()
     input_data, fallback_reason = _analysis_input_from_state(state)
@@ -28,11 +29,13 @@ def build_analysis_explanation(state: HealthChatbotGraphState) -> HealthChatbotG
         fallback_reason = fallback_reason or "analysis_result_missing"
     else:
         explanation = generate_analysis_explanation(input_data)
-        explanation = rewrite_analysis_explanation(
-            input_data=input_data,
-            explanation=explanation,
-            use_real_llm=bool(state.get("use_real_llm", False)),
-        )
+        if state.get("use_real_llm", False):
+            explanation = await asyncio.to_thread(
+                rewrite_analysis_explanation,
+                input_data=input_data,
+                explanation=explanation,
+                use_real_llm=True,
+            )
         if reference_contexts:
             explanation = explanation.model_copy(
                 update={

@@ -1,3 +1,4 @@
+import asyncio
 import re
 import time
 from collections.abc import Iterable
@@ -314,7 +315,7 @@ async def build_diet_health_recommendation_response_async(
         rag_disease_codes=rag_disease_codes,
         vector_retriever=vector_retriever,
     )
-    return _finalize_diet_health_recommendation_response(response=response, rag_comment=rag_comment)
+    return await _finalize_diet_health_recommendation_response_async(response=response, rag_comment=rag_comment)
 
 
 def _build_diet_health_recommendation_base(
@@ -366,6 +367,27 @@ def _finalize_diet_health_recommendation_response(
         recommendation_payload=response,
         use_real_llm=config.DIET_RECOMMENDATION_LLM_REWRITE_ENABLED and has_openai_config(config),
     )
+    return response
+
+
+async def _finalize_diet_health_recommendation_response_async(
+    *, response: dict[str, Any], rag_comment: dict[str, Any]
+) -> dict[str, Any]:
+    response["rag_comment"] = rag_comment
+    use_real_llm = config.DIET_RECOMMENDATION_LLM_REWRITE_ENABLED and has_openai_config(config)
+    if use_real_llm:
+        response["rag_comment"] = await asyncio.to_thread(
+            rewrite_diet_rag_comment,
+            rag_comment=rag_comment,
+            recommendation_payload=response,
+            use_real_llm=True,
+        )
+    else:
+        response["rag_comment"] = rewrite_diet_rag_comment(
+            rag_comment=rag_comment,
+            recommendation_payload=response,
+            use_real_llm=False,
+        )
     return response
 
 

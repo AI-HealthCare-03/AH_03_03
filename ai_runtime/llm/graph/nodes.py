@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -308,7 +309,7 @@ def _main_chatbot_vector_gate_enabled() -> bool:
     )
 
 
-def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
+async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     if state.get("safety_response"):
         final_answer = _with_caution(str(state["safety_response"]))
@@ -362,21 +363,39 @@ def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphSta
     if state.get("retrieved_docs"):
         retrieved_context = _retrieved_docs_to_context_text(state["retrieved_docs"])
         generation_started_at = perf_counter()
-        output = generate_main_health_rag_response(
-            user_message=state["user_message"],
-            retrieved_context=retrieved_context,
-            context_sources=state.get("reference_sources") or [],
-            use_real_llm=state.get("use_real_llm", False),
-        )
+        if state.get("use_real_llm", False):
+            output = await asyncio.to_thread(
+                generate_main_health_rag_response,
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=state.get("reference_sources") or [],
+                use_real_llm=True,
+            )
+        else:
+            output = generate_main_health_rag_response(
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=state.get("reference_sources") or [],
+                use_real_llm=False,
+            )
         elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)
     else:
         generation_started_at = perf_counter()
-        output = route_main_health_chatbot_response(
-            MainHealthChatbotInput(user_message=state["user_message"]),
-            use_llm_fallback=False,
-            use_llm_rewrite=state.get("use_real_llm", False),
-            use_real_llm=state.get("use_real_llm", False),
-        )
+        if state.get("use_real_llm", False):
+            output = await asyncio.to_thread(
+                route_main_health_chatbot_response,
+                MainHealthChatbotInput(user_message=state["user_message"]),
+                use_llm_fallback=False,
+                use_llm_rewrite=True,
+                use_real_llm=True,
+            )
+        else:
+            output = route_main_health_chatbot_response(
+                MainHealthChatbotInput(user_message=state["user_message"]),
+                use_llm_fallback=False,
+                use_llm_rewrite=False,
+                use_real_llm=False,
+            )
         elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)
 
     prompt_version = _prompt_version_for_output(output)
@@ -799,10 +818,12 @@ def _grounding_status(
 
 def _answer_with_grounding_guardrails(answer: str, grounding_metadata: dict[str, Any]) -> str:
     grounding_status = grounding_metadata["grounding_status"]
-    if grounding_status in {"no_reference", "summary_missing"} and "근거 문서를 찾지 못했습니다" not in answer:
-        return f"근거 문서를 찾지 못했습니다. 아래 내용은 일반적인 건강관리 참고 정보로만 확인해 주세요. {answer}"
-    if grounding_status == "weak_reference" and "근거 수준이 제한적" not in answer:
-        return f"근거 수준이 제한적이므로 단정하지 않고 참고용으로 안내드립니다. {answer}"
+    if grounding_status in {"no_reference", "summary_missing"} and "현재 준비된 참고자료만으로는" not in answer:
+        return (
+            "현재 준비된 참고자료만으로는 이 주제에 대해 구체적으로 안내하기 어렵습니다. "
+            "일반적인 건강정보는 참고용으로만 확인하고, 검사 결과나 치료 판단은 의료진과 상담해 주세요. "
+            f"{answer}"
+        )
     return answer
 
 

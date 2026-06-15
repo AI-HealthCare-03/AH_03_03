@@ -12,7 +12,7 @@ from ai_runtime.llm.rag_sources import is_allowed_rag_source
 from ai_runtime.llm.safety import check_medical_safety
 from ai_runtime.llm.schemas import MainHealthChatbotOutput, RagContextSource
 
-CAUTION_MESSAGE = "이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다."
+CAUTION_MESSAGE = "이 정보는 진단이 아니며 건강관리 참고용입니다. 정확한 진단과 치료는 의료진 상담이 필요합니다."
 RAG_SOURCE = "rag_llm"
 RAG_INTENT = "main_health_rag_guidance"
 RAG_RESPONSE_SCHEMA = {
@@ -36,6 +36,9 @@ _INTERNAL_RESPONSE_TERMS = (
     '"source":',
     '"is_safe":',
     '"caution_message":',
+)
+_LIMITED_EVIDENCE_PREFIX_RE = re.compile(
+    r"^\s*근거\s*수준이\s*제한적이므로\s*(?:단정하지\s*않고\s*)?참고용(?:으로)?(?:\s*안내드립니다|입니다)?[.。]?\s*",
 )
 
 
@@ -79,6 +82,7 @@ def generate_main_health_rag_response(
                 },
             )
             answer = extract_answer_from_rag_response(raw_answer)
+            answer = remove_limited_evidence_prefix(answer)
             if not is_public_rag_answer(answer):
                 raise ValueError("LLM RAG answer still includes internal response fields.")
         except Exception:
@@ -262,6 +266,10 @@ def _strip_markdown_code_fences(answer: str) -> str:
 
 def is_public_rag_answer(answer: str) -> bool:
     return bool(answer.strip()) and not any(term in answer for term in _INTERNAL_RESPONSE_TERMS)
+
+
+def remove_limited_evidence_prefix(answer: str) -> str:
+    return _LIMITED_EVIDENCE_PREFIX_RE.sub("", answer.strip()).strip()
 
 
 def ensure_caution_message(answer: str) -> str:

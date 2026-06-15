@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from datetime import datetime
@@ -158,7 +159,7 @@ async def get_analysis_result_detail(result_id: int) -> dict[str, Any] | None:
         "result": _analysis_result_response(result, snapshot),
         "factors": factors,
         "snapshot": snapshot,
-        "explanation": _analysis_explanation(result, factors),
+        "explanation": await _analysis_explanation_async(result, factors),
     }
 
 
@@ -235,7 +236,7 @@ async def run_analysis(
                 "model_name": result.model_name,
                 "model_version": result.model_version,
                 "guide_message": request.summary,
-                "explanation": _analysis_explanation(result, factors),
+                "explanation": await _analysis_explanation_async(result, factors),
                 "challenge_recommendation_ids": recommendation_ids,
                 "factor_count": len(factors),
                 **_risk_level_alias_fields(risk_level),
@@ -907,6 +908,10 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
             f"{disease_label} 관련 관심이 필요한 단계입니다. 건강정보를 꾸준히 기록하며 변화를 확인해 보세요.{notice}"
         )
     return f"{disease_label} 관련 관리 필요도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
+
+
+async def _analysis_explanation_async(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
+    return await asyncio.to_thread(_analysis_explanation, result, factors)
 
 
 def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
