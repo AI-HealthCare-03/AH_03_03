@@ -1416,7 +1416,7 @@ pre {
 .metric-summary-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  grid-template-columns: repeat(6, minmax(132px, 1fr));
 }
 
 .dashboard-summary-card,
