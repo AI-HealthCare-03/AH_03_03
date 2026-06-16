@@ -417,25 +417,7 @@ export default function DietResultPage() {
             </div>
           )}
         </div>
-      </Card>
-      {isManual ? (
-        <Card title="입력한 음식 목록">
-          <div className="card-list">
-            {detectedFoods.length === 0 && <div className="state-box">입력된 음식 목록이 없습니다.</div>}
-            {detectedFoods.map((food, index) => (
-              <div className="mini-card" key={`${String(food.name ?? "food")}-${index}`}>
-                <strong>{String(food.name ?? "음식")}</strong>
-                <span className="muted">
-                  {[food.quantity ? `수량: ${String(food.quantity)}` : "", food.memo ? `메모: ${String(food.memo)}` : ""]
-                    .filter(Boolean)
-                    .join(" · ") || "추가 정보 없음"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        <Card title="감지된 음식">
+        {!isManual && (
           <div className="card-list">
             {displayImageUrl && !detailImageFailed && (
               <div className="mini-card">
@@ -518,8 +500,8 @@ export default function DietResultPage() {
               </>
             )}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
       {!isManual && hasCandidateSection && (
         <Card title="음식 후보 확인">
           <div className="card-list">
