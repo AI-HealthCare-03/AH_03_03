@@ -10,7 +10,6 @@ import {
   getDashboardChallenges,
   getDashboardDiets,
   getDashboardHealth,
-  getDashboardMedications,
   getDashboardRiskTrend,
   getDashboardSummary,
   getDashboardTrends,
@@ -185,31 +184,6 @@ function makeValueSeries(
   };
 }
 
-function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
-  const grouped = new Map<string, { total: number; taken: number }>();
-  records.forEach((record) => {
-    const rawDate = String(record.scheduled_at ?? record.taken_at ?? record.created_at ?? "");
-    if (!rawDate) return;
-    const date = rawDate.slice(0, 10);
-    const current = grouped.get(date) ?? { total: 0, taken: 0 };
-    current.total += 1;
-    if (record.is_taken) current.taken += 1;
-    grouped.set(date, current);
-  });
-  return {
-    key: "복약 수행률",
-    label: "복약 수행률",
-    color: "var(--chart-overall)",
-    points: Array.from(grouped.entries())
-      .map(([date, value]) => ({
-        date,
-        label: formatDate(date),
-        value: value.total > 0 ? Math.round((value.taken / value.total) * 100) : 0,
-        displayValue: `${value.taken}/${value.total}회`,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date)),
-  };
-}
 
 function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
   return items
@@ -521,13 +495,7 @@ const analysisMetrics = [
     trendKeys: ["diet_score"],
     ready: true,
   },
-  {
-    key: "medication",
-    label: "복약 수행률",
-    description: "등록된 복약/영양제 기록을 기준으로 수행 상태를 확인합니다.",
-    trendKeys: ["medication"],
-    ready: true,
-  },
+
 ] as const;
 
 function formatDate(value: unknown): string {
@@ -592,7 +560,6 @@ export default function DashboardPage() {
   const [healthSection, setHealthSection] = useState<DashboardData>({});
   const [challengeSection, setChallengeSection] = useState<DashboardData>({});
   const [dietSection, setDietSection] = useState<DashboardData>({});
-  const [medicationSection, setMedicationSection] = useState<DashboardData>({});
   const [trends, setTrends] = useState<Record<string, Record<string, unknown>[]>>({});
   const [riskTrend, setRiskTrend] = useState<DashboardRiskTrend>({ period: "all", series: [] });
   const [todayRecommendations, setTodayRecommendations] = useState<TodayRecommendations>({ date: "", items: [] });
@@ -609,7 +576,6 @@ export default function DashboardPage() {
         healthResult,
         challengeResult,
         dietResult,
-        medicationResult,
       ] = await Promise.allSettled([
           getDashboardSummary<DashboardSummary>(),
           getDashboardTrends<Record<string, Record<string, unknown>[]>>(selectedPeriod),
@@ -618,7 +584,6 @@ export default function DashboardPage() {
           getDashboardHealth<DashboardData>(),
           getDashboardChallenges<DashboardData>(),
           getDashboardDiets<DashboardData>(),
-          getDashboardMedications<DashboardData>(),
         ]);
       if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
       if (trendsResult.status === "fulfilled") setTrends(trendsResult.value);
@@ -627,7 +592,6 @@ export default function DashboardPage() {
       if (healthResult.status === "fulfilled") setHealthSection(healthResult.value);
       if (challengeResult.status === "fulfilled") setChallengeSection(challengeResult.value);
       if (dietResult.status === "fulfilled") setDietSection(dietResult.value);
-      if (medicationResult.status === "fulfilled") setMedicationSection(medicationResult.value);
     };
     void load().catch(() => undefined);
   }, [selectedPeriod]);
@@ -650,9 +614,6 @@ export default function DashboardPage() {
   }));
   const dashboardDiets = Array.isArray(dietSection.recent_diet_records)
     ? (dietSection.recent_diet_records as AnyRecord[])
-    : [];
-  const dashboardMedicationRecords = Array.isArray(medicationSection.recent_medication_records)
-    ? (medicationSection.recent_medication_records as AnyRecord[])
     : [];
   const activeChallengesMap = Object.fromEntries(
     (Array.isArray(challengeSection.active_challenges)
@@ -695,12 +656,9 @@ export default function DashboardPage() {
   const lifestyleSeries = [
     makeValueSeries(trends.diet_score, "식단 점수", diseaseChartColors.DIABETES, { suffix: "점" }),
     makeValueSeries(trends.challenge_completion_rate, "챌린지 수행률", diseaseChartColors.OBESITY, { suffix: "%" }),
-    makeMedicationAdherenceSeries(dashboardMedicationRecords),
   ];
-  const medicationAdherenceSeries = makeMedicationAdherenceSeries(dashboardMedicationRecords);
   const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
   const hasRiskTrendEnoughData = riskTrendSeries.some((item) => item.points.length >= 2);
-  const medicationAdherence = medicationAdherenceSeries.points.at(-1)?.value ?? null;
   const sleepValue = toNumber(latest.sleep_hours);
   const summaryCards = [
     {
@@ -740,12 +698,6 @@ export default function DashboardPage() {
       gauge: toNumber(dietScore),
     },
     {
-      label: "복약 수행률",
-      value: medicationAdherence === null ? "아직 기록 없음" : `${Math.round(medicationAdherence)}%`,
-      delta: getSeriesDelta([medicationAdherenceSeries]),
-      gauge: medicationAdherence,
-    },
-    {
       label: "수면 시간",
       value: sleepValue === null ? "아직 기록 없음" : String(sleepValue),
       unit: sleepValue === null ? "" : "hr",
@@ -763,9 +715,7 @@ export default function DashboardPage() {
           ? [lifestyleSeries[0]]
           : activeMetricKey === "exercise"
             ? [lifestyleSeries[1]]
-            : activeMetricKey === "medication"
-              ? [medicationAdherenceSeries]
-              : [];
+            : [];
   const activeChartCards =
     activeMetricKey === "blood"
       ? [
@@ -817,20 +767,10 @@ export default function DashboardPage() {
                   series: [lifestyleSeries[1]],
                 },
               ]
-            : activeMetricKey === "medication"
-              ? [
-                  {
-                    title: "복약 수행률",
-                    unit: "%",
-                    value: medicationAdherence === null ? "-" : String(Math.round(medicationAdherence)),
-                    delta: getSeriesDelta([medicationAdherenceSeries]),
-                    series: [medicationAdherenceSeries],
-                  },
-                ]
-              : [
-                  {
-                    title: activeMetric.label,
-                    unit: "",
+            : [
+                {
+                  title: activeMetric.label,
+                  unit: "",
                     value: "-",
                     delta: null,
                     series: activeMetricSeries,
