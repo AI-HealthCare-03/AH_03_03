@@ -78,6 +78,68 @@ async def test_dashboard_risk_trend_groups_analysis_results_by_disease(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_dashboard_health_trends_are_oldest_first_with_same_day_records(monkeypatch) -> None:
+    day = datetime(2026, 6, 16, tzinfo=UTC)
+    newer_record = SimpleNamespace(
+        id=3,
+        measured_at=day.replace(hour=9),
+        created_at=day.replace(hour=9, minute=3),
+        fasting_glucose=180,
+        systolic_bp=150,
+        diastolic_bp=95,
+        weight_kg=Decimal("70.0"),
+    )
+    older_record = SimpleNamespace(
+        id=1,
+        measured_at=day.replace(hour=8),
+        created_at=day.replace(hour=8, minute=1),
+        fasting_glucose=95,
+        systolic_bp=120,
+        diastolic_bp=80,
+        weight_kg=Decimal("80.0"),
+    )
+    tie_break_record = SimpleNamespace(
+        id=2,
+        measured_at=day.replace(hour=8),
+        created_at=day.replace(hour=8, minute=2),
+        fasting_glucose=110,
+        systolic_bp=130,
+        diastolic_bp=85,
+        weight_kg=Decimal("78.0"),
+    )
+
+    async def fake_list_health_records(user_id: int, limit: int) -> list[Any]:
+        assert user_id == 42
+        assert limit == 1000
+        return [newer_record, tie_break_record, older_record]
+
+    async def fake_list_diet_records(user_id: int, limit: int) -> list[Any]:
+        assert user_id == 42
+        return []
+
+    async def fake_build_challenge_completion_rates(user_id: int, date_from, date_to) -> list[Any]:
+        assert user_id == 42
+        return []
+
+    monkeypatch.setattr(dashboard_service.health_service, "list_health_records", fake_list_health_records)
+    monkeypatch.setattr(dashboard_service.diet_service, "list_diet_records", fake_list_diet_records)
+    monkeypatch.setattr(
+        dashboard_service,
+        "_build_challenge_completion_rates",
+        fake_build_challenge_completion_rates,
+    )
+
+    result = await dashboard_service.get_dashboard_trends(user_id=42, period="all")
+
+    assert [point["value"] for point in result["glucose"]] == [95, 110, 180]
+    assert [point["systolic"] for point in result["blood_pressure"]] == [120, 130, 150]
+    assert [point["value"] for point in result["weight"]] == [80.0, 78.0, 70.0]
+    assert [point["id"] for point in result["glucose"]] == [1, 2, 3]
+    assert all(point["measured_at"] for point in result["glucose"])
+    assert all(point["created_at"] for point in result["glucose"])
+
+
+@pytest.mark.asyncio
 async def test_dashboard_summary_includes_x2_source_detail_fields(monkeypatch) -> None:
     now = datetime.now(UTC)
     analysis_result = SimpleNamespace(

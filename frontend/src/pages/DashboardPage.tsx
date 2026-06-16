@@ -143,12 +143,32 @@ function getTrendValue(item: TrendItem, key = "value"): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function toChartPoint(item: TrendItem, value: number, suffix = ""): ChartPoint {
-  const date = String(item.date ?? item.created_at ?? item.measured_at ?? "");
-  const label = date ? formatDate(date) : "-";
+function getTrendPointSortTime(item: TrendItem, fallbackIndex: number): number {
+  const parsed = Date.parse(String(item.measured_at ?? item.created_at ?? item.date ?? ""));
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  const id = Number(item.id);
+  return Number.isFinite(id) ? id : fallbackIndex;
+}
+
+function getTrendPointKey(item: TrendItem, fallbackIndex: number): string {
+  const timestamp = String(item.measured_at ?? item.created_at ?? item.date ?? "").trim();
+  const id = String(item.id ?? "").trim();
+  if (timestamp) {
+    return id ? `${timestamp}#${id}` : `${timestamp}#${fallbackIndex}`;
+  }
+  return id ? `id:${id}` : `index:${fallbackIndex}`;
+}
+
+function toChartPoint(item: TrendItem, value: number, suffix = "", fallbackIndex = 0): ChartPoint {
+  const key = getTrendPointKey(item, fallbackIndex);
+  const labelSource = String(item.measured_at ?? item.created_at ?? item.date ?? "");
+  const label = labelSource.includes("T") ? formatDateTime(labelSource) : formatDate(labelSource);
   return {
-    date,
+    date: key,
     label,
+    sortTime: getTrendPointSortTime(item, fallbackIndex),
     value,
     displayValue: `${Math.round(value * 10) / 10}${suffix}`,
   };
@@ -167,13 +187,21 @@ function makeValueSeries(
     label,
     color,
     points: (items ?? [])
-      .map((item) => {
+      .map((item, index) => {
         const value = getTrendValue(item, key);
-        return value === null ? null : toChartPoint(item, value, suffix);
+        return value === null ? null : toChartPoint(item, value, suffix, index);
       })
       .filter((point): point is ChartPoint => Boolean(point))
-      .sort((a, b) => a.date.localeCompare(b.date)),
+      .sort((a, b) => (a.sortTime ?? 0) - (b.sortTime ?? 0) || a.date.localeCompare(b.date)),
   };
+}
+
+function getChartPointSortTime(point: ChartPoint, fallbackIndex: number): number {
+  if (Number.isFinite(point.sortTime)) {
+    return point.sortTime ?? 0;
+  }
+  const parsed = Date.parse(point.date);
+  return Number.isFinite(parsed) ? parsed : fallbackIndex;
 }
 
 function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
@@ -274,7 +302,21 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
   const allPoints = visibleSeries.flatMap((item) => item.points);
-  const uniqueDates = Array.from(new Set(allPoints.map((point) => point.date || point.label))).sort();
+  const axisLabelByDate = new Map<string, string>();
+  allPoints.forEach((point) => {
+    if (!axisLabelByDate.has(point.date)) {
+      axisLabelByDate.set(point.date, point.label);
+    }
+  });
+  const uniqueDates = Array.from(new Set(allPoints.map((point) => point.date || point.label))).sort((a, b) => {
+    const pointA = allPoints.find((point) => (point.date || point.label) === a);
+    const pointB = allPoints.find((point) => (point.date || point.label) === b);
+    return (
+      getChartPointSortTime(pointA ?? { date: a, label: a, value: 0 }, 0) -
+        getChartPointSortTime(pointB ?? { date: b, label: b, value: 0 }, 0) ||
+      a.localeCompare(b)
+    );
+  });
   const hasEnoughData = uniqueDates.length >= 1 || visibleSeries.some((item) => item.points.length >= 1);
 
   if (!hasEnoughData) {
@@ -319,10 +361,10 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
           {uniqueDates.length > 0 && (
             <>
               <text className="line-chart-axis" x={padding.left} y={height - 8}>
-                {formatDate(uniqueDates[0])}
+                {axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
               </text>
               <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
-                {formatDate(uniqueDates[uniqueDates.length - 1])}
+                {axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
               </text>
             </>
           )}
