@@ -130,15 +130,6 @@ const periodOptions = [
   { label: "전체", value: "all" },
 ];
 
-function latestValue(items: Record<string, unknown>[] | undefined, fallback = "-"): string {
-  const item = items?.[0];
-  if (!item) {
-    return fallback;
-  }
-  const value = item.value ?? item.systolic;
-  return value === undefined || value === null ? fallback : String(value);
-}
-
 function averageValue(items: Record<string, unknown>[] | undefined): string {
   const values = (items ?? []).map((item) => Number(item.value)).filter((value) => Number.isFinite(value));
   if (values.length === 0) {
@@ -516,9 +507,9 @@ const analysisMetrics = [
   },
   {
     key: "diet",
-    label: "식단 점수 변화",
-    description: "최근 식단 기록의 점수 변화를 확인합니다.",
-    trendKeys: ["diet_score"],
+    label: "식단 기록 변화",
+    description: "최근 식단 기록과 관리 포인트를 확인합니다.",
+    trendKeys: [],
     ready: true,
   },
   {
@@ -654,6 +645,7 @@ export default function DashboardPage() {
   const dashboardMedicationRecords = Array.isArray(medicationSection.recent_medication_records)
     ? (medicationSection.recent_medication_records as AnyRecord[])
     : [];
+  const dietRecordCount = dashboardDiets.length;
   const activeChallengesMap = Object.fromEntries(
     (Array.isArray(challengeSection.active_challenges)
       ? (challengeSection.active_challenges as AnyRecord[])
@@ -674,7 +666,6 @@ export default function DashboardPage() {
       )
     : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
-  const dietScore = dashboardDiets[0]?.diet_score ? String(dashboardDiets[0].diet_score) : latestValue(trends.diet_score);
   const bloodPressureSeries = [
     makeValueSeries(trends.blood_pressure, "수축기 혈압", diseaseChartColors.HYPERTENSION, {
       key: "systolic",
@@ -693,7 +684,6 @@ export default function DashboardPage() {
     makeValueSeries(trends.bmi, "BMI", "var(--chart-obesity-soft-line)"),
   ];
   const lifestyleSeries = [
-    makeValueSeries(trends.diet_score, "식단 점수", diseaseChartColors.DIABETES, { suffix: "점" }),
     makeValueSeries(trends.challenge_completion_rate, "챌린지 수행률", diseaseChartColors.OBESITY, { suffix: "%" }),
     makeMedicationAdherenceSeries(dashboardMedicationRecords),
   ];
@@ -730,14 +720,8 @@ export default function DashboardPage() {
     {
       label: "챌린지 수행률",
       value: challengeRate,
-      delta: getSeriesDelta([lifestyleSeries[1]]),
-      gauge: toNumber(challengeRate.replace("%", "")),
-    },
-    {
-      label: "식단 점수",
-      value: dietScore === "-" ? "아직 기록 없음" : `${dietScore}점`,
       delta: getSeriesDelta([lifestyleSeries[0]]),
-      gauge: toNumber(dietScore),
+      gauge: toNumber(challengeRate.replace("%", "")),
     },
     {
       label: "복약 수행률",
@@ -760,9 +744,9 @@ export default function DashboardPage() {
       : activeMetricKey === "weight"
         ? weightSeries
         : activeMetricKey === "diet"
-          ? [lifestyleSeries[0]]
+          ? []
           : activeMetricKey === "exercise"
-            ? [lifestyleSeries[1]]
+            ? [lifestyleSeries[0]]
             : activeMetricKey === "medication"
               ? [medicationAdherenceSeries]
               : [];
@@ -800,11 +784,11 @@ export default function DashboardPage() {
         : activeMetricKey === "diet"
           ? [
               {
-                title: "식단 점수",
-                unit: "점",
-                value: dietScore === "-" ? "-" : dietScore,
-                delta: getSeriesDelta([lifestyleSeries[0]]),
-                series: [lifestyleSeries[0]],
+                title: "식단 기록",
+                unit: "건",
+                value: dietRecordCount === 0 ? "-" : String(dietRecordCount),
+                delta: null,
+                series: [],
               },
             ]
           : activeMetricKey === "exercise"
@@ -813,8 +797,8 @@ export default function DashboardPage() {
                   title: "챌린지 수행률",
                   unit: "%",
                   value: challengeRate,
-                  delta: getSeriesDelta([lifestyleSeries[1]]),
-                  series: [lifestyleSeries[1]],
+                  delta: getSeriesDelta([lifestyleSeries[0]]),
+                  series: [lifestyleSeries[0]],
                 },
               ]
             : activeMetricKey === "medication"
@@ -1014,8 +998,8 @@ export default function DashboardPage() {
         <section className="card diet-summary-section">
           <div className="card-header">
             <div>
-              <h2>식단 추천 결과 요약</h2>
-              <p>최근 식단 기록을 기준으로 식단 점수와 추천 포인트를 확인합니다.</p>
+              <h2>식단 분석 요약</h2>
+              <p>최근 식단 기록을 기준으로 음식 후보와 관리 포인트를 확인합니다.</p>
             </div>
             <div className="card-actions">
               <Link className="button secondary compact-button" to="/diets">
@@ -1025,12 +1009,8 @@ export default function DashboardPage() {
           </div>
           {latestDiet ? (
             <div className="dashboard-diet-summary">
-              <div className="dashboard-diet-score">
-                <MiniGauge value={toNumber(latestDiet.diet_score)} />
-                <strong>{latestDiet.diet_score ? `${String(latestDiet.diet_score)}점` : "점수 미산정"}</strong>
-              </div>
               <div className="dashboard-diet-copy">
-                <span>추천 식단 요약</span>
+                <span>식단 구성 요약</span>
                 <p>{dietSummary || "최근 식단 기록을 기준으로 식사 구성을 점검해보세요."}</p>
               </div>
               <div className="dashboard-diet-points">
@@ -1049,7 +1029,7 @@ export default function DashboardPage() {
           ) : (
             <div className="empty-state">
               <strong>아직 식단 분석 결과가 없습니다.</strong>
-              <p>식단 이미지를 업로드하면 식단 점수와 추천 포인트를 확인할 수 있습니다.</p>
+              <p>식단 이미지를 업로드하면 음식 후보와 관리 포인트를 확인할 수 있습니다.</p>
               <Link className="button secondary compact-button" to="/diets">
                 식단 업로드하기
               </Link>

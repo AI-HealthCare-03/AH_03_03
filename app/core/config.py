@@ -68,6 +68,7 @@ class Config(BaseSettings):
     DIET_GPT_VISION_ENABLED: bool = False
     DIET_GPT_VISION_MODEL: str = "gpt-4o"
     DIET_VISION_PROVIDER: str = "rule_based"
+    DIET_DEMO_FALLBACK_ENABLED: bool = False
     DIET_MFDS_ENABLED: bool = False
     DIET_RECOMMENDATION_LLM_REWRITE_ENABLED: bool = False
     DIET_RECOMMENDATION_RAG_STRATEGY: str = "keyword_only"

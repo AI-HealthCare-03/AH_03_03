@@ -29,6 +29,7 @@ from app.services.storage import get_storage_service, normalize_storage_key
 SCORING_SOURCE = "nutrition_rule_table"
 FOOD_DETECTION_SOURCE = "rule_based_food_detection"
 SCORING_FALLBACK_SOURCE = "nutrition_rule_table_unavailable"
+DIET_ANALYSIS_SERVICE_UNAVAILABLE = "diet_analysis_service_unavailable"
 DIET_ANALYSIS_UPLOAD_DIR = "diet_analysis"
 DIET_ANALYSIS_MEDIA_TYPES = {
     ".jpg": "image/jpeg",
@@ -134,9 +135,11 @@ async def run_diet_analysis(
     image_bytes: bytes | None = None,
     image_media_type: str | None = None,
 ) -> dict[str, object]:
-    case = _select_rule_based_diet_case(request)
+    ensure_diet_analysis_available()
+    demo_fallback_enabled = _diet_demo_fallback_enabled()
+    case = _select_rule_based_diet_case(request) if demo_fallback_enabled else None
     food_analysis = await run_food_analysis_pipeline(
-        rule_based_foods=case["detected_foods"],
+        rule_based_foods=case["detected_foods"] if case is not None else [],
         image_bytes=image_bytes,
         image_media_type=image_media_type,
         config=FoodAnalysisPipelineConfig(
@@ -154,14 +157,21 @@ async def run_diet_analysis(
     detected_foods = food_analysis.detected_foods
     fallback_used = food_analysis.fallback_used
     provider_message = food_analysis.provider_message
+    if food_candidate.provider == FOOD_DETECTION_SOURCE and not demo_fallback_enabled:
+        logger.warning(
+            "Diet analysis rejected rule-based fallback without DIET_DEMO_FALLBACK_ENABLED",
+            extra={"provider_message": provider_message},
+        )
+        raise ValueError(DIET_ANALYSIS_SERVICE_UNAVAILABLE)
     scoring_result = _safe_build_nutrition_scoring_result(detected_foods)
     explanation = _safe_generate_diet_explanation(scoring_result["disease_scores"])
     nutrition_summary = {
-        **case["nutrition_summary"],
+        **(case["nutrition_summary"] if case is not None else {}),
         "disease_scores": scoring_result["disease_scores"],
         "scoring_source": scoring_result["scoring_source"],
         "explanation": explanation,
     }
+    diet_feedback = _diet_feedback(case, food_candidate.needs_review)
     diet_record = await create_diet_record(
         user_id,
         DietRecordCreateRequest(
@@ -171,8 +181,8 @@ async def run_diet_analysis(
             image_path=request.image_path,
             detected_foods=detected_foods,
             nutrition_summary=nutrition_summary,
-            diet_score=case["diet_score"],
-            diet_feedback=case["diet_feedback"],
+            diet_score=None,
+            diet_feedback=diet_feedback,
             analysis_method="IMAGE_ANALYSIS",
             memo=request.memo,
         ),
@@ -196,7 +206,7 @@ async def run_diet_analysis(
                 "vision_provider": food_candidate.provider,
                 "fallback_used": fallback_used,
                 "provider_message": provider_message,
-                "case": case["case_name"],
+                **({"demo_fallback_case": case["case_name"]} if case is not None else {}),
                 "foods": detected_foods,
                 "provider_result": {
                     "provider": food_candidate.provider,
@@ -219,8 +229,8 @@ async def run_diet_analysis(
         "photo_result": photo_result,
         "detected_foods": detected_foods,
         "nutrition_summary": nutrition_summary,
-        "diet_score": case["diet_score"],
-        "diet_feedback": case["diet_feedback"],
+        "diet_score": None,
+        "diet_feedback": diet_feedback,
         "disease_scores": scoring_result["disease_scores"],
         "food_score_details": scoring_result["food_score_details"],
         "scoring_source": scoring_result["scoring_source"],
@@ -228,9 +238,33 @@ async def run_diet_analysis(
         "fallback_used": fallback_used,
         "raw_output": photo_result.raw_output,
         "explanation": explanation,
-        "warnings": case["warnings"],
-        "recommended_actions": case["recommended_actions"],
+        "warnings": case["warnings"] if case is not None else [],
+        "recommended_actions": case["recommended_actions"] if case is not None else [],
     }
+
+
+def ensure_diet_analysis_available() -> None:
+    if _diet_demo_fallback_enabled() or _gpt_vision_diet_provider_available():
+        return
+    raise ValueError(DIET_ANALYSIS_SERVICE_UNAVAILABLE)
+
+
+def _diet_demo_fallback_enabled() -> bool:
+    return bool(getattr(config, "DIET_DEMO_FALLBACK_ENABLED", False))
+
+
+def _gpt_vision_diet_provider_available() -> bool:
+    provider = str(config.DIET_VISION_PROVIDER or "").strip().lower()
+    api_key = str(config.OPENAI_API_KEY or "").strip()
+    return provider == "gpt_vision" and bool(config.DIET_GPT_VISION_ENABLED) and bool(api_key)
+
+
+def _diet_feedback(case: dict[str, Any] | None, needs_review: bool) -> str:
+    if case is not None:
+        return str(case["diet_feedback"])
+    if needs_review:
+        return "음식 후보와 영양성분 후보를 확인해 주세요."
+    return "음식 후보와 영양성분 후보를 기준으로 식단 관리 포인트를 확인해 주세요."
 
 
 def store_diet_analysis_upload(
@@ -547,7 +581,6 @@ def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
                 {"name": "블루베리", "confidence": 0.82},
             ],
             {"calories": 430, "carbohydrate_g": 48, "protein_g": 22, "fat_g": 14, "sodium_mg": 420},
-            88.0,
             "아침 식사로 균형이 좋습니다. 단백질 구성을 유지해 보세요.",
             [],
             ["물 한 컵 함께 마시기", "오전 간식은 견과류 소량 선택"],
@@ -562,7 +595,6 @@ def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
                 {"name": "샐러드", "confidence": 0.84},
             ],
             {"calories": 620, "carbohydrate_g": 72, "protein_g": 38, "fat_g": 18, "sodium_mg": 780},
-            82.5,
             "단백질과 채소 구성이 적절한 편입니다. 나트륨은 조금만 더 낮춰보세요.",
             ["소스류 나트륨 확인 필요"],
             ["드레싱은 절반만 사용", "식후 10분 산책"],
@@ -577,7 +609,6 @@ def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
                 {"name": "생선구이", "confidence": 0.87},
             ],
             {"calories": 710, "carbohydrate_g": 80, "protein_g": 34, "fat_g": 24, "sodium_mg": 1280},
-            74.0,
             "저녁으로는 나트륨이 다소 높을 수 있습니다. 국물 섭취를 줄여보세요.",
             ["나트륨 주의"],
             ["국물은 절반 이하로 섭취", "야식 피하기"],
@@ -588,7 +619,6 @@ def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
             "snack",
             [{"name": "카페라떼", "confidence": 0.83}, {"name": "쿠키", "confidence": 0.79}],
             {"calories": 360, "carbohydrate_g": 48, "protein_g": 8, "fat_g": 14, "sodium_mg": 210},
-            58.0,
             "당류와 정제 탄수화물이 많은 간식입니다. 대체 간식을 고려해 보세요.",
             ["당류 섭취 주의"],
             ["무가당 음료 선택", "견과류나 요거트로 대체"],
@@ -598,7 +628,6 @@ def _select_rule_based_diet_case(request: DietAnalyzeRequest) -> dict[str, Any]:
         "default",
         [{"name": "일반식", "confidence": 0.76}, {"name": "채소반찬", "confidence": 0.72}],
         {"calories": 650, "carbohydrate_g": 78, "protein_g": 25, "fat_g": 22, "sodium_mg": 900},
-        70.0,
         "식단 정보가 부족해 일반식 기준으로 분석했습니다.",
         ["정확한 음식명 입력 시 더 나은 분석 가능"],
         ["음식 설명 자세히 입력", "채소와 단백질 비율 확인"],
@@ -610,7 +639,6 @@ def _diet_case(
     case_name: str,
     detected_foods: list[dict[str, Any]],
     nutrition_summary: dict[str, Any],
-    diet_score: float,
     diet_feedback: str,
     warnings: list[str],
     recommended_actions: list[str],
@@ -620,7 +648,6 @@ def _diet_case(
         "case_name": case_name,
         "detected_foods": detected_foods,
         "nutrition_summary": nutrition_summary,
-        "diet_score": diet_score,
         "diet_feedback": diet_feedback,
         "warnings": warnings,
         "recommended_actions": recommended_actions,

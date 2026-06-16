@@ -76,6 +76,7 @@ async def handle_diet_analyze_image(job_id: int, payload: dict[str, Any]) -> Non
             "diet_analysis_job_not_found",
             "diet_analysis_user_id_missing",
             "diet_analysis_upload_missing",
+            "diet_analysis_service_unavailable",
         }:
             await async_job_service.mark_failed(job_id, error_message)
             raise NonRetryableJobError(error_message) from exc

@@ -50,6 +50,7 @@ async def run_diet_analysis(
     user: Annotated[User, Depends(get_request_user)],
 ):
     payload, image_bytes, image_media_type = await _parse_diet_analyze_request(request)
+    _ensure_diet_analysis_available()
     request_payload = payload.model_dump(mode="json", exclude_none=True)
     if image_bytes:
         request_payload.update(
@@ -61,6 +62,18 @@ async def run_diet_analysis(
             )
         )
     return await async_job_service.create_diet_analyze_image_job(int(user.id), request_payload)
+
+
+def _ensure_diet_analysis_available() -> None:
+    try:
+        diet_service.ensure_diet_analysis_available()
+    except ValueError as exc:
+        if str(exc) == diet_service.DIET_ANALYSIS_SERVICE_UNAVAILABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=diet_service.DIET_ANALYSIS_SERVICE_UNAVAILABLE,
+            ) from exc
+        raise
 
 
 async def _parse_diet_analyze_request(request: Request) -> tuple[DietAnalyzeRequest, bytes | None, str | None]:

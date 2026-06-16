@@ -91,6 +91,7 @@ RAG_RETRIEVAL_STRATEGY=keyword_only
 
 DIET_VISION_PROVIDER=rule_based
 DIET_GPT_VISION_ENABLED=false
+DIET_DEMO_FALLBACK_ENABLED=false
 
 EXAM_OCR_PROVIDER=auto
 EXAM_GPT_VISION_ENABLED=false
@@ -352,7 +353,7 @@ QA/smoke 스크립트는 로컬 검증용입니다. `scripts/qa/smoke_notificati
 |---|---|---|
 | 챗봇 LLM | `CHATBOT_USE_REAL_LLM`, `OPENAI_API_KEY` | 기본 mock/rule, 필요 시 OpenAI |
 | RAG | `RAG_ENABLED`, `RAG_RETRIEVAL_STRATEGY` | 기본 keyword-only, 필요 시 vector fallback/hybrid |
-| 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED` | 기본 rule/fallback |
+| 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED`, `DIET_DEMO_FALLBACK_ENABLED`, `OPENAI_API_KEY` | 운영은 실제 provider 필요, 데모 fallback은 명시 opt-in |
 | 건강검진 OCR | `EXAM_OCR_PROVIDER`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED` | 기본 auto |
 | 복약 정보 | 별도 OCR provider 없음 | MVP에서는 사용자가 직접 입력 |
 | Langfuse | `LANGFUSE_ENABLED`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | 기본 off |

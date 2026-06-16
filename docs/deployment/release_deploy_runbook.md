@@ -129,6 +129,27 @@ S3_BUCKET_NAME=
 
 local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다. S3로 전환할 때만 `STORAGE_BACKEND=s3`와 private bucket/IAM 권한을 준비합니다.
 
+식단 이미지 분석은 운영에서 실제 provider가 준비되어야 합니다. 아래 조합처럼 GPT Vision이 꺼져 있고 demo fallback도 꺼져 있으면 `/api/v1/diets/analyze`는 더미 결과를 저장하지 않고 service unavailable로 종료됩니다.
+
+```env
+DIET_VISION_PROVIDER=rule_based
+DIET_GPT_VISION_ENABLED=false
+DIET_DEMO_FALLBACK_ENABLED=false
+```
+
+운영에서 GPT Vision 식단 분석을 사용하려면 `.prod.env`에 아래 값을 준비합니다. 실제 key 값은 문서나 채팅에 남기지 않습니다.
+
+```env
+OPENAI_API_KEY=<OPENAI_API_KEY>
+DIET_VISION_PROVIDER=gpt_vision
+DIET_GPT_VISION_ENABLED=true
+DIET_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=false
+DIET_DEMO_FALLBACK_ENABLED=false
+```
+
+`DIET_DEMO_FALLBACK_ENABLED=true`는 시연/개발용 더미 fallback을 명시적으로 허용하는 설정입니다. 운영 기본값은 false로 유지합니다.
+
 ## 4. Docker 권한 확인
 
 현재 계정의 Docker 권한을 확인합니다.
@@ -172,6 +193,18 @@ make prod-migrate
 
 ```bash
 make danger-prod-seed-challenges
+```
+
+챌린지 seed 확인은 실제 컬럼 기준으로 집계합니다. `challenges` 테이블에는 `is_active` 컬럼이 없으므로 `status` 기준으로 확인합니다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec -T postgres \
+  sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "
+select status, count(*)
+from challenges
+group by status
+order by status;
+"'
 ```
 
 FAQ 목록이 비어 있고 운영자가 초기 FAQ seed를 승인한 경우에만 실행합니다.

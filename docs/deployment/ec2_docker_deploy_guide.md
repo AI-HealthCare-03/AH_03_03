@@ -158,6 +158,17 @@ S3_BUCKET_NAME=
 
 local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다. OCR/검진 업로드가 500으로 실패하면 먼저 운영 `.prod.env`의 storage 값을 확인합니다.
 
+식단 이미지 분석은 실제 provider가 준비되어야 합니다. `DIET_GPT_VISION_ENABLED=false`, `DIET_VISION_PROVIDER=rule_based`, `DIET_DEMO_FALLBACK_ENABLED=false` 조합에서는 더미 음식/점수를 저장하지 않고 service unavailable로 종료됩니다. 운영에서 GPT Vision을 사용할 때만 아래 값을 `.prod.env`에 설정합니다.
+
+```env
+OPENAI_API_KEY=<OPENAI_API_KEY>
+DIET_VISION_PROVIDER=gpt_vision
+DIET_GPT_VISION_ENABLED=true
+DIET_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=false
+DIET_DEMO_FALLBACK_ENABLED=false
+```
+
 ## 8. Docker image pull/build 정책
 
 EC2는 pull-only 운영입니다. EC2에서 app/frontend/worker 이미지를 build하지 않습니다.

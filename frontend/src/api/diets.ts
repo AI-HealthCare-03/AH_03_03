@@ -74,7 +74,7 @@ export type DietAnalyzeResponse = {
   photo_result: Record<string, ApiValue>;
   detected_foods: Array<Record<string, ApiValue>>;
   nutrition_summary: DietNutritionSummary;
-  diet_score: number;
+  diet_score: number | null;
   diet_feedback: string;
   disease_scores?: Record<string, number | null> | null;
   food_score_details?: Array<Record<string, ApiValue>>;

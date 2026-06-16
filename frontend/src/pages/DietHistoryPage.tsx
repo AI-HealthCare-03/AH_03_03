@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { listDietRecords } from "../api/diets";
 import Card from "../components/Card";
-import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
+import { formatDateTime, mealTypeLabel } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
 
@@ -64,7 +64,9 @@ export default function DietHistoryPage() {
         </Link>
       }
     >
-      <div className="state-box">식단 점수와 분석 결과는 건강관리 참고용이며, 실제 식사량과 음식 선택에 따라 달라질 수 있습니다.</div>
+      <div className="state-box">
+        음식 후보와 식단 분석 결과는 건강관리 참고용이며, 실제 식사량과 음식 선택에 따라 달라질 수 있습니다.
+      </div>
       <div className="filter-tabs">
         {TABS.map((tab) => (
           <span
@@ -81,7 +83,6 @@ export default function DietHistoryPage() {
       </div>
       <div className="table-list">
         {filtered.map((record) => {
-          const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
           const isManual = isManualRecord(record);
           const foodSummary = summarizeFoodItems(record.detected_foods);
           const mealName = String(record.description ?? record.meal_name ?? (foodSummary || "기록된 식단"));
@@ -98,11 +99,7 @@ export default function DietHistoryPage() {
                   <span className="badge badge-reference">{mealTypeLabel(record.meal_type)}</span>
                   {isManual && <span className="badge badge-reference">직접 기록</span>}
                 </div>
-                {scoreRaw !== null ? (
-                  <span className={`badge ${scoreBadgeClass(scoreRaw)}`}>{scoreRaw}점</span>
-                ) : (
-                  <span className="badge badge-reference">{isManual ? "점수 미산정" : "-"}</span>
-                )}
+                <span className="badge badge-reference">{isManual ? "직접 기록" : "분석 기록"}</span>
               </div>
               <strong>{mealName}</strong>
               <p className="diet-record-summary">{summary}</p>

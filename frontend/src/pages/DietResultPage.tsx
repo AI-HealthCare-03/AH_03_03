@@ -11,7 +11,7 @@ import {
 } from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
-import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
+import { formatDateTime, mealTypeLabel } from "../utils/format";
 
 type Item = Record<string, unknown>;
 
@@ -417,17 +417,11 @@ export default function DietResultPage() {
             </div>
           )}
           <div className="score-panel">
-            <span>{needsFoodConfirmation ? "참고 식단 점수" : "식단 점수"}</span>
-            {record?.diet_score != null ? (
-              <strong className={scoreBadgeClass(Number(record.diet_score))}>{String(record.diet_score)}점</strong>
-            ) : isManual ? (
-              <strong>점수 미산정</strong>
-            ) : (
-              <strong>-</strong>
-            )}
+            <span>{needsFoodConfirmation ? "음식 후보 확인" : "식단 분석 상태"}</span>
+            <strong>{isManual ? "기존 직접 입력" : needsFoodConfirmation ? "확인 필요" : "분석 기록"}</strong>
             <p>
               {needsFoodConfirmation
-                ? "음식 후보 확인 전 점수입니다. 음식명을 확인하면 질환별 평가를 더 정확하게 볼 수 있습니다."
+                ? "음식 후보와 영양성분 후보를 확인하면 식단 관리 포인트를 더 정확하게 볼 수 있습니다."
                 : isManual
                   ? "배포 전 MVP에서는 새 직접 입력은 제공하지 않으며, 기존 기록은 조회만 지원합니다."
                   : String(record?.diet_feedback ?? "식단 분석 결과를 확인해보세요.")}
@@ -621,7 +615,7 @@ export default function DietResultPage() {
         <Card title="내 상태에 맞춘 식단 관리 포인트">
           <div className="card-list">
             <div className="state-box">
-              점수보다 현재 식단에서 조절하거나 보완할 성분을 중심으로 확인해 주세요. 이 내용은 진단이나 처방이
+              현재 식단에서 조절하거나 보완할 성분을 중심으로 확인해 주세요. 이 내용은 진단이나 처방이
               아닌 생활관리 참고 정보입니다.
             </div>
             {recommendationLoading ? (

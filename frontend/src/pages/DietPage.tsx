@@ -13,7 +13,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import { isHeicFile } from "../utils/files";
-import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
+import { formatDateTime, mealTypeLabel } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
 
@@ -475,7 +475,9 @@ export default function DietPage() {
               <div className="state-box upload-selected-file">
                 <strong>선택한 이미지: {selectedImageFile.name}</strong>
                 <span className="muted">이미지를 다시 선택하려면 파일 선택 또는 카메라 촬영을 눌러주세요.</span>
-                <span className="muted">이미지에서 음식명 후보를 찾고 식단 기준표로 점수화합니다. 결과는 저장 전 확인해주세요.</span>
+                <span className="muted">
+                  이미지에서 음식명 후보와 영양성분 후보를 찾습니다. 결과는 저장 전 확인해주세요.
+                </span>
                 <button className="button secondary" disabled={isAnalyzing} onClick={clearSelectedImage} type="button">
                   선택 이미지 삭제
                 </button>
@@ -508,9 +510,9 @@ export default function DietPage() {
         {analysisResult && (
           <div className="card-list">
             <div className="score-panel">
-              <span>식단 점수</span>
-              <strong>{String(analysisResult.diet_score ?? "-")}</strong>
-              <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
+              <span>식단 분석 상태</span>
+              <strong>{analysisResult.needs_user_confirmation ? "음식 후보 확인 필요" : "음식 후보 분석 완료"}</strong>
+              <p>{String(analysisResult.diet_feedback ?? "음식 후보와 영양성분 후보를 확인해보세요.")}</p>
             </div>
             <div className="mini-card">
               {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
@@ -670,7 +672,6 @@ export default function DietPage() {
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
           {records.slice(0, 5).map((record) => {
-            const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
@@ -683,13 +684,7 @@ export default function DietPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <strong>{dietRecordDisplayTitle(record)}</strong>
-                  {scoreRaw !== null ? (
-                    <span className={`badge ${needsConfirmation ? "badge-reference" : scoreBadgeClass(scoreRaw)}`}>
-                      {needsConfirmation ? `참고 ${scoreRaw}점` : `${scoreRaw}점`}
-                    </span>
-                  ) : isManual ? (
-                    <span className="badge badge-reference">점수 미산정</span>
-                  ) : null}
+                  {!isManual && <span className="badge badge-reference">분석 기록</span>}
                 </div>
                 {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
