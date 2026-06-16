@@ -17,7 +17,11 @@ from app.dtos.exams import (
 )
 from app.models.exams import ExamMeasurement, ExamReport, OCRStatus
 from app.repositories import exam_repository, health_repository
-from app.services.health import _with_calculated_bmi
+from app.services.health import (
+    HEALTH_RECORD_SOURCE_OCR,
+    _with_calculated_bmi,
+    build_health_record_snapshot_data,
+)
 from app.services.storage import get_storage_service, normalize_storage_key
 
 EXAM_MEASUREMENT_METADATA = {
@@ -303,20 +307,28 @@ async def sync_exam_measurements_to_latest_health_record(
     if not data:
         return {}
 
-    latest_record = await health_repository.get_latest_health_record_by_user(report.user_id)
-    if latest_record is not None:
-        existing_payload = {field_name: getattr(latest_record, field_name, None) for field_name in data}
-        missing_only_data = merge_health_record_with_exam_missing_only(existing_payload, data)
-        if missing_only_data:
-            await health_repository.update_health_record(latest_record.id, missing_only_data)
-        return missing_only_data
-
     measured_at = (
         datetime.combine(report.exam_date, time.min, tzinfo=config.TIMEZONE)
         if report.exam_date
         else datetime.now(config.TIMEZONE)
     )
-    await health_repository.create_health_record(report.user_id, {"measured_at": measured_at, **data})
+    latest_record = await health_repository.get_latest_health_record_by_user(report.user_id)
+    if latest_record is not None:
+        existing_payload = {field_name: getattr(latest_record, field_name, None) for field_name in data}
+        missing_only_data = merge_health_record_with_exam_missing_only(existing_payload, data)
+        snapshot_data = {
+            **build_health_record_snapshot_data(latest_record),
+            **missing_only_data,
+            "source": HEALTH_RECORD_SOURCE_OCR,
+            "measured_at": measured_at,
+        }
+        await health_repository.create_health_record(report.user_id, snapshot_data)
+        return missing_only_data
+
+    await health_repository.create_health_record(
+        report.user_id,
+        {"measured_at": measured_at, "source": HEALTH_RECORD_SOURCE_OCR, **data},
+    )
     return data
 
 

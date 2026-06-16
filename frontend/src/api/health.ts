@@ -27,6 +27,7 @@ export type HealthRecordPayload = Record<string, ApiValue> & {
   walking_days_per_week?: number;
   strength_days_per_week?: number;
   sleep_hours?: number;
+  source?: "MANUAL" | "OCR" | "PROFILE" | "ANALYSIS_PREP";
   measured_at: string;
 };
 

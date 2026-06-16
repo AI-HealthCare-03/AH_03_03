@@ -12,11 +12,11 @@ async def get_health_record_by_id(record_id: int) -> HealthRecord | None:
 
 
 async def get_latest_health_record_by_user(user_id: int) -> HealthRecord | None:
-    return await HealthRecord.filter(user_id=user_id).order_by("-measured_at").first()
+    return await HealthRecord.filter(user_id=user_id).order_by("-created_at", "-id").first()
 
 
 async def list_health_records_by_user(user_id: int, limit: int = 20, offset: int = 0) -> list[HealthRecord]:
-    return await HealthRecord.filter(user_id=user_id).order_by("-measured_at").offset(offset).limit(limit)
+    return await HealthRecord.filter(user_id=user_id).order_by("-created_at", "-id").offset(offset).limit(limit)
 
 
 async def update_health_record(record_id: int, data: dict[str, Any]) -> HealthRecord | None:

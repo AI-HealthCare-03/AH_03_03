@@ -581,9 +581,11 @@ async def test_exam_ocr_returns_empty_measurements_when_parser_extracts_no_value
 
 
 @pytest.mark.asyncio
-async def test_confirm_without_request_updates_latest_health_record_from_existing_measurements(monkeypatch) -> None:
+async def test_confirm_without_request_creates_ocr_health_record_snapshot_from_existing_measurements(
+    monkeypatch,
+) -> None:
     report = SimpleNamespace(id=1, user_id=10, exam_date=None)
-    updated_payload: dict[str, object] = {}
+    created_payload: dict[str, object] = {}
 
     async def fake_get_exam_report(exam_report_id: int):
         assert exam_report_id == 1
@@ -601,10 +603,10 @@ async def test_confirm_without_request_updates_latest_health_record_from_existin
         assert user_id == 10
         return SimpleNamespace(id=99)
 
-    async def fake_update_health_record(record_id: int, data: dict):
-        assert record_id == 99
-        updated_payload.update(data)
-        return SimpleNamespace(id=record_id, **data)
+    async def fake_create_health_record(user_id: int, data: dict):
+        assert user_id == 10
+        created_payload.update(data)
+        return SimpleNamespace(id=101, user_id=user_id, **data)
 
     async def fake_confirm_exam_report(exam_report_id: int):
         assert exam_report_id == 1
@@ -615,23 +617,23 @@ async def test_confirm_without_request_updates_latest_health_record_from_existin
     monkeypatch.setattr(
         exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
     )
-    monkeypatch.setattr(exam_service.health_repository, "update_health_record", fake_update_health_record)
+    monkeypatch.setattr(exam_service.health_repository, "create_health_record", fake_create_health_record)
     monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
 
     confirmed = await exam_service.confirm_exam_report(1)
 
     assert confirmed is report
-    assert updated_payload == {
-        "systolic_bp": 130,
-        "ldl_cholesterol": 131,
-        "hdl_cholesterol": 47,
-    }
+    assert created_payload["systolic_bp"] == 130
+    assert created_payload["ldl_cholesterol"] == 131
+    assert created_payload["hdl_cholesterol"] == 47
+    assert created_payload["source"] == "OCR"
+    assert "measured_at" in created_payload
 
 
 @pytest.mark.asyncio
 async def test_confirm_preserves_existing_health_record_values_and_fills_missing_fields(monkeypatch) -> None:
     report = SimpleNamespace(id=1, user_id=10, exam_date=None)
-    updated_payload: dict[str, object] = {}
+    created_payload: dict[str, object] = {}
 
     async def fake_get_exam_report(exam_report_id: int):
         assert exam_report_id == 1
@@ -656,10 +658,10 @@ async def test_confirm_preserves_existing_health_record_values_and_fills_missing
             hdl_cholesterol=None,
         )
 
-    async def fake_update_health_record(record_id: int, data: dict):
-        assert record_id == 99
-        updated_payload.update(data)
-        return SimpleNamespace(id=record_id, **data)
+    async def fake_create_health_record(user_id: int, data: dict):
+        assert user_id == 10
+        created_payload.update(data)
+        return SimpleNamespace(id=101, user_id=user_id, **data)
 
     async def fake_confirm_exam_report(exam_report_id: int):
         assert exam_report_id == 1
@@ -670,19 +672,24 @@ async def test_confirm_preserves_existing_health_record_values_and_fills_missing
     monkeypatch.setattr(
         exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
     )
-    monkeypatch.setattr(exam_service.health_repository, "update_health_record", fake_update_health_record)
+    monkeypatch.setattr(exam_service.health_repository, "create_health_record", fake_create_health_record)
     monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
 
     confirmed = await exam_service.confirm_exam_report(1)
 
     assert confirmed is report
-    assert updated_payload == {"hdl_cholesterol": 47}
+    assert created_payload["systolic_bp"] == 160
+    assert created_payload["diastolic_bp"] == 90
+    assert created_payload["ldl_cholesterol"] == 150
+    assert created_payload["hdl_cholesterol"] == 47
+    assert created_payload["source"] == "OCR"
 
 
 @pytest.mark.asyncio
-async def test_confirm_skips_health_record_update_when_exam_values_are_already_present(monkeypatch) -> None:
+async def test_confirm_creates_ocr_snapshot_without_overwriting_present_values(monkeypatch) -> None:
     report = SimpleNamespace(id=1, user_id=10, exam_date=None)
     update_called = False
+    created_payload: dict[str, object] = {}
 
     async def fake_get_exam_report(exam_report_id: int):
         assert exam_report_id == 1
@@ -710,6 +717,11 @@ async def test_confirm_skips_health_record_update_when_exam_values_are_already_p
         update_called = True
         return SimpleNamespace(id=record_id, **data)
 
+    async def fake_create_health_record(user_id: int, data: dict):
+        assert user_id == 10
+        created_payload.update(data)
+        return SimpleNamespace(id=101, user_id=user_id, **data)
+
     async def fake_confirm_exam_report(exam_report_id: int):
         assert exam_report_id == 1
         return report
@@ -720,12 +732,17 @@ async def test_confirm_skips_health_record_update_when_exam_values_are_already_p
         exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
     )
     monkeypatch.setattr(exam_service.health_repository, "update_health_record", fake_update_health_record)
+    monkeypatch.setattr(exam_service.health_repository, "create_health_record", fake_create_health_record)
     monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
 
     confirmed = await exam_service.confirm_exam_report(1)
 
     assert confirmed is report
     assert update_called is False
+    assert created_payload["systolic_bp"] == 160
+    assert created_payload["diastolic_bp"] == 90
+    assert created_payload["ldl_cholesterol"] == 150
+    assert created_payload["source"] == "OCR"
 
 
 @pytest.mark.asyncio
@@ -772,6 +789,7 @@ async def test_confirm_creates_health_record_from_exam_when_latest_record_is_mis
     assert created_payload["systolic_bp"] == 111
     assert created_payload["diastolic_bp"] == 73
     assert created_payload["ldl_cholesterol"] == 100
+    assert created_payload["source"] == "OCR"
     assert "measured_at" in created_payload
 
 

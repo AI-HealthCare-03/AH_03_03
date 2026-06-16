@@ -5,6 +5,45 @@ from app.models.health import HealthRecord
 from app.models.users import User
 from app.repositories import health_repository
 
+HEALTH_RECORD_SOURCE_MANUAL = "MANUAL"
+HEALTH_RECORD_SOURCE_OCR = "OCR"
+HEALTH_RECORD_SOURCE_PROFILE = "PROFILE"
+HEALTH_RECORD_SOURCE_ANALYSIS_PREP = "ANALYSIS_PREP"
+HEALTH_RECORD_SOURCES = {
+    HEALTH_RECORD_SOURCE_MANUAL,
+    HEALTH_RECORD_SOURCE_OCR,
+    HEALTH_RECORD_SOURCE_PROFILE,
+    HEALTH_RECORD_SOURCE_ANALYSIS_PREP,
+}
+HEALTH_RECORD_SNAPSHOT_FIELDS = (
+    "height_cm",
+    "weight_kg",
+    "bmi",
+    "waist_cm",
+    "systolic_bp",
+    "diastolic_bp",
+    "fasting_glucose",
+    "hba1c",
+    "total_cholesterol",
+    "ldl_cholesterol",
+    "hdl_cholesterol",
+    "triglyceride",
+    "has_diabetes",
+    "has_obesity",
+    "has_dyslipidemia",
+    "has_hypertension",
+    "occupation_code",
+    "family_htn",
+    "family_dm",
+    "family_dyslipidemia",
+    "smoking_status",
+    "drinking_frequency",
+    "drinking_amount",
+    "walking_days_per_week",
+    "strength_days_per_week",
+    "sleep_hours",
+)
+
 REQUIRED_USER_ANALYSIS_FIELDS = {
     "gender": "성별",
     "birthday": "나이",
@@ -43,6 +82,7 @@ OPTIONAL_PRECISION_ANALYSIS_FIELDS = {
 
 async def create_health_record(user_id: int, request: HealthRecordCreateRequest) -> HealthRecord:
     data = _with_calculated_bmi(request.model_dump())
+    data["source"] = normalize_health_record_source(data.get("source"), HEALTH_RECORD_SOURCE_MANUAL)
     return await health_repository.create_health_record(user_id, data)
 
 
@@ -61,6 +101,8 @@ async def list_health_records(user_id: int, limit: int = 20, offset: int = 0) ->
 async def update_health_record(record_id: int, request: HealthRecordUpdateRequest) -> HealthRecord | None:
     data = request.model_dump(exclude_unset=True)
     data = _with_calculated_bmi(data)
+    if "source" in data:
+        data["source"] = normalize_health_record_source(data.get("source"), HEALTH_RECORD_SOURCE_MANUAL)
     return await health_repository.update_health_record(record_id, data)
 
 
@@ -131,6 +173,15 @@ def _with_calculated_bmi(data: dict) -> dict:
     height_m = height_decimal / Decimal("100")
     data["bmi"] = (weight_decimal / (height_m * height_m)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return data
+
+
+def normalize_health_record_source(value: object, default: str = HEALTH_RECORD_SOURCE_MANUAL) -> str:
+    normalized = str(value or "").strip().upper()
+    return normalized if normalized in HEALTH_RECORD_SOURCES else default
+
+
+def build_health_record_snapshot_data(record: HealthRecord) -> dict[str, object]:
+    return {field_name: getattr(record, field_name, None) for field_name in HEALTH_RECORD_SNAPSHOT_FIELDS}
 
 
 def _is_missing_value(value: object) -> bool:

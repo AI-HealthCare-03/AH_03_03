@@ -130,8 +130,11 @@ uv run python -m ai_runtime.cv.food.nutrition.scoring.disease_food_scorer
 설정 기준:
 
 - `GPT_VISION_FALLBACK_ENABLED=false`
+- `EXAM_OCR_PROVIDER=fallback`은 OCR provider 미설정 상태를 뜻하며, 더미 측정값을 저장하지 않는다.
+- 운영에서 GPT Vision OCR을 사용하려면 `OPENAI_API_KEY`, `EXAM_OCR_PROVIDER=gpt_vision`, `EXAM_GPT_VISION_ENABLED=true`, `EXAM_GPT_VISION_MODEL`, `GPT_VISION_FALLBACK_ENABLED=true`를 `.prod.env`에 설정한다.
 
 현재 `/api/v1/exams/{exam_id}/ocr`는 OCR 결과 확인/confirm 후 `ExamMeasurement` 값을 `HealthRecord` X2 필드에 반영하는 서비스 흐름을 검증하는 데 초점을 둔다.
+인식 후보가 없거나 provider가 꺼져 있으면 OCR job은 실패 상태가 되어야 하며, `ExamMeasurement` 더미 row를 만들지 않는다. 측정값 조회 SQL에서는 FK 컬럼 `exam_report_id`를 사용한다.
 
 ## MVP 범위 기준
 

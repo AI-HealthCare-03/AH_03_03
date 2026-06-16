@@ -30,6 +30,7 @@ class HealthRecord(models.Model):
     walking_days_per_week = fields.IntField(null=True)
     strength_days_per_week = fields.IntField(null=True)
     sleep_hours = fields.DecimalField(max_digits=4, decimal_places=2, null=True)
+    source = fields.CharField(max_length=30, default="MANUAL")
     measured_at = fields.DatetimeField()
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)

@@ -33,6 +33,7 @@ class HealthRecordCreateRequest(BaseModel):
     walking_days_per_week: int | None = Field(default=None, ge=0, le=7)
     strength_days_per_week: int | None = Field(default=None, ge=0, le=7)
     sleep_hours: Decimal | None = None
+    source: str | None = "MANUAL"
     measured_at: datetime
 
 
@@ -63,6 +64,7 @@ class HealthRecordUpdateRequest(BaseModel):
     walking_days_per_week: int | None = Field(default=None, ge=0, le=7)
     strength_days_per_week: int | None = Field(default=None, ge=0, le=7)
     sleep_hours: Decimal | None = None
+    source: str | None = None
     measured_at: datetime | None = None
 
 
@@ -95,6 +97,7 @@ class HealthRecordResponse(BaseSerializerModel):
     walking_days_per_week: int | None
     strength_days_per_week: int | None
     sleep_hours: Decimal | None
+    source: str
     measured_at: datetime
     created_at: datetime
     updated_at: datetime

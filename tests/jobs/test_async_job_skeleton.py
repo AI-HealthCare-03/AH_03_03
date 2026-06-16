@@ -322,6 +322,45 @@ async def test_exam_ocr_handler_runs_report_ocr_and_marks_success(monkeypatch) -
 
 
 @pytest.mark.asyncio
+async def test_exam_ocr_handler_marks_failed_when_no_measurements(monkeypatch) -> None:
+    from ai_runtime.jobs import exam_ocr_handler
+
+    calls: list[tuple[str, int, str | None]] = []
+
+    async def fake_mark_processing(job_id: int):
+        calls.append(("processing", job_id, None))
+
+    async def fake_run_exam_ocr_from_report(exam_report_id: int):
+        calls.append(("ocr", exam_report_id, None))
+        return SimpleNamespace(
+            measurements=[],
+            ocr_provider="none",
+            fallback_used=False,
+            provider_message="fallback_disabled",
+        )
+
+    async def fake_mark_failed(job_id: int, error_message: str):
+        calls.append(("failed", job_id, error_message))
+
+    async def fake_mark_success(job_id: int, result_payload: dict):
+        calls.append(("success", job_id, str(result_payload)))
+
+    monkeypatch.setattr(handlers.async_job_service, "mark_processing", fake_mark_processing)
+    monkeypatch.setattr(exam_ocr_handler, "run_exam_ocr_from_report", fake_run_exam_ocr_from_report)
+    monkeypatch.setattr(handlers.async_job_service, "mark_failed", fake_mark_failed)
+    monkeypatch.setattr(handlers.async_job_service, "mark_success", fake_mark_success)
+
+    with pytest.raises(handlers.NonRetryableJobError):
+        await handlers.handle_stream_job(15, "exam_ocr.run", {"exam_report_id": 33})
+
+    assert calls == [
+        ("processing", 15, None),
+        ("ocr", 33, None),
+        ("failed", 15, "exam_ocr_service_unavailable:fallback_disabled"),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_exam_ocr_handler_rejects_missing_exam_report_id(monkeypatch) -> None:
     calls: list[tuple[int, str]] = []
 
