@@ -488,13 +488,7 @@ const analysisMetrics = [
     trendKeys: ["exercise"],
     ready: true,
   },
-  {
-    key: "diet",
-    label: "식단 점수 변화",
-    description: "최근 식단 기록의 점수 변화를 확인합니다.",
-    trendKeys: ["diet_score"],
-    ready: true,
-  },
+
 
 ] as const;
 
@@ -635,7 +629,7 @@ export default function DashboardPage() {
       )
     : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
-  const dietScore = dashboardDiets[0]?.diet_score ? String(dashboardDiets[0].diet_score) : latestValue(trends.diet_score);
+  const latestDiet = dashboardDiets[0];
   const bloodPressureSeries = [
     makeValueSeries(trends.blood_pressure, "수축기 혈압", diseaseChartColors.HYPERTENSION, {
       key: "systolic",
@@ -654,7 +648,6 @@ export default function DashboardPage() {
     makeValueSeries(trends.bmi, "BMI", "var(--chart-obesity-soft-line)"),
   ];
   const lifestyleSeries = [
-    makeValueSeries(trends.diet_score, "식단 점수", diseaseChartColors.DIABETES, { suffix: "점" }),
     makeValueSeries(trends.challenge_completion_rate, "챌린지 수행률", diseaseChartColors.OBESITY, { suffix: "%" }),
   ];
   const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
@@ -688,14 +681,8 @@ export default function DashboardPage() {
     {
       label: "챌린지 수행률",
       value: challengeRate,
-      delta: getSeriesDelta([lifestyleSeries[1]]),
-      gauge: toNumber(challengeRate.replace("%", "")),
-    },
-    {
-      label: "식단 점수",
-      value: dietScore === "-" ? "아직 기록 없음" : `${dietScore}점`,
       delta: getSeriesDelta([lifestyleSeries[0]]),
-      gauge: toNumber(dietScore),
+      gauge: toNumber(challengeRate.replace("%", "")),
     },
     {
       label: "수면 시간",
@@ -711,10 +698,8 @@ export default function DashboardPage() {
       ? [...glucoseSeries, ...bloodPressureSeries]
       : activeMetricKey === "weight"
         ? weightSeries
-        : activeMetricKey === "diet"
-          ? [lifestyleSeries[0]]
-          : activeMetricKey === "exercise"
-            ? [lifestyleSeries[1]]
+        : activeMetricKey === "exercise"
+            ? [lifestyleSeries[0]]
             : [];
   const activeChartCards =
     activeMetricKey === "blood"
@@ -747,24 +732,14 @@ export default function DashboardPage() {
               series: weightSeries,
             },
           ]
-        : activeMetricKey === "diet"
-          ? [
-              {
-                title: "식단 점수",
-                unit: "점",
-                value: dietScore === "-" ? "-" : dietScore,
-                delta: getSeriesDelta([lifestyleSeries[0]]),
-                series: [lifestyleSeries[0]],
-              },
-            ]
-          : activeMetricKey === "exercise"
+        : activeMetricKey === "exercise"
             ? [
                 {
                   title: "챌린지 수행률",
                   unit: "%",
                   value: challengeRate,
-                  delta: getSeriesDelta([lifestyleSeries[1]]),
-                  series: [lifestyleSeries[1]],
+                  delta: getSeriesDelta([lifestyleSeries[0]]),
+                  series: [lifestyleSeries[0]],
                 },
               ]
             : [
@@ -781,7 +756,6 @@ export default function DashboardPage() {
     (latestAnalysisResults.length > 0
       ? "최근 분석 결과와 건강 지표 변화를 함께 보면서 생활습관을 꾸준히 조정해보세요."
       : "아직 분석 결과가 없습니다. 건강정보를 입력하고 간편 분석을 실행하면 맞춤 코멘트를 확인할 수 있습니다.");
-  const latestDiet = dashboardDiets[0];
   const dietSummary = String(
     latestDiet?.summary ??
       latestDiet?.analysis_summary ??
@@ -955,7 +929,7 @@ export default function DashboardPage() {
           <div className="card-header">
             <div>
               <h2>식단 추천 결과 요약</h2>
-              <p>최근 식단 기록을 기준으로 식단 점수와 추천 포인트를 확인합니다.</p>
+              <p>최근 식단 기록을 기준으로 추천 포인트를 확인합니다.</p>
             </div>
             <div className="card-actions">
               <Link className="button secondary compact-button" to="/diets">
@@ -965,10 +939,6 @@ export default function DashboardPage() {
           </div>
           {latestDiet ? (
             <div className="dashboard-diet-summary">
-              <div className="dashboard-diet-score">
-                <MiniGauge value={toNumber(latestDiet.diet_score)} />
-                <strong>{latestDiet.diet_score ? `${String(latestDiet.diet_score)}점` : "점수 미산정"}</strong>
-              </div>
               <div className="dashboard-diet-copy">
                 <span>추천 식단 요약</span>
                 <p>{dietSummary || "최근 식단 기록을 기준으로 식사 구성을 점검해보세요."}</p>
@@ -989,7 +959,7 @@ export default function DashboardPage() {
           ) : (
             <div className="empty-state">
               <strong>아직 식단 분석 결과가 없습니다.</strong>
-              <p>식단 이미지를 업로드하면 식단 점수와 추천 포인트를 확인할 수 있습니다.</p>
+              <p>식단 이미지를 업로드하면 추천 포인트를 확인할 수 있습니다.</p>
               <Link className="button secondary compact-button" to="/diets">
                 식단 업로드하기
               </Link>
