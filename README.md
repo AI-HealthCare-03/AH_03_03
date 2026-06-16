@@ -338,7 +338,7 @@ make danger-prod-seed
 
 QA/smoke 스크립트는 로컬 검증용입니다. `scripts/qa/smoke_notification_email.py` 같은 파일은 운영 이미지 런타임 필수 파일이 아니며, 실제 발송 smoke는 운영자가 명시적으로 허용한 별도 절차에서만 실행합니다.
 
-상세 절차는 `docs/deployment/ec2_docker_deploy_guide.md`, `docs/deployment/ec2_prod_env.md`, `docs/ops/docker_stacks.md`를 참고하세요.
+운영 배포 runbook은 `docs/deployment/release_deploy_runbook.md`를 참고하세요. 상세 배포/환경 문서는 `docs/deployment/ec2_docker_deploy_guide.md`, `docs/deployment/ec2_prod_env.md`, `docs/ops/docker_stacks.md`를 참고하세요.
 
 ## 주요 Provider Flag 요약
 
@@ -443,6 +443,7 @@ make dev-migrate
 ## 참고 문서 링크
 
 - Docker stack 정책: `docs/ops/docker_stacks.md`
+- 운영 배포 runbook: `docs/deployment/release_deploy_runbook.md`
 - Secret 처리: `docs/ops/secrets_handling.md`
 - DB migration 정책: `docs/ops/database_migration_policy.md`
 - Langfuse self-host: `docs/ops/langfuse_self_host.md`
