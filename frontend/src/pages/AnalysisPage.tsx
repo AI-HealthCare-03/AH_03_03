@@ -318,7 +318,7 @@ export default function AnalysisPage() {
       <div className="page-header">
         <div>
           <h1>건강 분석 결과</h1>
-          <p>당뇨, 고혈압, 비만, 이상지질혈증 이상 위험도를 한 화면에서 확인합니다.</p>
+          <p>나의 만성질환 위험도 예측 결과를 한눈에 확인해 보세요.</p>
         </div>
         <div className="button-row">
           <Link className="button secondary" to="/health">
@@ -369,7 +369,7 @@ export default function AnalysisPage() {
         </Card>
       )}
       <div className="page-grid">
-        <Card title="분석 기반 건강 코멘트">
+        <Card title="분석결과 기반 AI 건강 코멘트">
           <p>{analysisComment}</p>
         </Card>
       </div>
@@ -396,7 +396,7 @@ export default function AnalysisPage() {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
-              <span>{slot.diseaseName} 관리 필요 단계</span>
+              <span>{slot.diseaseName} 위험도 예측 결과</span>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
                 <div style={{ display: "flex", gap: 6 }}>
