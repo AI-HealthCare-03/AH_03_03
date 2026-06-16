@@ -7,6 +7,7 @@ import {
 } from "../api/notifications";
 import Card from "../components/Card";
 import { formatDateTime, formatRelativeTime } from "../utils/format";
+import { useNavigate } from "react-router-dom";
 
 type Notification = {
   id: number;
@@ -47,6 +48,7 @@ function getNotificationType(item: Notification): string {
 export default function NotificationPage() {
   const [items, setItems] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>("all");
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<number | "all" | null>(null);
@@ -104,6 +106,9 @@ export default function NotificationPage() {
 
   return (
     <div className="page-stack">
+      <button className="button ghost" onClick={() => navigate(-1)} type="button"style={{ alignSelf: "flex-start", fontSize: "13px", padding: "0", marginRight: "auto", marginTop: "-8px", marginBottom: "-8px" }}>
+        ← 뒤로
+      </button>
       <Card
         title="알림"
         actions={
