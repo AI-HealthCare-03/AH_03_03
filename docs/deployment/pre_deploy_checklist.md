@@ -96,21 +96,21 @@ docker push kdu0312/ai-health:ai-v1.0.0
 docker push kdu0312/ai-health:frontend-v1.0.0
 ```
 
-## 4. prod.env 확인
+## 4. .prod.env 확인
 
-`prod.env`는 운영 서버별 secret과 설정을 담는 로컬 파일입니다. 절대 commit하지 않습니다.
+`.prod.env`는 운영 서버별 secret과 설정을 담는 로컬 파일입니다. 절대 commit하지 않습니다.
 `envs/example.prod.env`는 템플릿 파일로 유지합니다.
 
 - [ ] 템플릿 복사
 
 ```bash
-cp envs/example.prod.env prod.env
+cp envs/example.prod.env .prod.env
 ```
 
 - [ ] Git ignore 확인
 
 ```bash
-git check-ignore -v prod.env
+git check-ignore -v .prod.env
 ```
 
 - [ ] 필수 변수 이름 확인
@@ -153,7 +153,7 @@ VITE_API_BASE_URL=/api/v1
 
 `OPENAI_API_KEY`, `LANGFUSE_*`, SMTP 값은 사용하는 provider를 켤 때만 실제 값이 필요합니다. prod에서는 debug/mock/test 계열 flag를 기본 false로 두고, `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`, `REFRESH_TOKEN_COOKIE_SECURE=true`를 유지합니다.
 
-DuckDNS token은 secret입니다. `prod.env`, 문서, PR, issue, shell history, 배포 로그에 원문을 남기지 않습니다.
+DuckDNS token은 secret입니다. `.prod.env`, 문서, PR, issue, shell history, 배포 로그에 원문을 남기지 않습니다.
 
 ## 5. EC2 배포 순서
 
@@ -163,11 +163,11 @@ DuckDNS token은 secret입니다. `prod.env`, 문서, PR, issue, shell history, 
 git pull origin feature/kdu
 ```
 
-- [ ] `prod.env` 작성
+- [ ] `.prod.env` 작성
 
 ```bash
-cp envs/example.prod.env prod.env
-# prod.env 실제 운영값 수정
+cp envs/example.prod.env .prod.env
+# .prod.env 실제 운영값 수정
 ```
 
 - [ ] DuckDNS DNS 확인
@@ -230,13 +230,13 @@ curl -fsS https://healthladder.duckdns.org/api/v1/system/health
 - [ ] ai-worker 로그 확인
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
 ```
 
 - [ ] nginx 로그 확인
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
 ```
 
 - [ ] DB / Redis health 확인
@@ -263,13 +263,13 @@ curl -fsS http://localhost/api/v1/system/health
 - [ ] `ai-worker` running 확인
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml ps ai-worker
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml ps ai-worker
 ```
 
 - [ ] `ai-worker` logs 확인
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
 ```
 
 - [ ] 이메일 인증 job 처리 확인
@@ -309,13 +309,13 @@ FastAPI 컨테이너 재생성 후 dev Nginx가 이전 upstream IP를 물고 있
 make dev-restart-nginx
 ```
 
-### prod.env 누락
+### .prod.env 누락
 
-`prod.env`가 없으면 `make prod-pull`, `make prod-up`이 실패합니다.
+`.prod.env`가 없으면 `make prod-pull`, `make prod-up`이 실패합니다.
 
 ```bash
-cp envs/example.prod.env prod.env
-git check-ignore -v prod.env
+cp envs/example.prod.env .prod.env
+git check-ignore -v .prod.env
 ```
 
 ### SMTP 535 Authentication failed

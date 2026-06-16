@@ -4,7 +4,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-ENV_FILE="${ENV_FILE:-prod.env}"
+ENV_FILE="${ENV_FILE:-.prod.env}"
 COMPOSE_FILE="${COMPOSE_FILE:-infra/docker/docker-compose.prod.yml}"
 LOCAL_HEALTH_URL="${LOCAL_HEALTH_URL:-http://localhost/api/v1/system/health}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"

@@ -1,7 +1,7 @@
 DEV_ENV ?= .env
-PROD_ENV ?= prod.env
+PROD_ENV_FILE ?= .prod.env
 DEV_COMPOSE = docker compose --env-file $(DEV_ENV) -f infra/docker/docker-compose.dev.yml
-PROD_COMPOSE = docker compose --env-file $(PROD_ENV) -f infra/docker/docker-compose.prod.yml
+PROD_COMPOSE = docker compose --env-file $(PROD_ENV_FILE) -f infra/docker/docker-compose.prod.yml
 COMPOSE_DEV = $(DEV_COMPOSE)
 FASTAPI_EXEC = $(DEV_COMPOSE) exec fastapi uv run --no-sync
 DOCKER_USER ?= kdu0312

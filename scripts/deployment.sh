@@ -4,7 +4,7 @@ set -eo pipefail
 # DEPRECATED:
 #   This legacy interactive script uses envs/.prod.env and mutates nginx conf
 #   files directly. The current deployment flow is:
-#     cp envs/example.prod.env prod.env
+#     cp envs/example.prod.env .prod.env
 #     make prod-pull
 #     make prod-up
 #     make prod-migrate

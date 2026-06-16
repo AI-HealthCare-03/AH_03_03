@@ -3,7 +3,7 @@ set -eo pipefail
 
 # DEPRECATED:
 #   This legacy interactive script uses envs/.prod.env and mutates nginx conf
-#   files directly. Prefer the current prod.env + infra/docker/docker-compose.prod.yml
+#   files directly. Prefer the current .prod.env + infra/docker/docker-compose.prod.yml
 #   flow documented in docs/deployment/ec2_prod_env.md. Keep this script only
 #   as a historical/manual certbot reference.
 

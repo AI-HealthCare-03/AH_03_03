@@ -1,6 +1,0 @@
-classes =3165
-train  = /workspace/food3165_yolo/yolo/data/food/food_train_20210211.txt
-valid  = /workspace/food3165_yolo/yolo/data/food/food_val_20210211.txt
-#valid = coco_testdev
-names = /workspace/food3165_yolo/yolo/data/food/food3165-classes.names
-backup = /workspace/food3165_yolo/yolo/data/food/weights/

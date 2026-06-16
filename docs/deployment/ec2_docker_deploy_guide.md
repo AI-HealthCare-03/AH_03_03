@@ -6,7 +6,7 @@
 
 - prod compose: `infra/docker/docker-compose.prod.yml`
 - dev compose: `infra/docker/docker-compose.dev.yml`
-- prod env: `prod.env`
+- prod env: `.prod.env`
 - prod env template: `envs/example.prod.env`
 - prod domain: `healthladder.duckdns.org`
 - HTTPS Nginx: `infra/nginx/prod_https.conf`
@@ -103,15 +103,15 @@ curl -I http://healthladder.duckdns.org
 
 `curl -I http://...`는 인증서 발급 전 HTTP bootstrap 확인용입니다.
 
-## 7. prod.env 작성
+## 7. .prod.env 작성
 
 표준 생성:
 
 ```bash
-cp envs/example.prod.env prod.env
+cp envs/example.prod.env .prod.env
 ```
 
-`prod.env`는 운영 서버 로컬 secret 파일이며 Git에 올리지 않습니다. 실제 값은 화면 공유/로그/PR에 노출하지 않습니다.
+`.prod.env`는 운영 서버 로컬 secret 파일이며 Git에 올리지 않습니다. 실제 값은 화면 공유/로그/PR에 노출하지 않습니다.
 
 중요 값:
 
@@ -171,7 +171,7 @@ make prod-pull
 표준 흐름:
 
 ```bash
-cp envs/example.prod.env prod.env
+cp envs/example.prod.env .prod.env
 make prod-pull
 make prod-up
 make prod-migrate
@@ -179,10 +179,10 @@ make prod-health
 make prod-logs
 ```
 
-직접 compose를 써야 할 때도 반드시 prod compose와 `prod.env`를 명시합니다.
+직접 compose를 써야 할 때도 반드시 prod compose와 `.prod.env`를 명시합니다.
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용입니다. 운영 표준으로 쓰지 않습니다.
@@ -231,7 +231,7 @@ prod compose의 Nginx는 외부 `80/443`을 노출합니다.
 certbot 예시:
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml run --rm certbot \
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml run --rm certbot \
   certonly --webroot -w /var/www/certbot \
   -d healthladder.duckdns.org \
   --email admin@example.com \
@@ -246,7 +246,7 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml run -
 /etc/letsencrypt/live/healthladder.duckdns.org/privkey.pem
 ```
 
-`scripts/certbot.sh`는 legacy interactive reference입니다. 현재 표준 배포 흐름은 `prod.env`와 `infra/docker/docker-compose.prod.yml` 기준 문서를 따릅니다.
+`scripts/certbot.sh`는 legacy interactive reference입니다. 현재 표준 배포 흐름은 `.prod.env`와 `infra/docker/docker-compose.prod.yml` 기준 문서를 따릅니다.
 
 ## 13. health check
 
@@ -302,7 +302,7 @@ uv run python scripts/qa/smoke_notification_email.py --confirm-send
 
 ## 15. 운영 주의사항
 
-- `prod.env`와 secret은 Git에 올리지 않습니다.
+- `.prod.env`와 secret은 Git에 올리지 않습니다.
 - DuckDNS token은 절대 기록하지 않습니다.
 - `docker compose config` 원문 출력은 secret 노출 위험이 있어 사용하지 않습니다.
 - 필요한 경우 `config --quiet` 또는 `config --services`만 사용합니다.
@@ -313,8 +313,8 @@ uv run python scripts/qa/smoke_notification_email.py --confirm-send
 안전한 compose 확인:
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml config --quiet
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml config --services
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml config --quiet
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml config --services
 ```
 
 ## 16. rollback / 로그 확인
@@ -323,9 +323,9 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml confi
 
 ```bash
 make prod-logs
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 fastapi
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 fastapi
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
 ```
 
 Rollback 기본 방향:

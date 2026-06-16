@@ -64,11 +64,11 @@ cp envs/example.local.env .env
 주의:
 
 - `.env`와 secret은 절대 commit하지 않습니다.
-- `prod.env`도 절대 commit하지 않습니다.
+- `.prod.env`도 절대 commit하지 않습니다.
 - 실제 OpenAI key, SMTP password, Langfuse secret 값은 README나 PR에 넣지 않습니다.
 - secret 예시는 `<OPENAI_API_KEY>`, `<SMTP_PASSWORD>`처럼 placeholder로만 작성합니다.
 - `docker compose config` 전체 출력은 secret이 펼쳐질 수 있으므로 문서/화면공유에 사용하지 마세요.
-- 운영 배포용 `prod.env`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
+- 운영 배포용 `.prod.env`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
 
 최소 dev 예시:
 
@@ -277,7 +277,7 @@ make qa-frontend
 
 ## Prod Image / EC2 배포 준비
 
-운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
+운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `.prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
 
 기본 이미지 tag:
 
@@ -300,8 +300,8 @@ docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Arch
 운영 배포 env 준비와 실행:
 
 ```bash
-cp envs/example.prod.env prod.env
-# prod.env 실제 운영값 수정
+cp envs/example.prod.env .prod.env
+# .prod.env 실제 운영값 수정
 make prod-pull
 make prod-up
 make prod-migrate
@@ -310,7 +310,7 @@ make prod-ps
 make prod-logs
 ```
 
-DuckDNS 배포 기준 도메인은 `healthladder.duckdns.org`입니다. `prod.env`에는 같은 도메인 기준으로 아래 public URL 값을 맞춥니다.
+DuckDNS 배포 기준 도메인은 `healthladder.duckdns.org`입니다. `.prod.env`에는 같은 도메인 기준으로 아래 public URL 값을 맞춥니다.
 
 ```env
 COOKIE_DOMAIN=healthladder.duckdns.org

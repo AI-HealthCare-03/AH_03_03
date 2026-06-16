@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-ENV_FILE="${ENV_FILE:-prod.env}"
+ENV_FILE="${ENV_FILE:-.prod.env}"
 COMPOSE_FILE="${COMPOSE_FILE:-infra/docker/docker-compose.prod.yml}"
 
 if [[ $# -ne 1 ]]; then
@@ -37,7 +37,7 @@ fi
 
 if [[ ! -f "${ENV_PATH}" ]]; then
   echo "env file not found: ${ENV_PATH}" >&2
-  echo "Set ENV_FILE=/path/to/prod.env if your production env file is elsewhere." >&2
+  echo "Set ENV_FILE=/path/to/.prod.env if your production env file is elsewhere." >&2
   exit 1
 fi
 

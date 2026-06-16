@@ -247,14 +247,14 @@ make image-build-native-check
 `frontend/Dockerfile`의 `VITE_*` 값은 build-time에 정적 bundle로 들어간다. 브라우저 public config만 넣고 server secret은 절대 build arg로 전달하지 않는다.
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml pull
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml pull
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
 Makefile 표준 흐름:
 
 ```bash
-cp envs/example.prod.env prod.env
+cp envs/example.prod.env .prod.env
 make prod-pull
 make prod-up
 make prod-migrate
