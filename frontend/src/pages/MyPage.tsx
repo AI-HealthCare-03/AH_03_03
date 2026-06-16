@@ -60,7 +60,6 @@ const myPageMenuItems: MyPageMenuItem[] = [
   { label: "기본 건강정보", to: "/health/profile" },
   { label: "복약/영양제", to: "/medications" },
   { label: "챌린지 현황", to: "/challenges" },
-  { label: "내 가족", to: "/family" },
 ];
 
 function getText(item: Item | undefined | null, key: string, fallback = "-"): string {
@@ -245,7 +244,7 @@ export default function MyPage() {
     () => [
       ["생년월일", backendUser?.birthday],
       ["성별", backendUser?.gender === "FEMALE" ? "여성" : backendUser?.gender === "MALE" ? "남성" : "-"],
-      ["키/몸무게", `${getText(latestHealth, "height_cm")}cm / ${getText(latestHealth, "weight_kg")}kg`],
+      ["키/몸무게", `${latestHealth?.height_cm != null ? Number(latestHealth.height_cm).toFixed(1) : "-"}cm / ${getText(latestHealth, "weight_kg")}kg`],
       ["BMI", getText(latestHealth, "bmi")],
     ],
     [backendUser, latestHealth],
@@ -313,40 +312,21 @@ export default function MyPage() {
           <p>계정 정보와 건강 분석 내역을 확인하고 관리합니다.</p>
         </div>
       </header>
-    <div className="dashboard-grid">
-      <Card>
-        <div className="mypage-menu">
-          {myPageMenuItems.map((item) => {
-            if (item.to) {
-              return (
-                <Link className="mypage-menu-item" key={item.label} to={item.to}>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            }
-
-            return (
-              <button
-                className="mypage-menu-item"
-                key={item.label}
-                type="button"
-              >
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
+    <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
       <div className="page-stack">
         {notice && <div className="state-box">{notice}</div>}
         {error && <ErrorMessage message={error} />}
 
         <Card title="프로필/기본 내역" actions={
           !isEditingProfile ? (
-            <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
-              수정
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Link className="btn-primary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/family">
+                내 가족
+              </Link>
+              <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
+                수정
+              </button>
+            </div>
           ) : undefined
         }>
           <div className="profile-card-row">
@@ -487,7 +467,7 @@ export default function MyPage() {
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Activity size={14} /> 혈압
+                  <Activity size={14} /> 혈압(mmHg)
                 </span>
                 <strong>
                   {getText(latestHealth, "systolic_bp", "-")}/{getText(latestHealth, "diastolic_bp", "-")}
@@ -495,7 +475,7 @@ export default function MyPage() {
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Droplet size={14} /> 공복혈당
+                  <Droplet size={14} /> 공복혈당(mg/dL)
                 </span>
                 <strong>{getText(latestHealth, "fasting_glucose", "기록 없음")}</strong>
               </div>
