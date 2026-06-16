@@ -16,6 +16,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import ErrorMessage from "../components/ErrorMessage";
 
 type Item = Record<string, unknown>;
+type MedicationFormErrors = Partial<Record<"name" | "medication_type" | "reminder_time", string>>;
 
 const MEDICATION_TYPE_LABEL: Record<string, string> = {
   MEDICATION: "경구약",
@@ -25,6 +26,42 @@ const MEDICATION_TYPE_LABEL: Record<string, string> = {
 
 function getMedicationTypeLabel(type: unknown): string {
   return MEDICATION_TYPE_LABEL[String(type ?? "")] ?? String(type ?? "-");
+}
+
+function cleanOptionalText(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return text.length > 0 ? text : null;
+}
+
+function validateMedicationDraft(draft: MedicationPayload): MedicationFormErrors {
+  const errors: MedicationFormErrors = {};
+  const name = String(draft.name ?? "").trim();
+  const medicationType = String(draft.medication_type ?? "").trim();
+  const reminderTime = String(draft.reminder_time ?? "").trim();
+
+  if (!name) {
+    errors.name = "약 이름을 입력해 주세요.";
+  }
+  if (!medicationType || !Object.prototype.hasOwnProperty.call(MEDICATION_TYPE_LABEL, medicationType)) {
+    errors.medication_type = "구분을 선택해 주세요.";
+  }
+  if (reminderTime && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(reminderTime)) {
+    errors.reminder_time = "복용 시간은 08:00처럼 입력해 주세요.";
+  }
+
+  return errors;
+}
+
+function buildMedicationPayload(draft: MedicationPayload): MedicationPayload {
+  return {
+    name: String(draft.name ?? "").trim(),
+    medication_type: String(draft.medication_type ?? "SUPPLEMENT").trim(),
+    dosage: cleanOptionalText(draft.dosage),
+    frequency: cleanOptionalText(draft.frequency),
+    reminder_time: cleanOptionalText(draft.reminder_time),
+    memo: cleanOptionalText(draft.memo),
+    is_active: draft.is_active !== false,
+  };
 }
 
 export default function MedicationPage() {
@@ -40,6 +77,7 @@ export default function MedicationPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [records, setRecords] = useState<Item[]>([]);
   const [error, setError] = useState("");
+  const [registerErrors, setRegisterErrors] = useState<MedicationFormErrors>({});
   const [selectedMedicationId, setSelectedMedicationId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<MedicationPayload>({});
   const [pendingAction, setPendingAction] = useState<null | { type: "deactivate" | "delete"; medicationId: number }>(
@@ -68,11 +106,25 @@ export default function MedicationPage() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    await submitRegisterDraft();
+  };
+
+  const submitRegisterDraft = async () => {
     if (isMutating) return;
     setError("");
+    const validationErrors = validateMedicationDraft(registerDraft);
+    setRegisterErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      setError("필수 입력값을 확인해 주세요.");
+      return;
+    }
+
+    const payload = buildMedicationPayload(registerDraft);
     try {
       setIsMutating(true);
-      await createMedication(registerDraft);
+      const created = await createMedication<Item>(payload);
+      setItems((prev) => [created, ...prev.filter((item) => Number(item.id) !== Number(created.id))]);
+      setRecords([]);
       setRegisterDraft({
         name: "",
         medication_type: "SUPPLEMENT",
@@ -82,6 +134,7 @@ export default function MedicationPage() {
         memo: "",
         is_active: true,
       });
+      setRegisterErrors({});
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 등록에 실패했습니다.");
@@ -194,7 +247,7 @@ export default function MedicationPage() {
           </p>
         </div>
 
-        <form className="form" onSubmit={submit}>
+        <form className="form" noValidate onSubmit={submit}>
           <div className="form two-col">
             <label>
               <span style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
@@ -205,8 +258,8 @@ export default function MedicationPage() {
                 placeholder="약 이름 직접 입력"
                 value={String(registerDraft.name ?? "")}
                 onChange={(e) => setRegisterDraft((prev) => ({ ...prev, name: e.target.value }))}
-                required
               />
+              {registerErrors.name && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{registerErrors.name}</span>}
             </label>
             <label>
               구분
@@ -218,6 +271,7 @@ export default function MedicationPage() {
                 <option value="SUPPLEMENT">영양제</option>
                 <option value="PRESCRIPTION">처방약</option>
               </select>
+              {registerErrors.medication_type && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{registerErrors.medication_type}</span>}
             </label>
             <label>
               용량
@@ -247,6 +301,7 @@ export default function MedicationPage() {
                   }))
                 }
               />
+              {registerErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{registerErrors.reminder_time}</span>}
             </label>
             <label>
               메모
@@ -259,7 +314,7 @@ export default function MedicationPage() {
           </div>
           <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
             <button disabled={isMutating} type="submit">
-              추가
+              {isMutating ? "추가 중..." : "추가"}
             </button>
           </div>
         </form>

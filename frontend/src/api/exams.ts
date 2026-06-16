@@ -45,6 +45,10 @@ export async function listExams<T = ExamReport[]>(params?: { limit?: number; off
   return apiRequest<T>(`/exams${qs ? `?${qs}` : ""}`);
 }
 
+export async function getExam(examId: number): Promise<ExamReport> {
+  return apiRequest<ExamReport>(`/exams/${examId}`);
+}
+
 export async function createExam(payload: {
   original_filename: string;
   file_path: string;

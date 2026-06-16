@@ -7,7 +7,6 @@ import {
   createHealthRecord,
   getAnalysisReadiness,
   getLatestHealthRecord,
-  updateHealthRecord,
   type HealthRecordPayload,
 } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
@@ -17,6 +16,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
 type HealthRecord = Record<string, unknown>;
+type HealthRecordSource = NonNullable<HealthRecordPayload["source"]>;
 type Readiness = {
   is_ready: boolean;
   basic_ready?: boolean;
@@ -288,11 +288,16 @@ function parseNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function buildHealthPayload(form: HealthProfileFormState, bmi: number | null): HealthRecordPayload {
+function buildHealthPayload(
+  form: HealthProfileFormState,
+  bmi: number | null,
+  source: HealthRecordSource,
+): HealthRecordPayload {
   const walkingDays = parseNumber(form.walking_days);
   const strengthDays = parseNumber(form.strength_days);
   const payload: HealthRecordPayload = {
     measured_at: new Date().toISOString(),
+    source,
     occupation_code: form.occupation,
     family_htn: form.family_htn,
     family_dm: form.family_dm,
@@ -395,6 +400,7 @@ export default function HealthProfilePage() {
   const [missingInfoDialog, setMissingInfoDialog] = useState<MissingInfoDialog | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
 
@@ -453,6 +459,8 @@ export default function HealthProfilePage() {
   }, [backendUser?.id]);
 
   const save = async (): Promise<boolean> => {
+    setError("");
+    setNotice("");
     const validationError = validateForm(form);
     if (validationError) {
       setError(validationError);
@@ -462,16 +470,20 @@ export default function HealthProfilePage() {
       setError("저장할 건강정보를 먼저 입력해주세요.");
       return false;
     }
-    const payload = buildHealthPayload(form, bmi);
-    if (latestRecord?.id) {
-      await updateHealthRecord(Number(latestRecord.id), payload);
-    } else {
+    const payload = buildHealthPayload(form, bmi, "PROFILE");
+    try {
+      setIsSaving(true);
       await createHealthRecord(payload);
+      await load();
+      setEditing(false);
+      setNotice("건강정보가 저장되었습니다. 이후 분석에 반영됩니다.");
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "건강정보 저장에 실패했습니다.");
+      throw err;
+    } finally {
+      setIsSaving(false);
     }
-    await load();
-    setEditing(false);
-    setNotice("건강정보가 저장되었습니다. 이후 분석에 반영됩니다.");
-    return true;
   };
 
   const runAnalysis = async (mode: AnalysisMode) => {
@@ -586,6 +598,9 @@ export default function HealthProfilePage() {
         <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=precision">
           정밀 분석 정보 입력
         </Link>
+        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health">
+          건강정보 기록
+        </Link>
       </div>
 
       {error && <ErrorMessage message={error} />}
@@ -678,16 +693,11 @@ export default function HealthProfilePage() {
             <div className="button-row sticky-actions">
               <button
                 className="btn-primary"
-                onClick={() =>
-                  setDialog({
-                    type: "save",
-                    title: "건강정보 저장",
-                    message: "입력한 건강정보를 저장하면 이후 분석에 반영됩니다. 저장하시겠습니까?",
-                  })
-                }
+                disabled={isSaving || runningMode !== null}
+                onClick={() => void save().catch(() => undefined)}
                 type="button"
               >
-                저장
+                {isSaving ? "저장 중..." : "저장"}
               </button>
               <button
                 className="btn-secondary"

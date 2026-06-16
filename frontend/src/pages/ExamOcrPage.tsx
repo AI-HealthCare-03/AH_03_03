@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import {
   confirmExam,
   createExam,
+  getExam,
   listMeasurements,
   runExamOcr,
   updateMeasurement,
@@ -11,6 +12,7 @@ import {
   type ExamReport,
 } from "../api/exams";
 import { normalizeImageForPreview } from "../api/uploads";
+import type { AsyncJob } from "../api/jobs";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
@@ -110,29 +112,52 @@ export default function ExamOcrPage() {
       setIsRunningOcr(false);
       setOcrJobId(null);
       if (!exam) {
-        showFailure({ message: "이미지를 다시 확인한 뒤 업로드해 주세요." });
+        const message = "OCR 결과를 확인할 검진표 정보가 없습니다. 파일을 다시 선택해 주세요.";
+        setError(message);
+        showFailure({ message });
+        setCanRetryOcr(true);
         return;
       }
       try {
+        const latestExam = await getExam(exam.id);
         const latestMeasurements = await listMeasurements(exam.id);
+        setExam(latestExam);
         setMeasurements(latestMeasurements);
+        if (latestExam.ocr_status === "FAILED" || latestMeasurements.length === 0) {
+          const message = getOcrEmptyResultMessage(latestExam.ocr_status);
+          setError(message);
+          showFailure({ message });
+          setCanRetryOcr(true);
+          return;
+        }
         setCanRetryOcr(false);
+        setError("");
         showSuccess({ message: "인식된 항목을 확인하고 필요한 경우 수정해 주세요." });
-      } catch {
-        showFailure({ message: "이미지를 다시 확인한 뒤 업로드해 주세요." });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "OCR 결과를 확인하지 못했습니다. 파일을 다시 확인한 뒤 업로드해 주세요.";
+        setError(message);
+        showFailure({ message });
         setCanRetryOcr(true);
       }
     },
     onFailure: (job) => {
+      const message = getOcrFailureMessage(job);
+      if (exam) {
+        void getExam(exam.id).then(setExam).catch(() => undefined);
+      }
+      setMeasurements([]);
+      setError(message);
       showFailure({
-        message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "이미지를 다시 확인한 뒤 업로드해 주세요.",
+        message,
       });
       setCanRetryOcr(true);
       setIsRunningOcr(false);
       setOcrJobId(null);
     },
     onTimeout: () => {
-      showFailure({ message: "이미지를 다시 확인한 뒤 업로드해 주세요." });
+      const message = "OCR 작업 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.";
+      setError(message);
+      showFailure({ message });
       setCanRetryOcr(true);
       setIsRunningOcr(false);
       setOcrJobId(null);
@@ -215,6 +240,16 @@ export default function ExamOcrPage() {
   const saveAndConfirm = async () => {
     if (!exam) {
       setError("먼저 측정값 후보를 생성해주세요.");
+      return;
+    }
+    if (measurements.length === 0) {
+      const message = "인식된 측정값 후보가 없어 검진 결과를 등록할 수 없습니다. OCR provider 설정을 확인하거나 파일을 다시 업로드해 주세요.";
+      setError(message);
+      showFeedback("error", {
+        title: "등록할 검진 결과가 없습니다.",
+        message,
+      });
+      setCanRetryOcr(true);
       return;
     }
     setError("");
@@ -432,7 +467,9 @@ export default function ExamOcrPage() {
         <div className="ocr-result-table">
           {measurements.length === 0 ? (
             <div className="state-box">
-              아직 인식된 검진표가 없습니다. 파일을 업로드하고 '검진표 인식 시작'버튼을 눌러주세요.
+              {exam?.ocr_status === "FAILED" || canRetryOcr
+                ? "저장된 측정값 후보가 없습니다. OCR provider 설정 또는 업로드 파일을 확인한 뒤 다시 시도해 주세요."
+                : "아직 인식된 검진표가 없습니다. 파일을 업로드하고 '검진표 인식 시작' 버튼을 눌러주세요."}
             </div>
           ) : (
             measurements.map((m) => (
@@ -477,6 +514,33 @@ export default function ExamOcrPage() {
       </Card>
     </div>
   );
+}
+
+function getOcrFailureMessage(job: AsyncJob): string {
+  if (job.status === "CANCELED") {
+    return "OCR 작업이 취소되었습니다.";
+  }
+  const errorMessage = job.error_message ?? "";
+  if (errorMessage.includes("service_unavailable") || errorMessage.includes("fallback_disabled")) {
+    return "건강검진 OCR 기능이 현재 비활성화되어 있습니다. 운영 환경에서 OCR provider 설정이 필요합니다.";
+  }
+  if (errorMessage.includes("gpt_vision_disabled")) {
+    return "GPT Vision OCR이 비활성화되어 있습니다. 운영 환경에서 EXAM_GPT_VISION_ENABLED와 provider 설정을 확인해 주세요.";
+  }
+  if (errorMessage.includes("paddleocr_disabled")) {
+    return "PaddleOCR이 비활성화되어 있습니다. 운영 환경에서 OCR provider 설정을 확인해 주세요.";
+  }
+  if (errorMessage.includes("no_measurements")) {
+    return "검진표에서 측정값 후보를 찾지 못했습니다. 파일이 선명한지 확인한 뒤 다시 업로드해 주세요.";
+  }
+  return "검진표 OCR에 실패했습니다. 파일을 다시 확인한 뒤 업로드해 주세요.";
+}
+
+function getOcrEmptyResultMessage(ocrStatus: string): string {
+  if (ocrStatus === "FAILED") {
+    return "검진표 OCR이 실패했고 저장된 측정값 후보가 없습니다. OCR provider 설정 또는 업로드 파일을 확인해 주세요.";
+  }
+  return "인식된 측정값 후보가 없습니다. 파일이 선명한지 확인한 뒤 다시 업로드해 주세요.";
 }
 
 function isPdfFile(file: File): boolean {

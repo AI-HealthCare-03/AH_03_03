@@ -50,6 +50,11 @@ async def handle_exam_ocr(job_id: int, payload: dict[str, Any]) -> None:
     from ai_runtime.jobs import exam_ocr_handler
 
     response = await exam_ocr_handler.run_exam_ocr_from_report(exam_report_id)
+    if not response.measurements:
+        error_message = _exam_ocr_failure_message(response.provider_message)
+        await async_job_service.mark_failed(job_id, error_message)
+        raise NonRetryableJobError(error_message)
+
     await async_job_service.mark_success(
         job_id,
         {
@@ -60,6 +65,13 @@ async def handle_exam_ocr(job_id: int, payload: dict[str, Any]) -> None:
             "provider_message": response.provider_message,
         },
     )
+
+
+def _exam_ocr_failure_message(provider_message: str | None) -> str:
+    provider_reason = provider_message or "no_measurements"
+    if any(token in provider_reason for token in ("disabled", "unavailable", "missing")):
+        return f"exam_ocr_service_unavailable:{provider_reason}"
+    return f"exam_ocr_no_measurements:{provider_reason}"
 
 
 @register_job_handler(async_job_service.DIET_ANALYZE_IMAGE_JOB_TYPE)

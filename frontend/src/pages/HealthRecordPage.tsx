@@ -9,7 +9,6 @@ import {
   getAnalysisReadiness,
   getLatestHealthRecord,
   listHealthRecords,
-  updateHealthRecord,
   type HealthRecordPayload,
 } from "../api/health";
 import { useAuth } from "../auth/AuthContext";
@@ -23,6 +22,7 @@ import HealthProfileForm, {
 import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 
 type HealthRecord = Record<string, unknown>;
+type HealthRecordSource = NonNullable<HealthRecordPayload["source"]>;
 type Readiness = {
   is_ready: boolean;
   basic_ready?: boolean;
@@ -174,11 +174,16 @@ function formFromRecord(
   };
 }
 
-function buildHealthPayload(form: HealthProfileFormState, bmi: number | null): HealthRecordPayload {
+function buildHealthPayload(
+  form: HealthProfileFormState,
+  bmi: number | null,
+  source: HealthRecordSource,
+): HealthRecordPayload {
   const walkingDays = parseNumber(form.walking_days);
   const strengthDays = parseNumber(form.strength_days);
   const payload: HealthRecordPayload = {
     measured_at: new Date().toISOString(),
+    source,
     occupation_code: form.occupation,
     family_htn: form.family_htn,
     family_dm: form.family_dm,
@@ -235,12 +240,51 @@ function hasMeaningfulHealthData(form: HealthProfileFormState): boolean {
   return values.some((value) => value !== "") || [form.family_htn, form.family_dm, form.family_dyslipidemia].some((value) => value !== "UNKNOWN");
 }
 
+function validateHealthInput(form: HealthProfileFormState): string[] {
+  const ranges: Array<[keyof HealthProfileFormState, string, number, number]> = [
+    ["height_cm", "키", 50, 250],
+    ["weight_kg", "몸무게", 20, 300],
+    ["waist_cm", "허리둘레", 30, 200],
+    ["systolic_bp", "수축기 혈압", 60, 250],
+    ["diastolic_bp", "이완기 혈압", 30, 160],
+    ["fasting_glucose", "공복혈당", 40, 500],
+    ["hba1c", "당화혈색소", 3, 20],
+    ["total_cholesterol", "총콜레스테롤", 50, 500],
+    ["triglyceride", "중성지방", 20, 1000],
+    ["hdl_cholesterol", "HDL 콜레스테롤", 10, 150],
+    ["ldl_cholesterol", "LDL 콜레스테롤", 10, 400],
+    ["walking_days", "걷기 일수", 0, 7],
+    ["strength_days", "근력운동 일수", 0, 7],
+  ];
+  return ranges
+    .map(([key, label, min, max]) => {
+      const raw = String(form[key] ?? "").trim();
+      if (!raw) {
+        return "";
+      }
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < min || value > max) {
+        return `${label} (${min}~${max})`;
+      }
+      return "";
+    })
+    .filter(Boolean);
+}
+
 function formatDate(value: unknown): string {
   if (!value) {
     return "-";
   }
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ko-KR");
+}
+
+function formatDateTime(value: unknown): string {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ko-KR");
 }
 
 function getValue(record: HealthRecord, key: string, unit = ""): string {
@@ -260,6 +304,63 @@ function getDisplayValue(record: HealthRecord, key: string, unit = ""): string {
   return `${healthValueLabels[key]?.[stringValue] ?? stringValue}${unit}`;
 }
 
+function getSourceLabel(value: unknown): string {
+  switch (String(value ?? "MANUAL").toUpperCase()) {
+    case "OCR":
+      return "검진표 OCR";
+    case "PROFILE":
+      return "한눈에 보기 수정";
+    case "ANALYSIS_PREP":
+      return "분석 전 저장";
+    case "MANUAL":
+    default:
+      return "수기 입력";
+  }
+}
+
+function getRecordSummary(record: HealthRecord): string {
+  const items: string[] = [];
+  const systolic = record.systolic_bp;
+  const diastolic = record.diastolic_bp;
+  if (systolic !== undefined && systolic !== null && diastolic !== undefined && diastolic !== null) {
+    items.push(`혈압 ${systolic}/${diastolic} mmHg`);
+  }
+  if (record.weight_kg !== undefined && record.weight_kg !== null) {
+    items.push(`체중 ${record.weight_kg}kg`);
+  }
+  if (record.fasting_glucose !== undefined && record.fasting_glucose !== null) {
+    items.push(`공복혈당 ${record.fasting_glucose}mg/dL`);
+  }
+  if (record.ldl_cholesterol !== undefined && record.ldl_cholesterol !== null) {
+    items.push(`LDL ${record.ldl_cholesterol}mg/dL`);
+  }
+  return items.length > 0 ? items.join(" · ") : "주요 수치 미입력";
+}
+
+const recordDetailItems: Array<{ key: string; label: string; unit?: string; display?: boolean }> = [
+  { key: "height_cm", label: "키", unit: "cm" },
+  { key: "weight_kg", label: "몸무게", unit: "kg" },
+  { key: "bmi", label: "BMI" },
+  { key: "waist_cm", label: "허리둘레", unit: "cm" },
+  { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
+  { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
+  { key: "fasting_glucose", label: "공복혈당", unit: "mg/dL" },
+  { key: "hba1c", label: "당화혈색소", unit: "%" },
+  { key: "total_cholesterol", label: "총콜레스테롤", unit: "mg/dL" },
+  { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL" },
+  { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL" },
+  { key: "triglyceride", label: "중성지방", unit: "mg/dL" },
+  { key: "occupation_code", label: "직업군" },
+  { key: "family_htn", label: "고혈압 가족력", display: true },
+  { key: "family_dm", label: "당뇨병 가족력", display: true },
+  { key: "family_dyslipidemia", label: "이상지질혈증 가족력", display: true },
+  { key: "smoking_status", label: "흡연", display: true },
+  { key: "drinking_frequency", label: "음주 빈도", display: true },
+  { key: "drinking_amount", label: "음주량", display: true },
+  { key: "walking_days_per_week", label: "걷기 일수", unit: "일/주" },
+  { key: "strength_days_per_week", label: "근력운동 일수", unit: "일/주" },
+];
+
 export default function HealthRecordPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -267,10 +368,13 @@ export default function HealthRecordPage() {
   const [form, setForm] = useState(initialForm);
   const [latestRecord, setLatestRecord] = useState<HealthRecord | null>(null);
   const [records, setRecords] = useState<HealthRecord[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<HealthRecord | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [inputErrors, setInputErrors] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
@@ -322,6 +426,12 @@ export default function HealthRecordPage() {
     ]);
     setLatestRecord(latest);
     setRecords(list);
+    setSelectedRecord((current) => {
+      if (!current) {
+        return null;
+      }
+      return list.find((record) => Number(record.id) === Number(current.id)) ?? null;
+    });
     setReadiness(readinessResult);
     setForm(formFromRecord(latest, backendUser));
   };
@@ -340,21 +450,39 @@ export default function HealthRecordPage() {
     }
   }, [searchParams]);
 
-  const save = async () => {
+  const save = async (
+    options: { showNotice?: boolean; source?: HealthRecordSource } = {},
+  ): Promise<HealthRecord | null> => {
+    const showNoticeMessage = options.showNotice ?? true;
     setError("");
     setNotice("");
+    setInputErrors([]);
     if (!hasMeaningfulHealthData(form)) {
+      setInputErrors(["저장할 건강정보"]);
       setError("저장할 건강정보를 먼저 입력해주세요.");
-      return;
+      return null;
     }
-    const payload = buildHealthPayload(form, bmi);
-    if (latestRecord?.id) {
-      await updateHealthRecord(Number(latestRecord.id), payload);
-    } else {
-      await createHealthRecord(payload);
+    const validationErrors = validateHealthInput(form);
+    if (validationErrors.length > 0) {
+      setInputErrors(validationErrors);
+      setError("입력값을 확인해 주세요.");
+      return null;
     }
-    await load();
-    setNotice("건강정보가 저장되었습니다.");
+    const payload = buildHealthPayload(form, bmi, options.source ?? "MANUAL");
+    try {
+      setIsSaving(true);
+      const saved = await createHealthRecord<HealthRecord>(payload);
+      await load();
+      if (showNoticeMessage) {
+        setNotice("건강정보가 저장되었습니다.");
+      }
+      return saved;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "건강정보 저장에 실패했습니다.");
+      throw err;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const submit = async (event: FormEvent) => {
@@ -367,14 +495,23 @@ export default function HealthRecordPage() {
     setNotice("");
     clearFeedback();
     try {
-      await save();
+      const saved = await save({ showNotice: false, source: "ANALYSIS_PREP" });
+      if (!saved) {
+        return;
+      }
       const latestReadiness = await getAnalysisReadiness<Readiness>();
+      setReadiness(latestReadiness);
       if (!latestReadiness.latest_health_record_id) {
+        setInputErrors(["저장할 건강정보"]);
         setError("저장된 건강정보가 없습니다.");
         return;
       }
       if (!latestReadiness.is_ready) {
-        setError("기본 분석에 필요한 정보가 부족합니다.");
+        const missingLabels = (latestReadiness.missing_basic_fields ?? latestReadiness.missing_fields ?? []).map(
+          (field) => healthFieldLabels[field] ?? field,
+        );
+        setInputErrors(missingLabels);
+        setError(`기본 분석에 필요한 정보가 부족합니다. 누락 항목: ${missingLabels.join(", ")}`);
         return;
       }
       setRunningMode(mode);
@@ -468,6 +605,18 @@ export default function HealthRecordPage() {
         }
       >
         {error && <ErrorMessage message={error} />}
+        {inputErrors.length > 0 && (
+          <div className="state-box">
+            <strong>확인이 필요한 항목</strong>
+            <div className="chip-list" style={{ marginTop: 8 }}>
+              {inputErrors.map((field) => (
+                <span className="badge badge-missing" key={field}>
+                  {field}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {notice && <div className="state-box">{notice}</div>}
         {activeStep < 4 && (
           <div className="state-box" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 12px" }}>
@@ -490,12 +639,17 @@ export default function HealthRecordPage() {
             visibleSections={stepToSection[activeStep]}
           />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
-            <button className="secondary" type="submit">
-              저장
+            <button
+              className="secondary"
+              disabled={isSaving || runningMode !== null}
+              onClick={() => void save().catch(() => undefined)}
+              type="button"
+            >
+              {isSaving ? "저장 중..." : "저장"}
             </button>
             {activeStep === 0 && (
               <button
-                disabled={runningMode !== null}
+                disabled={isSaving || runningMode !== null}
                 onClick={() => void runAnalysis("BASIC")}
                 type="button"
               >
@@ -504,7 +658,7 @@ export default function HealthRecordPage() {
             )}
             {activeStep === 1 && (
               <button
-                disabled={runningMode !== null}
+                disabled={isSaving || runningMode !== null}
                 onClick={() => void runAnalysis("PRECISION")}
                 type="button"
               >
@@ -513,6 +667,82 @@ export default function HealthRecordPage() {
             )}
           </div>
         </form>
+      </Card>
+      <Card title="건강정보 기록">
+        {records.length === 0 ? (
+          <div className="state-box">아직 저장된 건강정보 기록이 없습니다.</div>
+        ) : (
+          <div className="page-stack">
+            <div className="state-box">
+              저장하거나 검진표 OCR 결과를 반영할 때마다 새 기록으로 남습니다. 분석에는 가장 최근에 저장된 기록이 기본으로 사용됩니다.
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>저장일</th>
+                    <th>기록일</th>
+                    <th>입력 방식</th>
+                    <th>주요 수치</th>
+                    <th>상세</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((record) => (
+                    <tr key={String(record.id)}>
+                      <td>{formatDateTime(record.created_at)}</td>
+                      <td>{formatDate(record.measured_at)}</td>
+                      <td>
+                        <span className="badge badge-saved">{getSourceLabel(record.source)}</span>
+                      </td>
+                      <td>{getRecordSummary(record)}</td>
+                      <td>
+                        <button
+                          className="btn-secondary"
+                          onClick={() =>
+                            setSelectedRecord((current) =>
+                              Number(current?.id) === Number(record.id) ? null : record,
+                            )
+                          }
+                          style={{ fontSize: "13px", padding: "4px 12px" }}
+                          type="button"
+                        >
+                          {Number(selectedRecord?.id) === Number(record.id) ? "닫기" : "상세보기"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {selectedRecord && (
+              <section className="profile-section">
+                <div className="section-heading">
+                  <h3>기록 상세</h3>
+                  <p>
+                    {formatDateTime(selectedRecord.created_at)} · {getSourceLabel(selectedRecord.source)}
+                  </p>
+                </div>
+                <div className="readonly-health-grid">
+                  {recordDetailItems.map((item) => (
+                    <div className="readonly-health-item" key={item.key}>
+                      <div className="item-header">
+                        <span>{item.label}</span>
+                      </div>
+                      <div className="item-value-row">
+                        <strong>
+                          {item.display
+                            ? getDisplayValue(selectedRecord, item.key, item.unit ? ` ${item.unit}` : "")
+                            : getValue(selectedRecord, item.key, item.unit ? ` ${item.unit}` : "")}
+                        </strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
       </Card>
       {deleteTargetId && (
         <ConfirmDialog
