@@ -13,7 +13,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import { isHeicFile } from "../utils/files";
-import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
+import { formatDateTime, mealTypeLabel } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
 
@@ -508,8 +508,6 @@ export default function DietPage() {
         {analysisResult && (
           <div className="card-list">
             <div className="score-panel">
-              <span>식단 점수</span>
-              <strong>{String(analysisResult.diet_score ?? "-")}</strong>
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
             <div className="mini-card">
@@ -670,7 +668,6 @@ export default function DietPage() {
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
           {records.slice(0, 5).map((record) => {
-            const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
@@ -683,13 +680,6 @@ export default function DietPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <strong>{dietRecordDisplayTitle(record)}</strong>
-                  {scoreRaw !== null ? (
-                    <span className={`badge ${needsConfirmation ? "badge-reference" : scoreBadgeClass(scoreRaw)}`}>
-                      {needsConfirmation ? `참고 ${scoreRaw}점` : `${scoreRaw}점`}
-                    </span>
-                  ) : isManual ? (
-                    <span className="badge badge-reference">점수 미산정</span>
-                  ) : null}
                 </div>
                 {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
