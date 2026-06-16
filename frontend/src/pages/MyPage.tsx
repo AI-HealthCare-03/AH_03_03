@@ -81,6 +81,17 @@ function getDateLabel(value: unknown): string {
   return date.toLocaleDateString("ko-KR");
 }
 
+function getDateTimeLabel(value: unknown): string {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 function normalizeStatus(value: unknown): string {
   return String(value ?? "").toUpperCase();
 }
@@ -438,9 +449,14 @@ export default function MyPage() {
         <Card
           title="기본 건강정보"
           actions={
-            <Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/health/profile">
-              건강정보 수정
-            </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className={profileRows.some(([, v]) => !v || v === "-") ? "badge badge-missing" : "badge badge-saved"}>
+                {profileRows.some(([, v]) => !v || v === "-") ? "미입력 있음" : "전체 저장됨"}
+              </span>
+<Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/health/profile">
+                건강정보 수정
+              </Link>
+            </div>
           }
         >
           <div className="table-list">
@@ -448,9 +464,6 @@ export default function MyPage() {
               <div className="table-row" key={String(label)}>
                 <span>{String(label)}</span>
                 <strong>{String(value ?? "-")}</strong>
-                <span className={value && value !== "-" ? "badge badge-saved" : "badge badge-missing"}>
-                  {value && value !== "-" ? "저장됨" : "미입력"}
-                </span>
               </div>
             ))}
           </div>
