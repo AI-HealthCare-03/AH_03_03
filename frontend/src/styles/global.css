@@ -147,6 +147,17 @@ button.secondary,
   color: var(--color-text);
 }
 
+button.ghost,
+.button.ghost {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+}
+button.ghost:hover,
+.button.ghost:hover {
+  background: var(--color-surface-hover);
+}
+
 button.danger {
   background: var(--color-danger);
 }
@@ -2946,6 +2957,13 @@ a:hover .mini-card {
   .desktop-nav-action { display: none; }
   .health-tab-group { flex-direction: column; }
   .health-tab-group > a { align-self: flex-start; }
+  .ocr-hint {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .ocr-hint .button {
+    align-self: flex-end;
+  }
 }
 
 [data-theme="dark"] .risk-stage-card {
