@@ -407,15 +407,6 @@ export default function DietResultPage() {
             <span className="muted">{formatDateTime(record?.meal_time ?? record?.created_at)}</span>
             <span className="badge badge-reference">{mealTypeLabel(record?.meal_type)}</span>
           </div>
-          <strong>{dietRecordTitle}</strong>
-          {!isManual && (
-            <div className="mini-card">
-              <span className="muted">분석 음식</span>
-              <strong>
-                {detectedFoods.length > 0 ? detectedFoods.map(foodDisplayName).join(", ") : "음식명 확인 불가"}
-              </strong>
-            </div>
-          )}
         </div>
         {!isManual && (
           <div className="card-list">
@@ -610,19 +601,6 @@ export default function DietResultPage() {
                 <span>{publicNutritionText(recommendation.rag_comment.summary)}</span>
               </div>
             )}
-            {recommendation && recommendation.disease_context.length > 0 && (
-              <div className="mini-card">
-                <strong>연결된 건강상태 참고</strong>
-                <div className="card-list">
-                  {recommendation.disease_context.map((context) => (
-                    <div className="mini-card" key={`disease-evaluation-${context.disease_code}`}>
-                      <span className="badge badge-reference">{context.label}</span>
-                      <span>{publicNutritionText(context.message)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
             {cautionFindings.length > 0 && (
               <div className="mini-card">
                 <strong>주의하면 좋은 점</strong>
@@ -727,20 +705,6 @@ export default function DietResultPage() {
               표시할 건강관리 추천이 아직 없습니다. 식단 사진의 음식명과 영양성분 후보가 확인되면 참고용 추천이 표시됩니다.
             </div>
           )}
-          {recommendation && recommendation.nutrition_findings.length > 0 && (
-            <div className="mini-card">
-              <strong>영양 참고 포인트</strong>
-              <div className="card-list">
-                {recommendation.nutrition_findings.map((finding) => (
-                  <div className="mini-card" key={`${finding.issue_key}-${finding.label}`}>
-                    <span className="badge badge-reference">{finding.label}</span>
-                    <span>{publicNutritionText(finding.message)}</span>
-                    {finding.basis && <span className="muted">{publicNutritionText(finding.basis)}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           {recommendation && recommendation.disease_context.length > 0 && (
             <div className="mini-card">
               <strong>건강상태 참고</strong>
@@ -754,36 +718,6 @@ export default function DietResultPage() {
               </div>
             </div>
           )}
-          {recommendation &&
-            (recommendation.recommended_foods.length > 0 || recommendation.caution_foods.length > 0) && (
-              <div className="mini-card">
-                <strong>음식 선택 참고</strong>
-                {recommendation.recommended_foods.length > 0 && (
-                  <>
-                    <span className="muted">보완하면 좋은 음식</span>
-                    <div className="chip-list">
-                      {recommendation.recommended_foods.map((food) => (
-                        <span className="badge risk-low" key={`recommended-${food}`}>
-                          {publicNutritionText(food)}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {recommendation.caution_foods.length > 0 && (
-                  <>
-                    <span className="muted">주의해서 살펴볼 음식</span>
-                    <div className="chip-list">
-                      {recommendation.caution_foods.map((food) => (
-                        <span className="badge badge-reference" key={`caution-${food}`}>
-                          {publicNutritionText(food)}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           {recommendation && recommendation.recommended_challenges.length > 0 && (
             <div className="mini-card">
               <strong>추천 챌린지</strong>
