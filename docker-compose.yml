@@ -1,3 +1,17 @@
+#
+# Legacy/minimal backend/AI verification stack.
+#
+# Keep this file for quick FastAPI/PostgreSQL/Redis/AI Worker checks only.
+# It is not the standard local demo stack and does not cover the current
+# frontend, storage, scheduler, or full async UX.
+#
+# Standard local/dev stack:
+#   docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build --force-recreate
+#
+# Standard EC2/prod stack:
+#   docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml pull
+#   docker compose --env-file .env.prod -f infra/docker/docker-compose.prod.yml up -d
+#
 services:
   # 1. Redis (메시지 브로커 및 캐싱)
   redis:
@@ -49,8 +63,11 @@ services:
         - linux/arm64
     image: ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}  # APP_VERSION은 빌드된 이미지의 버전관리를 위함입니다. v1.0.0 형식으로 사용합니다.
     env_file: .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     command: | 
-      sh -c "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./app:/app/app  # 로컬의 app 디렉토리를 컨테이너의 /app/app에 마운트(수정사항 즉시 반영)
       - static_volume:/app/templates
@@ -64,18 +81,35 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/system/health').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # 4. AI Worker (Model 학습 및 추론)
   ai-worker:
     container_name: ai-worker
     build:
       context: .  # 프로젝트 루트를 빌드 컨텍스트로 지정
-      dockerfile: ai_worker/Dockerfile  # Dockerfile 위치 지정
+      dockerfile: ai_runtime/Dockerfile  # Dockerfile 위치 지정
       platforms:
         - linux/amd64
         - linux/arm64
     image: ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}  # AI_WORKER_VERSION은 빌드된 이미지의 버전관리를 위함입니다. V1.0.0 형식으로 사용합니다.
     env_file: .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./ai_runtime:/app/ai_runtime
     restart: always
     mem_limit: 4G
     networks:
@@ -98,7 +132,8 @@ services:
     networks:
       - ws
     depends_on:
-      - fastapi
+      fastapi:
+        condition: service_healthy
 
 volumes:
   postgres_data:

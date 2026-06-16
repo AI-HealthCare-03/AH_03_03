@@ -1,0 +1,552 @@
+# EC2 Production Deployment Checklist
+
+이 문서는 EC2에서 `infra/docker/docker-compose.prod.yml` 기준으로 운영 스택을 띄울 때 확인할 항목을 정리한 것입니다. 실제 secret, API key, private key 원문은 이 문서나 Git tracked 파일에 작성하지 않습니다.
+
+처음부터 순서대로 배포할 때는 `docs/deployment/ec2_docker_deploy_guide.md`를 먼저 보고, 이 문서는 세부 설정 체크 문서로 함께 사용합니다.
+
+## Compose 기준
+
+- 시연/운영 스택 기준 파일: `infra/docker/docker-compose.prod.yml`
+- 로컬 개발 스택 기준 파일: `infra/docker/docker-compose.dev.yml`
+- 이번 MVP 운영 범위는 AWS `EC2 + Docker Compose + local storage` 기준입니다.
+- EC2 단일 서버에서 Docker Compose로 `nginx`, `frontend`, `fastapi`, `ai-worker`, `postgres`, `redis` 컨테이너를 실행합니다.
+- PostgreSQL은 EC2 내부 `postgres` 컨테이너와 `postgres_data` Docker volume으로 운영합니다.
+- Redis Stream은 EC2 내부 `redis` 컨테이너와 `redis_data` Docker volume으로 운영합니다.
+- 업로드 파일은 기본적으로 EC2 Docker volume의 local storage에 저장합니다.
+- RDS와 ElastiCache는 이번 데모 운영 범위에서 제외합니다. 장기 운영 전환 시 별도 운영 설계로 검토할 수 있습니다.
+- prod compose는 외부에 `nginx:80`, `nginx:443`만 노출합니다.
+- Postgres와 Redis는 Docker network 내부 `expose`만 사용하며 EC2 보안 그룹에서 직접 열지 않습니다.
+- FastAPI와 ai-worker는 각각 DB connection pool을 만들기 때문에 `DB_POOL_MAX_SIZE`는 작게 시작합니다.
+- HTTPS 운영 기본 Nginx 설정은 `infra/nginx/prod_https.conf`입니다.
+
+## EC2에서 준비할 환경 파일
+
+운영 서버에서는 예시 파일을 복사해서 별도 파일로 관리합니다.
+
+```bash
+cp envs/example.prod.env .prod.env
+```
+
+운영 자동배포는 GitHub Actions `deploy-prod` workflow가 담당합니다. Repository secrets에는 아래 5개만 등록하고, 실제 secret 값을 문서나 Git tracked 파일에 쓰지 않습니다.
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+- `EC2_HOST`
+- `EC2_USER`
+- `EC2_SSH_KEY`
+
+workflow는 EC2의 `.prod.env` 전체를 덮어쓰지 않고, 배포 image tag에 해당하는 아래 세 key만 갱신합니다.
+
+- `APP_VERSION`
+- `AI_WORKER_VERSION`
+- `FRONTEND_VERSION`
+
+반드시 운영자가 교체해야 하는 주요 항목:
+
+- `SECRET_KEY`
+- `COOKIE_DOMAIN`
+- `CORS_ALLOW_ORIGINS`
+- `FRONTEND_BASE_URL`
+- `DB_PASSWORD`
+- `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
+- `OPENAI_API_KEY` 또는 사용하는 LLM provider secret
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`를 사용하는 경우
+- `S3_BUCKET_NAME`은 `STORAGE_BACKEND=s3`를 선택할 때만 필요
+- `NGINX_CONF`는 기본 `../nginx/prod_https.conf`, 최초 인증서 발급 전에는 `../nginx/prod_http.conf`
+
+`healthladder.duckdns.org` 배포 기준 URL 값:
+
+```env
+COOKIE_DOMAIN=healthladder.duckdns.org
+CORS_ALLOW_ORIGINS=https://healthladder.duckdns.org
+FRONTEND_BASE_URL=https://healthladder.duckdns.org
+VITE_API_BASE_URL=/api/v1
+```
+
+`VITE_API_BASE_URL`은 브라우저에 포함되는 public build-time 값입니다. 현재 Nginx가 같은 도메인에서 프론트를 서빙하고 `/api/` 요청을 FastAPI로 proxy하므로, 프론트 API client 기준 값은 versioned path인 `/api/v1`을 사용합니다.
+
+이메일 인증/비밀번호 재설정/가족 초대 링크는 백엔드의 `FRONTEND_BASE_URL` 기준으로 생성됩니다. 일반 알림 이메일 smoke나 수동 발송에서 action link를 넣을 때도 `https://healthladder.duckdns.org/notifications`처럼 같은 운영 도메인을 사용합니다.
+
+Brevo SMTP를 사용하는 운영 이메일 예시:
+
+```env
+EMAIL_ENABLED=true
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USERNAME=<SET_IN_PROD>
+SMTP_PASSWORD=<SET_IN_PROD>
+SMTP_FROM_EMAIL=<SET_IN_PROD>
+SMTP_FROM_NAME=Health Ladder
+SMTP_USE_TLS=true
+```
+
+OpenAI/GPT Vision 기반 식단 분석과 건강검진 OCR을 사용하는 운영 예시:
+
+```env
+OPENAI_API_KEY=<SET_IN_PROD>
+OPENAI_MODEL=gpt-4o-mini
+
+DIET_VISION_PROVIDER=gpt_vision
+DIET_GPT_VISION_ENABLED=true
+DIET_GPT_VISION_MODEL=gpt-4o
+DIET_DEMO_FALLBACK_ENABLED=false
+
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+EXAM_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=true
+```
+
+작성하지 말아야 하는 값:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- DuckDNS token 원문
+- SMTP password 원문을 문서/README/예시 파일에 직접 작성한 값
+- OpenAI, Langfuse secret 원문
+
+## 배포 이미지 빌드 기준
+
+`infra/docker/docker-compose.prod.yml`은 app, ai-worker, frontend 이미지를 EC2에서 build하지 않고 registry에서 pull한다. 따라서 배포 전 로컬 또는 CI에서 아래 3개 이미지를 같은 tag 규칙으로 build/push해야 한다.
+
+| 이미지 | prod compose tag | Dockerfile | build context |
+| --- | --- | --- | --- |
+| FastAPI app | `${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}` | `app/Dockerfile` | repo root |
+| AI Worker | `${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}` | `ai_runtime/Dockerfile` | repo root |
+| Frontend | `${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}` | `frontend/Dockerfile` | repo root |
+
+운영 배포마다 같은 tag를 재사용하지 말고 `v1.0.1` 또는 `20260616-1` 같은 새 tag를 정한다. EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`은 Docker Hub에 push된 tag와 일치해야 한다.
+
+로컬 build 검증:
+
+```bash
+export APP_VERSION=v1.0.1
+export AI_WORKER_VERSION=v1.0.1
+export FRONTEND_VERSION=v1.0.1
+make image-tags
+make image-build-check
+```
+
+`make image-build-check`는 배포 검증용 alias이며 기본적으로 `make image-buildx-amd64-check`를 실행한다. EC2 Ubuntu t3 계열 배포 대상은 `linux/amd64`이므로 배포 전 검증은 amd64 buildx 기준으로 맞춘다.
+
+Apple Silicon에서 Docker Desktop 기본 native build를 실행하면 `linux/arm64/aarch64`로 빌드될 수 있다. `paddlepaddle`은 Linux aarch64 wheel이 제공되지 않는 버전이 있어 ai-worker 이미지 native build가 실패할 수 있다. 이 실패는 EC2 amd64 배포 이미지 실패와 다르므로, 배포 검증에는 아래 buildx target을 사용한다.
+
+```bash
+make image-buildx-amd64-check
+```
+
+로컬 아키텍처 자체를 확인하고 싶을 때만 native build target을 사용한다.
+
+```bash
+make image-build-native-check
+```
+
+필요하면 platform을 명시적으로 바꿀 수 있다. EC2 amd64 배포에서는 기본값을 유지한다.
+
+```bash
+DOCKER_PLATFORM=linux/amd64 make image-buildx-amd64-check
+```
+
+Docker Hub push 전에는 로컬 이미지 architecture가 `amd64`인지 확인한다.
+
+```bash
+docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION} \
+  --format '{{.Os}}/{{.Architecture}}'
+docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION} \
+  --format '{{.Os}}/{{.Architecture}}'
+docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION} \
+  --format '{{.Os}}/{{.Architecture}}'
+```
+
+각 출력이 `linux/amd64`인지 확인한 뒤 push한다.
+
+Docker Hub push는 build 검증과 tag 확인 후 별도로 실행한다. push 전에는 Docker Hub 계정/레포/tag가 prod compose와 일치하는지 확인한다.
+
+```bash
+make image-push
+```
+
+### Frontend build args
+
+`frontend/Dockerfile`은 Vite 정적 번들을 build한다. `VITE_*` 값은 runtime 환경변수가 아니라 build-time 값이며, 빌드 결과 JS bundle에 포함된다.
+
+사용하는 build arg:
+
+- `VITE_API_BASE_URL`
+
+`VITE_*`에는 브라우저 public config만 넣는다. `OPENAI_API_KEY`, `SMTP_PASSWORD`, `LANGFUSE_SECRET_KEY` 같은 server secret은 절대 build arg로 넘기지 않는다.
+
+### Secret bake-in 점검
+
+backend Dockerfile은 `.env`를 copy하지 않고, root `.dockerignore`는 `.env`, private env 파일, service account JSON, node_modules, cache/output 계열 파일을 제외한다. 그래도 배포 전 아래 명령으로 image metadata와 파일 포함 여부를 확인한다.
+
+```bash
+docker history --no-trunc ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}
+docker history --no-trunc ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}
+docker history --no-trunc ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
+
+docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}
+docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}
+docker inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
+```
+
+이미지 내부에 `.env`나 service account JSON이 들어가지 않았는지 확인한다.
+
+```bash
+docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION} \
+  sh -lc 'find /app -name ".env" -o -name "*service-account*.json"'
+docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION} \
+  sh -lc 'find /app -name ".env" -o -name "*service-account*.json"'
+```
+
+frontend bundle에 server secret 키워드가 섞이지 않았는지도 확인한다. server secret 값이나 server secret 변수명은 없어야 한다.
+
+```bash
+docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION} \
+  sh -lc 'grep -R "OPENAI_API_KEY\\|SMTP_PASSWORD\\|LANGFUSE_SECRET_KEY\\|PRIVATE_KEY" -n /usr/share/nginx/html || true'
+```
+
+## Storage 기준
+
+MVP 운영에서는 `STORAGE_BACKEND=local`을 기본으로 사용합니다. OCR/검진 파일 업로드가 S3 설정 누락 때문에 500으로 실패하지 않도록 운영 `.prod.env`에는 아래 값을 명시합니다.
+
+```env
+STORAGE_BACKEND=local
+UPLOAD_STORAGE_DIR=var/uploads
+LOCAL_STORAGE_ROOT=var/storage
+S3_BUCKET_NAME=
+```
+
+`S3_BUCKET_NAME`은 local storage 사용 시 비어 있어도 됩니다. prod compose는 `/app/var/uploads`, `/app/var/storage`를 Docker volume으로 보존합니다.
+
+### S3 storage
+
+S3로 전환할 때만 `STORAGE_BACKEND=s3`와 private bucket 이름을 설정합니다.
+
+```env
+STORAGE_BACKEND=s3
+S3_BUCKET_NAME=
+S3_REGION=ap-northeast-2
+S3_PREFIX=ai-health/
+S3_PRESIGNED_URL_EXPIRES_SECONDS=3600
+```
+
+S3 object는 private 전제로 사용합니다. EC2에는 S3 접근 권한을 가진 IAM Role을 붙이고, AWS access key/secret을 `.prod.env`에 넣지 않는 구성을 우선합니다.
+
+## Database and Redis 기준
+
+이번 데모 운영은 RDS/ElastiCache를 사용하지 않습니다.
+
+```env
+DB_HOST=postgres
+DB_PORT=5432
+REDIS_HOST=redis
+REDIS_PORT=6379
+```
+
+- `postgres`와 `redis`는 compose service name입니다.
+- 두 서비스는 Docker network 내부에서만 접근합니다.
+- EC2 security group에서 `5432`, `6379`를 열지 않습니다.
+- 장기 운영에서 managed service가 필요해지면 RDS/ElastiCache 전환을 별도 작업으로 검토합니다.
+
+### 데이터 보존 기준
+
+- PostgreSQL 데이터는 Docker named volume `postgres_data`에 저장됩니다.
+- Redis 데이터는 Docker named volume `redis_data`에 저장됩니다. prod compose는 Redis AOF를 켜서 Stream/job 상태가 컨테이너 재시작에 최대한 보존되도록 합니다.
+- `docker compose up -d`, 이미지 pull, 컨테이너 재생성, EC2 재부팅만으로는 named volume이 삭제되지 않습니다.
+- `docker compose down`만 실행해도 named volume은 기본적으로 남습니다.
+- `docker compose down -v`, Docker volume 수동 삭제, EBS/EC2 인스턴스 삭제를 하면 DB/Redis 데이터가 사라질 수 있습니다.
+- EC2 종료, EBS 정리, compose volume 삭제 전에는 PostgreSQL 백업을 먼저 남깁니다.
+- Redis는 캐시/큐 성격이 강하므로 PostgreSQL처럼 장기 원장으로 보지 않습니다. 처리 중인 job이 중요한 시점에는 배포 전 worker idle 상태와 DLQ를 확인합니다.
+
+## Domain and HTTPS
+
+### DNS
+
+도메인 DNS에서 EC2 public IPv4 주소를 가리키도록 설정합니다. DuckDNS를 사용할 때는 `healthladder.duckdns.org`가 현재 EC2 public IP로 resolve되어야 합니다. DuckDNS token은 운영자 개인 secret으로 취급하고 Git tracked 파일, README, 이슈, 배포 로그에 남기지 않습니다.
+
+- 운영 도메인: `healthladder.duckdns.org`
+- `COOKIE_DOMAIN`, `CORS_ALLOW_ORIGINS`, `FRONTEND_BASE_URL`, Nginx `server_name`은 같은 운영 도메인 기준으로 맞춥니다.
+
+배포 전 DNS/HTTP bootstrap 확인 예시:
+
+```bash
+nslookup healthladder.duckdns.org
+curl -I http://healthladder.duckdns.org
+```
+
+### Nginx 설정
+
+- HTTP bootstrap 설정: `infra/nginx/prod_http.conf`
+- HTTPS 운영 설정: `infra/nginx/prod_https.conf`
+- prod compose는 `NGINX_CONF` 값으로 mount할 Nginx 설정 파일을 고를 수 있습니다.
+
+`prod_https.conf`는 `healthladder.duckdns.org` 기준으로 관리합니다. 다른 도메인을 쓰는 배포에서는 아래 값을 해당 도메인으로 교체해야 합니다.
+
+- `server_name healthladder.duckdns.org;`
+- `/etc/letsencrypt/live/healthladder.duckdns.org/fullchain.pem`
+- `/etc/letsencrypt/live/healthladder.duckdns.org/privkey.pem`
+
+실제 인증서 파일은 Git에 커밋하지 않습니다. `certbot-conf` Docker volume 또는 운영 서버의 secret mount로 관리합니다.
+
+### Certbot bootstrap 예시
+
+인증서가 아직 없으면 HTTPS Nginx가 시작되지 않을 수 있습니다. 처음에는 HTTP 설정으로 Nginx를 띄운 뒤 certbot으로 인증서를 발급합니다.
+
+```bash
+NGINX_CONF=../nginx/prod_http.conf \
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
+```
+
+certbot webroot 발급 예시:
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml run --rm certbot \
+  certonly --webroot -w /var/www/certbot \
+  -d healthladder.duckdns.org \
+  --email admin@example.com \
+  --agree-tos \
+  --no-eff-email
+```
+
+인증서 발급 후 `.prod.env`의 `NGINX_CONF=../nginx/prod_https.conf`를 확인하고 Nginx를 재시작합니다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+### Security headers
+
+`prod_https.conf`는 HTTPS server block에서 다음 헤더를 적용합니다.
+
+- `Strict-Transport-Security`
+- `X-Content-Type-Options`
+- `X-Frame-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+
+`Strict-Transport-Security`는 브라우저가 HTTPS를 강하게 기억하게 하므로, 도메인/인증서/HTTPS 운영이 안정화된 뒤 적용 상태를 유지하세요. Content-Security-Policy는 프론트 asset과 API endpoint를 모두 확인한 뒤 별도 강화하는 편이 안전합니다.
+
+## 실행 순서
+
+이미지를 먼저 push한 뒤 EC2에서 실행합니다. prod compose는 pull-only 구조이므로 EC2에서 app/frontend/worker 이미지를 build하지 않는다.
+
+`docker-compose.prod.yml`은 외부 Docker network `ai-health-shared`를 사용합니다. `make prod-up`은 이 network가 없으면 자동 생성합니다. 직접 compose 명령을 쓰는 경우에는 EC2 최초 배포 전 한 번 생성합니다.
+
+```bash
+docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared
+```
+
+EC2에서는 `envs/example.prod.env`를 복사한 `.prod.env`를 준비하고, 실제 운영 값은 `.prod.env`에만 채운다. 최초 IP/HTTP 확인 또는 Let's Encrypt 인증서 발급 전에는 HTTPS 설정 대신 HTTP bootstrap 설정을 사용한다.
+
+```env
+NGINX_CONF=../nginx/prod_http.conf
+```
+
+이미지를 pull하고 컨테이너를 실행한다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml pull
+docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d
+```
+
+`REFRESH_TOKEN_COOKIE_SECURE=true` 상태에서는 HTTP/IP 접속 smoke test에서 refresh cookie 기반 로그인 유지가 제한될 수 있다. 이 값은 HTTPS/도메인 운영 기준으로는 true를 유지해야 하며, HTTP 임시 테스트에서만 쿠키 동작 제약을 감안한다. `healthladder.duckdns.org`처럼 프론트와 API가 같은 site에서 동작하면 `REFRESH_TOKEN_COOKIE_SAMESITE=lax` 기본값을 유지할 수 있다.
+
+마이그레이션:
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec fastapi \
+  uv run --no-sync aerich upgrade
+```
+
+챌린지 seed가 필요한 초기 환경에서는 운영자가 명시적으로 승인한 뒤 danger target을 따로 실행한다. 일반 배포 흐름에서는 seed를 자동 실행하지 않는다.
+
+```bash
+make danger-prod-seed-challenges
+```
+
+FAQ 테이블은 migration으로 생성되지만 FAQ 목록 row는 별도 seed입니다. FAQ 목록이 비어 있고 운영자가 승인한 경우에만 실행합니다.
+
+```bash
+make danger-prod-seed-faqs
+```
+
+기본 health check:
+
+```bash
+curl -fsS http://localhost/api/v1/system/health
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml ps
+```
+
+Makefile을 사용할 때는 `make prod-health`가 `.prod.env`의 `NGINX_HTTP_PORT`를 읽고, 값이 없으면 운영 기본 `80`으로 `http://localhost:80/api/v1/system/health`를 확인한다.
+
+도메인 DNS, 인증서, Nginx HTTPS 설정이 준비되면 `.prod.env`를 HTTPS 설정으로 전환한다.
+
+```env
+NGINX_CONF=../nginx/prod_https.conf
+```
+
+HTTPS 적용 후 외부 확인 예시:
+
+```bash
+curl -I https://healthladder.duckdns.org
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
+
+이후 Nginx 설정을 재적용하고 외부 HTTPS health check를 확인한다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
+
+## PostgreSQL 백업/복구
+
+EC2 내부 postgres 컨테이너를 사용하므로 EC2 인스턴스 종료, EBS 삭제, volume 삭제 전에는 반드시 DB 백업을 남깁니다.
+
+운영 편의 스크립트:
+
+```bash
+./scripts/ops/backup_postgres.sh
+./scripts/ops/restore_postgres.sh var/backups/postgres/backup.sql
+```
+
+기본값:
+
+- env file: `.prod.env`
+- compose file: `infra/docker/docker-compose.prod.yml`
+- backup dir: `var/backups/postgres/`
+
+다른 경로를 쓰는 경우:
+
+```bash
+ENV_FILE=/home/ubuntu/app/.prod.env BACKUP_DIR=/home/ubuntu/backups ./scripts/ops/backup_postgres.sh
+ENV_FILE=/home/ubuntu/app/.prod.env ./scripts/ops/restore_postgres.sh /home/ubuntu/backups/backup.sql
+```
+
+직접 백업 명령:
+
+```bash
+mkdir -p var/backups/postgres
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec -T postgres \
+  sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  > var/backups/postgres/ai_health_$(date +%Y%m%d_%H%M%S).sql
+```
+
+직접 복구 명령:
+
+```bash
+cat var/backups/postgres/backup.sql | docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec -T postgres \
+  sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+복구는 대상 DB 상태를 확인한 뒤 진행합니다. 기존 데이터가 있는 DB에 그대로 복구하면 충돌이 날 수 있습니다. `restore_postgres.sh`는 파일 경로 인자를 요구하고 확인 문구를 입력해야 진행됩니다.
+
+local storage 업로드 파일은 PostgreSQL dump에 포함되지 않고 Docker volume에 남습니다. DB backup과 별도로 `upload_volume`, `storage_volume` 보존 정책을 관리해야 합니다. S3로 전환한 경우에는 S3 bucket 보존/버전 관리 정책을 별도로 관리합니다.
+
+## Health check
+
+운영 편의 스크립트:
+
+```bash
+./scripts/ops/check_prod_health.sh
+```
+
+도메인 연결 후 외부 HTTPS까지 확인하려면:
+
+```bash
+PUBLIC_BASE_URL=https://healthladder.duckdns.org ./scripts/ops/check_prod_health.sh
+```
+
+수동 확인:
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml ps
+curl -fsS http://localhost/api/v1/system/health
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec postgres \
+  sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec redis redis-cli ping
+```
+
+외부 도메인을 연결한 뒤에는 다음도 확인합니다.
+
+```bash
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
+
+## 로그 확인 루틴
+
+서비스별 로그:
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 fastapi
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 ai-worker
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 nginx
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 postgres
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs --tail=100 redis
+```
+
+실시간 추적:
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs -f fastapi
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs -f ai-worker
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs -f nginx
+```
+
+장애 상황별 첫 확인 위치:
+
+- API 500: `fastapi` 로그, PostgreSQL 연결 상태, 최근 migration 적용 여부
+- 프론트 접속 불가: `nginx` 로그, `frontend` 컨테이너 상태, 80/443 보안 그룹, 인증서 경로
+- OCR/식단/분석 job 멈춤: `ai-worker` 로그, `redis` ping, Redis Stream pending/DLQ 상태
+- Redis Stream 처리 지연: `ai-worker` 로그와 `redis` 로그를 함께 확인
+- DB 연결 실패: `postgres` 로그, `pg_isready`, `.prod.env`의 `DB_HOST=postgres` 확인
+- OCR/업로드 500: MVP 운영 기준 `STORAGE_BACKEND=local`, `UPLOAD_STORAGE_DIR=var/uploads`, `LOCAL_STORAGE_ROOT=var/storage` 확인. S3를 쓰는 경우에만 `S3_BUCKET_NAME`, EC2 IAM Role 권한 확인
+
+## EC2 보안 그룹 포트
+
+열어야 하는 포트:
+
+- `80/tcp`: nginx HTTP
+- `443/tcp`: nginx HTTPS
+- `22/tcp`: SSH, 운영자 IP로 제한
+
+열지 말아야 하는 포트:
+
+- `5432/tcp`: Postgres
+- `6379/tcp`: Redis
+- `8000/tcp`: FastAPI container
+- frontend 내부 포트: nginx container에서만 접근
+
+## 배포 전 검증
+
+로컬 또는 CI에서 먼저 확인합니다.
+
+```bash
+git diff --check
+uv run ruff check app scripts ai_runtime tests
+uv run ruff format app scripts ai_runtime tests --check
+CHATBOT_USE_REAL_LLM=false OPENAI_API_KEY= LANGFUSE_ENABLED=false RAG_ENABLED=false uv run pytest tests
+cd frontend && npm run build && cd ..
+```
+
+prod compose 렌더링은 secret 원문이 포함될 수 있으므로 전체 출력으로 확인하지 않습니다. 유효성 확인은 출력 없는 `--quiet` 또는 서비스 이름만 출력하는 `--services`를 사용합니다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml config --quiet
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml config --services
+```
+
+## 운영 체크 포인트
+
+- `EMAIL_VERIFICATION_DEBUG=false`
+- `PASSWORD_RESET_DEBUG=false`
+- `REFRESH_TOKEN_COOKIE_SECURE=true`
+- `CORS_ALLOW_ORIGINS`는 실제 프론트 도메인만 포함
+- MVP 기준은 `STORAGE_BACKEND=local`; S3 전환 시에만 private bucket과 IAM Role 권한 확인
+- AI provider flag는 비용/관측/secret 준비 후 단계적으로 활성화
+- Redis/Postgres는 EC2 외부로 직접 노출하지 않음

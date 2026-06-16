@@ -1,0 +1,71 @@
+{
+  "experiment_id": "htn_catboost_final",
+  "disease": "HTN",
+  "target_column": "고혈압유병",
+  "dataset_name": "hn_all",
+  "model_type": "catboost",
+  "artifact_dir": "ai_runtime/ml/artifacts/htn/catboost",
+  "feature_columns": [
+    "성별",
+    "나이",
+    "음주빈도",
+    "음주량",
+    "현재흡연",
+    "걷기일수",
+    "근력운동일수",
+    "고혈압가족력_부",
+    "고혈압가족력_모",
+    "고혈압가족력_형제",
+    "고지혈증가족력_부",
+    "고지혈증가족력_모",
+    "고지혈증가족력_형제",
+    "당뇨가족력_부",
+    "당뇨가족력_모",
+    "당뇨가족력_형제",
+    "키",
+    "체중",
+    "BMI",
+    "직업_관리전문",
+    "직업_사무",
+    "직업_서비스판매",
+    "직업_농림어업",
+    "직업_기능노무",
+    "직업_주부학생",
+    "직업_무직",
+    "직업_작업미상"
+  ],
+  "categorical_columns": [],
+  "fe_keys": [
+    "age_bin",
+    "alcohol_risk",
+    "walk_level",
+    "family_sum",
+    "bmi_x_age"
+  ],
+  "folds": 5,
+  "random_seed": 42,
+  "test_size": 0.2,
+  "class_weight": "balanced",
+  "threshold_strategy": {
+    "name": "recall_min_f1",
+    "recall_min": 0.87,
+    "range": [
+      0.3,
+      0.7,
+      0.01
+    ]
+  },
+  "primary_metrics": [
+    "recall",
+    "f1",
+    "auc"
+  ],
+  "model_params": {
+    "iterations": 500,
+    "learning_rate": 0.03,
+    "depth": 5,
+    "l2_leaf_reg": 4.0,
+    "bagging_temperature": 0.2,
+    "random_strength": 0.8
+  }
+}

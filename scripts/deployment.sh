@@ -1,6 +1,16 @@
 #!/bin/bash
 set -eo pipefail
 
+# DEPRECATED:
+#   This legacy interactive script uses envs/.prod.env and mutates nginx conf
+#   files directly. The current deployment flow is:
+#     cp envs/example.prod.env .prod.env
+#     make prod-pull
+#     make prod-up
+#     make prod-migrate
+#     make prod-health
+#   Keep this script only as a historical/manual reference.
+
 COLOR_GREEN=$(tput setaf 2)
 COLOR_BLUE=$(tput setaf 4)
 COLOR_RED=$(tput setaf 1)
@@ -57,7 +67,7 @@ echo ""
 # ---------- Select Prompt ----------
 echo "${COLOR_BLUE}배포 전 빌드 & 푸시할 이미지를 선택하세요(복수선택 가능, 띄어쓰기로 구분)${COLOR_NC}"
 echo "1) fastapi"
-echo "2) ai_worker"
+echo "2) ai_runtime"
 read -p "선택 (예: 1 2): " selections
 echo ""
 
@@ -76,7 +86,7 @@ for choice in $selections; do
     2)
       echo "${COLOR_BLUE}AI-worker 앱의 배포 버젼을 입력하세요(ex. v1.0.0)${COLOR_NC}"
       read -p "AI-worker 앱 버젼: " ai_version
-      build_and_push ${docker_user} ${docker_repo} "AI Worker" ${ai_version} "ai_worker/Dockerfile" "."
+      build_and_push ${docker_user} ${docker_repo} "AI Worker" ${ai_version} "ai_runtime/Dockerfile" "."
       DEPLOY_SERVICES+=("ai-worker")
       ;;
     *)

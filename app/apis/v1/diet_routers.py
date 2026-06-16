@@ -1,0 +1,189 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, status
+
+from ai_runtime.common.image_normalizer import ImageNormalizationError, normalize_upload_image
+from app.apis.v1.dependencies import ensure_found, ensure_owner, get_request_user
+from app.dtos.async_jobs import AsyncJobResponse
+from app.dtos.diets import (
+    DietAnalyzeRequest,
+    DietHealthRecommendationResponse,
+    DietPhotoResultCreateRequest,
+    DietPhotoResultResponse,
+    DietRecordCreateRequest,
+    DietRecordResponse,
+    DietRecordUpdateRequest,
+)
+from app.models.users import User
+from app.services import async_jobs as async_job_service
+from app.services import diet_recommendations as diet_recommendation_service
+from app.services import diets as diet_service
+
+diet_router = APIRouter(prefix="/diets", tags=["diets"])
+
+
+@diet_router.post("", response_model=DietRecordResponse, status_code=status.HTTP_201_CREATED)
+async def create_diet_record(request: DietRecordCreateRequest, user: Annotated[User, Depends(get_request_user)]):
+    record = await diet_service.create_diet_record(user.id, request)
+    return diet_service.build_diet_record_response(record)
+
+
+@diet_router.get("", response_model=list[DietRecordResponse])
+async def list_diet_records(
+    user: Annotated[User, Depends(get_request_user)],
+    analysis_method: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+):
+    records = await diet_service.list_diet_records(
+        user.id,
+        analysis_method=analysis_method,
+        limit=limit,
+        offset=offset,
+    )
+    return [diet_service.build_diet_record_response(record) for record in records]
+
+
+@diet_router.post("/analyze", response_model=AsyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def run_diet_analysis(
+    request: Request,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    payload, image_bytes, image_media_type = await _parse_diet_analyze_request(request)
+    _ensure_diet_analysis_available()
+    request_payload = payload.model_dump(mode="json", exclude_none=True)
+    if image_bytes:
+        request_payload.update(
+            diet_service.store_diet_analysis_upload(
+                user_id=int(user.id),
+                image_bytes=image_bytes,
+                image_media_type=image_media_type,
+                filename=str(request_payload.get("image_path") or "") or None,
+            )
+        )
+    return await async_job_service.create_diet_analyze_image_job(int(user.id), request_payload)
+
+
+def _ensure_diet_analysis_available() -> None:
+    try:
+        diet_service.ensure_diet_analysis_available()
+    except ValueError as exc:
+        if str(exc) == diet_service.DIET_ANALYSIS_SERVICE_UNAVAILABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=diet_service.DIET_ANALYSIS_SERVICE_UNAVAILABLE,
+            ) from exc
+        raise
+
+
+async def _parse_diet_analyze_request(request: Request) -> tuple[DietAnalyzeRequest, bytes | None, str | None]:
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        body = await request.json()
+        return DietAnalyzeRequest.model_validate(body), None, None
+
+    form = await request.form()
+    data = {
+        key: value
+        for key, value in form.items()
+        if key != "image" and not _is_upload(value) and value not in {"", None}
+    }
+    image = form.get("image")
+    if not _is_upload(image):
+        return DietAnalyzeRequest.model_validate(data), None, None
+
+    image_bytes = await image.read()
+    normalized_image = _normalize_uploaded_image(
+        image_bytes,
+        image.content_type,
+        getattr(image, "filename", None),
+    )
+    image_bytes = normalized_image.data
+    image_media_type = normalized_image.media_type
+    return DietAnalyzeRequest.model_validate(data), image_bytes, image_media_type
+
+
+def _is_upload(value: object) -> bool:
+    return isinstance(value, UploadFile) or (hasattr(value, "read") and hasattr(value, "filename"))
+
+
+def _normalize_uploaded_image(image_bytes: bytes, media_type: str | None, filename: str | None):
+    try:
+        return normalize_upload_image(image_bytes, media_type, filename)
+    except ImageNormalizationError as exc:
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
+
+
+@diet_router.get("/{diet_record_id}", response_model=DietRecordResponse)
+async def get_diet_record(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    return diet_service.build_diet_record_response(record)
+
+
+@diet_router.get("/{diet_record_id}/recommendations", response_model=DietHealthRecommendationResponse)
+async def get_diet_health_recommendations(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    return await diet_recommendation_service.get_diet_health_recommendations(int(user.id), diet_record_id)
+
+
+@diet_router.patch("/{diet_record_id}", response_model=DietRecordResponse)
+async def update_diet_record(
+    diet_record_id: int,
+    request: DietRecordUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    updated = await diet_service.update_diet_record(diet_record_id, request)
+    return diet_service.build_diet_record_response(ensure_found(updated, "식단 기록을 찾을 수 없습니다."))
+
+
+@diet_router.delete("/{diet_record_id}")
+async def delete_diet_record(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    deleted_count = await diet_service.delete_diet_record(diet_record_id)
+    return {"deleted_count": deleted_count}
+
+
+@diet_router.get("/{diet_record_id}/image")
+async def get_diet_record_image(diet_record_id: int, user: Annotated[User, Depends(get_request_user)]):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    image_payload = diet_service.read_diet_record_image(record)
+    if image_payload is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 이미지를 찾을 수 없습니다.")
+    image_bytes, media_type, filename = image_payload
+    return Response(
+        content=image_bytes,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "Content-Disposition": f'inline; filename="{filename}"',
+        },
+    )
+
+
+@diet_router.post(
+    "/{diet_record_id}/photo-result", response_model=DietPhotoResultResponse, status_code=status.HTTP_201_CREATED
+)
+async def create_diet_photo_result(
+    diet_record_id: int,
+    request: DietPhotoResultCreateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    return await diet_service.create_diet_photo_result(diet_record_id, request)
+
+
+@diet_router.get("/{diet_record_id}/photo-result", response_model=list[DietPhotoResultResponse])
+async def list_diet_photo_results(
+    diet_record_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    limit: int = 20,
+    offset: int = 0,
+):
+    record = ensure_found(await diet_service.get_diet_record(diet_record_id), "식단 기록을 찾을 수 없습니다.")
+    ensure_owner(record.user_id, user)
+    return await diet_service.list_diet_photo_results(diet_record_id, limit=limit, offset=offset)

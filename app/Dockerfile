@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
     libffi-dev \
+    libgl1 \
+    libglib2.0-0 \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # 1. uv 설치 (공식 이미지에서 복사해오는 가장 깔끔한 방법)
@@ -14,11 +17,18 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # 2. 의존성 패키지 관리 파일을 컨테이너 내부에 복사합니다.
 COPY pyproject.toml uv.lock ./
 
-# 3. pyproject.toml에 명시된 의존성 패키지 중에서 'app' 그룹만 설치합니다.
-RUN uv sync --group app --no-dev --frozen
+# 3. FastAPI 앱과 ML 추론에 필요한 의존성 패키지를 설치합니다.
+RUN uv sync --group app --group ai --no-dev --frozen
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 4. 로컬 소스 코드를 컨테이너 내부로 복사합니다.
 COPY ./app ./app
+COPY ./ai_runtime ./ai_runtime
+COPY ./docs/rag_sources ./docs/rag_sources
+COPY ./docs/data/challenges ./docs/data/challenges
+COPY ./scripts/seed_mvp_challenges.py ./scripts/seed_mvp_challenges.py
+COPY ./scripts/seed_mvp_faqs.py ./scripts/seed_mvp_faqs.py
+COPY ./scripts/rag ./scripts/rag
 
 # 5. 해당 이미지를 활용하여 도커컨테이너 실행시 실행되는 명령어입니다.
 # FastAPI를 uvicorn을 활용하여 비동기 환경으로 서버를 실행합니다.
