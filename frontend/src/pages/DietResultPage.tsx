@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -576,8 +576,8 @@ export default function DietResultPage() {
       {!isManual && (
         <Card title="내 상태에 맞춘 식단 관리 포인트">
           <div className="card-list">
-            <div className="state-box">
-              점수보다 현재 식단에서 조절하거나 보완할 성분을 중심으로 확인해 주세요. 이 내용은 진단이나 처방이
+            <div className="state-box" style={{ marginBottom: 0 }}>
+              현재 식단에서 조절하거나 보완할 성분을 중심으로 확인해 주세요. 이 내용은 진단이나 처방이
               아닌 생활관리 참고 정보입니다.
             </div>
             {recommendationLoading ? (
@@ -585,7 +585,7 @@ export default function DietResultPage() {
             ) : recommendationError ? (
               <div className="state-box">식단 평가를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
             ) : needsFoodConfirmation ? (
-              <div className="state-box">
+              <div className="state-box" style={{ marginTop: "-6px" }}>
                 음식 후보 확인이 필요합니다. 영양성분은 후보 기준이며, 음식명을 확인하면 더 정확한 식단 조언을 볼 수
                 있습니다.
               </div>
@@ -609,7 +609,7 @@ export default function DietResultPage() {
                     <div className="mini-card" key={`caution-${finding.issue_key}-${finding.label}`}>
                       <span className="badge badge-reference">{finding.label}</span>
                       <span>{publicNutritionText(finding.message)}</span>
-                      {finding.basis && <span className="muted">{publicNutritionText(finding.basis)}</span>}
+                      {finding.basis && <span className="muted" style={{ fontSize: "11px" }}>{publicNutritionText(finding.basis)}</span>}
                     </div>
                   ))}
                 </div>
@@ -620,11 +620,11 @@ export default function DietResultPage() {
                 <strong>보완하면 좋은 점</strong>
                 <div className="card-list">
                   {supportFindings.map((finding) => (
-                    <div className="mini-card" key={`support-${finding.issue_key}-${finding.label}`}>
-                      <span className="badge risk-low">{finding.label}</span>
+                    <Fragment key={`support-${finding.issue_key}-${finding.label}`}>
+                      <span className="badge risk-low" style={{ fontSize: "14px" }}>{finding.label}</span>
                       <span>{publicNutritionText(finding.message)}</span>
-                      {finding.basis && <span className="muted">{publicNutritionText(finding.basis)}</span>}
-                    </div>
+                      {finding.basis && <span className="muted" style={{ fontSize: "11px" }}>{publicNutritionText(finding.basis)}</span>}
+                    </Fragment>
                   ))}
                 </div>
               </div>
@@ -634,10 +634,10 @@ export default function DietResultPage() {
                 <strong>다음 식사에서 참고할 선택</strong>
                 {recommendedFoods.length > 0 && (
                   <>
-                    <span className="muted">보완하면 좋은 선택</span>
+                    <span className="muted" style={{ fontSize: "12px" }}>보완하면 좋은 선택</span>
                     <div className="chip-list">
                       {recommendedFoods.map((food) => (
-                        <span className="badge risk-low" key={`management-recommended-${food}`}>
+                        <span className="badge risk-low" style={{ fontSize: "14px" }} key={`management-recommended-${food}`}>
                           {publicNutritionText(food)}
                         </span>
                       ))}
