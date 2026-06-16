@@ -14,8 +14,9 @@ ALLOWED_RAG_DOMAINS = [
     "nhis.or.kr",
     "diabetes.or.kr",
     "koreanhypertension.org",
+    # 대한지질·동맥경화학회 guideline source is managed in docs/rag_sources/index.json.
+    "lipid.or.kr",
     # TODO: 대한비만학회 공식 도메인 확인 후 추가
-    # TODO: 대한지질·동맥경화학회 공식 도메인 확인 후 추가
 ]
 
 

@@ -1,6 +1,16 @@
 #!/bin/bash
 set -eo pipefail
 
+# DEPRECATED:
+#   This legacy interactive script uses envs/.prod.env and mutates nginx conf
+#   files directly. The current deployment flow is:
+#     cp envs/example.prod.env prod.env
+#     make prod-pull
+#     make prod-up
+#     make prod-migrate
+#     make prod-health
+#   Keep this script only as a historical/manual reference.
+
 COLOR_GREEN=$(tput setaf 2)
 COLOR_BLUE=$(tput setaf 4)
 COLOR_RED=$(tput setaf 1)

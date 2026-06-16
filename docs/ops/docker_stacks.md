@@ -171,6 +171,7 @@ make dev-logs
 make dev-migrate
 make dev-seed
 make dev-health
+make dev-rebuild-worker
 make dev-down
 ```
 
@@ -250,12 +251,35 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml pull
 docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
+Makefile 표준 흐름:
+
+```bash
+cp envs/example.prod.env prod.env
+make prod-pull
+make prod-up
+make prod-migrate
+make prod-health
+```
+
+운영 배포 target은 seed와 RAG ingest를 자동 실행하지 않는다. 초기 운영 DB에 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 `make danger-prod-seed`를 별도로 실행한다. 하위 호환용 `make prod-release-db`는 migration만 수행한다.
+
 운영 실행 전 확인할 것:
 
 - app, ai-worker, frontend image registry와 tag가 준비되어 있는지
 - prod env 값이 placeholder가 아닌지
-- HTTPS/certbot 설정이 실제 도메인과 맞는지
+- `healthladder.duckdns.org`가 EC2 public IP로 resolve되는지
+- HTTPS/certbot 설정이 `healthladder.duckdns.org`와 맞는지
 - DB backup/restore 계획이 있는지
+- QA/smoke script는 운영 이미지 런타임 필수 파일이 아니며, `scripts/qa`는 로컬 QA 또는 별도 수동 smoke 절차에서만 사용한다.
+
+DuckDNS token은 secret이므로 Git tracked 파일, README, issue, shell history, 배포 로그에 남기지 않는다. DNS/HTTP/HTTPS 확인은 실제 배포 전후에 아래처럼 수행한다.
+
+```bash
+nslookup healthladder.duckdns.org
+curl -I http://healthladder.duckdns.org
+curl -I https://healthladder.duckdns.org
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
 
 ## 4. 주의사항
 
@@ -266,6 +290,7 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d
 안전한 확인 명령:
 
 ```bash
+docker compose config --quiet
 docker compose config --services
 docker compose ps
 docker compose logs --tail=100 fastapi

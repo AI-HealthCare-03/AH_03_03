@@ -1,15 +1,11 @@
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
   analyzeDiet,
-  createDietRecord,
   listDietRecords,
   type DietCandidateFood,
-  type DietFoodItem,
   type DietAnalyzeResponse,
-  type DietNutritionSummary,
-  type DietRecordPayload,
 } from "../api/diets";
 import { normalizeImageForPreview } from "../api/uploads";
 import Card from "../components/Card";
@@ -20,20 +16,6 @@ import { isHeicFile } from "../utils/files";
 import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
-
-type ManualFoodDraft = {
-  name: string;
-  quantity: string;
-  memo: string;
-};
-
-type NutritionDraft = {
-  calories: string;
-  carbohydrate_g: string;
-  protein_g: string;
-  fat_g: string;
-  sodium_mg: string;
-};
 
 const mealTypeOptions = [
   { value: "BREAKFAST", label: "아침" },
@@ -54,45 +36,32 @@ function getDefaultMealType(): string {
 
 const DIET_ANALYSIS_JOB_POLLING_INTERVAL_MS = 10000;
 
-function currentLocalDateTime(): string {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
-const emptyFoodDraft: ManualFoodDraft = { name: "", quantity: "", memo: "" };
-const emptyNutritionDraft: NutritionDraft = {
-  calories: "",
-  carbohydrate_g: "",
-  protein_g: "",
-  fat_g: "",
-  sodium_mg: "",
-};
-
-function parseOptionalNumber(value: string): number | null {
-  if (value.trim() === "") return null;
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : null;
-}
-
-function buildNutritionSummary(draft: NutritionDraft): DietNutritionSummary | null {
-  const nutrition: DietNutritionSummary = {
-    calories: parseOptionalNumber(draft.calories),
-    carbohydrate_g: parseOptionalNumber(draft.carbohydrate_g),
-    protein_g: parseOptionalNumber(draft.protein_g),
-    fat_g: parseOptionalNumber(draft.fat_g),
-    sodium_mg: parseOptionalNumber(draft.sodium_mg),
-  };
-  return Object.values(nutrition).some((value) => value !== null) ? nutrition : null;
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+function normalizeFoodItems(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["foods", "detected_foods", "items"]) {
+      if (Array.isArray(record[key])) {
+        return normalizeFoodItems(record[key]);
+      }
+    }
+    return Object.entries(value as Record<string, unknown>).map(([name, detail]) => ({
+      name,
+      value: detail,
+    }));
+  }
+  return [];
+}
+
 function foodDisplayName(food: Record<string, unknown>): string {
   return (
-    String(food.original_name ?? food.query_name ?? food.name ?? food.food_name ?? food.matched_food_name ?? "").trim() ||
+    String(food.matched_food_name ?? food.name ?? food.food_name ?? food.original_name ?? food.query_name ?? "").trim() ||
     "음식명 확인 불가"
   );
 }
@@ -109,7 +78,7 @@ function mfdsCandidateName(food: Record<string, unknown>): string {
 function matchStatusLabel(food: Record<string, unknown>): string {
   const source = String(food.match_source ?? "").toLowerCase();
   const sourceLabels: Record<string, string> = {
-    mfds_matched: "MFDS 후보 확인 필요",
+    mfds_matched: "영양성분 후보 확인 필요",
     mfds_multiple_candidates: "후보 여러 개 확인 필요",
     mfds_weak_match: "낮은 신뢰 후보",
     mfds_no_candidates: "영양성분 후보 없음",
@@ -129,6 +98,14 @@ function hasMfdsNutrition(food: Record<string, unknown>): boolean {
   return ["calories_kcal", "carbohydrate_g", "protein_g", "fat_g", "sodium_mg"].some(
     (key) => nutrition[key] !== null && nutrition[key] !== undefined && nutrition[key] !== "",
   );
+}
+
+function publicNutritionText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[Mm][Ff][Dd][Ss]\s*기준\s*영양성분\s*후보/g, "식품영양성분 데이터 기준 후보")
+    .replace(/[Mm][Ff][Dd][Ss]\s*기준/g, "식품영양성분 데이터 기준")
+    .replace(/[Mm][Ff][Dd][Ss]\s*후보/g, "영양성분 후보")
+    .replace(/\b[Mm][Ff][Dd][Ss]\b/g, "식품영양성분 데이터");
 }
 
 function nutritionValue(value: unknown, unit: string): string {
@@ -175,15 +152,46 @@ function candidateFoodName(food: DietCandidateFood): string {
   );
 }
 
+function dietRecordDisplayTitle(record: DietRecord): string {
+  const foodNames = normalizeFoodItems(record.detected_foods)
+    .map(foodDisplayName)
+    .filter((name) => name && name !== "음식명 확인 불가");
+  if (foodNames.length === 1) {
+    return foodNames[0];
+  }
+  if (foodNames.length > 1) {
+    return `${foodNames[0]} 외 ${foodNames.length - 1}개`;
+  }
+  const description = String(record.description ?? "").trim();
+  if (description && description !== "사진으로 선택한 식단") {
+    return description;
+  }
+  return "식단 기록";
+}
+
+function recordNeedsFoodConfirmation(record: DietRecord): boolean {
+  const summary = asRecord(record.nutrition_summary);
+  const status = String(record.match_source ?? record.nutrition_calculation_status ?? summary.nutrition_calculation_status ?? "").toLowerCase();
+  return (
+    record.needs_user_confirmation === true ||
+    summary.needs_user_confirmation === true ||
+    Number(record.needs_user_confirmation_count ?? summary.needs_user_confirmation_count ?? 0) > 0 ||
+    status === "partial" ||
+    status === "needs_user_confirmation" ||
+    status === "needs_confirmation" ||
+    status === "mfds_multiple_candidates" ||
+    status.includes("confirmation") ||
+    normalizeFoodItems(record.detected_foods).some((food) => {
+      const foodStatus = String(food.match_source ?? food.match_status ?? food.nutrition_status ?? "").toLowerCase();
+      return food.needs_user_confirmation === true || foodStatus.includes("confirmation") || foodStatus === "mfds_multiple_candidates";
+    })
+  );
+}
+
 export default function DietPage() {
   const [analysisMealType, setAnalysisMealType] = useState(getDefaultMealType());
   const [analysisDescription, setAnalysisDescription] = useState("");
-  const [manualMealType, setManualMealType] = useState("LUNCH");
-  const [manualMealTime, setManualMealTime] = useState(currentLocalDateTime());
-  const [manualDescription, setManualDescription] = useState("");
-  const [manualMemo, setManualMemo] = useState("");
-  const [manualFoods, setManualFoods] = useState<ManualFoodDraft[]>([{ ...emptyFoodDraft }]);
-  const [manualNutrition, setManualNutrition] = useState<NutritionDraft>({ ...emptyNutritionDraft });
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -221,6 +229,17 @@ export default function DietPage() {
       }
     };
   }, [selectedImagePreviewUrl]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      const mobileUserAgent = /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+      setIsMobileDevice(coarsePointer || mobileUserAgent);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useAsyncJobPolling({
     jobId: analysisJobId,
@@ -320,47 +339,6 @@ export default function DietPage() {
     setImagePreviewMessage("");
   };
 
-  const submitManualDiet = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    const foodItems: DietFoodItem[] = manualFoods
-      .map((food) => ({
-        name: food.name.trim(),
-        quantity: food.quantity.trim() || null,
-        memo: food.memo.trim() || null,
-      }))
-      .filter((food) => food.name.length > 0);
-    if (foodItems.length === 0 && !manualDescription.trim()) {
-      setError("음식명 또는 식단 설명을 입력해주세요.");
-      return;
-    }
-    const nutritionSummary = buildNutritionSummary(manualNutrition);
-    const description =
-      manualDescription.trim() || foodItems.map((food) => food.name).join(", ") || "직접 입력한 식단";
-    const payload: DietRecordPayload = {
-      meal_type: manualMealType,
-      meal_time: manualMealTime ? new Date(manualMealTime).toISOString() : new Date().toISOString(),
-      description,
-      detected_foods: foodItems.length > 0 ? foodItems : null,
-      nutrition_summary: nutritionSummary,
-      analysis_method: "MANUAL",
-      is_user_corrected: true,
-      memo: manualMemo.trim() || null,
-    };
-    try {
-      await createDietRecord(payload);
-      setManualMealType("LUNCH");
-      setManualMealTime(currentLocalDateTime());
-      setManualDescription("");
-      setManualMemo("");
-      setManualFoods([{ ...emptyFoodDraft }]);
-      setManualNutrition({ ...emptyNutritionDraft });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "식단 기록 저장에 실패했습니다.");
-    }
-  };
-
   const runDietAnalysis = async () => {
     if (isAnalyzing || analysisRequestInFlightRef.current) {
       return;
@@ -430,15 +408,20 @@ export default function DietPage() {
       ) : null}
       {message && <div className="state-box">{message}</div>}
       {feedbackDialog}
+      <div className="state-box" style={{ gridColumn: "1 / -1" }}>
+        식단 사진을 업로드하면 음식 후보와 영양 정보를 분석합니다. 직접 입력 기반 영양성분 자동 산정은 추후 제공
+        예정입니다.
+      </div>
       <Card
         title="식단 이미지 분석"
+        className="diet-analysis-card"
         actions={
           <Link className="button secondary" to="/diets/history">
             결과 전체
           </Link>
         }
       >
-        <form className="form" onSubmit={(event) => event.preventDefault()}>
+        <form className="form" onSubmit={(event) => event.preventDefault()} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <label>
             식사 구분
             <select value={analysisMealType} onChange={(event) => setAnalysisMealType(event.target.value)}>
@@ -456,13 +439,22 @@ export default function DietPage() {
           <div className="upload-box">
             <strong>음식 사진 선택</strong>
             <span>이미지 파일을 선택하거나, 지원되는 모바일 브라우저에서는 후면 카메라로 바로 촬영할 수 있습니다.</span>
-            <div className="button-row">
-              <label className="button secondary" htmlFor="diet-file-input">
+            <div className="upload-action-grid">
+              <label className="upload-action-button" htmlFor="diet-file-input">
                 이미지 파일 선택
               </label>
-              <label className="button secondary" htmlFor="diet-camera-input">
-                카메라로 촬영
-              </label>
+              {isMobileDevice ? (
+                <label className="upload-action-button" htmlFor="diet-camera-input">
+                  카메라로 촬영
+                </label>
+              ) : (
+                <span className="upload-action-button upload-action-button--disabled">
+                  <span style={{ fontSize: "14px", fontWeight: 600 }}>카메라 촬영</span>
+                  <span style={{ fontSize: "11px", fontWeight: 400, opacity: 0.7 }}>
+                    카메라 촬영은 모바일에서 사용할 수 있습니다.
+                  </span>
+                </span>
+              )}
             </div>
             <input
               accept="image/*,.heic,.heif"
@@ -497,151 +489,12 @@ export default function DietPage() {
             {selectedImagePreviewUrl ? (
               <img alt="선택한 음식 사진 미리보기" className="upload-preview" src={selectedImagePreviewUrl} />
             ) : null}
-          </div>
+          </div>  {/* upload-box 닫힘 */}
+          <div style={{ flex: 1 }} />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button disabled={isAnalyzing} type="button" onClick={runDietAnalysis}>
               {isAnalyzing ? "식단 분석 중..." : "간편 식단 분석"}
             </button>
-          </div>
-        </form>
-      </Card>
-      <Card title="식단 직접 입력">
-        <form className="form" onSubmit={submitManualDiet}>
-          <div className="state-box">사진 없이 식단을 직접 기록할 수 있습니다. 영양정보를 알고 있다면 선택적으로 입력해주세요.</div>
-          <div className="form-grid">
-            <label>
-              식사 구분
-              <select value={manualMealType} onChange={(event) => setManualMealType(event.target.value)}>
-                {mealTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              식사 시각
-              <input type="datetime-local" value={manualMealTime} onChange={(event) => setManualMealTime(event.target.value)} />
-            </label>
-          </div>
-          <label>
-            식단 설명
-            <input
-              placeholder="예: 현미밥, 닭가슴살 샐러드"
-              value={manualDescription}
-              onChange={(event) => setManualDescription(event.target.value)}
-            />
-          </label>
-          <div className="manual-food-list">
-            <div className="diet-record-header">
-              <strong>음식 목록</strong>
-              <button
-                className="secondary compact-button"
-                onClick={() => setManualFoods((prev) => [...prev, { ...emptyFoodDraft }])}
-                type="button"
-              >
-                음식 추가
-              </button>
-            </div>
-            {manualFoods.map((food, index) => (
-              <div className="manual-food-row" key={`manual-food-${index}`}>
-                <label>
-                  음식명
-                  <input
-                    placeholder="예: 현미밥"
-                    value={food.name}
-                    onChange={(event) =>
-                      setManualFoods((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, name: event.target.value } : item)))
-                    }
-                  />
-                </label>
-                <label>
-                  수량
-                  <input
-                    placeholder="예: 1공기"
-                    value={food.quantity}
-                    onChange={(event) =>
-                      setManualFoods((prev) =>
-                        prev.map((item, itemIndex) => (itemIndex === index ? { ...item, quantity: event.target.value } : item)),
-                      )
-                    }
-                  />
-                </label>
-                <label>
-                  메모
-                  <input
-                    placeholder="선택"
-                    value={food.memo}
-                    onChange={(event) =>
-                      setManualFoods((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, memo: event.target.value } : item)))
-                    }
-                  />
-                </label>
-                {manualFoods.length > 1 && (
-                  <button
-                    className="btn-danger-outline compact-button"
-                    onClick={() => setManualFoods((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
-                    type="button"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="nutrition-input-grid">
-            <label>
-              칼로리 kcal
-              <input
-                min="0"
-                type="number"
-                value={manualNutrition.calories}
-                onChange={(event) => setManualNutrition((prev) => ({ ...prev, calories: event.target.value }))}
-              />
-            </label>
-            <label>
-              탄수화물 g
-              <input
-                min="0"
-                type="number"
-                value={manualNutrition.carbohydrate_g}
-                onChange={(event) => setManualNutrition((prev) => ({ ...prev, carbohydrate_g: event.target.value }))}
-              />
-            </label>
-            <label>
-              단백질 g
-              <input
-                min="0"
-                type="number"
-                value={manualNutrition.protein_g}
-                onChange={(event) => setManualNutrition((prev) => ({ ...prev, protein_g: event.target.value }))}
-              />
-            </label>
-            <label>
-              지방 g
-              <input
-                min="0"
-                type="number"
-                value={manualNutrition.fat_g}
-                onChange={(event) => setManualNutrition((prev) => ({ ...prev, fat_g: event.target.value }))}
-              />
-            </label>
-            <label>
-              나트륨 mg
-              <input
-                min="0"
-                type="number"
-                value={manualNutrition.sodium_mg}
-                onChange={(event) => setManualNutrition((prev) => ({ ...prev, sodium_mg: event.target.value }))}
-              />
-            </label>
-          </div>
-          <label>
-            메모
-            <textarea value={manualMemo} onChange={(event) => setManualMemo(event.target.value)} />
-          </label>
-          <div className="button-row" style={{ justifyContent: "flex-end" }}>
-            <button type="submit">직접 기록 저장</button>
           </div>
         </form>
       </Card>
@@ -684,14 +537,14 @@ export default function DietPage() {
             </div>
             {!hasAnyMfdsNutrition && (
               <div className="state-box">
-                영양성분 후보를 찾지 못했습니다. 음식명 확인 또는 섭취량 입력 후 더 정확한 분석이 가능합니다.
+                영양성분 후보를 찾지 못했습니다. 음식 후보를 확인하면 더 정확한 분석이 가능합니다.
               </div>
             )}
             {detectedFoods.some((food) => mfdsCandidateName(food) || hasMfdsNutrition(food)) && (
               <div className="card-list">
                 <div className="state-box">
-                  MFDS 영양성분은 식약처 데이터 기준 후보입니다. 기준량은 100g 또는 1회 제공량일 수 있으며, 실제
-                  섭취량 입력 전까지 총 영양성분은 확정되지 않습니다.
+                  식품영양성분 데이터 기준 후보입니다. 기준량은 100g 또는 1회 제공량일 수 있으며, 실제 음식 후보
+                  확정 전까지 총 영양성분은 확정되지 않습니다.
                 </div>
                 {detectedFoods
                   .filter((food) => mfdsCandidateName(food) || hasMfdsNutrition(food))
@@ -701,15 +554,15 @@ export default function DietPage() {
                     return (
                       <div className="mini-card" key={`${foodDisplayName(food)}-mfds-${index}`}>
                         <strong>{foodDisplayName(food)}</strong>
-                        {candidateName && <span className="muted">MFDS 후보: {candidateName}</span>}
+                        {candidateName && <span className="muted">영양성분 후보: {candidateName}</span>}
                         <span className="badge badge-reference">상태: {matchStatusLabel(food)}</span>
                         {hasMfdsNutrition(food) ? (
                           <>
-                            <span className="muted">MFDS 기준 영양성분</span>
+                            <span className="muted">식품영양성분 데이터 기준</span>
                             <div className="nutrition-grid">
                               <div>
                                 <span>기준량</span>
-                                <strong>{String(mfds.basis_label ?? "기준량 확인 필요")}</strong>
+                                <strong>{publicNutritionText(mfds.basis_label ?? "기준량 확인 필요")}</strong>
                               </div>
                               <div>
                                 <span>열량</span>
@@ -741,15 +594,29 @@ export default function DietPage() {
                             )}
                           </>
                         ) : (
-                          <span className="muted">표시할 MFDS 영양성분 후보가 없습니다.</span>
+                          <span className="muted">표시할 영양성분 후보가 없습니다.</span>
                         )}
                       </div>
                     );
                   })}
               </div>
             )}
-            <div className="state-box">
-              질환별 식단 평가는 준비 중입니다. 사용자의 건강정보와 실제 섭취량을 기준으로 LLM 해석을 거쳐 제공될 예정입니다.
+            <div className="mini-card">
+              <strong>식단 관리 포인트</strong>
+              <span className="muted">
+                현재 식단에서 확인할 성분과 다음 행동을 중심으로 보여드립니다.
+              </span>
+              {recommendedActions.length > 0 ? (
+                <div className="chip-list">
+                  {recommendedActions.map((action) => (
+                    <span className="badge risk-low" key={`management-${action}`}>
+                      {publicNutritionText(action)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span>음식 후보와 영양성분을 확인한 뒤 국물, 소스, 튀김류, 단 음료처럼 조절할 부분을 살펴보세요.</span>
+              )}
             </div>
             {hasCandidateSection && (
               <div className="card-list">
@@ -774,7 +641,7 @@ export default function DietPage() {
                     <strong>{candidateFoods.needsConfirmation.length}개</strong>
                   </div>
                   <div>
-                    <span>직접 입력 필요</span>
+                    <span>후보 없음</span>
                     <strong>{candidateFoods.noCandidate.length}개</strong>
                   </div>
                 </div>
@@ -796,13 +663,6 @@ export default function DietPage() {
                 ))}
               </div>
             )}
-            <div className="chip-list">
-              {recommendedActions.map((action) => (
-                <span className="badge risk-low" key={action}>
-                  {action}
-                </span>
-              ))}
-            </div>
           </div>
         )}
       </Card>
@@ -812,21 +672,26 @@ export default function DietPage() {
           {records.slice(0, 5).map((record) => {
             const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
+            const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
               <Link className="mini-card" key={String(record.id)} to={`/diets/${String(record.id)}`}>
                 <div className="diet-record-meta">
                   <span className="muted">{formatDateTime(record.meal_time ?? record.created_at)}</span>
                   <span className="badge badge-reference">{mealTypeLabel(record.meal_type)}</span>
                   {isManual && <span className="badge badge-reference">직접 기록</span>}
+                  {needsConfirmation && <span className="badge badge-reference">음식 후보 확인 필요</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                  <strong>{String(record.description ?? "식단 기록")}</strong>
+                  <strong>{dietRecordDisplayTitle(record)}</strong>
                   {scoreRaw !== null ? (
-                    <span className={`badge ${scoreBadgeClass(scoreRaw)}`}>{scoreRaw}점</span>
+                    <span className={`badge ${needsConfirmation ? "badge-reference" : scoreBadgeClass(scoreRaw)}`}>
+                      {needsConfirmation ? `참고 ${scoreRaw}점` : `${scoreRaw}점`}
+                    </span>
                   ) : isManual ? (
                     <span className="badge badge-reference">점수 미산정</span>
                   ) : null}
                 </div>
+                {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
             );
           })}

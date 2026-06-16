@@ -68,6 +68,12 @@ class UserChallengeResponse(BaseSerializerModel):
     id: int
     user_id: int
     challenge_id: int
+    challenge_title: str | None = None
+    challenge_description: str | None = None
+    challenge_category: ChallengeCategory | None = None
+    challenge_difficulty: ChallengeDifficulty | None = None
+    challenge_status: ChallengeStatus | None = None
+    challenge_duration_days: int | None = None
     status: UserChallengeStatus
     started_at: datetime
     expected_done_at: datetime | None = None

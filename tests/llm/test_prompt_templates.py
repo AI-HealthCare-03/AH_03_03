@@ -59,7 +59,7 @@ def test_fallback_safe_response_prompt_avoids_diagnosis_or_prescription_instruct
     rendered = spec.render()
 
     assert spec.version == FALLBACK_SAFE_RESPONSE_PROMPT_VERSION
-    assert "현재 질문에 답변할 수 있는 신뢰 가능한 근거 자료가 충분하지 않습니다" in rendered
+    assert "현재 준비된 참고자료만으로는 이 주제에 대해 구체적으로 안내하기 어렵습니다" in rendered
     assert "참고용" in rendered
     assert "의료진과 상담" in rendered
     assert "진단이 아니" in rendered

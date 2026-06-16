@@ -143,4 +143,10 @@ async def create_challenge_recommendation(
 async def list_challenge_recommendations(
     user_id: int, limit: int = 20, offset: int = 0
 ) -> list[ChallengeRecommendation]:
-    return await ChallengeRecommendation.filter(user_id=user_id).order_by("-created_at").offset(offset).limit(limit)
+    return (
+        await ChallengeRecommendation.filter(user_id=user_id, challenge__status=ChallengeStatus.ACTIVE)
+        .prefetch_related("challenge")
+        .order_by("-created_at")
+        .offset(offset)
+        .limit(limit)
+    )

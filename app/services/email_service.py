@@ -109,6 +109,51 @@ class EmailService:
         )
         return await self._send_email(email, subject, body, html_body=html_body)
 
+    async def send_notification_email(
+        self,
+        to_email: str,
+        title: str,
+        message: str,
+        action_url: str | None = None,
+    ) -> bool:
+        subject = f"[Health Ladder] {title}"
+        body_parts = [
+            "안녕하세요, Health Ladder입니다.",
+            "",
+            title,
+            "",
+            message,
+        ]
+        if action_url:
+            body_parts.extend(["", f"알림 확인: {action_url}"])
+        body_parts.extend(
+            [
+                "",
+                "본 메일은 Health Ladder 서비스 알림 설정에 따라 발송되었습니다.",
+                "",
+                "Health Ladder 드림",
+            ]
+        )
+        body = "\n".join(body_parts)
+
+        escaped_title = escape(title)
+        escaped_message = escape(message).replace("\n", "<br>")
+        html_body = (
+            "<p>안녕하세요, <strong>Health Ladder</strong>입니다.</p>"
+            f"<p><strong>{escaped_title}</strong></p>"
+            f"<p>{escaped_message}</p>"
+        )
+        if action_url:
+            escaped_action_url = escape(action_url, quote=True)
+            html_body += (
+                f'<p><a href="{escaped_action_url}" target="_blank" rel="noopener noreferrer">알림 확인하기</a></p>'
+            )
+        html_body += (
+            "<p>본 메일은 <strong>Health Ladder</strong> 서비스 알림 설정에 따라 발송되었습니다.</p>"
+            "<p>감사합니다.<br><strong>Health Ladder</strong> 드림</p>"
+        )
+        return await self._send_email(to_email, subject, body, html_body=html_body)
+
     async def _send_email(self, recipient: str, subject: str, body: str, html_body: str | None = None) -> bool:
         if not config.EMAIL_ENABLED:
             if config.is_production:

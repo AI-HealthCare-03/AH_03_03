@@ -87,6 +87,7 @@ PASSWORD_RESET_DEBUG=false
 OPENAI_API_KEY=<OPENAI_API_KEY>
 CHATBOT_USE_REAL_LLM=false
 RAG_ENABLED=false
+RAG_RETRIEVAL_STRATEGY=keyword_only
 
 DIET_VISION_PROVIDER=rule_based
 DIET_GPT_VISION_ENABLED=false
@@ -234,6 +235,12 @@ make dev-logs
 make dev-rebuild-api
 ```
 
+AI Worker만 빠르게 재빌드:
+
+```bash
+make dev-rebuild-worker
+```
+
 프론트엔드 UI/정적 빌드 변경만 Docker에 반영:
 
 ```bash
@@ -256,6 +263,16 @@ dev compose 설정 검증:
 
 ```bash
 make dev-config-check
+```
+
+`make dev-config-check`는 `docker compose config --quiet`만 실행해 compose 유효성만 확인합니다. secret이 펼쳐질 수 있는 `docker compose config` 전체 출력은 문서/화면공유에 사용하지 마세요.
+
+로컬 QA 검증:
+
+```bash
+make qa-diff
+make qa-backend
+make qa-frontend
 ```
 
 ## Prod Image / EC2 배포 준비
@@ -287,30 +304,48 @@ cp envs/example.prod.env prod.env
 # prod.env 실제 운영값 수정
 make prod-pull
 make prod-up
-make prod-release-db
+make prod-migrate
 make prod-health
 make prod-ps
 make prod-logs
 ```
 
-DB 반영을 더 명시적으로 나누어 실행하려면 아래처럼 실행합니다.
+DuckDNS 배포 기준 도메인은 `healthladder.duckdns.org`입니다. `prod.env`에는 같은 도메인 기준으로 아래 public URL 값을 맞춥니다.
 
-```bash
-make prod-pull
-make prod-up
-make prod-migrate
-make prod-seed
-make prod-health
+```env
+COOKIE_DOMAIN=healthladder.duckdns.org
+CORS_ALLOW_ORIGINS=https://healthladder.duckdns.org
+FRONTEND_BASE_URL=https://healthladder.duckdns.org
+VITE_API_BASE_URL=/api/v1
 ```
 
-상세 절차는 `docs/deployment/ec2_prod_env.md`와 `docs/ops/docker_stacks.md`를 참고하세요.
+DuckDNS token은 secret이므로 README, PR, issue, shell history, 배포 로그에 남기지 않습니다. DNS/HTTP 확인은 실제 배포 전 운영자가 아래처럼 확인합니다.
+
+```bash
+nslookup healthladder.duckdns.org
+curl -I http://healthladder.duckdns.org
+curl -I https://healthladder.duckdns.org
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
+
+초기 환경에서 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 아래 danger target을 따로 실행합니다.
+
+```bash
+make danger-prod-seed
+```
+
+`make prod-release-db`는 하위 호환용으로 남아 있지만 이제 migration만 실행합니다. 운영/배포용 target에서는 seed와 RAG ingest를 자동 실행하지 않습니다.
+
+QA/smoke 스크립트는 로컬 검증용입니다. `scripts/qa/smoke_notification_email.py` 같은 파일은 운영 이미지 런타임 필수 파일이 아니며, 실제 발송 smoke는 운영자가 명시적으로 허용한 별도 절차에서만 실행합니다.
+
+상세 절차는 `docs/deployment/ec2_docker_deploy_guide.md`, `docs/deployment/ec2_prod_env.md`, `docs/ops/docker_stacks.md`를 참고하세요.
 
 ## 주요 Provider Flag 요약
 
 | 기능 | 주요 flag | 기본 방향 |
 |---|---|---|
 | 챗봇 LLM | `CHATBOT_USE_REAL_LLM`, `OPENAI_API_KEY` | 기본 mock/rule, 필요 시 OpenAI |
-| RAG | `RAG_ENABLED` | 기본 off |
+| RAG | `RAG_ENABLED`, `RAG_RETRIEVAL_STRATEGY` | 기본 keyword-only, 필요 시 vector fallback/hybrid |
 | 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED` | 기본 rule/fallback |
 | 건강검진 OCR | `EXAM_OCR_PROVIDER`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED` | 기본 auto |
 | 복약 정보 | 별도 OCR provider 없음 | MVP에서는 사용자가 직접 입력 |
@@ -318,6 +353,10 @@ make prod-health
 | 이메일 | `EMAIL_ENABLED`, `SMTP_*`, `EMAIL_VERIFICATION_DEBUG` | local은 debug 또는 SMTP |
 
 provider별 상세 정책은 `docs/design/*`, `docs/ops/*` 문서를 참고하세요.
+
+챗봇 응답은 현재 `/api/v1/chatbot/ask`의 POST JSON 응답을 사용합니다. SSE/streaming은 아직
+미구현이며, Bearer token 인증에서는 브라우저 `EventSource`에 Authorization header를 붙이기
+어렵기 때문에 추후에는 `POST + fetch ReadableStream` 방식을 우선 검토합니다.
 
 복약 정보는 사용자가 직접 입력합니다. 약물 정보 확인은 약학정보원/약찾기 서비스를 참고하고,
 본 서비스는 처방, 복용량 판단, 약물 변경 안내를 제공하지 않습니다. 복약 관련 의사결정은

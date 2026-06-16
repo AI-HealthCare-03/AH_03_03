@@ -3,6 +3,8 @@
 - status: candidate_unreviewed
 - source_org: 대한지질·동맥경화학회, 질병관리청 국가건강정보포털
 - source_url: https://lipid.or.kr/reference/guideline.php?boardid=guideline&mode=view&idx=1281
+- source_type: clinical_guideline
+- source_trust_level: official_guideline
 - year: 2022
 - runtime_use: keyword_rag_poc_candidate
 

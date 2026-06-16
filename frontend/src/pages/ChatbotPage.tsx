@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import { askChatbot, type ChatbotAskResponse, type ChatbotContextType } from "../api/chatbot";
 import Card from "../components/Card";
@@ -34,12 +34,18 @@ const exampleQuestions = [
   "복약 시간을 자주 잊어버려요",
 ];
 
+function isChatbotContextType(value: string | null): value is ChatbotContextType {
+  return Boolean(value && ["MAIN", "ANALYSIS", "DIET", "CHALLENGE", "GENERAL"].includes(value));
+}
+
 function toUserFacingText(text: string) {
   return text;
 }
 
 export default function ChatbotPage() {
+  const location = useLocation();
   const [selectedContext, setSelectedContext] = useState<ContextOption>(contextOptions[0]);
+  const [targetId, setTargetId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState("");
@@ -68,6 +74,7 @@ export default function ChatbotPage() {
       const response = await askChatbot({
         message: requestMessage,
         context_type: selectedContext.value,
+        target_id: targetId,
       });
       const userFacingResponse: ChatbotAskResponse = {
         ...response,
@@ -90,6 +97,31 @@ export default function ChatbotPage() {
       setIsSending(false);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const state = (location.state ?? {}) as {
+      context_type?: ChatbotContextType;
+      target_id?: number | string | null;
+      initial_question?: string;
+    };
+    const contextValue = isChatbotContextType(params.get("context_type"))
+      ? params.get("context_type")
+      : state.context_type;
+    if (isChatbotContextType(contextValue ?? null)) {
+      const matched = contextOptions.find((option) => option.value === contextValue);
+      if (matched) {
+        setSelectedContext(matched);
+      }
+    }
+    const rawTargetId = params.get("target_id") ?? state.target_id;
+    const parsedTargetId = rawTargetId === null || rawTargetId === undefined ? NaN : Number(rawTargetId);
+    setTargetId(Number.isFinite(parsedTargetId) && parsedTargetId > 0 ? parsedTargetId : null);
+    const initialQuestion = params.get("initial_question") ?? state.initial_question;
+    if (initialQuestion) {
+      setMessage(initialQuestion);
+    }
+  }, [location.search, location.state]);
 
   return (
     <div className="page-stack">

@@ -3,6 +3,8 @@
 이 문서는 Health Ladder 배포 전/후 확인 항목을 빠르게 점검하기 위한 체크리스트입니다.
 실제 secret, API key, password, private key 값은 이 문서나 Git tracked 파일에 작성하지 않습니다.
 
+EC2 + Docker Compose + DuckDNS + HTTPS 전체 절차는 `docs/deployment/ec2_docker_deploy_guide.md`를 기준으로 확인합니다.
+
 ## 1. 로컬 검증
 
 - [ ] 현재 브랜치와 변경 상태 확인
@@ -134,10 +136,24 @@ git check-ignore -v prod.env
 - `SMTP_FROM_NAME`
 - `OPENAI_API_KEY`
 - `LANGFUSE_BASE_URL`
+- `LANGFUSE_HOST`
 - `LANGFUSE_PUBLIC_KEY`
 - `LANGFUSE_SECRET_KEY`
 - `VITE_API_BASE_URL`
 - `NGINX_CONF`
+
+`healthladder.duckdns.org` 기준으로 아래 값이 맞는지 확인합니다.
+
+```env
+COOKIE_DOMAIN=healthladder.duckdns.org
+CORS_ALLOW_ORIGINS=https://healthladder.duckdns.org
+FRONTEND_BASE_URL=https://healthladder.duckdns.org
+VITE_API_BASE_URL=/api/v1
+```
+
+`OPENAI_API_KEY`, `LANGFUSE_*`, SMTP 값은 사용하는 provider를 켤 때만 실제 값이 필요합니다. prod에서는 debug/mock/test 계열 flag를 기본 false로 두고, `EMAIL_VERIFICATION_DEBUG=false`, `PASSWORD_RESET_DEBUG=false`, `REFRESH_TOKEN_COOKIE_SECURE=true`를 유지합니다.
+
+DuckDNS token은 secret입니다. `prod.env`, 문서, PR, issue, shell history, 배포 로그에 원문을 남기지 않습니다.
 
 ## 5. EC2 배포 순서
 
@@ -154,6 +170,15 @@ cp envs/example.prod.env prod.env
 # prod.env 실제 운영값 수정
 ```
 
+- [ ] DuckDNS DNS 확인
+
+`healthladder.duckdns.org`가 현재 EC2 public IP를 가리키는지 확인합니다.
+
+```bash
+nslookup healthladder.duckdns.org
+curl -I http://healthladder.duckdns.org
+```
+
 - [ ] Docker Hub 이미지 pull
 
 ```bash
@@ -166,17 +191,16 @@ make prod-pull
 make prod-up
 ```
 
-- [ ] DB migration과 seed 명시 실행
-
-```bash
-make prod-release-db
-```
-
-명시적으로 나누어 실행하려면 아래 순서로 실행합니다.
+- [ ] DB migration 실행
 
 ```bash
 make prod-migrate
-make prod-seed
+```
+
+챌린지 seed가 필요한 초기 환경에서는 운영자가 명시적으로 승인한 뒤 danger target을 별도로 실행합니다. 일반 배포 흐름에서는 seed를 자동 실행하지 않습니다.
+
+```bash
+make danger-prod-seed
 ```
 
 - [ ] 컨테이너 상태 확인
@@ -189,6 +213,13 @@ make prod-ps
 
 ```bash
 make prod-health
+```
+
+- [ ] HTTPS 적용 후 외부 health 확인
+
+```bash
+curl -I https://healthladder.duckdns.org
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
 ```
 
 ## 6. 배포 후 기능 확인

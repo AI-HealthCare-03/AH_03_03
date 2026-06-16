@@ -92,6 +92,8 @@ docker compose down
 
 볼륨까지 초기화:
 
+주의: 아래 명령은 Langfuse Postgres, Redis, ClickHouse, MinIO 볼륨을 삭제할 수 있다. 운영/공유 환경에서는 실행하지 않는다. 로컬 실험 데이터를 완전히 버릴 때만 사용한다.
+
 ```bash
 docker compose down -v
 ```

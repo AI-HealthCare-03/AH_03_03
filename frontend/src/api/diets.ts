@@ -130,6 +130,8 @@ export type DietRagEvidenceSource = {
 export type DietRagComment = {
   enabled: boolean;
   fallback_used: boolean;
+  rewrite_used?: boolean | null;
+  fallback_reason?: string | null;
   summary: string;
   disease_comments: DietRagDiseaseComment[];
   evidence_sources: DietRagEvidenceSource[];

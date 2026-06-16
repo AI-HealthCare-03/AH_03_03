@@ -2,6 +2,8 @@
 
 이 문서는 EC2에서 `infra/docker/docker-compose.prod.yml` 기준으로 운영 스택을 띄울 때 확인할 항목을 정리한 것입니다. 실제 secret, API key, private key 원문은 이 문서나 Git tracked 파일에 작성하지 않습니다.
 
+처음부터 순서대로 배포할 때는 `docs/deployment/ec2_docker_deploy_guide.md`를 먼저 보고, 이 문서는 세부 설정 체크 문서로 함께 사용합니다.
+
 ## Compose 기준
 
 - 시연/운영 스택 기준 파일: `infra/docker/docker-compose.prod.yml`
@@ -38,10 +40,24 @@ cp envs/example.prod.env prod.env
 - `S3_BUCKET_NAME`
 - `NGINX_CONF`는 기본 `../nginx/prod_https.conf`, 최초 인증서 발급 전에는 `../nginx/prod_http.conf`
 
+`healthladder.duckdns.org` 배포 기준 URL 값:
+
+```env
+COOKIE_DOMAIN=healthladder.duckdns.org
+CORS_ALLOW_ORIGINS=https://healthladder.duckdns.org
+FRONTEND_BASE_URL=https://healthladder.duckdns.org
+VITE_API_BASE_URL=/api/v1
+```
+
+`VITE_API_BASE_URL`은 브라우저에 포함되는 public build-time 값입니다. 현재 Nginx가 같은 도메인에서 프론트를 서빙하고 `/api/` 요청을 FastAPI로 proxy하므로, 프론트 API client 기준 값은 versioned path인 `/api/v1`을 사용합니다.
+
+이메일 인증/비밀번호 재설정/가족 초대 링크는 백엔드의 `FRONTEND_BASE_URL` 기준으로 생성됩니다. 일반 알림 이메일 smoke나 수동 발송에서 action link를 넣을 때도 `https://healthladder.duckdns.org/notifications`처럼 같은 운영 도메인을 사용합니다.
+
 작성하지 말아야 하는 값:
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
+- DuckDNS token 원문
 - SMTP password 원문을 문서/README/예시 파일에 직접 작성한 값
 - OpenAI, Langfuse secret 원문
 
@@ -198,10 +214,17 @@ REDIS_PORT=6379
 
 ### DNS
 
-도메인 DNS에서 EC2 public IPv4 주소를 가리키는 A record를 설정합니다.
+도메인 DNS에서 EC2 public IPv4 주소를 가리키도록 설정합니다. DuckDNS를 사용할 때는 `healthladder.duckdns.org`가 현재 EC2 public IP로 resolve되어야 합니다. DuckDNS token은 운영자 개인 secret으로 취급하고 Git tracked 파일, README, 이슈, 배포 로그에 남기지 않습니다.
 
-- 예: `your-domain.example A <EC2_PUBLIC_IP>`
+- 운영 도메인: `healthladder.duckdns.org`
 - `COOKIE_DOMAIN`, `CORS_ALLOW_ORIGINS`, `FRONTEND_BASE_URL`, Nginx `server_name`은 같은 운영 도메인 기준으로 맞춥니다.
+
+배포 전 DNS/HTTP bootstrap 확인 예시:
+
+```bash
+nslookup healthladder.duckdns.org
+curl -I http://healthladder.duckdns.org
+```
 
 ### Nginx 설정
 
@@ -209,11 +232,11 @@ REDIS_PORT=6379
 - HTTPS 운영 설정: `infra/nginx/prod_https.conf`
 - prod compose는 `NGINX_CONF` 값으로 mount할 Nginx 설정 파일을 고를 수 있습니다.
 
-`prod_https.conf`의 placeholder는 운영 도메인으로 교체해야 합니다.
+`prod_https.conf`는 `healthladder.duckdns.org` 기준으로 관리합니다. 다른 도메인을 쓰는 배포에서는 아래 값을 해당 도메인으로 교체해야 합니다.
 
-- `server_name your-domain.example;`
-- `/etc/letsencrypt/live/your-domain.example/fullchain.pem`
-- `/etc/letsencrypt/live/your-domain.example/privkey.pem`
+- `server_name healthladder.duckdns.org;`
+- `/etc/letsencrypt/live/healthladder.duckdns.org/fullchain.pem`
+- `/etc/letsencrypt/live/healthladder.duckdns.org/privkey.pem`
 
 실제 인증서 파일은 Git에 커밋하지 않습니다. `certbot-conf` Docker volume 또는 운영 서버의 secret mount로 관리합니다.
 
@@ -231,7 +254,7 @@ certbot webroot 발급 예시:
 ```bash
 docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml run --rm certbot \
   certonly --webroot -w /var/www/certbot \
-  -d your-domain.example \
+  -d healthladder.duckdns.org \
   --email admin@example.com \
   --agree-tos \
   --no-eff-email
@@ -280,7 +303,7 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml pull
 docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
-`REFRESH_TOKEN_COOKIE_SECURE=true` 상태에서는 HTTP/IP 접속 smoke test에서 refresh cookie 기반 로그인 유지가 제한될 수 있다. 이 값은 HTTPS/도메인 운영 기준으로는 true를 유지해야 하며, HTTP 임시 테스트에서만 쿠키 동작 제약을 감안한다.
+`REFRESH_TOKEN_COOKIE_SECURE=true` 상태에서는 HTTP/IP 접속 smoke test에서 refresh cookie 기반 로그인 유지가 제한될 수 있다. 이 값은 HTTPS/도메인 운영 기준으로는 true를 유지해야 하며, HTTP 임시 테스트에서만 쿠키 동작 제약을 감안한다. `healthladder.duckdns.org`처럼 프론트와 API가 같은 site에서 동작하면 `REFRESH_TOKEN_COOKIE_SAMESITE=lax` 기본값을 유지할 수 있다.
 
 마이그레이션:
 
@@ -289,11 +312,10 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec 
   uv run --no-sync aerich upgrade
 ```
 
-챌린지 seed가 필요한 초기 환경:
+챌린지 seed가 필요한 초기 환경에서는 운영자가 명시적으로 승인한 뒤 danger target을 따로 실행한다. 일반 배포 흐름에서는 seed를 자동 실행하지 않는다.
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec fastapi \
-  uv run --no-sync python scripts/seed_mvp_challenges.py
+make danger-prod-seed
 ```
 
 기본 health check:
@@ -309,12 +331,19 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml ps
 NGINX_CONF=../nginx/prod_https.conf
 ```
 
+HTTPS 적용 후 외부 확인 예시:
+
+```bash
+curl -I https://healthladder.duckdns.org
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
+
 이후 Nginx 설정을 재적용하고 외부 HTTPS health check를 확인한다.
 
 ```bash
 docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml up -d nginx
 docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec nginx nginx -t
-curl -fsS https://your-domain.example/api/v1/system/health
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
 ```
 
 ## PostgreSQL 백업/복구
@@ -372,7 +401,7 @@ S3 업로드 파일은 S3 bucket에 저장되므로 PostgreSQL dump에는 포함
 도메인 연결 후 외부 HTTPS까지 확인하려면:
 
 ```bash
-PUBLIC_BASE_URL=https://your-domain.example ./scripts/ops/check_prod_health.sh
+PUBLIC_BASE_URL=https://healthladder.duckdns.org ./scripts/ops/check_prod_health.sh
 ```
 
 수동 확인:
@@ -388,7 +417,7 @@ docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml exec 
 외부 도메인을 연결한 뒤에는 다음도 확인합니다.
 
 ```bash
-curl -fsS https://your-domain.example/api/v1/system/health
+curl -fsS https://healthladder.duckdns.org/api/v1/system/health
 ```
 
 ## 로그 확인 루틴
@@ -447,10 +476,11 @@ CHATBOT_USE_REAL_LLM=false OPENAI_API_KEY= LANGFUSE_ENABLED=false RAG_ENABLED=fa
 cd frontend && npm run build && cd ..
 ```
 
-prod compose config 렌더링도 확인합니다. 출력에 secret 원문이 포함될 수 있으므로 공유하거나 PR에 붙이지 않습니다.
+prod compose 렌더링은 secret 원문이 포함될 수 있으므로 전체 출력으로 확인하지 않습니다. 유효성 확인은 출력 없는 `--quiet` 또는 서비스 이름만 출력하는 `--services`를 사용합니다.
 
 ```bash
-docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml config
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml config --quiet
+docker compose --env-file prod.env -f infra/docker/docker-compose.prod.yml config --services
 ```
 
 ## 운영 체크 포인트

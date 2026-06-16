@@ -11,6 +11,7 @@ from ai_runtime.jobs import scheduler
 from app.core import config
 from app.models.notifications import NotificationChannel, NotificationLogStatus, ReminderType
 from app.services import notifications as notification_service
+from app.services.notification_email import NotificationEmailDeliveryResult
 
 
 class FakeNotificationRepository:
@@ -125,19 +126,32 @@ async def test_due_reminder_does_not_create_duplicate_notification(monkeypatch: 
 
 
 @pytest.mark.asyncio
-async def test_email_channel_reminder_creates_notification_and_log(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_email_channel_reminder_records_skipped_when_email_is_not_sent(monkeypatch: pytest.MonkeyPatch) -> None:
     now = datetime(2026, 5, 31, 9, 0, 0, tzinfo=config.TIMEZONE)
     repository = FakeNotificationRepository(
         [_schedule(channel=NotificationChannel.EMAIL, next_trigger_at=now - timedelta(minutes=1))]
     )
 
+    async def fake_deliver_notification_email_to_user(**kwargs):
+        assert kwargs["user_id"] == 7
+        return NotificationEmailDeliveryResult(
+            status=NotificationLogStatus.SKIPPED,
+            sent=False,
+            error_code="email_delivery_disabled",
+            error_message="email_delivery_disabled",
+        )
+
     monkeypatch.setattr(notification_service, "notification_repository", repository)
+    monkeypatch.setattr(
+        notification_service, "deliver_notification_email_to_user", fake_deliver_notification_email_to_user
+    )
 
     created_count = await notification_service.process_due_reminder_schedules(now=now)
 
     assert created_count == 1
-    assert repository.logs[0]["status"] == NotificationLogStatus.SENT
+    assert repository.logs[0]["status"] == NotificationLogStatus.SKIPPED
     assert repository.logs[0]["channel"] == NotificationChannel.EMAIL
+    assert repository.logs[0]["error_code"] == "email_delivery_disabled"
 
 
 @pytest.mark.asyncio

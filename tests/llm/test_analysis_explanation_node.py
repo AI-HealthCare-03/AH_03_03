@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ai_runtime.llm.graph import run_analysis_explanation_graph, run_chatbot_graph
+import pytest
+
+from ai_runtime.llm.graph import run_analysis_explanation_graph, run_analysis_explanation_graph_async, run_chatbot_graph
 from ai_runtime.llm.prompt_templates import ANALYSIS_EXPLANATION_PROMPT_VERSION
 from ai_runtime.llm.schemas import AnalysisExplanationInput, HealthRiskFactor, RetrievedContext
 
@@ -98,6 +100,38 @@ def test_analysis_explanation_node_keeps_reference_sources_without_document_body
     assert trace["reference_source_ids"] == ["diabetes"]
     assert trace["reference_source_types"] == ["대한당뇨병학회"]
     assert "민감한 본문" not in str(trace)
+
+
+@pytest.mark.asyncio
+async def test_analysis_explanation_real_llm_rewrite_is_thread_offloaded(monkeypatch) -> None:
+    offloaded: list[str] = []
+
+    async def fake_to_thread(func, /, *args, **kwargs):
+        offloaded.append(func.__name__)
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr("ai_runtime.llm.graph.analysis_nodes.asyncio.to_thread", fake_to_thread)
+    monkeypatch.setattr("ai_runtime.llm.explanation_service.config.OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "ai_runtime.llm.explanation_service.call_llm_json",
+        lambda *args, **kwargs: (
+            '{"summary":"입력된 결과 기준으로 혈압 관리 참고점을 정리했어요.",'
+            '"caution":"수축기 혈압 항목은 생활관리 참고 신호로 살펴보면 좋습니다.",'
+            '"recommended_action":"혈압 기록과 나트륨 섭취를 함께 점검해 보세요."}'
+        ),
+    )
+
+    result = await run_analysis_explanation_graph_async(
+        input_data=AnalysisExplanationInput(
+            disease_type="HYPERTENSION",
+            risk_level="CAUTION",
+            factors=[HealthRiskFactor(name="수축기 혈압", value="132", reason="positive")],
+        ),
+        use_real_llm=True,
+    )
+
+    assert "rewrite_analysis_explanation" in offloaded
+    assert result.explanation.summary == "입력된 결과 기준으로 혈압 관리 참고점을 정리했어요."
 
 
 def test_crisis_chatbot_path_does_not_run_analysis_explanation_node() -> None:
