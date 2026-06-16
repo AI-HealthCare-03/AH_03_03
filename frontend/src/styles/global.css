@@ -2943,6 +2943,14 @@ a:hover .mini-card {
     display: none;
   }
 
+  .health-tab-group {
+    flex-direction: column;
+  }
+  
+  .health-tab-group > a {
+    align-self: flex-start;
+  }
+
   .risk-trend-charts {
     display: flex;
     flex-direction: row;
@@ -4149,7 +4157,7 @@ input:-webkit-autofill:focus {
 .profile-summary-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr 1fr;
 }
 
 .profile-summary-item {
@@ -4178,7 +4186,7 @@ input:-webkit-autofill:focus {
 .readonly-health-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .readonly-health-item {

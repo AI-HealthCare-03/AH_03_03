@@ -576,16 +576,18 @@ export default function HealthProfilePage() {
         </div>
       </header>
       {/* 입력 단계 탭 */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health/profile">
+      <div className="health-tab-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px", alignSelf: "flex-start" }} to="/health/profile">
           한눈에 보기
         </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=basic">
-          간편 분석 정보 입력
-        </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=precision">
-          정밀 분석 정보 입력
-        </Link>
+        <div className="health-tab-sub-group" style={{ display: "flex", gap: "8px" }}>
+          <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=basic">
+            간편 분석 정보 입력
+          </Link>
+          <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=precision">
+            정밀 분석 정보 입력
+          </Link>
+        </div>
       </div>
 
       {error && <ErrorMessage message={error} />}

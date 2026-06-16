@@ -422,25 +422,28 @@ export default function HealthRecordPage() {
       </header>
 
       {/* 입력 단계 탭 */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <div className="health-tab-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Link
           className="filter-tab"
-          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center" }}
+          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center", alignSelf: "flex-start" }}
           to="/health/profile"
         >
           한눈에 보기
         </Link>
-        {steps.map((step, index) => (
-          <button
-            className={index === activeStep ? "filter-tab active" : "filter-tab"}
-            key={step}
-            onClick={() => setActiveStep(index)}
-            style={{ fontSize: "15px", padding: "8px 18px" }}
-            type="button"
-          >
-            {step}
-          </button>
-        ))}
+
+        <div className="health-tab-sub-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {steps.map((step, index) => (
+            <button
+              className={index === activeStep ? "filter-tab active" : "filter-tab"}
+              key={step}
+              onClick={() => setActiveStep(index)}
+              style={{ fontSize: "15px", padding: "8px 18px" }}
+              type="button"
+            >
+              {step}
+            </button>
+          ))}
+        </div>
       </div>
 
     <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
