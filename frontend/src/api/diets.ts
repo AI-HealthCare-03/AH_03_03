@@ -112,6 +112,7 @@ export type DietRecommendedChallenge = {
   challenge_id: number;
   title: string;
   reason: string;
+  category?: string | null;
 };
 
 export type DietRagDiseaseComment = {
