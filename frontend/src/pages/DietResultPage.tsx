@@ -382,7 +382,7 @@ export default function DietResultPage() {
   const isManual = isManualRecord(record);
 
   return (
-    <div className="page-grid">
+    <div className="page-grid" style={{ gridTemplateColumns: "1fr" }}>
       {error && <ErrorMessage message={error} />}
       <div style={{ marginBottom: "8px", gridColumn: "1 / -1" }}>
         <button className="button secondary" onClick={() => navigate(-1)} type="button">
