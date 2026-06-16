@@ -196,6 +196,7 @@ export default function DietPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
+  const [analysisResultImageUrl, setAnalysisResultImageUrl] = useState("");
   const [detectedFoodsImagePreviewFailed, setDetectedFoodsImagePreviewFailed] = useState(false);
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
@@ -207,6 +208,9 @@ export default function DietPage() {
     useAnalysisFeedbackDialog();
   const analysisRequestInFlightRef = useRef(false);
   const analysisStartedAtRef = useRef<number | null>(null);
+  const pendingAnalysisImageUrlRef = useRef("");
+  const selectedImagePreviewUrlRef = useRef("");
+  const analysisResultImageUrlRef = useRef("");
   const handledAnalysisJobIdsRef = useRef<Set<number>>(new Set());
 
   const load = async () => {
@@ -223,12 +227,21 @@ export default function DietPage() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (selectedImagePreviewUrl) {
-        URL.revokeObjectURL(selectedImagePreviewUrl);
-      }
-    };
+    selectedImagePreviewUrlRef.current = selectedImagePreviewUrl;
   }, [selectedImagePreviewUrl]);
+
+  useEffect(() => {
+    analysisResultImageUrlRef.current = analysisResultImageUrl;
+  }, [analysisResultImageUrl]);
+
+  useEffect(() => {
+    return () => {
+      const urls = new Set([selectedImagePreviewUrlRef.current, analysisResultImageUrlRef.current]);
+      urls.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -267,6 +280,7 @@ export default function DietPage() {
           throw new Error("식단 분석 결과를 불러오지 못했습니다.");
         }
         setAnalysisResult(result as unknown as Record<string, unknown>);
+        setAnalysisResultImageUrl(pendingAnalysisImageUrlRef.current);
         setCanRetryAnalysis(false);
         showSuccess({ message: "저장된 식단 분석 결과를 확인해 주세요." });
         await load();
@@ -297,7 +311,7 @@ export default function DietPage() {
 
   const handleDietImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (selectedImagePreviewUrl) {
+    if (selectedImagePreviewUrl && selectedImagePreviewUrl !== analysisResultImageUrl) {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setImagePreviewMessage("");
@@ -330,7 +344,7 @@ export default function DietPage() {
   };
 
   const clearSelectedImage = () => {
-    if (selectedImagePreviewUrl) {
+    if (selectedImagePreviewUrl && selectedImagePreviewUrl !== analysisResultImageUrl) {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setSelectedImageFile(null);
@@ -354,7 +368,12 @@ export default function DietPage() {
       return;
     }
     setAnalysisResult(null);
+    if (analysisResultImageUrl && analysisResultImageUrl !== selectedImagePreviewUrl) {
+      URL.revokeObjectURL(analysisResultImageUrl);
+    }
+    setAnalysisResultImageUrl("");
     setCanRetryAnalysis(false);
+    pendingAnalysisImageUrlRef.current = selectedImagePreviewUrl;
     analysisRequestInFlightRef.current = true;
     analysisStartedAtRef.current = Date.now();
     setIsAnalyzing(true);
@@ -515,12 +534,12 @@ export default function DietPage() {
               <p>{String(analysisResult.diet_feedback ?? "음식 후보와 영양성분 후보를 확인해보세요.")}</p>
             </div>
             <div className="mini-card">
-              {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
+              {analysisResultImageUrl && !detectedFoodsImagePreviewFailed && (
                 <img
                   alt="업로드한 식단 사진"
                   className="upload-preview"
                   onError={() => setDetectedFoodsImagePreviewFailed(true)}
-                  src={selectedImagePreviewUrl}
+                  src={analysisResultImageUrl}
                   style={{ maxHeight: 140 }}
                 />
               )}
