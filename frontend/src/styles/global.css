@@ -2929,6 +2929,13 @@ a:hover .mini-card {
   font-weight: 700;
 }
 
+.profile-action-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
 @media (max-width: 767px) {
   .sidebar { display: none; }
   .app-shell { grid-template-columns: 1fr; }
@@ -2964,9 +2971,20 @@ a:hover .mini-card {
   .ocr-hint .button {
     align-self: flex-end;
   }
-
   .form.two-col {
     grid-template-columns: 1fr;
+  }
+  .profile-action-row button {
+    font-size: 13px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+  .profile-action-analyze {
+    display: flex;
+    gap: 8px;
+  }
+  .profile-action-analyze button {
+    flex: 1;
   }
 }
 
@@ -4750,10 +4768,6 @@ input:-webkit-autofill:focus {
 
   .home-action-links {
     justify-content: flex-start;
-  }
-
-  .dashboard-header {
-    flex-direction: column;
   }
 
   .dashboard-summary-strip,

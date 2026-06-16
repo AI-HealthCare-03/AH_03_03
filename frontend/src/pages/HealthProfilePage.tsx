@@ -561,17 +561,12 @@ export default function HealthProfilePage() {
           <h1>건강 분석</h1>
           <p>건강정보를 입력하고 만성질환 위험도를 분석합니다.</p>
         </div>
-        <div className="button-row">
-          {!editing && (
-            <button className="btn-primary" onClick={() => setEditing(true)} type="button">
-              수정하기
-            </button>
-          )}
+        <div className="profile-action-row">
           <button className="btn-secondary" disabled={runningMode !== null} onClick={() => void runAnalysis("BASIC")} type="button">
-            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석하기"}
+            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석"}
           </button>
           <button className="btn-secondary" disabled={runningMode !== null} onClick={() => void runAnalysis("PRECISION")} type="button">
-            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석하기"}
+            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석"}
           </button>
         </div>
       </header>
