@@ -88,7 +88,6 @@ export default function DietHistoryPage() {
             ? String(record.memo ?? (foodSummary || "직접 입력한 식단 기록입니다."))
             : String(record.diet_feedback ?? record.summary ?? "식단 분석 결과를 확인해보세요.");
           const dateStr = String(record.meal_time ?? record.created_at ?? "");
-
           return (
             <div className="diet-record-card" key={String(record.id)}>
               <div className="diet-record-header">
@@ -97,15 +96,12 @@ export default function DietHistoryPage() {
                   <span className="badge badge-reference">{mealTypeLabel(record.meal_type)}</span>
                   {isManual && <span className="badge badge-reference">직접 기록</span>}
                 </div>
-
-              </div>
-              <strong>{mealName}</strong>
-              <p className="diet-record-summary">{summary}</p>
-              <div className="diet-record-footer">
                 <Link className="button secondary compact-button" to={`/diets/${String(record.id)}`}>
                   상세보기
                 </Link>
               </div>
+              <strong>{mealName}</strong>
+              <p className="diet-record-summary">{summary}</p>
             </div>
           );
         })}
