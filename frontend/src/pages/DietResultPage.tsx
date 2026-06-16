@@ -714,48 +714,22 @@ export default function DietResultPage() {
           )}
         </div>
       </Card>
-      <Card title="추천 액션">
+      <Card title="더 알아보기">
         <div className="button-row">
           {dietRecordId && (
             <Link
               className="button secondary"
               to={`/chatbot?context_type=DIET&target_id=${dietRecordId}&initial_question=${encodeURIComponent("이 식단에서 조심할 점을 알려줘")}`}
             >
-              이 식단에 대해 질문하기
+              AI에게 질문하기
             </Link>
           )}
-          <button onClick={() => navigate("/diets/history")}>기록 완료</button>
           <Link className="button secondary" to="/dashboard">
-            추적 대시보드 이동
+            건강 리포트 보러가기
           </Link>
           <Link className="button secondary" to="/challenges">
-            추천 챌린지
+            챌린지 보러가기
           </Link>
-        </div>
-      </Card>
-      <Card title="분석 요약">
-        <div className="card-list">
-          <div className="mini-card">
-            <span className="muted">분석 일시</span>
-            <strong>{formatDateTime(record?.meal_time ?? record?.created_at)}</strong>
-          </div>
-          <div className="mini-card">
-            <span className="muted">식사 구분</span>
-            <strong>{mealTypeLabel(record?.meal_type)}</strong>
-          </div>
-          <div className="mini-card">
-            <span className="muted">기록 방식</span>
-            <strong>{analysisMethodLabel(record?.analysis_method)}</strong>
-          </div>
-          <div className="mini-card">
-            <span className="muted">식단 메모</span>
-            <strong>{String(record?.description ?? record?.memo ?? "기록된 메모가 없습니다.")}</strong>
-          </div>
-          <div className="state-box">
-            {isManual
-              ? "기존 직접 입력 기록입니다. 새 식단 분석은 사진 업로드 기반으로 진행됩니다."
-              : "자동 분석 결과는 참고용이며, 실제 진단이나 처방을 대신하지 않습니다."}
-          </div>
         </div>
       </Card>
     </div>
