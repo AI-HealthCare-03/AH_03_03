@@ -12,6 +12,8 @@ import {
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel } from "../utils/format";
+import { categoryIcon } from "./ChallengePage";
+import { Trophy } from "lucide-react";
 
 type Item = Record<string, unknown>;
 
@@ -656,7 +658,6 @@ export default function DietResultPage() {
           {recommendation?.rag_comment && (
             <div className="mini-card">
               <strong>식사 기반 건강 조언</strong>
-              {recommendation.rag_comment.rewrite_used && <span className="badge badge-reference">문장 다듬기 적용</span>}
               <span>{publicNutritionText(recommendation.rag_comment.summary)}</span>
               {recommendation.rag_comment.disease_comments.length > 0 && (
                 <div className="card-list">
@@ -696,7 +697,10 @@ export default function DietResultPage() {
               <div className="card-list">
                 {recommendation.recommended_challenges.map((challenge) => (
                   <div className="mini-card" key={challenge.challenge_id}>
-                    <strong>{challenge.title}</strong>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {categoryIcon[String(challenge.category ?? "").toUpperCase()] ?? <Trophy size={20} />}
+                      <strong>{challenge.title}</strong>
+                    </div>
                     <span className="muted">{truncateText(challenge.reason)}</span>
                     {challenge.challenge_id ? (
                       <Link className="button secondary compact-button" to={`/challenges/${challenge.challenge_id}`}>
