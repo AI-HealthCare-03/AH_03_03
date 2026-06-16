@@ -278,6 +278,8 @@ make qa-frontend
 
 ## Prod Image / EC2 배포 준비
 
+운영 배포 기준 브랜치는 `main`입니다. `main`에 push되면 GitHub Actions `deploy-prod` workflow가 CI 검증, Docker image build/push, EC2 image tag 반영, `make prod-pull`, `make prod-up`, `make prod-migrate`, health check를 순서대로 실행합니다.
+
 운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `.prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
 
 기본 이미지 tag:
@@ -298,7 +300,7 @@ docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Arch
 
 기대값은 `linux/amd64`입니다. Apple Silicon 로컬에서도 EC2 Ubuntu 배포 이미지는 `make image-build-check`의 buildx `linux/amd64` 기준으로 확인합니다.
 
-운영 배포 env 준비와 실행:
+수동 운영 배포 env 준비와 실행:
 
 ```bash
 cp envs/example.prod.env .prod.env
@@ -310,6 +312,8 @@ make prod-health
 make prod-ps
 make prod-logs
 ```
+
+위 수동 절차는 장애 대응 또는 workflow 우회가 필요한 경우에만 사용합니다. 일반 운영 배포는 `main` push 기준 자동배포를 사용하세요.
 
 DuckDNS 배포 기준 도메인은 `healthladder.duckdns.org`입니다. `.prod.env`에는 같은 도메인 기준으로 아래 public URL 값을 맞춥니다.
 

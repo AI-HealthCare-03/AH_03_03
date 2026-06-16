@@ -1,10 +1,11 @@
 # Health Ladder 운영 배포 Runbook
 
-이 문서는 release 브랜치 기준 운영 배포자가 EC2에서 수동 배포할 때 따르는 체크리스트입니다. 실제 secret 값은 이 문서, PR, issue, 채팅, 스크린샷, 배포 로그에 남기지 않습니다.
+이 문서는 `main` 브랜치 기준 운영 자동배포와, 장애 대응 시 사용할 수 있는 EC2 수동 배포 체크리스트입니다. 실제 secret 값은 이 문서, PR, issue, 채팅, 스크린샷, 배포 로그에 남기지 않습니다.
 
 ## 1. 개요
 
-- 대상 브랜치: `release`
+- 운영 배포 기준 브랜치: `main`
+- 기본 배포 방식: GitHub Actions `deploy-prod` workflow
 - 운영 env 파일: `.prod.env`
 - prod compose: `infra/docker/docker-compose.prod.yml`
 - 운영 도메인: `healthladder.duckdns.org`
@@ -27,7 +28,7 @@ AI_WORKER_VERSION=v1.0.1
 FRONTEND_VERSION=v1.0.1
 ```
 
-같은 tag(`v1.0.0` 등)를 반복해서 재사용하면 EC2의 release 브랜치는 최신이어도 Docker Hub의 frontend image가 예전 build일 수 있습니다. 운영 배포마다 `v1.0.1` 같은 증가 tag 또는 `20260616-1` 같은 배포 날짜 tag를 새로 만들고, 로컬 build/push와 EC2 `.prod.env`를 같은 값으로 맞춥니다.
+같은 tag(`v1.0.0` 등)를 반복해서 재사용하면 EC2의 `main` 브랜치는 최신이어도 Docker Hub의 frontend image가 예전 build일 수 있습니다. GitHub Actions 자동배포는 `main-<short-sha>` tag를 매번 새로 만들고, EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`만 같은 tag로 갱신합니다.
 
 최종 운영 확인 결과 기준:
 
@@ -43,9 +44,60 @@ curl -I https://healthladder.duckdns.org
 - HTTPS 응답이 `HTTP/2 200`
 - `strict-transport-security` 헤더 확인
 
-## 2. 로컬 배포 전 검증
+## 2. GitHub Actions 운영 자동배포
 
-release 브랜치 push 전에 로컬에서 확인합니다.
+운영 배포는 `main` push를 기준으로 합니다.
+
+필요한 GitHub Secrets:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+- `EC2_HOST`
+- `EC2_USER`
+- `EC2_SSH_KEY`
+
+자동배포 workflow:
+
+```text
+push to main
+-> checkout
+-> uv/Python 준비
+-> ruff format check, ruff check, pytest
+-> frontend build
+-> docker buildx 준비
+-> Docker Hub login
+-> app/ai-worker/frontend image build & push
+-> EC2 SSH 접속
+-> git fetch origin && git reset --hard origin/main
+-> .prod.env의 APP_VERSION, AI_WORKER_VERSION, FRONTEND_VERSION만 새 tag로 갱신
+-> make prod-pull
+-> make prod-up
+-> make prod-migrate
+-> make prod-health
+-> curl -fsS https://healthladder.duckdns.org/api/v1/system/health
+```
+
+자동 생성되는 image tag 예:
+
+```text
+main-<short-sha>
+```
+
+Docker Hub image 예:
+
+```text
+kdu0312/ai-health:app-main-<short-sha>
+kdu0312/ai-health:ai-main-<short-sha>
+kdu0312/ai-health:frontend-main-<short-sha>
+```
+
+workflow는 `.prod.env`의 실제 secret 값을 생성하거나 덮어쓰지 않습니다. 운영 서버에 이미 존재하는 `.prod.env`에서 image version key 세 개만 수정합니다.
+
+실패 시에도 `docker compose down -v`나 volume 삭제 명령은 실행하지 않습니다. `make prod-up`은 새 container 재생성을 시도하며, pull/build/migration/health 중 실패하면 workflow가 실패합니다.
+
+## 3. 로컬 배포 전 검증
+
+`main` push 전에 로컬에서 확인합니다.
 
 ```bash
 uv run ruff format app scripts ai_runtime tests --check
@@ -56,15 +108,15 @@ git diff --check
 docker compose --env-file envs/example.prod.env -f infra/docker/docker-compose.prod.yml config --quiet
 ```
 
-release 브랜치 상태 확인과 push:
+`main` 브랜치 상태 확인과 push:
 
 ```bash
 git status -sb
 git log --oneline -5
-git push origin release
+git push origin main
 ```
 
-운영 image build/push는 release 브랜치에서 새 tag로 수행합니다. 아래 예시는 세 image를 같은 배포 tag로 맞추는 방식입니다.
+아래 수동 image build/push는 GitHub Actions를 우회해야 하는 경우에만 사용합니다. 일반 운영 배포는 `main` push 자동배포를 사용합니다. 수동 build/push를 할 때도 세 image를 같은 배포 tag로 맞춥니다.
 Makefile image target은 `.prod.env` 전체를 자동으로 source하지 않습니다. secret 노출을 피하기 위해 build/push에 필요한 version 값만 shell에서 export하거나 command line 변수로 넘깁니다.
 
 ```bash
@@ -88,19 +140,19 @@ make image-build-push
 
 `make image-push`와 `make image-build-push`는 app, ai-worker, frontend 세 image를 모두 대상으로 합니다. Docker Hub token/password는 shell history나 문서에 남기지 않습니다.
 
-## 3. EC2 반영 절차
+## 4. EC2 반영 절차
 
-운영 서버의 실제 `.prod.env`는 Git에 없으므로 먼저 백업합니다.
+이 절차는 자동배포 장애 대응이나 수동 점검용입니다. 운영 서버의 실제 `.prod.env`는 Git에 없으므로 먼저 백업합니다.
 
 ```bash
 cp .prod.env ~/.prod.env.backup.$(date +%Y%m%d_%H%M%S)
 ```
 
-release 최신화:
+`main` 최신화:
 
 ```bash
 git fetch origin
-git reset --hard origin/release
+git reset --hard origin/main
 ls -al .prod.env
 ```
 
@@ -150,7 +202,37 @@ DIET_DEMO_FALLBACK_ENABLED=false
 
 `DIET_DEMO_FALLBACK_ENABLED=true`는 시연/개발용 더미 fallback을 명시적으로 허용하는 설정입니다. 운영 기본값은 false로 유지합니다.
 
-## 4. Docker 권한 확인
+건강검진 OCR도 실제 provider가 준비되어야 합니다. 운영 기본값이 아래처럼 provider 미설정 상태라면 더미 검진값을 저장하지 않고 OCR job이 실패합니다.
+
+```env
+EXAM_OCR_PROVIDER=fallback
+EXAM_GPT_VISION_ENABLED=false
+PADDLE_OCR_ENABLED=false
+GPT_VISION_FALLBACK_ENABLED=false
+```
+
+운영에서 GPT Vision 건강검진 OCR을 사용할 때는 `.prod.env`에 아래 값을 준비합니다. 실제 key 값은 문서나 채팅에 남기지 않습니다.
+
+```env
+OPENAI_API_KEY=<OPENAI_API_KEY>
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+EXAM_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=true
+```
+
+`EXAM_OCR_PROVIDER`는 현재 `fallback`, `auto`, `paddleocr`, `gpt_vision` 값을 사용합니다. `fallback`은 운영 안전 기본값이며 OCR provider 후보가 없다는 뜻입니다. 이 상태에서는 `/api/v1/exams/{exam_id}/ocr` job이 성공처럼 보이지 않아야 하고, `exam_reports.ocr_status=FAILED` 및 `exam_measurements` 빈 결과로 확인됩니다.
+
+검진표 OCR 측정값 확인 시 실제 FK 컬럼명은 `exam_report_id`입니다.
+
+```sql
+select id, exam_report_id, measurement_key, value, unit, created_at
+from exam_measurements
+where exam_report_id = <EXAM_REPORT_ID>
+order by id;
+```
+
+## 5. Docker 권한 확인
 
 현재 계정의 Docker 권한을 확인합니다.
 
@@ -175,7 +257,7 @@ compose 상태 확인:
 docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml ps
 ```
 
-## 5. 운영 기동
+## 6. 운영 기동
 
 `make prod-up`은 `ai-health-shared` external network가 없으면 먼저 생성합니다.
 
@@ -230,7 +312,7 @@ docker exec frontend ls -al /usr/share/nginx/html/assets | grep -E 'index-|ExamO
 
 로컬 최신 build의 `frontend/dist/assets` hash와 EC2 frontend 컨테이너의 hash가 다르면, EC2 코드가 최신이어도 frontend Docker image tag가 예전 build를 가리키는 상태입니다. 예전 admin asset(`AdminDashboard`, `AdminFaq`)이 남아 있으면 stale frontend image를 우선 의심합니다. 이 경우 새 frontend tag를 build/push하고 `.prod.env`의 `FRONTEND_VERSION`을 새 tag로 바꾼 뒤 다시 pull/up 합니다.
 
-## 6. HTTP Bootstrap
+## 7. HTTP Bootstrap
 
 최초 HTTPS 인증서 발급 전에는 `.prod.env`에서 HTTP Nginx 설정을 사용합니다.
 
@@ -246,7 +328,7 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -
 
 HTTP health가 성공한 뒤 certbot 발급과 HTTPS 전환으로 넘어갑니다.
 
-## 7. DuckDNS 확인
+## 8. DuckDNS 확인
 
 DuckDNS가 EC2 public IP를 가리키는지 확인합니다.
 
@@ -257,7 +339,7 @@ dig +short healthladder.duckdns.org
 
 기대값은 현재 EC2 public IP입니다. 다르면 DuckDNS의 current ip를 EC2 public IP로 갱신합니다. DuckDNS token은 secret이므로 문서, shell history, 채팅, issue에 남기지 않습니다.
 
-## 8. ACME Challenge 확인
+## 9. ACME Challenge 확인
 
 certbot 발급 전에 HTTP bootstrap Nginx가 ACME challenge 경로를 외부에 노출하는지 확인합니다.
 
@@ -280,7 +362,7 @@ curl -fsS http://healthladder.duckdns.org/.well-known/acme-challenge/ping
 ok
 ```
 
-## 9. Certbot 발급
+## 10. Certbot 발급
 
 `certbot` compose service의 기본 command가 renew loop일 수 있으므로, 신규 발급은 `--entrypoint certbot`으로 override합니다. 이메일은 운영자가 소유한 주소를 넣되 문서에는 실제 주소를 남기지 않습니다.
 
@@ -325,7 +407,7 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml run 
 
 `No renewals were attempted`만 출력되면 신규 발급 command가 아니라 renew loop가 실행된 것일 수 있습니다. 이 경우 위처럼 `--entrypoint certbot`을 사용했는지 확인합니다.
 
-## 10. Certbot 보조 TLS 파일
+## 11. Certbot 보조 TLS 파일
 
 certbot 인증서 파일(`fullchain.pem`, `privkey.pem`)은 Git에 넣지 않습니다. 인증서와 보조 TLS 파일은 Docker named volume인 `certbot-conf` 안에서만 관리합니다.
 
@@ -355,7 +437,7 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml run 
   -c 'ls -l /etc/letsencrypt/options-ssl-nginx.conf /etc/letsencrypt/ssl-dhparams.pem'
 ```
 
-## 11. HTTPS 전환
+## 12. HTTPS 전환
 
 HTTPS 전환 전 순서:
 
@@ -393,11 +475,11 @@ curl -I https://healthladder.duckdns.org
 - `HTTP/2 200`
 - `strict-transport-security` 헤더 확인
 
-## 12. 자주 발생한 장애 대응
+## 13. 자주 발생한 장애 대응
 
-### EC2 release는 최신인데 화면이 예전 버전으로 보임
+### EC2 main은 최신인데 화면이 예전 버전으로 보임
 
-Git branch 최신화는 compose 파일과 문서만 갱신합니다. 브라우저에 보이는 정적 파일은 `frontend` Docker image 안에 들어 있으므로 Docker Hub의 `frontend-${FRONTEND_VERSION}` image가 최신 release build여야 합니다.
+Git branch 최신화는 compose 파일과 문서만 갱신합니다. 브라우저에 보이는 정적 파일은 `frontend` Docker image 안에 들어 있으므로 Docker Hub의 `frontend-${FRONTEND_VERSION}` image가 최신 `main` build여야 합니다.
 
 확인:
 
@@ -409,7 +491,7 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml imag
 
 대응:
 
-1. 로컬 release에서 새 `FRONTEND_VERSION` tag로 frontend를 포함한 세 image를 build/push합니다.
+1. `main`에서 새 `FRONTEND_VERSION` tag로 frontend를 포함한 세 image를 build/push합니다.
 2. EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`을 새 tag로 맞춥니다.
 3. EC2에서 image를 다시 pull하고 컨테이너를 재생성합니다.
 
@@ -433,6 +515,21 @@ S3_BUCKET_NAME=
 ```
 
 local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다.
+
+### OCR job은 끝났지만 검진 결과가 비어 있음
+
+`exam_reports.ocr_status=FAILED`이고 `exam_measurements`가 비어 있으면 provider 설정 또는 업로드 파일 문제입니다. `EXAM_OCR_PROVIDER=fallback`, `EXAM_GPT_VISION_ENABLED=false`, `PADDLE_OCR_ENABLED=false` 조합은 더미 결과를 만들지 않는 안전 기본값입니다.
+
+GPT Vision OCR을 운영에서 사용하려면 `OPENAI_API_KEY`, `EXAM_OCR_PROVIDER=gpt_vision`, `EXAM_GPT_VISION_ENABLED=true`, `EXAM_GPT_VISION_MODEL`, `GPT_VISION_FALLBACK_ENABLED=true`를 확인합니다. 값 자체는 출력하지 않습니다.
+
+측정값 조회 SQL은 `report_id`가 아니라 `exam_report_id`를 사용합니다.
+
+```sql
+select id, exam_report_id, measurement_key, value, unit, created_at
+from exam_measurements
+where exam_report_id = <EXAM_REPORT_ID>
+order by id;
+```
 
 ### SECRET_KEY must be set to a strong non-default value in production
 
@@ -486,7 +583,7 @@ NGINX_CONF=../nginx/prod_http.conf
 
 compose service의 기본 command가 renew loop라서 그럴 수 있습니다. 신규 발급은 `docker compose run ... --entrypoint certbot certbot certonly ...` 형태로 실행합니다.
 
-## 13. HTTPS 전환 전 체크
+## 14. HTTPS 전환 전 체크
 
 - [ ] HTTP health OK
 - [ ] DuckDNS IP OK
@@ -505,7 +602,7 @@ curl -I https://healthladder.duckdns.org
 curl -fsS https://healthladder.duckdns.org/api/v1/system/health
 ```
 
-## 14. 보안 주의
+## 15. 보안 주의
 
 - `.prod.env` 커밋 금지
 - 실제 API key, SMTP password, DuckDNS token, DB password, SSH private key 문서화 금지

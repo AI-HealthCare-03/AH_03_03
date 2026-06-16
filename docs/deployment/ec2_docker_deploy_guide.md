@@ -169,6 +169,27 @@ GPT_VISION_FALLBACK_ENABLED=false
 DIET_DEMO_FALLBACK_ENABLED=false
 ```
 
+건강검진 OCR도 실제 provider가 준비되어야 합니다. 운영 기본값이 아래처럼 provider 미설정 상태라면 더미 검진값을 저장하지 않고 OCR job이 실패합니다.
+
+```env
+EXAM_OCR_PROVIDER=fallback
+EXAM_GPT_VISION_ENABLED=false
+PADDLE_OCR_ENABLED=false
+GPT_VISION_FALLBACK_ENABLED=false
+```
+
+운영에서 GPT Vision 건강검진 OCR을 사용할 때만 아래 값을 `.prod.env`에 설정합니다.
+
+```env
+OPENAI_API_KEY=<OPENAI_API_KEY>
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+EXAM_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=true
+```
+
+`EXAM_OCR_PROVIDER`는 `fallback`, `auto`, `paddleocr`, `gpt_vision` 값을 사용합니다. `fallback`은 OCR provider 후보가 없다는 뜻이며 성공용 더미 provider가 아닙니다. OCR 측정값 조회 시 실제 FK 컬럼명은 `exam_report_id`입니다.
+
 ## 8. Docker image pull/build 정책
 
 EC2는 pull-only 운영입니다. EC2에서 app/frontend/worker 이미지를 build하지 않습니다.
