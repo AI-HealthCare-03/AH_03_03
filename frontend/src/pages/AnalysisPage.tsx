@@ -236,7 +236,7 @@ export default function AnalysisPage() {
       <div className="page-header">
         <div>
           <h1>건강 분석 결과</h1>
-          <p>당뇨, 고혈압, 비만, 이상지질혈증 이상 위험도를 한 화면에서 확인합니다.</p>
+          <p>나의 만성질환 위험도 예측 결과를 한눈에 확인해 보세요.</p>
         </div>
         <div className="button-row">
           <Link className="button secondary" to="/health/profile">
@@ -248,8 +248,46 @@ export default function AnalysisPage() {
         </div>
       </div>
       {error && <ErrorMessage message={error} />}
+      {pollingError && <ErrorMessage message={pollingError.message} />}
+      {notice && <div className="state-box">{notice}</div>}
+      {feedbackDialog}
+      {missingFields.length > 0 && (
+        <Card title="분석에 필요한 정보가 부족합니다">
+          <div className="readiness-card">
+            <p>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.</p>
+            <div className="chip-list">
+              {missingFields.map((field) => (
+                <span className="badge badge-missing" key={field}>
+                  {missingFieldLabels[field] ?? field}
+                </span>
+              ))}
+            </div>
+            <Link className="button" to="/health/profile">
+              필수 건강정보 입력하기
+            </Link>
+          </div>
+        </Card>
+      )}
+      {precisionMissingFields.length > 0 && (
+        <Card title="건강 정보 추가 입력">
+          <div className="readiness-card">
+            <p style={{ margin: 0 }}>기본 정보로 간편 분석 이용이 가능합니다.</p>
+            <p style={{ margin: "4px 0 0" }}>검진 수치를 추가로 입력하시면 정밀 분석 결과를 확인할 수 있습니다.</p>
+            <div className="chip-list">
+              {precisionMissingFields.map((field) => (
+                <span className="badge badge-reference" key={field}>
+                  {missingFieldLabels[field] ?? field}
+                </span>
+              ))}
+            </div>
+            <Link className="button secondary" to="/health/profile">
+              추가 정보 입력하기
+            </Link>
+          </div>
+        </Card>
+      )}
       <div className="page-grid">
-        <Card title="분석 기반 건강 코멘트">
+        <Card title="분석결과 기반 AI 건강 코멘트">
           <p>{analysisComment}</p>
         </Card>
       </div>
@@ -276,7 +314,7 @@ export default function AnalysisPage() {
           const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
-              <span>{slot.diseaseName} 관리 필요 단계</span>
+              <span>{slot.diseaseName} 위험도 예측 결과</span>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -303,7 +341,7 @@ export default function AnalysisPage() {
                 style={{ marginTop: 8, textAlign: "center", display: "block" }}
                 to={`/chatbot?context_type=ANALYSIS&target_id=${String(result.id)}&initial_question=${encodeURIComponent("이 분석 결과에서 먼저 관리할 점을 알려줘")}`}
               >
-                이 결과에 대해 질문하기
+                AI에게 질문하기
               </Link>
             </div>
           );
