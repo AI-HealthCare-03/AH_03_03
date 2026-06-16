@@ -507,10 +507,10 @@ export default function DietPage() {
         )}
         {analysisResult && (
           <div className="card-list">
-            <div className="score-panel">
+            <div className="mini-card">
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
-            <div className="mini-card">
+            <div className="mini-card" style={{ padding: "10px 14px" }}>
               {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
                 <img
                   alt="업로드한 식단 사진"
