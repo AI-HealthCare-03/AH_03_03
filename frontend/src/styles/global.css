@@ -3203,6 +3203,8 @@ a:hover .mini-card {
 
 .chat-message {
   display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .chat-message.user {
@@ -3213,6 +3215,39 @@ a:hover .mini-card {
   justify-content: flex-start;
 }
 
+.chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.chat-bubble-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(720px, 86%);
+}
+
+.chat-message.user .chat-bubble-wrapper {
+  align-items: flex-end;
+}
+
+.chat-role {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 4px;
+}
+
 .chat-bubble {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -3220,19 +3255,12 @@ a:hover .mini-card {
   box-shadow: var(--shadow-soft);
   display: grid;
   gap: 8px;
-  max-width: min(720px, 86%);
   padding: 14px;
 }
 
 .chat-message.user .chat-bubble {
   background: var(--color-primary-soft);
   border-color: var(--color-secondary);
-}
-
-.chat-role {
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 900;
 }
 
 .chat-bubble p {

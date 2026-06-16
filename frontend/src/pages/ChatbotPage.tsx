@@ -158,13 +158,19 @@ export default function ChatbotPage() {
 
           {messages.map((chatMessage) => (
             <div className={`chat-message ${chatMessage.role}`} key={chatMessage.id}>
-              <div className="chat-bubble">
+              {chatMessage.role === "assistant" && (
+                <div className="chat-avatar">
+                  <span>H</span>
+                </div>
+              )}
+              <div className="chat-bubble-wrapper">
                 <span className="chat-role">{chatMessage.role === "user" ? "나" : "AI 건강 상담"}</span>
-                <p>{chatMessage.text}</p>
-
-                {chatMessage.response?.safety_notice && (
-                  <p className="chat-safety-notice">{chatMessage.response.safety_notice}</p>
-                )}
+                <div className="chat-bubble">
+                  <p>{chatMessage.text}</p>
+                  {chatMessage.response?.safety_notice && (
+                    <p className="chat-safety-notice">{chatMessage.response.safety_notice}</p>
+                  )}
+                </div>
               </div>
             </div>
           ))}
