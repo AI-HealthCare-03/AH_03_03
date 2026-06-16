@@ -2957,37 +2957,6 @@ a:hover .mini-card {
   }
 }
 
-@media (max-width: 576px) {
-  .brand { font-size: 16px; }
-  .nav-logout-btn,
-  .navbar-notification-link,
-  .desktop-nav-action { display: none; }
-  .health-tab-group { flex-direction: column; }
-  .health-tab-group > a { align-self: flex-start; }
-  .ocr-hint {
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-  .ocr-hint .button {
-    align-self: flex-end;
-  }
-  .form.two-col {
-    grid-template-columns: 1fr;
-  }
-  .profile-action-row button {
-    font-size: 13px;
-    padding: 8px 10px;
-    white-space: nowrap;
-  }
-  .profile-action-analyze {
-    display: flex;
-    gap: 8px;
-  }
-  .profile-action-analyze button {
-    flex: 1;
-  }
-}
-
 [data-theme="dark"] .risk-stage-card {
   --risk-stage-chip-bg: rgba(255, 255, 255, 0.07);
   --risk-stage-chip-border: rgba(255, 255, 255, 0.14);
@@ -4018,7 +3987,7 @@ input:-webkit-autofill:focus {
 .ocr-result-table {
   display: grid;
   gap: 10px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
 }
 
 .ocr-result-row {
@@ -5152,6 +5121,37 @@ input:-webkit-autofill:focus {
 
   .upload-mobile-hint {
     width: 100%;
+  }
+  .brand { font-size: 16px; }
+  .nav-logout-btn,
+  .navbar-notification-link,
+  .desktop-nav-action { display: none; }
+  .health-tab-group { flex-direction: column; }
+  .health-tab-group > a { align-self: flex-start; }
+  .ocr-hint {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .ocr-hint .button {
+    align-self: flex-end;
+  }
+  .form.two-col {
+    grid-template-columns: 1fr;
+  }
+  .profile-action-row button {
+    font-size: 13px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+  .profile-action-analyze {
+    display: flex;
+    gap: 8px;
+  }
+  .profile-action-analyze button {
+    flex: 1;
+  }
+  .step-indicator__label {
+    display: none;
   }
 }
 
