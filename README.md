@@ -66,7 +66,7 @@ cp envs/example.local.env .env
 - `.env`와 secret은 절대 commit하지 않습니다.
 - `.prod.env`도 절대 commit하지 않습니다.
 - 실제 OpenAI key, SMTP password, Langfuse secret 값은 README나 PR에 넣지 않습니다.
-- secret 예시는 `<OPENAI_API_KEY>`, `<SMTP_PASSWORD>`처럼 placeholder로만 작성합니다.
+- secret 예시는 `<SET_IN_PROD>`, `<SET_FOR_LOCAL_IF_NEEDED>`, `<SET_IN_GITHUB_SECRET>`처럼 placeholder로만 작성합니다.
 - `docker compose config` 전체 출력은 secret이 펼쳐질 수 있으므로 문서/화면공유에 사용하지 마세요.
 - 운영 배포용 `.prod.env`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
 
@@ -84,7 +84,7 @@ EMAIL_ENABLED=false
 EMAIL_VERIFICATION_DEBUG=true
 PASSWORD_RESET_DEBUG=false
 
-OPENAI_API_KEY=<OPENAI_API_KEY>
+OPENAI_API_KEY=<SET_FOR_LOCAL_IF_NEEDED>
 CHATBOT_USE_REAL_LLM=false
 RAG_ENABLED=false
 RAG_RETRIEVAL_STRATEGY=keyword_only
@@ -282,6 +282,14 @@ make qa-frontend
 
 운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `.prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
 
+GitHub Actions 운영 자동배포에는 repository secrets가 필요합니다.
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+- `EC2_HOST`
+- `EC2_USER`
+- `EC2_SSH_KEY`
+
 기본 이미지 tag:
 
 - `kdu0312/ai-health:app-v1.0.0`
@@ -404,12 +412,12 @@ EMAIL_VERIFICATION_DEBUG=true
 ```env
 EMAIL_ENABLED=true
 EMAIL_VERIFICATION_DEBUG=false
-SMTP_HOST=<SMTP_HOST>
+SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
-SMTP_USERNAME=<SMTP_USERNAME>
-SMTP_PASSWORD=<SMTP_PASSWORD>
-SMTP_FROM_EMAIL=<SMTP_FROM_EMAIL>
-SMTP_FROM_NAME=<SMTP_FROM_NAME>
+SMTP_USERNAME=<SET_IN_PROD>
+SMTP_PASSWORD=<SET_IN_PROD>
+SMTP_FROM_EMAIL=<SET_IN_PROD>
+SMTP_FROM_NAME=Health Ladder
 SMTP_USE_TLS=true
 ```
 

@@ -27,6 +27,20 @@
 cp envs/example.prod.env .prod.env
 ```
 
+운영 자동배포는 GitHub Actions `deploy-prod` workflow가 담당합니다. Repository secrets에는 아래 5개만 등록하고, 실제 secret 값을 문서나 Git tracked 파일에 쓰지 않습니다.
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+- `EC2_HOST`
+- `EC2_USER`
+- `EC2_SSH_KEY`
+
+workflow는 EC2의 `.prod.env` 전체를 덮어쓰지 않고, 배포 image tag에 해당하는 아래 세 key만 갱신합니다.
+
+- `APP_VERSION`
+- `AI_WORKER_VERSION`
+- `FRONTEND_VERSION`
+
 반드시 운영자가 교체해야 하는 주요 항목:
 
 - `SECRET_KEY`
@@ -52,6 +66,36 @@ VITE_API_BASE_URL=/api/v1
 `VITE_API_BASE_URL`은 브라우저에 포함되는 public build-time 값입니다. 현재 Nginx가 같은 도메인에서 프론트를 서빙하고 `/api/` 요청을 FastAPI로 proxy하므로, 프론트 API client 기준 값은 versioned path인 `/api/v1`을 사용합니다.
 
 이메일 인증/비밀번호 재설정/가족 초대 링크는 백엔드의 `FRONTEND_BASE_URL` 기준으로 생성됩니다. 일반 알림 이메일 smoke나 수동 발송에서 action link를 넣을 때도 `https://healthladder.duckdns.org/notifications`처럼 같은 운영 도메인을 사용합니다.
+
+Brevo SMTP를 사용하는 운영 이메일 예시:
+
+```env
+EMAIL_ENABLED=true
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USERNAME=<SET_IN_PROD>
+SMTP_PASSWORD=<SET_IN_PROD>
+SMTP_FROM_EMAIL=<SET_IN_PROD>
+SMTP_FROM_NAME=Health Ladder
+SMTP_USE_TLS=true
+```
+
+OpenAI/GPT Vision 기반 식단 분석과 건강검진 OCR을 사용하는 운영 예시:
+
+```env
+OPENAI_API_KEY=<SET_IN_PROD>
+OPENAI_MODEL=gpt-4o-mini
+
+DIET_VISION_PROVIDER=gpt_vision
+DIET_GPT_VISION_ENABLED=true
+DIET_GPT_VISION_MODEL=gpt-4o
+DIET_DEMO_FALLBACK_ENABLED=false
+
+EXAM_OCR_PROVIDER=gpt_vision
+EXAM_GPT_VISION_ENABLED=true
+EXAM_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=true
+```
 
 작성하지 말아야 하는 값:
 

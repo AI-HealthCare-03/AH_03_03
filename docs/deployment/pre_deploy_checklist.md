@@ -69,6 +69,16 @@ make dev-restart-nginx
 배포 전 app, ai-worker, frontend image가 같은 tag 규칙으로 준비되어야 합니다.
 같은 `v1.0.0` tag를 반복 재사용하지 말고 배포마다 새 version을 정합니다.
 
+운영 자동배포는 `main` push 기반 GitHub Actions `deploy-prod` workflow를 사용합니다. GitHub repository secrets에 아래 값이 등록되어 있어야 합니다.
+
+- [ ] `DOCKERHUB_USERNAME`
+- [ ] `DOCKERHUB_TOKEN`
+- [ ] `EC2_HOST`
+- [ ] `EC2_USER`
+- [ ] `EC2_SSH_KEY`
+
+workflow는 EC2 `.prod.env` 전체를 덮어쓰지 않고 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`만 새 image tag로 갱신합니다.
+
 - [ ] 배포용 이미지 build 검증
 
 ```bash
@@ -170,8 +180,11 @@ DuckDNS token은 secret입니다. `.prod.env`, 문서, PR, issue, shell history,
 
 - [ ] 서버에서 최신 코드 반영
 
+운영 배포 기준 브랜치는 `main`입니다. 일반 배포는 GitHub Actions `deploy-prod` workflow가 `main` push를 받아 EC2에서 `origin/main`으로 reset합니다. 수동 점검 시에도 `main` 기준으로 확인합니다.
+
 ```bash
-git pull origin release
+git fetch origin
+git reset --hard origin/main
 ```
 
 - [ ] `.prod.env` 작성

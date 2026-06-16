@@ -161,11 +161,11 @@ local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다. OCR/검
 식단 이미지 분석은 실제 provider가 준비되어야 합니다. `DIET_GPT_VISION_ENABLED=false`, `DIET_VISION_PROVIDER=rule_based`, `DIET_DEMO_FALLBACK_ENABLED=false` 조합에서는 더미 음식/점수를 저장하지 않고 service unavailable로 종료됩니다. 운영에서 GPT Vision을 사용할 때만 아래 값을 `.prod.env`에 설정합니다.
 
 ```env
-OPENAI_API_KEY=<OPENAI_API_KEY>
+OPENAI_API_KEY=<SET_IN_PROD>
 DIET_VISION_PROVIDER=gpt_vision
 DIET_GPT_VISION_ENABLED=true
 DIET_GPT_VISION_MODEL=gpt-4o
-GPT_VISION_FALLBACK_ENABLED=false
+GPT_VISION_FALLBACK_ENABLED=true
 DIET_DEMO_FALLBACK_ENABLED=false
 ```
 
@@ -181,7 +181,7 @@ GPT_VISION_FALLBACK_ENABLED=false
 운영에서 GPT Vision 건강검진 OCR을 사용할 때만 아래 값을 `.prod.env`에 설정합니다.
 
 ```env
-OPENAI_API_KEY=<OPENAI_API_KEY>
+OPENAI_API_KEY=<SET_IN_PROD>
 EXAM_OCR_PROVIDER=gpt_vision
 EXAM_GPT_VISION_ENABLED=true
 EXAM_GPT_VISION_MODEL=gpt-4o
@@ -207,7 +207,7 @@ EC2에서는 pull:
 make prod-pull
 ```
 
-운영 서버가 실제로 pull하는 이미지 tag는 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 기준을 따릅니다. 같은 tag를 반복 재사용하면 EC2 release 브랜치는 최신이어도 예전 frontend image가 계속 서빙될 수 있으므로, 배포마다 `v1.0.1` 또는 `20260616-1` 같은 새 tag를 발급하고 Docker Hub push 후 `.prod.env`의 세 version 값을 함께 갱신합니다.
+운영 서버가 실제로 pull하는 이미지 tag는 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 기준을 따릅니다. 같은 tag를 반복 재사용하면 EC2 `main` 브랜치는 최신이어도 예전 frontend image가 계속 서빙될 수 있으므로, 배포마다 `main-<short-sha>`, `v1.0.1`, `20260616-1` 같은 새 tag를 발급하고 Docker Hub push 후 `.prod.env`의 세 version 값을 함께 갱신합니다.
 
 frontend 정적 bundle 반영 여부는 배포 후 컨테이너 내부 asset hash로 확인합니다.
 

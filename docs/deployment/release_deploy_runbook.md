@@ -192,11 +192,11 @@ DIET_DEMO_FALLBACK_ENABLED=false
 운영에서 GPT Vision 식단 분석을 사용하려면 `.prod.env`에 아래 값을 준비합니다. 실제 key 값은 문서나 채팅에 남기지 않습니다.
 
 ```env
-OPENAI_API_KEY=<OPENAI_API_KEY>
+OPENAI_API_KEY=<SET_IN_PROD>
 DIET_VISION_PROVIDER=gpt_vision
 DIET_GPT_VISION_ENABLED=true
 DIET_GPT_VISION_MODEL=gpt-4o
-GPT_VISION_FALLBACK_ENABLED=false
+GPT_VISION_FALLBACK_ENABLED=true
 DIET_DEMO_FALLBACK_ENABLED=false
 ```
 
@@ -214,7 +214,7 @@ GPT_VISION_FALLBACK_ENABLED=false
 운영에서 GPT Vision 건강검진 OCR을 사용할 때는 `.prod.env`에 아래 값을 준비합니다. 실제 key 값은 문서나 채팅에 남기지 않습니다.
 
 ```env
-OPENAI_API_KEY=<OPENAI_API_KEY>
+OPENAI_API_KEY=<SET_IN_PROD>
 EXAM_OCR_PROVIDER=gpt_vision
 EXAM_GPT_VISION_ENABLED=true
 EXAM_GPT_VISION_MODEL=gpt-4o
