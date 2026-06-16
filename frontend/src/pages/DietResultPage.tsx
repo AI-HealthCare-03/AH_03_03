@@ -597,7 +597,6 @@ export default function DietResultPage() {
             )}
             {recommendation?.rag_comment?.summary && (
               <div className="mini-card">
-                <strong>요약</strong>
                 <span>{publicNutritionText(recommendation.rag_comment.summary)}</span>
               </div>
             )}
@@ -638,18 +637,6 @@ export default function DietResultPage() {
                     <div className="chip-list">
                       {recommendedFoods.map((food) => (
                         <span className="badge risk-low" style={{ fontSize: "14px" }} key={`management-recommended-${food}`}>
-                          {publicNutritionText(food)}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {cautionFoods.length > 0 && (
-                  <>
-                    <span className="muted">양을 조절해 볼 선택</span>
-                    <div className="chip-list">
-                      {cautionFoods.map((food) => (
-                        <span className="badge badge-reference" key={`management-caution-${food}`}>
                           {publicNutritionText(food)}
                         </span>
                       ))}
