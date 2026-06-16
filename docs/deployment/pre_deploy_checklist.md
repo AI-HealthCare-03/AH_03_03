@@ -160,7 +160,7 @@ DuckDNS token은 secret입니다. `.prod.env`, 문서, PR, issue, shell history,
 - [ ] 서버에서 최신 코드 반영
 
 ```bash
-git pull origin feature/kdu
+git pull origin release
 ```
 
 - [ ] `.prod.env` 작성
@@ -168,6 +168,13 @@ git pull origin feature/kdu
 ```bash
 cp envs/example.prod.env .prod.env
 # .prod.env 실제 운영값 수정
+```
+
+최초 HTTPS 인증서 발급 전에는 HTTP bootstrap을 위해 `.prod.env`에서 아래 값을 사용합니다.
+
+```env
+NGINX_CONF=../nginx/prod_http.conf
+NGINX_HTTP_PORT=80
 ```
 
 - [ ] DuckDNS DNS 확인
@@ -190,6 +197,8 @@ make prod-pull
 ```bash
 make prod-up
 ```
+
+`make prod-up`은 prod compose의 external network인 `ai-health-shared`가 없으면 생성합니다. 수동 compose 명령을 사용하는 경우에는 먼저 `docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared`로 보장합니다.
 
 - [ ] DB migration 실행
 
@@ -214,6 +223,8 @@ make prod-ps
 ```bash
 make prod-health
 ```
+
+`make prod-health`는 `.prod.env`의 `NGINX_HTTP_PORT`를 읽고, 값이 없으면 운영 기본 `80`으로 `http://localhost:80/api/v1/system/health`를 확인합니다. HTTPS 전환 전에는 HTTP health가 먼저 성공해야 합니다.
 
 - [ ] HTTPS 적용 후 외부 health 확인
 

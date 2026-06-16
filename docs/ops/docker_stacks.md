@@ -255,11 +255,16 @@ Makefile 표준 흐름:
 
 ```bash
 cp envs/example.prod.env .prod.env
+# 최초 HTTPS 인증서 발급 전에는 .prod.env에서 NGINX_CONF=../nginx/prod_http.conf 사용
 make prod-pull
 make prod-up
 make prod-migrate
 make prod-health
 ```
+
+`make prod-up`은 external network `ai-health-shared`가 없으면 자동 생성한 뒤 prod compose를 실행한다. 직접 compose 명령을 사용하는 운영자는 먼저 `docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared`로 네트워크를 보장한다.
+
+`make prod-health`는 `.prod.env`의 `NGINX_HTTP_PORT`를 읽고, 값이 없으면 운영 기본 `80`으로 `http://localhost:80/api/v1/system/health`를 확인한다. HTTPS/certbot 전환 전에는 HTTP health가 먼저 성공해야 한다.
 
 운영 배포 target은 seed와 RAG ingest를 자동 실행하지 않는다. 초기 운영 DB에 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 `make danger-prod-seed`를 별도로 실행한다. 하위 호환용 `make prod-release-db`는 migration만 수행한다.
 

@@ -172,6 +172,7 @@ make prod-pull
 
 ```bash
 cp envs/example.prod.env .prod.env
+# 최초 HTTPS 인증서 발급 전에는 .prod.env에서 NGINX_CONF=../nginx/prod_http.conf 사용
 make prod-pull
 make prod-up
 make prod-migrate
@@ -179,9 +180,12 @@ make prod-health
 make prod-logs
 ```
 
+`make prod-up`은 prod compose의 external network인 `ai-health-shared`가 없으면 먼저 생성합니다. 직접 compose를 실행하는 경우에는 같은 이름의 external network를 먼저 보장해야 합니다.
+
 직접 compose를 써야 할 때도 반드시 prod compose와 `.prod.env`를 명시합니다.
 
 ```bash
+docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared
 docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
@@ -222,11 +226,12 @@ prod compose의 Nginx는 외부 `80/443`을 노출합니다.
 1. DuckDNS가 EC2 public IP를 가리키는지 확인합니다.
 2. 보안 그룹에서 80 포트가 열려 있는지 확인합니다.
 3. 최초 인증서 발급 전에는 `NGINX_CONF=../nginx/prod_http.conf`로 HTTP Nginx를 띄웁니다.
-4. `/.well-known/acme-challenge/`가 Nginx에서 webroot로 제공되는지 확인합니다.
-5. certbot webroot 방식으로 인증서를 발급합니다.
-6. `NGINX_CONF=../nginx/prod_https.conf`로 전환합니다.
-7. Nginx를 재시작하거나 reload합니다.
-8. HTTPS health check를 확인합니다.
+4. `make prod-health` 또는 `curl -fsS http://localhost/api/v1/system/health`로 HTTP health를 확인합니다.
+5. `/.well-known/acme-challenge/`가 Nginx에서 webroot로 제공되는지 확인합니다.
+6. certbot webroot 방식으로 인증서를 발급합니다.
+7. `NGINX_CONF=../nginx/prod_https.conf`로 전환합니다.
+8. Nginx를 재시작하거나 reload합니다.
+9. HTTPS health check를 확인합니다.
 
 certbot 예시:
 
@@ -275,6 +280,8 @@ Makefile:
 ```bash
 make prod-health
 ```
+
+`make prod-health`는 `.prod.env`의 `NGINX_HTTP_PORT`를 읽고, 값이 없으면 운영 기본 포트 `80`으로 `http://localhost:80/api/v1/system/health`를 확인합니다.
 
 ## 14. 배포 후 QA
 

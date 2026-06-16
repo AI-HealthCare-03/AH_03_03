@@ -2,6 +2,7 @@ DEV_ENV ?= .env
 PROD_ENV_FILE ?= .prod.env
 DEV_COMPOSE = docker compose --env-file $(DEV_ENV) -f infra/docker/docker-compose.dev.yml
 PROD_COMPOSE = docker compose --env-file $(PROD_ENV_FILE) -f infra/docker/docker-compose.prod.yml
+PROD_NETWORK ?= ai-health-shared
 COMPOSE_DEV = $(DEV_COMPOSE)
 FASTAPI_EXEC = $(DEV_COMPOSE) exec fastapi uv run --no-sync
 DOCKER_USER ?= kdu0312
@@ -229,11 +230,14 @@ langfuse-restart:
 
 # Prod compose convenience
 # Uses infra/docker/docker-compose.prod.yml and pulls prebuilt registry images.
-.PHONY: prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed danger-prod-seed prod-health prod-release-db
+.PHONY: prod-network prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed danger-prod-seed prod-health prod-release-db
+prod-network:
+	docker network inspect $(PROD_NETWORK) >/dev/null 2>&1 || docker network create $(PROD_NETWORK) >/dev/null
+
 prod-pull:
 	$(PROD_COMPOSE) pull
 
-prod-up:
+prod-up: prod-network
 	$(PROD_COMPOSE) up -d
 
 prod-ps:
@@ -252,7 +256,9 @@ danger-prod-seed:
 	$(PROD_COMPOSE) exec -T fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
 
 prod-health:
-	curl -fsS http://localhost:$${NGINX_HTTP_PORT:-8080}/api/v1/system/health
+	@port=$$(awk -F= '/^NGINX_HTTP_PORT=/{print $$2; exit}' "$(PROD_ENV_FILE)" 2>/dev/null | tr -d '[:space:]"'); \
+	port=$${port:-80}; \
+	curl -fsS http://localhost:$${port}/api/v1/system/health
 
 prod-release-db: prod-migrate
 	@echo "prod-release-db now runs migration only. Use danger-prod-seed separately when production seed is explicitly approved."

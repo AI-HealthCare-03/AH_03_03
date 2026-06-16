@@ -284,10 +284,10 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec
 
 이미지를 먼저 push한 뒤 EC2에서 실행합니다. prod compose는 pull-only 구조이므로 EC2에서 app/frontend/worker 이미지를 build하지 않는다.
 
-`docker-compose.prod.yml`은 외부 Docker network `ai-health-shared`를 사용합니다. EC2 최초 배포 전 한 번 생성합니다.
+`docker-compose.prod.yml`은 외부 Docker network `ai-health-shared`를 사용합니다. `make prod-up`은 이 network가 없으면 자동 생성합니다. 직접 compose 명령을 쓰는 경우에는 EC2 최초 배포 전 한 번 생성합니다.
 
 ```bash
-docker network create ai-health-shared || true
+docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared
 ```
 
 EC2에서는 `envs/example.prod.env`를 복사한 `.prod.env`를 준비하고, 실제 운영 값은 `.prod.env`에만 채운다. 최초 IP/HTTP 확인 또는 Let's Encrypt 인증서 발급 전에는 HTTPS 설정 대신 HTTP bootstrap 설정을 사용한다.
@@ -300,6 +300,7 @@ NGINX_CONF=../nginx/prod_http.conf
 
 ```bash
 docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml pull
+docker network inspect ai-health-shared >/dev/null 2>&1 || docker network create ai-health-shared
 docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d
 ```
 
@@ -324,6 +325,8 @@ make danger-prod-seed
 curl -fsS http://localhost/api/v1/system/health
 docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml ps
 ```
+
+Makefile을 사용할 때는 `make prod-health`가 `.prod.env`의 `NGINX_HTTP_PORT`를 읽고, 값이 없으면 운영 기본 `80`으로 `http://localhost:80/api/v1/system/health`를 확인한다.
 
 도메인 DNS, 인증서, Nginx HTTPS 설정이 준비되면 `.prod.env`를 HTTPS 설정으로 전환한다.
 
