@@ -2918,39 +2918,11 @@ a:hover .mini-card {
   font-weight: 700;
 }
 
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-  .page {
-    grid-column: 1;
-  }
-  .topbar {
-    padding: 0 14px;
-    gap: 8px;
-  }
-
-  .brand {
-    font-size: 16px;
-  }
-
-  .nav-logout-btn,
-  .navbar-notification-link,
-  .desktop-nav-action {
-    display: none;
-  }
-
-  .health-tab-group {
-    flex-direction: column;
-  }
-  
-  .health-tab-group > a {
-    align-self: flex-start;
-  }
-
+@media (max-width: 767px) {
+  .sidebar { display: none; }
+  .app-shell { grid-template-columns: 1fr; }
+  .page { grid-column: 1; }
+  .topbar { padding: 0 14px; gap: 8px; }
   .risk-trend-charts {
     display: flex;
     flex-direction: row;
@@ -2959,16 +2931,21 @@ a:hover .mini-card {
     gap: 12px;
     scrollbar-width: none;
   }
-
-  .risk-trend-charts::-webkit-scrollbar {
-    display: none;
-  }
-
+  .risk-trend-charts::-webkit-scrollbar { display: none; }
   .risk-trend-chart-item {
     min-width: 85vw;
     scroll-snap-align: start;
     flex-shrink: 0;
   }
+}
+
+@media (max-width: 576px) {
+  .brand { font-size: 16px; }
+  .nav-logout-btn,
+  .navbar-notification-link,
+  .desktop-nav-action { display: none; }
+  .health-tab-group { flex-direction: column; }
+  .health-tab-group > a { align-self: flex-start; }
 }
 
 [data-theme="dark"] .risk-stage-card {
