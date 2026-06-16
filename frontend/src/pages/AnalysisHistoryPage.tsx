@@ -226,7 +226,7 @@ export default function AnalysisHistoryPage() {
             <span>{getAnalysisTypeLabel(result?.analysis_type, "분석")}</span>
             <strong>{getDisplayRiskLabel(result)}</strong>
             <div className="button-row">
-              <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
             </div>
             <p>{String(result?.summary ?? "")}</p>
@@ -247,6 +247,7 @@ export default function AnalysisHistoryPage() {
         </Card>
         {detailSlots.length > 0 && (
           <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 예측 결과" : "간편분석 질환별 예측 결과"}>
+            <p className="muted" style={{ marginBottom: 12 }}>질환별 카드를 클릭하시면 해당 질병의 분석 결과를 바로 확인하실 수 있습니다.</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {detailSlots.map((slot) => {
                 if (slot.isUnavailable || !slot.result) {

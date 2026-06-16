@@ -95,16 +95,16 @@ const analysisSourceLabels: Record<string, string> = {
 };
 
 const x2UnavailableReasons: Record<string, string> = {
-  HYPERTENSION: "혈압 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  DIABETES: "공복혈당 또는 당화혈색소 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  DYSLIPIDEMIA: "이상지질혈증 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  OBESITY: "BMI 또는 키/몸무게 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  ABDOMINAL_OBESITY: "허리둘레 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  FATTY_LIVER: "AST/ALT 등 간 관련 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  ANEMIA: "혈색소 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  LIVER_FUNCTION: "AST/ALT/감마GTP 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  KIDNEY_FUNCTION: "요단백/크레아티닌/eGFR 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
-  CHRONIC_KIDNEY_DISEASE: "eGFR 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.",
+  HYPERTENSION: "혈압 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  DIABETES: "공복혈당 또는 당화혈색소 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  DYSLIPIDEMIA: "이상지질혈증 관련 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  OBESITY: "BMI 또는 키/몸무게 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  ABDOMINAL_OBESITY: "허리둘레 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  FATTY_LIVER: "AST/ALT 등 간 관련 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  ANEMIA: "혈색소 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  LIVER_FUNCTION: "AST/ALT/감마GTP 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  KIDNEY_FUNCTION: "요단백/크레아티닌/eGFR 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
+  CHRONIC_KIDNEY_DISEASE: "eGFR 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.",
 };
 
 export type AnalysisDisplaySlot<T extends AnalysisResultLike> = {
@@ -204,7 +204,7 @@ export function getUnavailableAnalysisReason(analysisType: unknown, mode: unknow
   if (normalizeKey(mode) !== "PRECISION") {
     return "이번 간편분석 결과에 포함되지 않았습니다.";
   }
-  return x2UnavailableReasons[key] ?? "필요한 검진 수치가 없어 이번 정밀분석에서 판정하지 않았습니다.";
+  return x2UnavailableReasons[key] ?? "필요한 검진 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.";
 }
 
 export function mergeResultsWithExpectedAnalysisTypes<T extends AnalysisResultLike>(
