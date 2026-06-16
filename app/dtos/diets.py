@@ -105,7 +105,7 @@ class DietAnalyzeResponse(BaseModel):
     photo_result: DietAnalyzePhotoResultResponse
     detected_foods: list[dict[str, Any]]
     nutrition_summary: dict[str, Any]
-    diet_score: float
+    diet_score: float | None
     diet_feedback: str
     disease_scores: dict[str, float | None] | None = None
     food_score_details: list[dict[str, Any]] = []

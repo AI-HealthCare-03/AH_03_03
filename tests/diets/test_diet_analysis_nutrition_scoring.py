@@ -95,6 +95,7 @@ async def test_run_diet_analysis_adds_nutrition_scoring_and_service_sources(monk
 
     monkeypatch.setattr(diet_service, "create_diet_record", fake_create_diet_record)
     monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
+    monkeypatch.setattr(diet_service.config, "DIET_DEMO_FALLBACK_ENABLED", True)
 
     response = await diet_service.run_diet_analysis(
         10,
@@ -117,6 +118,8 @@ async def test_run_diet_analysis_adds_nutrition_scoring_and_service_sources(monk
     assert created_photo_payload["raw_output"]["food_score_details"]
     assert created_photo_payload["raw_output"]["scoring_source"] == "nutrition_rule_table"
     assert created_photo_payload["raw_output"]["explanation"]["source"] == "rule_based_explanation"
+    assert created_record_payload["diet_score"] is None
+    assert response["diet_score"] is None
     assert "rule_stub" not in str(response)
     assert "image_analysis_stub" not in str(response)
     assert "rule_stub" not in str(created_photo_payload)
@@ -137,6 +140,7 @@ async def test_run_diet_analysis_keeps_response_when_scorer_fails(monkeypatch) -
     monkeypatch.setattr(diet_service, "create_diet_record", fake_create_diet_record)
     monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
     monkeypatch.setattr(diet_service, "build_nutrition_scoring_result", raise_scoring_error)
+    monkeypatch.setattr(diet_service.config, "DIET_DEMO_FALLBACK_ENABLED", True)
 
     response = await diet_service.run_diet_analysis(
         10,
@@ -146,6 +150,36 @@ async def test_run_diet_analysis_keeps_response_when_scorer_fails(monkeypatch) -
     assert response["scoring_source"] == "nutrition_rule_table_unavailable"
     assert response["disease_scores"] == {"DM": None, "HTN": None, "DL": None, "OBE": None, "ANEM": None}
     assert response["explanation"]["source"] == "rule_based_explanation"
+
+
+@pytest.mark.asyncio
+async def test_run_diet_analysis_rejects_rule_based_without_demo_fallback(monkeypatch) -> None:
+    created_record_called = False
+
+    async def fake_create_diet_record(user_id: int, request):
+        nonlocal created_record_called
+        created_record_called = True
+        return SimpleNamespace(id=1, user_id=user_id, **request.model_dump())
+
+    async def fake_create_diet_photo_result(diet_record_id: int, request):
+        return SimpleNamespace(id=2, diet_record_id=diet_record_id, **request.model_dump())
+
+    monkeypatch.setattr(diet_service, "create_diet_record", fake_create_diet_record)
+    monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
+    monkeypatch.setattr(diet_service.config, "DIET_VISION_PROVIDER", "rule_based")
+    monkeypatch.setattr(diet_service.config, "DIET_GPT_VISION_ENABLED", False)
+    monkeypatch.setattr(diet_service.config, "DIET_DEMO_FALLBACK_ENABLED", False)
+    monkeypatch.setattr(diet_service.config, "OPENAI_API_KEY", None)
+
+    with pytest.raises(ValueError, match=diet_service.DIET_ANALYSIS_SERVICE_UNAVAILABLE):
+        await diet_service.run_diet_analysis(
+            10,
+            DietAnalyzeRequest(meal_type="LUNCH", description="비빔밥 사진"),
+            image_bytes=b"image",
+            image_media_type="image/jpeg",
+        )
+
+    assert created_record_called is False
 
 
 @pytest.mark.asyncio
@@ -248,8 +282,12 @@ async def test_run_diet_analysis_returns_stable_food_names_from_gpt_aliases(monk
 
 
 @pytest.mark.asyncio
-async def test_run_diet_analysis_falls_back_when_gpt_vision_key_missing(monkeypatch) -> None:
+async def test_run_diet_analysis_rejects_when_gpt_vision_key_missing(monkeypatch) -> None:
+    created_record_called = False
+
     async def fake_create_diet_record(user_id: int, request):
+        nonlocal created_record_called
+        created_record_called = True
         return SimpleNamespace(id=1, user_id=user_id, **request.model_dump())
 
     async def fake_create_diet_photo_result(diet_record_id: int, request):
@@ -259,18 +297,18 @@ async def test_run_diet_analysis_falls_back_when_gpt_vision_key_missing(monkeypa
     monkeypatch.setattr(diet_service, "create_diet_photo_result", fake_create_diet_photo_result)
     monkeypatch.setattr(diet_service.config, "DIET_VISION_PROVIDER", "gpt_vision")
     monkeypatch.setattr(diet_service.config, "DIET_GPT_VISION_ENABLED", True)
+    monkeypatch.setattr(diet_service.config, "DIET_DEMO_FALLBACK_ENABLED", False)
     monkeypatch.setattr(diet_service.config, "OPENAI_API_KEY", None)
 
-    response = await diet_service.run_diet_analysis(
-        10,
-        DietAnalyzeRequest(meal_type="LUNCH", description="사진 식단"),
-        image_bytes=b"image",
-        image_media_type="image/png",
-    )
+    with pytest.raises(ValueError, match=diet_service.DIET_ANALYSIS_SERVICE_UNAVAILABLE):
+        await diet_service.run_diet_analysis(
+            10,
+            DietAnalyzeRequest(meal_type="LUNCH", description="사진 식단"),
+            image_bytes=b"image",
+            image_media_type="image/png",
+        )
 
-    assert response["vision_provider"] == "rule_based_food_detection"
-    assert response["fallback_used"] is True
-    assert response["raw_output"]["source"] == "rule_based_food_detection"
+    assert created_record_called is False
 
 
 @pytest.mark.asyncio
