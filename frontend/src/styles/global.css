@@ -2252,6 +2252,17 @@ pre {
   padding: 14px;
 }
 
+a .mini-card {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+a:hover .mini-card {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
 .mypage-menu {
   display: grid;
   gap: 10px;
@@ -2421,6 +2432,14 @@ pre {
 .analysis-history-row {
   grid-template-columns: 1fr auto;
   align-items: stretch;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.analysis-history-row:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 .record-row {
