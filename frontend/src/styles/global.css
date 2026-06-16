@@ -1917,12 +1917,12 @@ pre {
   align-items: center;
   display: grid;
   gap: 16px;
-  grid-template-columns: 150px minmax(0, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
 }
 
 .dashboard-primary-grid .dashboard-diet-summary {
   align-items: stretch;
-  grid-template-columns: 150px minmax(0, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
 }
 
 .dashboard-diet-summary p {
