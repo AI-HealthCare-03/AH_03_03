@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { HouseHeart, HeartPulse, Trophy, Salad, FileText } from "lucide-react";
+import { HouseHeart, HeartPulse, Trophy, Salad, FileText, Bell, User } from "lucide-react";
 
 import { useAuth } from "../auth/AuthContext";
 import { sidebarLinks } from "./Sidebar";
@@ -26,17 +26,12 @@ const pickLinks = (paths: string[]) => paths.flatMap((path) => {
 
 const drawerSections = [
   {
-    links: pickLinks(["/", "/health", "/ocr/exam", "/diets", "/challenges", "/chatbot"]),
-    title: "주요 기능",
-  },
-  {
-    links: pickLinks(["/dashboard", "/medications", "/family"]),
+    links: pickLinks(["/chatbot", "/dashboard", "/medications", "/family"]),
     title: "기록/관리",
   },
   {
     links: [
-      { to: "/notifications", icon: "🔔", label: "알림" },
-      { to: "/mypage", icon: "👤", label: "마이페이지" },
+      { to: "/mypage", icon: <User size={20} />, label: "마이페이지" },
       ...pickLinks(["/inquiries", "/faq", "/settings"]),
     ],
     title: "계정/지원",

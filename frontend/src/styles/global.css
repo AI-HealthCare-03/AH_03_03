@@ -5124,7 +5124,6 @@ input:-webkit-autofill:focus {
   }
   .brand { font-size: 16px; }
   .nav-logout-btn,
-  .navbar-notification-link,
   .desktop-nav-action { display: none; }
   .health-tab-group { flex-direction: column; }
   .health-tab-group > a { align-self: flex-start; }

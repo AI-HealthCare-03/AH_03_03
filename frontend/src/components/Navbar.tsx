@@ -4,6 +4,7 @@ import { Link, NavLink } from "react-router-dom";
 import { listUnreadNotifications } from "../api/notifications";
 import { useAuth } from "../auth/AuthContext";
 import ThemeToggle from "./ThemeToggle";
+import { Bell } from "lucide-react";
 
 type NavbarProps = {
   isMobileMenuOpen?: boolean;
@@ -46,6 +47,11 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
       </Link>
       <div className="navbar-actions">
         <ThemeToggle />
+        {isAuthenticated && (
+          <NavLink className="icon-button navbar-notification-link" to="/notifications">
+            <Bell size={20} />
+          </NavLink>
+        )}
         {isAuthenticated ? (
           <>
             <NavLink className="icon-button desktop-nav-action" to="/about">
