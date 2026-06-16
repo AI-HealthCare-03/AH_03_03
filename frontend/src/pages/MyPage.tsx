@@ -332,7 +332,7 @@ export default function MyPage() {
           !isEditingProfile ? (
             <div style={{ display: "flex", gap: 8 }}>
               <Link className="btn-primary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/family">
-                내 가족 설정
+                가족 설정
               </Link>
               <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
                 수정
