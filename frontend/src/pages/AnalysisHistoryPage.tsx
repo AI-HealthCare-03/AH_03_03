@@ -217,7 +217,7 @@ export default function AnalysisHistoryPage() {
         <Card
           title="위험도 추론 결과 상세"
           actions={
-            <Link className="button secondary" to="/analysis/history">
+            <Link className="button" to="/analysis/history">
               전체 리스트
             </Link>
           }
@@ -289,7 +289,7 @@ export default function AnalysisHistoryPage() {
 
   return (
     <Card
-      title="위험도 추론 결과 전체 리스트"
+      title="위험도 예측 결과 전체 리스트"
       actions={
         <button className="button" onClick={() => navigate(-1)} type="button">
           뒤로가기
