@@ -103,6 +103,71 @@ async def test_precision_input_payload_includes_confirmed_x2_only_exam_measureme
 
 
 @pytest.mark.asyncio
+async def test_precision_input_payload_keeps_health_record_values_over_exam_measurements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("systolic_bp", "111 mmHg"),
+            _measurement("diastolic_bp", "73 mmHg"),
+            _measurement("LDL", "95 mg/dL"),
+            _measurement("HbA1c", "5.3 %"),
+        ],
+    )
+
+    payload = await analysis_service.build_precision_analysis_input_payload(
+        user=SimpleNamespace(id=7, gender="MALE"),
+        health_record=_health_record(
+            systolic_bp=160,
+            diastolic_bp=90,
+            ldl_cholesterol=150,
+            hba1c=Decimal("6.1"),
+        ),
+    )
+
+    x2_payload = payload["x2_input_payload"]
+    assert x2_payload["systolic_bp"] == 160
+    assert x2_payload["diastolic_bp"] == 90
+    assert x2_payload["ldl_cholesterol"] == 150
+    assert x2_payload["hba1c"] == Decimal("6.1")
+    assert payload["x2_field_sources"]["systolic_bp"] == "health_record"
+    assert payload["x2_field_sources"]["ldl_cholesterol"] == "health_record"
+    assert payload["x2_merge_policy"] == "health_record_first_missing_only_exam_fallback"
+
+
+@pytest.mark.asyncio
+async def test_precision_input_payload_uses_exam_measurements_for_missing_health_record_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_confirmed_exam_measurements(
+        monkeypatch,
+        [
+            _measurement("LDL", "132 mg/dL"),
+            _measurement("HDL", "45 mg/dL"),
+            _measurement("triglyceride", "170 mg/dL"),
+        ],
+    )
+
+    payload = await analysis_service.build_precision_analysis_input_payload(
+        user=SimpleNamespace(id=7, gender="MALE"),
+        health_record=_health_record(
+            ldl_cholesterol=None,
+            hdl_cholesterol=55,
+            triglyceride=None,
+        ),
+    )
+
+    x2_payload = payload["x2_input_payload"]
+    assert x2_payload["ldl_cholesterol"] == 132
+    assert x2_payload["hdl_cholesterol"] == 55
+    assert x2_payload["triglyceride"] == 170
+    assert payload["x2_field_sources"]["ldl_cholesterol"] == "exam_measurements"
+    assert payload["x2_field_sources"]["hdl_cholesterol"] == "health_record"
+    assert payload["x2_field_sources"]["triglyceride"] == "exam_measurements"
+
+
+@pytest.mark.asyncio
 async def test_basic_mode_keeps_four_diseases_and_does_not_call_x2(monkeypatch: pytest.MonkeyPatch) -> None:
     created, _snapshots = _patch_analysis_writes(monkeypatch)
     monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
@@ -241,34 +306,40 @@ async def test_precision_uses_exam_measurements_for_x2_only_diseases(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_precision_prefers_confirmed_exam_measurements_over_health_record(
+async def test_precision_prefers_health_record_values_over_confirmed_exam_measurements(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    created, _snapshots = _patch_analysis_writes(monkeypatch)
+    created, snapshots = _patch_analysis_writes(monkeypatch)
     monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
     _patch_confirmed_exam_measurements(
         monkeypatch,
         [
-            _measurement("systolic_bp", "161 mmHg"),
-            _measurement("diastolic_bp", "88 mmHg"),
+            _measurement("systolic_bp", "111 mmHg"),
+            _measurement("diastolic_bp", "73 mmHg"),
         ],
     )
 
     await analysis_service.run_analysis(
         7,
-        _health_record(systolic_bp=118, diastolic_bp=76),
+        _health_record(systolic_bp=160, diastolic_bp=90),
         AnalysisMode.PRECISION,
     )
 
     by_type = {item.analysis_type: item for item in created}
     assert by_type[AnalysisType.HYPERTENSION].risk_level == RiskLevel.HIGH_CAUTION
+    snapshot_by_type = {snapshot.input_payload["analysis_type"]: snapshot for snapshot in snapshots}
+    htn_input = snapshot_by_type[AnalysisType.HYPERTENSION.value].input_payload
+    assert htn_input["x2_input_payload"]["systolic_bp"] == 160
+    assert htn_input["x2_input_payload"]["diastolic_bp"] == 90
+    assert htn_input["x2_field_sources"]["systolic_bp"] == "health_record"
+    assert htn_input["x2_field_sources"]["diastolic_bp"] == "health_record"
 
 
 @pytest.mark.asyncio
-async def test_precision_obesity_prefers_confirmed_exam_bmi_over_health_record(
+async def test_precision_obesity_prefers_health_record_bmi_over_confirmed_exam_bmi(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    created, _snapshots = _patch_analysis_writes(monkeypatch)
+    created, snapshots = _patch_analysis_writes(monkeypatch)
     monkeypatch.setattr(analysis_service, "_predict_basic_screening_dual_stage", lambda **kwargs: None)
     _patch_confirmed_exam_measurements(monkeypatch, [_measurement("bmi", "30.0 kg/m2")])
 
@@ -280,7 +351,11 @@ async def test_precision_obesity_prefers_confirmed_exam_bmi_over_health_record(
 
     by_type = {item.analysis_type: item for item in created}
     assert by_type[AnalysisType.OBESITY].model_name == "x2_rule"
-    assert by_type[AnalysisType.OBESITY].risk_level == RiskLevel.HIGH_CAUTION
+    assert by_type[AnalysisType.OBESITY].risk_level == RiskLevel.LOW
+    snapshot_by_type = {snapshot.input_payload["analysis_type"]: snapshot for snapshot in snapshots}
+    obesity_input = snapshot_by_type[AnalysisType.OBESITY.value].input_payload
+    assert obesity_input["x2_input_payload"]["bmi"] == 22.0
+    assert obesity_input["x2_field_sources"]["bmi"] == "health_record"
 
 
 @pytest.mark.asyncio

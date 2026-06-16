@@ -218,6 +218,34 @@ async def test_family_invite_email_job_enqueue_uses_service_stream_and_slim_payl
     assert calls[0][1]["stream_payload"] == {"resource_type": "family_invite_email"}
 
 
+@pytest.mark.asyncio
+async def test_notification_email_job_enqueue_uses_service_stream_and_notification_payload(monkeypatch) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    async def fake_create_async_job(**kwargs):
+        calls.append(("create_async_job", kwargs))
+
+    monkeypatch.setattr(service_job_service.async_job_service, "create_async_job", fake_create_async_job)
+
+    await service_job_service.enqueue_notification_email_send(
+        user_id=7,
+        notification_id=11,
+        notification_log_id=13,
+        title="서비스 알림",
+        message="확인용 알림입니다.",
+        action_url="http://localhost:8080/notifications",
+    )
+
+    assert calls[0][1]["job_type"] == "notification.email.send"
+    assert calls[0][1]["stream"] == "ai_health:jobs:service"
+    assert calls[0][1]["user_id"] == 7
+    assert calls[0][1]["resource_id"] == 11
+    assert calls[0][1]["request_payload"]["notification_id"] == 11
+    assert calls[0][1]["request_payload"]["notification_log_id"] == 13
+    assert calls[0][1]["request_payload"]["action_url"] == "http://localhost:8080/notifications"
+    assert calls[0][1]["stream_payload"] == {"resource_type": "notification_email"}
+
+
 def test_family_alert_job_payload_uses_action_message_without_sensitive_health_values() -> None:
     payload = {
         "title": "챌린지 알림",

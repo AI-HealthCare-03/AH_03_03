@@ -12,7 +12,7 @@ from ai_runtime.llm.schemas import (
     ResultChatbotOutput,
 )
 
-CAUTION_MESSAGE = "이 정보는 진단이 아니며, 정확한 진단과 치료는 의료진 상담이 필요합니다."
+CAUTION_MESSAGE = "이 정보는 진단이 아니며 건강관리 참고용입니다. 정확한 진단과 치료는 의료진 상담이 필요합니다."
 
 
 def infer_result_chatbot_intent(user_message: str) -> str:

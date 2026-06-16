@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import lru_cache
+from inspect import isawaitable
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
@@ -74,11 +76,14 @@ def build_analysis_explanation_graph():
 
 def _with_node_fallback(
     node_name: str,
-    node_func: Callable[[HealthChatbotGraphState], HealthChatbotGraphState],
-) -> Callable[[HealthChatbotGraphState], HealthChatbotGraphState]:
-    def wrapped(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
+    node_func: Callable[[HealthChatbotGraphState], Any],
+) -> Callable[[HealthChatbotGraphState], Any]:
+    async def wrapped(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
         try:
-            return node_func(state)
+            result = node_func(state)
+            if isawaitable(result):
+                result = await result
+            return result
         except Exception as exc:
             fallback_state = _node_exception_fallback_state(node_name=node_name, state=state, exc=exc)
             trace_graph_node(

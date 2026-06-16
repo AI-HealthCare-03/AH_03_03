@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 from dataclasses import dataclass
 from time import perf_counter
@@ -15,11 +17,20 @@ from ai_runtime.llm.prompt_templates import (
     MAIN_REWRITE_PROMPT_VERSION,
 )
 from ai_runtime.llm.rag import RetrievedDocument, disabled_rag_retrieval_result, get_default_rag_retriever
+from ai_runtime.llm.rag.embeddings import get_embedding_provider
+from ai_runtime.llm.rag.hybrid_retriever import (
+    HYBRID_STRATEGY_HYBRID_PARALLEL,
+    HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
+    HYBRID_STRATEGY_KEYWORD_ONLY,
+    HYBRID_STRATEGY_VECTOR_DISABLED,
+    HybridRagRetriever,
+)
 from ai_runtime.llm.rag.source_trust import (
     is_low_trust_level,
     lowest_source_trust_level,
     source_trust_level_for_metadata,
 )
+from ai_runtime.llm.rag.vector_retriever import VectorRagRetriever
 from ai_runtime.llm.rag_generator import generate_main_health_rag_response
 from ai_runtime.llm.response_router import route_main_health_chatbot_response
 from ai_runtime.llm.safety import check_medical_safety, detect_mental_health_safety
@@ -31,6 +42,14 @@ from .state import HealthChatbotGraphState
 
 SOURCE_GRAPH = "langgraph_chatbot"
 _REAL_RECORD_LANGFUSE_EVENT = record_langfuse_event
+logger = logging.getLogger(__name__)
+MAIN_CHATBOT_RAG_MIN_KEYWORD_RESULTS = 1
+SUPPORTED_MAIN_CHATBOT_RAG_STRATEGIES = {
+    HYBRID_STRATEGY_KEYWORD_ONLY,
+    HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK,
+    HYBRID_STRATEGY_HYBRID_PARALLEL,
+    HYBRID_STRATEGY_VECTOR_DISABLED,
+}
 
 
 @dataclass(frozen=True)
@@ -171,7 +190,7 @@ def classify_intent(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     return next_state
 
 
-def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
+async def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     if not state.get("use_rag") or not config.RAG_ENABLED:
         result = disabled_rag_retrieval_result()
@@ -192,11 +211,8 @@ def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphSt
         return next_state
 
     retrieval_started_at = perf_counter()
-    result = get_default_rag_retriever().retrieve(
-        query=state["user_message"] or "",
-        top_k=2,
-        include_safety_disclaimer=True,
-    )
+    retrieval_query = _query_with_domain_context(state["user_message"] or "", state.get("user_context") or {})
+    result = await _retrieve_main_chatbot_rag_context(retrieval_query)
     elapsed_ms = round((perf_counter() - retrieval_started_at) * 1000, 2)
     documents = [_retrieved_document_to_langchain_document(document) for document in result.documents]
     next_state = {
@@ -230,12 +246,101 @@ def retrieve_rag_context(state: HealthChatbotGraphState) -> HealthChatbotGraphSt
             "document_ids": result.trace_metadata.get("document_ids", []),
             "strategy": result.strategy,
             "fallback_reason": result.fallback_reason,
+            **_runtime_rag_trace_summary(result.trace_metadata),
         },
     )
+    log_runtime_rag_retrieval_metadata(result.trace_metadata)
     return next_state
 
 
-def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
+async def _retrieve_main_chatbot_rag_context(query: str):
+    strategy = _normalized_main_chatbot_rag_strategy()
+    if strategy == HYBRID_STRATEGY_KEYWORD_ONLY:
+        return get_default_rag_retriever().retrieve(
+            query=query,
+            top_k=2,
+            include_safety_disclaimer=True,
+        )
+
+    vector_retriever = (
+        _build_main_chatbot_vector_retriever()
+        if strategy in {HYBRID_STRATEGY_KEYWORD_FIRST_VECTOR_FALLBACK, HYBRID_STRATEGY_HYBRID_PARALLEL}
+        else None
+    )
+    retriever = HybridRagRetriever(
+        keyword_retriever=get_default_rag_retriever(),
+        vector_retriever=vector_retriever,
+    )
+    return await retriever.retrieve(
+        query=query,
+        top_k=2,
+        strategy=strategy,
+        min_keyword_results=MAIN_CHATBOT_RAG_MIN_KEYWORD_RESULTS,
+        include_safety_disclaimer=True,
+    )
+
+
+def _normalized_main_chatbot_rag_strategy() -> str:
+    strategy = str(getattr(config, "RAG_RETRIEVAL_STRATEGY", HYBRID_STRATEGY_KEYWORD_ONLY) or "").strip()
+    legacy_strategy = str(getattr(config, "MAIN_CHATBOT_RAG_STRATEGY", HYBRID_STRATEGY_KEYWORD_ONLY) or "").strip()
+    if strategy == HYBRID_STRATEGY_KEYWORD_ONLY and legacy_strategy != HYBRID_STRATEGY_KEYWORD_ONLY:
+        strategy = legacy_strategy
+    if strategy not in SUPPORTED_MAIN_CHATBOT_RAG_STRATEGIES:
+        return HYBRID_STRATEGY_KEYWORD_ONLY
+    return strategy
+
+
+def _build_main_chatbot_vector_retriever() -> VectorRagRetriever | None:
+    if not _main_chatbot_vector_gate_enabled():
+        return None
+    try:
+        provider = get_embedding_provider(config)
+    except Exception:
+        return None
+    if provider is None:
+        return None
+    return VectorRagRetriever(embedding_provider=provider)
+
+
+def _main_chatbot_vector_gate_enabled() -> bool:
+    return (
+        bool(getattr(config, "RAG_EMBEDDING_ENABLED", False))
+        and str(getattr(config, "RAG_EMBEDDING_PROVIDER", "") or "").strip().lower() == "openai"
+        and bool(config.OPENAI_API_KEY)
+    )
+
+
+def _domain_context_text(user_context: dict[str, Any]) -> str:
+    domain_context = user_context.get("domain_context")
+    if not isinstance(domain_context, dict):
+        return ""
+    text = domain_context.get("safe_context_text")
+    if not isinstance(text, str):
+        return ""
+    return sanitize_for_trace(text, limit=1000)
+
+
+def _query_with_domain_context(query: str, user_context: dict[str, Any]) -> str:
+    domain_context_text = _domain_context_text(user_context)
+    if not domain_context_text:
+        return query
+    return f"{query}\n\n사용자 도메인 요약:\n{domain_context_text}"
+
+
+def _context_text_with_domain_context(retrieved_context: str, user_context: dict[str, Any]) -> str:
+    domain_context_text = _domain_context_text(user_context)
+    if not domain_context_text:
+        return retrieved_context
+    domain_block = (
+        "사용자 데이터 요약 context입니다. 이 요약은 생활관리 참고용이며 진단/처방 판단에 사용하지 않습니다.\n"
+        f"{domain_context_text}"
+    )
+    if not retrieved_context.strip():
+        return domain_block
+    return f"{domain_block}\n\nRAG 참고 context:\n{retrieved_context}"
+
+
+async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     if state.get("safety_response"):
         final_answer = _with_caution(str(state["safety_response"]))
@@ -288,22 +393,60 @@ def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphSta
 
     if state.get("retrieved_docs"):
         retrieved_context = _retrieved_docs_to_context_text(state["retrieved_docs"])
+        retrieved_context = _context_text_with_domain_context(retrieved_context, state.get("user_context") or {})
         generation_started_at = perf_counter()
-        output = generate_main_health_rag_response(
-            user_message=state["user_message"],
-            retrieved_context=retrieved_context,
-            context_sources=state.get("reference_sources") or [],
-            use_real_llm=state.get("use_real_llm", False),
-        )
+        if state.get("use_real_llm", False):
+            output = await asyncio.to_thread(
+                generate_main_health_rag_response,
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=state.get("reference_sources") or [],
+                use_real_llm=True,
+            )
+        else:
+            output = generate_main_health_rag_response(
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=state.get("reference_sources") or [],
+                use_real_llm=False,
+            )
+        elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)
+    elif _domain_context_text(state.get("user_context") or {}):
+        retrieved_context = _context_text_with_domain_context("", state.get("user_context") or {})
+        generation_started_at = perf_counter()
+        if state.get("use_real_llm", False):
+            output = await asyncio.to_thread(
+                generate_main_health_rag_response,
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=[],
+                use_real_llm=True,
+            )
+        else:
+            output = generate_main_health_rag_response(
+                user_message=state["user_message"],
+                retrieved_context=retrieved_context,
+                context_sources=[],
+                use_real_llm=False,
+            )
         elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)
     else:
         generation_started_at = perf_counter()
-        output = route_main_health_chatbot_response(
-            MainHealthChatbotInput(user_message=state["user_message"]),
-            use_llm_fallback=False,
-            use_llm_rewrite=state.get("use_real_llm", False),
-            use_real_llm=state.get("use_real_llm", False),
-        )
+        if state.get("use_real_llm", False):
+            output = await asyncio.to_thread(
+                route_main_health_chatbot_response,
+                MainHealthChatbotInput(user_message=state["user_message"]),
+                use_llm_fallback=False,
+                use_llm_rewrite=True,
+                use_real_llm=True,
+            )
+        else:
+            output = route_main_health_chatbot_response(
+                MainHealthChatbotInput(user_message=state["user_message"]),
+                use_llm_fallback=False,
+                use_llm_rewrite=False,
+                use_real_llm=False,
+            )
         elapsed_ms = round((perf_counter() - generation_started_at) * 1000, 2)
 
     prompt_version = _prompt_version_for_output(output)
@@ -548,6 +691,52 @@ def trace_graph_node(
     )
 
 
+def log_runtime_rag_retrieval_metadata(trace_metadata: dict[str, Any]) -> bool:
+    if not _should_log_runtime_rag_metadata():
+        return False
+
+    summary = _runtime_rag_trace_summary(trace_metadata)
+    if not summary:
+        return False
+
+    logger.info(
+        "main_chatbot_rag_retrieval rag_strategy=%s keyword_returned_count=%s "
+        "vector_returned_count=%s merged_count=%s final_count=%s fallback_used=%s fallback_reason=%s",
+        summary.get("rag_strategy"),
+        summary.get("keyword_returned_count"),
+        summary.get("vector_returned_count"),
+        summary.get("merged_count"),
+        summary.get("final_count"),
+        summary.get("fallback_used"),
+        summary.get("fallback_reason"),
+        extra={"rag_retrieval": summary},
+    )
+    return True
+
+
+def _should_log_runtime_rag_metadata() -> bool:
+    env = getattr(config, "ENV", "")
+    env_value = getattr(env, "value", str(env))
+    return str(env_value).lower() in {"local", "dev"}
+
+
+def _runtime_rag_trace_summary(trace_metadata: dict[str, Any]) -> dict[str, Any]:
+    if not trace_metadata:
+        return {}
+
+    return {
+        "rag_strategy": trace_metadata.get("retriever_strategy")
+        or trace_metadata.get("strategy")
+        or trace_metadata.get("source"),
+        "keyword_returned_count": trace_metadata.get("keyword_returned_count"),
+        "vector_returned_count": trace_metadata.get("vector_returned_count"),
+        "merged_count": trace_metadata.get("merged_count"),
+        "final_count": trace_metadata.get("final_count") or trace_metadata.get("document_count"),
+        "fallback_used": trace_metadata.get("fallback_used", trace_metadata.get("fallback")),
+        "fallback_reason": trace_metadata.get("fallback_reason"),
+    }
+
+
 def sanitize_for_trace(value: str, limit: int = 80) -> str:
     sanitized = re.sub(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[email]", value)
     sanitized = re.sub(r"\b\d{6}[- ]?[1-4]\d{6}\b", "[rrn]", sanitized)
@@ -680,10 +869,12 @@ def _grounding_status(
 
 def _answer_with_grounding_guardrails(answer: str, grounding_metadata: dict[str, Any]) -> str:
     grounding_status = grounding_metadata["grounding_status"]
-    if grounding_status in {"no_reference", "summary_missing"} and "근거 문서를 찾지 못했습니다" not in answer:
-        return f"근거 문서를 찾지 못했습니다. 아래 내용은 일반적인 건강관리 참고 정보로만 확인해 주세요. {answer}"
-    if grounding_status == "weak_reference" and "근거 수준이 제한적" not in answer:
-        return f"근거 수준이 제한적이므로 단정하지 않고 참고용으로 안내드립니다. {answer}"
+    if grounding_status in {"no_reference", "summary_missing"} and "현재 준비된 참고자료만으로는" not in answer:
+        return (
+            "현재 준비된 참고자료만으로는 이 주제에 대해 구체적으로 안내하기 어렵습니다. "
+            "일반적인 건강정보는 참고용으로만 확인하고, 검사 결과나 치료 판단은 의료진과 상담해 주세요. "
+            f"{answer}"
+        )
     return answer
 
 

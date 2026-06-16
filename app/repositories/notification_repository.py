@@ -93,6 +93,16 @@ async def create_notification_log(user_id: int, data: dict[str, Any]) -> Notific
     return await NotificationLog.create(user_id=user_id, **data)
 
 
+async def update_notification_log(notification_log_id: int, data: dict[str, Any]) -> NotificationLog | None:
+    log = await NotificationLog.get_or_none(id=notification_log_id)
+    if log is None:
+        return None
+    for key, value in data.items():
+        setattr(log, key, value)
+    await log.save(update_fields=list(data.keys()) if data else None)
+    return log
+
+
 async def list_notification_logs_by_user(user_id: int, limit: int = 50, offset: int = 0) -> list[NotificationLog]:
     return await NotificationLog.filter(user_id=user_id).order_by("-created_at").offset(offset).limit(limit)
 

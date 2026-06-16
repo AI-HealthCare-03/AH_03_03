@@ -1,4 +1,6 @@
+import logging
 import sys
+from time import perf_counter
 from typing import Any
 
 from dotenv import load_dotenv
@@ -24,6 +26,7 @@ REWRITE_RESPONSE_SCHEMA = {
     },
     "required": ["answer"],
 }
+logger = logging.getLogger(__name__)
 
 
 load_dotenv()
@@ -77,9 +80,11 @@ def create_openai_response(
 ):
     langfuse = build_langfuse_client()
     if langfuse is None:
-        return client.responses.create(
+        return _create_openai_response_with_observability(
+            client=client,
             model=model,
-            input=prompt,
+            prompt=prompt,
+            metadata=metadata,
             **kwargs,
         )
 
@@ -92,25 +97,31 @@ def create_openai_response(
             model=model,
         )
     except Exception:
-        return client.responses.create(
+        return _create_openai_response_with_observability(
+            client=client,
             model=model,
-            input=prompt,
+            prompt=prompt,
+            metadata=metadata,
             **kwargs,
         )
 
     try:
         generation = observation_context.__enter__()
     except Exception:
-        return client.responses.create(
+        return _create_openai_response_with_observability(
+            client=client,
             model=model,
-            input=prompt,
+            prompt=prompt,
+            metadata=metadata,
             **kwargs,
         )
 
     try:
-        response = client.responses.create(
+        response = _create_openai_response_with_observability(
+            client=client,
             model=model,
-            input=prompt,
+            prompt=prompt,
+            metadata=metadata,
             **kwargs,
         )
         output_text = extract_response_text(response)
@@ -220,6 +231,119 @@ def build_langfuse_client():
 
 def is_langfuse_enabled() -> bool:
     return config.LANGFUSE_ENABLED and has_langfuse_config(config)
+
+
+def _create_openai_response_with_observability(
+    *,
+    client,
+    model: str,
+    prompt: str,
+    metadata: dict | None,
+    **kwargs,
+):
+    started_at = perf_counter()
+    try:
+        response = client.responses.create(
+            model=model,
+            input=prompt,
+            **kwargs,
+        )
+    except Exception as exc:
+        _log_openai_runtime_call(
+            metadata=metadata,
+            model=model,
+            latency_ms=round((perf_counter() - started_at) * 1000, 2),
+            success=False,
+            error_type=type(exc).__name__,
+            usage=None,
+        )
+        raise
+
+    _log_openai_runtime_call(
+        metadata=metadata,
+        model=model,
+        latency_ms=round((perf_counter() - started_at) * 1000, 2),
+        success=True,
+        error_type=None,
+        usage=_extract_token_usage(response),
+    )
+    return response
+
+
+def _log_openai_runtime_call(
+    *,
+    metadata: dict | None,
+    model: str,
+    latency_ms: float,
+    success: bool,
+    error_type: str | None,
+    usage: dict[str, int | None] | None,
+) -> bool:
+    if not _should_log_llm_runtime():
+        return False
+
+    metadata = metadata or {}
+    usage = usage or {}
+    llm_call_path = _llm_call_path(metadata)
+    payload = {
+        "llm_provider": "openai",
+        "llm_model": model,
+        "llm_call_path": llm_call_path,
+        "latency_ms": latency_ms,
+        "success": success,
+        "error_type": error_type,
+        "prompt_tokens": usage.get("prompt_tokens"),
+        "completion_tokens": usage.get("completion_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }
+    logger.info(
+        "llm_runtime llm_provider=%s llm_model=%s llm_call_path=%s latency_ms=%s "
+        "success=%s error_type=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+        payload["llm_provider"],
+        payload["llm_model"],
+        payload["llm_call_path"],
+        payload["latency_ms"],
+        payload["success"],
+        payload["error_type"],
+        payload["prompt_tokens"],
+        payload["completion_tokens"],
+        payload["total_tokens"],
+        extra={"llm_runtime": payload},
+    )
+    return True
+
+
+def _should_log_llm_runtime() -> bool:
+    env = getattr(config, "ENV", "")
+    env_value = getattr(env, "value", str(env))
+    return str(env_value).lower() in {"local", "dev"}
+
+
+def _llm_call_path(metadata: dict[str, Any]) -> str:
+    source = str(metadata.get("source") or "llm_call")
+    chatbot_type = metadata.get("chatbot_type")
+    if chatbot_type:
+        return f"{chatbot_type}.{source}"
+    return source
+
+
+def _extract_token_usage(response) -> dict[str, int | None]:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None}
+    if isinstance(usage, dict):
+        prompt_tokens = usage.get("input_tokens") or usage.get("prompt_tokens")
+        completion_tokens = usage.get("output_tokens") or usage.get("completion_tokens")
+        total_tokens = usage.get("total_tokens")
+    else:
+        prompt_tokens = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", None)
+        completion_tokens = getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
 
 
 def build_langfuse_observation_name(metadata: dict | None) -> str:

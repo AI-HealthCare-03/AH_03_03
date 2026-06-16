@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from datetime import datetime
@@ -32,7 +33,7 @@ from app.models.analysis import (
     FactorDirection,
     RiskLevel,
 )
-from app.models.challenges import ChallengeCategory
+from app.models.challenges import ChallengeCategory, ChallengeTargetDisease
 from app.models.health import HealthRecord
 from app.models.users import User
 from app.repositories import analysis_repository
@@ -158,7 +159,7 @@ async def get_analysis_result_detail(result_id: int) -> dict[str, Any] | None:
         "result": _analysis_result_response(result, snapshot),
         "factors": factors,
         "snapshot": snapshot,
-        "explanation": _analysis_explanation(result, factors),
+        "explanation": await _analysis_explanation_async(result, factors),
     }
 
 
@@ -235,7 +236,7 @@ async def run_analysis(
                 "model_name": result.model_name,
                 "model_version": result.model_version,
                 "guide_message": request.summary,
-                "explanation": _analysis_explanation(result, factors),
+                "explanation": await _analysis_explanation_async(result, factors),
                 "challenge_recommendation_ids": recommendation_ids,
                 "factor_count": len(factors),
                 **_risk_level_alias_fields(risk_level),
@@ -745,11 +746,10 @@ async def build_precision_analysis_input_payload(
     health_record: HealthRecord,
 ) -> dict[str, Any]:
     x2_payload = _x2_feature_payload(user=user, health_record=health_record)
-    field_sources = {
-        field_name: "health_record_fallback" for field_name, value in x2_payload.items() if value is not None
-    }
+    field_sources = {field_name: "health_record" for field_name, value in x2_payload.items() if value is not None}
     selected_exam_report_id = None
     x2_measurement_source = "health_record_fallback"
+    x2_merge_policy = "health_record_first_missing_only_exam_fallback"
 
     user_id = getattr(user, "id", None) or getattr(health_record, "user_id", None)
     if user_id is not None:
@@ -758,9 +758,14 @@ async def build_precision_analysis_input_payload(
             selected_exam_report_id = int(exam_report.id)
         measurement_payload, measurement_sources = _exam_measurements_to_x2_payload_with_sources(measurements)
         if measurement_payload:
-            x2_payload.update(measurement_payload)
-            field_sources.update(measurement_sources)
-            x2_measurement_source = "exam_measurements"
+            x2_payload, field_sources, exam_values_applied = merge_x2_payload_with_exam_missing_only(
+                base_payload=x2_payload,
+                exam_payload=measurement_payload,
+                base_sources=field_sources,
+                exam_sources=measurement_sources,
+            )
+            if exam_values_applied:
+                x2_measurement_source = "exam_measurements"
 
     return {
         "selected_exam_report_id": selected_exam_report_id,
@@ -768,7 +773,31 @@ async def build_precision_analysis_input_payload(
         "x2_input_payload": x2_payload,
         "x2_measurement_source": x2_measurement_source,
         "x2_field_sources": field_sources,
+        "x2_merge_policy": x2_merge_policy,
     }
+
+
+def merge_x2_payload_with_exam_missing_only(
+    *,
+    base_payload: dict[str, Any],
+    exam_payload: dict[str, Any],
+    base_sources: dict[str, str] | None = None,
+    exam_sources: dict[str, str] | None = None,
+) -> tuple[dict[str, Any], dict[str, str], bool]:
+    merged_payload = dict(base_payload)
+    merged_sources = dict(base_sources or {})
+    applied_exam_value = False
+    for field_name, exam_value in exam_payload.items():
+        if not _is_missing_x2_payload_value(merged_payload.get(field_name)):
+            continue
+        merged_payload[field_name] = exam_value
+        merged_sources[field_name] = (exam_sources or {}).get(field_name, "exam_measurements")
+        applied_exam_value = True
+    return merged_payload, merged_sources, applied_exam_value
+
+
+def _is_missing_x2_payload_value(value: Any) -> bool:
+    return value is None or value == ""
 
 
 def exam_measurements_to_x2_payload(measurements: list[Any]) -> dict[str, Any]:
@@ -907,6 +936,10 @@ def _guide_message(analysis_type: AnalysisType, risk_level: RiskLevel, mode: Ana
             f"{disease_label} 관련 관심이 필요한 단계입니다. 건강정보를 꾸준히 기록하며 변화를 확인해 보세요.{notice}"
         )
     return f"{disease_label} 관련 관리 필요도는 낮은 편입니다. 현재의 건강 기록 습관을 유지해 보세요.{notice}"
+
+
+async def _analysis_explanation_async(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
+    return await asyncio.to_thread(_analysis_explanation, result, factors)
 
 
 def _analysis_explanation(result: AnalysisResult, factors: list[AnalysisResultFactor]) -> dict[str, Any]:
@@ -1083,6 +1116,7 @@ def _analysis_snapshot_request(
         precision_input.get("x2_measurement_source") if precision_input else "health_record_fallback"
     )
     x2_field_sources = precision_input.get("x2_field_sources") if precision_input else {}
+    x2_merge_policy = precision_input.get("x2_merge_policy") if precision_input else None
     shap_outputs = [
         {
             "factor_key": factor.factor_key,
@@ -1116,6 +1150,7 @@ def _analysis_snapshot_request(
                 "x2_input_payload": x2_input_payload,
                 "x2_measurement_source": x2_measurement_source,
                 "x2_field_sources": x2_field_sources,
+                "x2_merge_policy": x2_merge_policy,
             }
         ),
         output_payload=_to_json_value(
@@ -1378,19 +1413,104 @@ def _is_missing_health_record_field(record: HealthRecord, field_name: str) -> bo
     return _is_missing_value(getattr(record, field_name))
 
 
+def _enum_value(value: object) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+CHALLENGE_RECOMMENDATION_PROFILES: dict[AnalysisType, dict[str, tuple[str, ...]]] = {
+    AnalysisType.HYPERTENSION: {
+        "categories": (ChallengeCategory.BLOOD_PRESSURE.value, ChallengeCategory.DIET.value),
+        "target_diseases": (ChallengeTargetDisease.HYPERTENSION.value,),
+        "title_keywords": ("혈압", "나트륨", "염분", "국물", "소금"),
+    },
+    AnalysisType.DIABETES: {
+        "categories": (ChallengeCategory.BLOOD_GLUCOSE.value, ChallengeCategory.DIET.value),
+        "target_diseases": (ChallengeTargetDisease.DIABETES.value,),
+        "title_keywords": ("혈당", "당", "탄수", "식사", "간식"),
+    },
+    AnalysisType.DYSLIPIDEMIA: {
+        "categories": (ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.DYSLIPIDEMIA.value,),
+        "title_keywords": ("지방", "기름", "튀김", "식이섬유", "건강식탁", "걷기"),
+    },
+    AnalysisType.OBESITY: {
+        "categories": (ChallengeCategory.WEIGHT.value, ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.OBESITY.value,),
+        "title_keywords": ("체중", "야식", "폭식", "걷기", "활동"),
+    },
+    AnalysisType.ABDOMINAL_OBESITY: {
+        "categories": (ChallengeCategory.WEIGHT.value, ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.OBESITY.value,),
+        "title_keywords": ("체중", "허리", "야식", "걷기", "활동"),
+    },
+    AnalysisType.FATTY_LIVER: {
+        "categories": (ChallengeCategory.DIET.value, ChallengeCategory.EXERCISE.value),
+        "target_diseases": (ChallengeTargetDisease.GENERAL.value, ChallengeTargetDisease.COMMON.value),
+        "title_keywords": ("기름", "당", "음주", "걷기", "식사"),
+    },
+    AnalysisType.ANEMIA: {
+        "categories": (ChallengeCategory.DIET.value, ChallengeCategory.MONITORING.value),
+        "target_diseases": (ChallengeTargetDisease.ANEMIA.value,),
+        "title_keywords": ("철분", "식사", "기록", "빈혈"),
+    },
+    AnalysisType.KIDNEY_FUNCTION: {
+        "categories": (
+            ChallengeCategory.MONITORING.value,
+            ChallengeCategory.DIET.value,
+            ChallengeCategory.BLOOD_PRESSURE.value,
+        ),
+        "target_diseases": (ChallengeTargetDisease.GENERAL.value, ChallengeTargetDisease.COMMON.value),
+        "title_keywords": ("식사일지", "기록", "염분", "나트륨", "상담"),
+    },
+    AnalysisType.CHRONIC_KIDNEY_DISEASE: {
+        "categories": (
+            ChallengeCategory.MONITORING.value,
+            ChallengeCategory.DIET.value,
+            ChallengeCategory.BLOOD_PRESSURE.value,
+        ),
+        "target_diseases": (ChallengeTargetDisease.GENERAL.value, ChallengeTargetDisease.COMMON.value),
+        "title_keywords": ("식사일지", "기록", "염분", "나트륨", "상담"),
+    },
+}
+
+
+def _challenge_recommendation_score(challenge: object, profile: dict[str, tuple[str, ...]]) -> int:
+    category = _enum_value(getattr(challenge, "category", None))
+    target_disease = _enum_value(getattr(challenge, "target_disease", None))
+    text = " ".join(
+        str(getattr(challenge, field, "") or "") for field in ("title", "description", "target_metric", "target_value")
+    )
+    score = 0
+    if category in profile.get("categories", ()):
+        score += 3
+    if target_disease in profile.get("target_diseases", ()):
+        score += 4
+    score += sum(2 for keyword in profile.get("title_keywords", ()) if keyword in text)
+    return score
+
+
+def _select_active_challenge_for_analysis(active_challenges: list[object], result: AnalysisResult) -> object | None:
+    if not active_challenges:
+        return None
+
+    profile = CHALLENGE_RECOMMENDATION_PROFILES.get(result.analysis_type)
+    if profile is None:
+        return None
+
+    ranked = sorted(
+        (
+            (_challenge_recommendation_score(challenge, profile), index, challenge)
+            for index, challenge in enumerate(active_challenges)
+        ),
+        key=lambda item: (-item[0], item[1]),
+    )
+    best_score, _, best_challenge = ranked[0]
+    return best_challenge if best_score > 0 else active_challenges[0]
+
+
 async def _create_challenge_recommendations(user_id: int, result: AnalysisResult) -> list[int]:
     active_challenges = await challenge_service.list_active_challenges(limit=100)
-    target_category = {
-        AnalysisType.DIABETES: ChallengeCategory.BLOOD_GLUCOSE,
-        AnalysisType.OBESITY: ChallengeCategory.WEIGHT,
-        AnalysisType.DYSLIPIDEMIA: ChallengeCategory.DIET,
-        AnalysisType.HYPERTENSION: ChallengeCategory.BLOOD_PRESSURE,
-    }.get(result.analysis_type)
-    if target_category is None:
-        return []
-    challenge = next((item for item in active_challenges if item.category == target_category), None)
-    if challenge is None and active_challenges:
-        challenge = active_challenges[0]
+    challenge = _select_active_challenge_for_analysis(active_challenges, result)
     if challenge is None:
         return []
 

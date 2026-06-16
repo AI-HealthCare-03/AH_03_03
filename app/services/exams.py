@@ -305,8 +305,11 @@ async def sync_exam_measurements_to_latest_health_record(
 
     latest_record = await health_repository.get_latest_health_record_by_user(report.user_id)
     if latest_record is not None:
-        await health_repository.update_health_record(latest_record.id, data)
-        return data
+        existing_payload = {field_name: getattr(latest_record, field_name, None) for field_name in data}
+        missing_only_data = merge_health_record_with_exam_missing_only(existing_payload, data)
+        if missing_only_data:
+            await health_repository.update_health_record(latest_record.id, missing_only_data)
+        return missing_only_data
 
     measured_at = (
         datetime.combine(report.exam_date, time.min, tzinfo=config.TIMEZONE)
@@ -315,6 +318,20 @@ async def sync_exam_measurements_to_latest_health_record(
     )
     await health_repository.create_health_record(report.user_id, {"measured_at": measured_at, **data})
     return data
+
+
+def merge_health_record_with_exam_missing_only(
+    existing_payload: dict[str, Any], exam_payload: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        field_name: exam_value
+        for field_name, exam_value in exam_payload.items()
+        if _is_missing_health_record_sync_value(existing_payload.get(field_name))
+    }
+
+
+def _is_missing_health_record_sync_value(value: Any) -> bool:
+    return value is None or value == ""
 
 
 def build_health_record_update_from_exam_measurements(measurements: list[ExamMeasurement]) -> dict[str, Any]:

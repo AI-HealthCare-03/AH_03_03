@@ -1,6 +1,12 @@
 #!/bin/bash
 set -eo pipefail
 
+# DEPRECATED:
+#   This legacy interactive script uses envs/.prod.env and mutates nginx conf
+#   files directly. Prefer the current prod.env + infra/docker/docker-compose.prod.yml
+#   flow documented in docs/deployment/ec2_prod_env.md. Keep this script only
+#   as a historical/manual certbot reference.
+
 COLOR_GREEN=$(tput setaf 2)
 COLOR_BLUE=$(tput setaf 4)
 COLOR_RED=$(tput setaf 1)
@@ -89,4 +95,3 @@ EOF
 else
   echo "${COLOR_BLUE} 스크립트를 종료합니다.${COLOR_NC}"
 fi
-

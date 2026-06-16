@@ -552,12 +552,12 @@ function getChallengeIcon(category: unknown): ReactNode {
 
 function getChallengeTitle(challenge: AnyRecord): string {
   const nested = challenge.challenge as AnyRecord | undefined;
-  return String(nested?.title ?? challenge.title ?? "추천 챌린지");
+  return String(challenge.challenge_title ?? nested?.title ?? challenge.title ?? "추천 챌린지");
 }
 
 function getChallengeDuration(challenge: AnyRecord): string {
   const nested = challenge.challenge as AnyRecord | undefined;
-  const days = nested?.duration_days ?? challenge.duration_days;
+  const days = challenge.challenge_duration_days ?? nested?.duration_days ?? challenge.duration_days;
   return days ? `${String(days)}일` : "기간 확인";
 }
 
@@ -663,10 +663,14 @@ export default function DashboardPage() {
 
   const dashboardChallenges: AnyRecord[] = Array.isArray(challengeSection.user_challenges)
     ? (challengeSection.user_challenges as AnyRecord[]).map(
-        (uc): AnyRecord => ({
-          ...uc,
-          challenge: activeChallengesMap[Number(uc.challenge_id)],
-        }),
+        (uc): AnyRecord => {
+          const nested =
+            uc.challenge && typeof uc.challenge === "object" ? (uc.challenge as AnyRecord) : undefined;
+          return {
+            ...uc,
+            challenge: nested ?? activeChallengesMap[Number(uc.challenge_id)],
+          };
+        },
       )
     : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
@@ -1076,7 +1080,7 @@ export default function DashboardPage() {
                 const progress = getChallengeProgress(challenge);
                 const challengeId = challenge.challenge_id ?? nested?.id ?? "";
                 const cardKey = challenge.id ?? challengeId;
-                const iconCategory = nested?.category ?? challenge.category;
+                const iconCategory = challenge.challenge_category ?? nested?.category ?? challenge.category;
                 return (
                   <article className="challenge-compact-card" key={String(cardKey)}>
                     <div className="challenge-compact-icon">{getChallengeIcon(iconCategory)}</div>

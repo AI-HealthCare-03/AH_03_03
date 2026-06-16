@@ -155,6 +155,8 @@ class DietRagEvidenceSourceResponse(BaseModel):
 class DietRagCommentResponse(BaseModel):
     enabled: bool
     fallback_used: bool
+    rewrite_used: bool | None = None
+    fallback_reason: str | None = None
     summary: str
     disease_comments: list[DietRagDiseaseCommentResponse]
     evidence_sources: list[DietRagEvidenceSourceResponse]

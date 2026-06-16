@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { AnalysisMode, getAnalysisResultDetail, getLatestAnalysisResults, runAnalysisAsync } from "../api/analysis";
-import { listChallengeRecommendations, listChallenges } from "../api/challenges";
-import { getAnalysisReadiness } from "../api/health";
+import { getAnalysisResultDetail, getLatestAnalysisResults } from "../api/analysis";
+import { getChallenge, listChallengeRecommendations } from "../api/challenges";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
-import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
-import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import {
   getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
@@ -45,38 +42,16 @@ type AnalysisDetailPreview = {
   factors?: AnalysisFactor[];
   explanation?: AnalysisExplanation | null;
 };
-type Readiness = {
-  is_ready: boolean;
-  basic_ready?: boolean;
-  precision_ready?: boolean;
-  latest_health_record_id: number | null;
-  missing_fields: string[];
-  missing_basic_fields?: string[];
-  missing_precision_fields?: string[];
-  message: string;
-};
-const missingFieldLabels: Record<string, string> = {
-  height_cm: "키",
-  weight_kg: "몸무게",
-  bmi: "BMI",
-  systolic_bp: "수축기 혈압",
-  diastolic_bp: "이완기 혈압",
-  fasting_glucose: "공복혈당",
-  hba1c: "당화혈색소",
-  total_cholesterol: "총콜레스테롤",
-  triglyceride: "중성지방",
-  hdl_cholesterol: "HDL 콜레스테롤",
-  ldl_cholesterol: "LDL 콜레스테롤",
-  occupation_code: "직업군",
-  family_htn: "고혈압 가족력 여부",
-  family_dm: "당뇨병 가족력 여부",
-  family_dyslipidemia: "이상지질혈증 이상 가족력 여부",
-  smoking_status: "현재 흡연 여부",
-  drinking_frequency: "1년간 음주 빈도",
-  drinking_amount: "한 번 음주량",
-  walking_days_per_week: "1주일간 걷기 일수",
-  strength_days_per_week: "1주일간 근력운동 일수",
-};
+
+function getChallengeCardDescription(value: unknown): string {
+  const cleaned = String(value ?? "")
+    .replace(/\[target_disease=[A-Z_]+\]\s*/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const fallback = cleaned || "분석 결과를 바탕으로 추천된 챌린지입니다.";
+  return fallback.length > 140 ? `${fallback.slice(0, 139).trim()}…` : fallback;
+}
 
 const factorValueLabels: Record<string, Record<string, string>> = {
   family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
@@ -170,42 +145,11 @@ function getMostRecentAnalysisRunResults(items: AnalysisResult[]): AnalysisResul
 
 export default function AnalysisPage() {
   const [results, setResults] = useState<AnalysisResult[]>([]);
-  const [healthRecordId, setHealthRecordId] = useState<number | null>(null);
-  const [basicReady, setBasicReady] = useState(false);
-  const [precisionReady, setPrecisionReady] = useState(false);
-  const [missingFields, setMissingFields] = useState<string[]>([]);
-  const [precisionMissingFields, setPrecisionMissingFields] = useState<string[]>([]);
   const [factorsByResultId, setFactorsByResultId] = useState<Record<string, AnalysisFactor[]>>({});
   const [explanationsByResultId, setExplanationsByResultId] = useState<Record<string, AnalysisExplanation>>({});
   const [recommendedChallenges, setRecommendedChallenges] = useState<AnalysisResult[]>([]);
-  const [notice, setNotice] = useState("");
+  const [recommendedChallengesLoading, setRecommendedChallengesLoading] = useState(false);
   const [error, setError] = useState("");
-  const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
-  const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
-  const { clearFeedback, feedbackDialog, showFailure, showProcessing, showSuccess } = useAnalysisFeedbackDialog();
-
-  const { pollingError } = useAsyncJobPolling({
-    jobId: analysisJobId,
-    enabled: analysisJobId !== null && runningMode !== null,
-    intervalMs: 1500,
-    timeoutMs: 120000,
-    onSuccess: async () => {
-      setRunningMode(null);
-      setAnalysisJobId(null);
-      await load();
-      showSuccess({ message: "결과 화면에서 건강 관리 단계를 확인해 주세요." });
-    },
-    onFailure: (job) => {
-      showFailure({ message: job.status === "CANCELED" ? "분석 작업이 취소되었습니다." : "다시 시도해주세요." });
-      setRunningMode(null);
-      setAnalysisJobId(null);
-    },
-    onTimeout: () => {
-      showFailure();
-      setRunningMode(null);
-      setAnalysisJobId(null);
-    },
-  });
 
   const load = async () => {
     const latestResults = await getLatestAnalysisResults<AnalysisResult[]>();
@@ -230,69 +174,43 @@ export default function AnalysisPage() {
           .map(([id, detail]) => [id, detail.explanation]),
       ),
     );
-    const readiness = await getAnalysisReadiness<Readiness>();
-    setHealthRecordId(readiness.latest_health_record_id);
-    setBasicReady(Boolean(readiness.basic_ready ?? readiness.is_ready));
-    setPrecisionReady(Boolean(readiness.precision_ready));
-    setMissingFields((readiness.basic_ready ?? readiness.is_ready) ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
-    setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
-    const [recommendations, challenges] = await Promise.allSettled([
-      listChallengeRecommendations<AnalysisResult[]>({ limit: 4 }),
-      listChallenges<AnalysisResult[]>({ limit: 20 }),
-    ]);
-    if (recommendations.status === "fulfilled" && challenges.status === "fulfilled") {
-      const ids = recommendations.value.map((recommendation) => Number(recommendation.challenge_id));
-      setRecommendedChallenges(
-        ids
-          .map((id) => challenges.value.find((challenge) => Number(challenge.id) === id))
-          .filter((challenge): challenge is AnalysisResult => Boolean(challenge)),
+    setRecommendedChallengesLoading(true);
+    try {
+      const recommendations = await listChallengeRecommendations<AnalysisResult[]>({ limit: 4 });
+      const ids = Array.from(
+        new Set(
+          recommendations
+            .map((recommendation) => Number(recommendation.challenge_id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+        ),
       );
+      if (ids.length > 0) {
+        const challengeDetails = await Promise.allSettled(ids.map((id) => getChallenge<AnalysisResult>(id)));
+        challengeDetails.forEach((result, index) => {
+          if (result.status === "rejected") {
+            console.warn("추천 챌린지 상세를 불러오지 못했습니다.", { challenge_id: ids[index] });
+          }
+        });
+        setRecommendedChallenges(
+          challengeDetails
+            .map((result) => (result.status === "fulfilled" ? result.value : null))
+            .filter((challenge): challenge is AnalysisResult => Boolean(challenge))
+            .slice(0, 4),
+        );
+      } else {
+        setRecommendedChallenges([]);
+      }
+    } catch {
+      console.warn("추천 챌린지 목록을 불러오지 못했습니다.");
+      setRecommendedChallenges([]);
+    } finally {
+      setRecommendedChallengesLoading(false);
     }
   };
 
   useEffect(() => {
     void load().catch(() => setError("분석 결과를 불러오지 못했습니다."));
   }, []);
-
-  const run = async (mode: AnalysisMode) => {
-    setError("");
-    setNotice("");
-    clearFeedback();
-    setAnalysisJobId(null);
-    setRunningMode(mode);
-    try {
-      const readiness = await getAnalysisReadiness<Readiness>();
-      const currentBasicReady = Boolean(readiness.basic_ready ?? readiness.is_ready);
-      const currentPrecisionReady = Boolean(readiness.precision_ready);
-      setHealthRecordId(readiness.latest_health_record_id);
-      setBasicReady(currentBasicReady);
-      setPrecisionReady(currentPrecisionReady);
-      setMissingFields(currentBasicReady ? [] : readiness.missing_basic_fields ?? readiness.missing_fields);
-      setPrecisionMissingFields(readiness.missing_precision_fields ?? []);
-      if (!readiness.latest_health_record_id) {
-        setNotice(mode === "PRECISION" ? "건강검진 데이터를 입력해주세요." : "분석을 실행할 건강정보가 없습니다. 먼저 건강정보를 입력해주세요.");
-        setRunningMode(null);
-        return;
-      }
-      if (!currentBasicReady) {
-        setNotice("기본 분석에 필요한 정보가 부족해 분석을 실행하지 않았습니다.");
-        setRunningMode(null);
-        return;
-      }
-      if (mode === "PRECISION" && !currentPrecisionReady) {
-        setNotice("건강검진 데이터를 입력해주세요.");
-        setRunningMode(null);
-        return;
-      }
-      showProcessing();
-      const job = await runAnalysisAsync(readiness.latest_health_record_id, mode);
-      setAnalysisJobId(job.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
-      showFailure();
-      setRunningMode(null);
-    }
-  };
 
   const analysisComment = buildAnalysisComment(results, explanationsByResultId);
   const latestRunResults = getMostRecentAnalysisRunResults(results.filter((result) => isKnownAnalysisType(result.analysis_type)));
@@ -321,7 +239,7 @@ export default function AnalysisPage() {
           <p>당뇨, 고혈압, 비만, 이상지질혈증 이상 위험도를 한 화면에서 확인합니다.</p>
         </div>
         <div className="button-row">
-          <Link className="button secondary" to="/health">
+          <Link className="button secondary" to="/health/profile">
             정보 수정
           </Link>
           <Link className="button" to="/analysis/history">
@@ -330,44 +248,6 @@ export default function AnalysisPage() {
         </div>
       </div>
       {error && <ErrorMessage message={error} />}
-      {pollingError && <ErrorMessage message={pollingError.message} />}
-      {notice && <div className="state-box">{notice}</div>}
-      {feedbackDialog}
-      {missingFields.length > 0 && (
-        <Card title="분석에 필요한 정보가 부족합니다">
-          <div className="readiness-card">
-            <p>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.</p>
-            <div className="chip-list">
-              {missingFields.map((field) => (
-                <span className="badge badge-missing" key={field}>
-                  {missingFieldLabels[field] ?? field}
-                </span>
-              ))}
-            </div>
-            <Link className="button" to="/health/profile">
-              필수 건강정보 입력하기
-            </Link>
-          </div>
-        </Card>
-      )}
-      {precisionMissingFields.length > 0 && (
-        <Card title="정밀 분석 선택 입력">
-          <div className="readiness-card">
-            <p>정밀 분석은 혈압/혈당/지질/허리둘레 등 검진 수치를 함께 반영합니다.</p>
-            <p>부족한 검진값을 입력하면 정밀 분석을 실행할 수 있습니다.</p>
-            <div className="chip-list">
-              {precisionMissingFields.map((field) => (
-                <span className="badge badge-reference" key={field}>
-                  {missingFieldLabels[field] ?? field}
-                </span>
-              ))}
-            </div>
-            <Link className="button secondary" to="/health/profile">
-              검진값 입력하기
-            </Link>
-          </div>
-        </Card>
-      )}
       <div className="page-grid">
         <Card title="분석 기반 건강 코멘트">
           <p>{analysisComment}</p>
@@ -418,6 +298,13 @@ export default function AnalysisPage() {
               <Link className="button secondary" style={{ marginTop: 8, textAlign: "center", display: "block" }} to={`/analysis/${String(result.id)}`}>
                 상세보기
               </Link>
+              <Link
+                className="button secondary"
+                style={{ marginTop: 8, textAlign: "center", display: "block" }}
+                to={`/chatbot?context_type=ANALYSIS&target_id=${String(result.id)}&initial_question=${encodeURIComponent("이 분석 결과에서 먼저 관리할 점을 알려줘")}`}
+              >
+                이 결과에 대해 질문하기
+              </Link>
             </div>
           );
         })}
@@ -430,7 +317,9 @@ export default function AnalysisPage() {
         )}
       </div>
       <Card title="추천 챌린지">
-        {recommendedChallenges.length > 0 ? (
+        {recommendedChallengesLoading ? (
+          <div className="state-box">추천 챌린지를 불러오는 중입니다...</div>
+        ) : recommendedChallenges.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {recommendedChallenges.map((challenge) => (
               <div className="mini-card" key={String(challenge.id)}>
@@ -440,7 +329,7 @@ export default function AnalysisPage() {
                   </span>
                   <strong>{String(challenge.title ?? "추천 챌린지")}</strong>
                 </div>
-                <p className="muted">{String(challenge.description ?? "분석 결과를 바탕으로 추천된 챌린지입니다.")}</p>
+                <p className="muted">{getChallengeCardDescription(challenge.description)}</p>
                 <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
                   상세보기
                 </Link>
@@ -448,16 +337,19 @@ export default function AnalysisPage() {
             ))}
           </div>
         ) : (
-          <div className="button-row">
-            <Link className="button secondary" to="/challenges">
-              챌린지 보기
-            </Link>
-            <Link className="button secondary" to="/diets">
-              식단 이미지 분석
-            </Link>
-            <Link className="button secondary" to="/dashboard">
-              추적 대시보드 이동
-            </Link>
+          <div className="state-box">
+            <strong>추천 챌린지가 아직 없습니다.</strong>
+            <div className="button-row" style={{ marginTop: 12 }}>
+              <Link className="button secondary" to="/challenges">
+                챌린지 보기
+              </Link>
+              <Link className="button secondary" to="/diets">
+                식단 이미지 분석
+              </Link>
+              <Link className="button secondary" to="/dashboard">
+                추적 대시보드 이동
+              </Link>
+            </div>
           </div>
         )}
       </Card>

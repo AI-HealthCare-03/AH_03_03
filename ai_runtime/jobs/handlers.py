@@ -174,6 +174,10 @@ def _register_service_job_handlers() -> None:
         service_job_service.handle_family_invite_email_send,
     )
     _register_service_job_handler(
+        service_job_service.NOTIFICATION_EMAIL_SEND_JOB_TYPE,
+        service_job_service.handle_notification_email_send,
+    )
+    _register_service_job_handler(
         service_job_service.FAMILY_NOTIFICATION_CREATE_JOB_TYPE,
         service_job_service.handle_family_notification_create,
     )
