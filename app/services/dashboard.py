@@ -143,15 +143,43 @@ async def get_dashboard_health(user_id: int) -> dict[str, Any]:
 async def get_dashboard_challenges(user_id: int) -> dict[str, Any]:
     active_challenges = await challenge_service.list_active_challenges(limit=10)
     user_challenges = await challenge_service.list_user_challenges(user_id, limit=10)
+    user_challenge_summaries = await _build_user_challenge_dashboard_responses(user_challenges)
     return {
         "active_challenges": [
             ChallengeResponse.model_validate(challenge).model_dump(mode="json") for challenge in active_challenges
         ],
-        "user_challenges": [
-            UserChallengeResponse.model_validate(user_challenge).model_dump(mode="json")
-            for user_challenge in user_challenges
-        ],
+        "user_challenges": user_challenge_summaries,
     }
+
+
+async def _build_user_challenge_dashboard_responses(user_challenges: list[Any]) -> list[dict[str, Any]]:
+    challenge_ids = {int(user_challenge.challenge_id) for user_challenge in user_challenges}
+    challenge_by_id = {}
+    for challenge_id in challenge_ids:
+        challenge = await challenge_service.get_challenge(challenge_id)
+        if challenge is not None:
+            challenge_by_id[challenge_id] = challenge
+    responses = []
+    for user_challenge in user_challenges:
+        payload = UserChallengeResponse.model_validate(user_challenge).model_dump(mode="json")
+        challenge = challenge_by_id.get(int(user_challenge.challenge_id))
+        if challenge is not None:
+            payload.update(
+                {
+                    "challenge_title": challenge.title,
+                    "challenge_description": challenge.description,
+                    "challenge_category": challenge.category.value
+                    if hasattr(challenge.category, "value")
+                    else challenge.category,
+                    "challenge_difficulty": challenge.difficulty.value
+                    if hasattr(challenge.difficulty, "value")
+                    else challenge.difficulty,
+                    "challenge_status": challenge.status.value if hasattr(challenge.status, "value") else challenge.status,
+                    "challenge_duration_days": challenge.duration_days,
+                }
+            )
+        responses.append(payload)
+    return responses
 
 
 async def get_dashboard_diets(user_id: int) -> dict[str, Any]:
