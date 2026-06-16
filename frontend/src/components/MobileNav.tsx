@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { HouseHeart, HeartPulse, Trophy, Salad, FileText } from "lucide-react";
 
 import { useAuth } from "../auth/AuthContext";
 import { sidebarLinks } from "./Sidebar";
@@ -10,11 +11,11 @@ type MobileNavProps = {
 };
 
 const bottomLinks = [
-  { to: "/", icon: "🏠", label: "홈" },
-  { to: "/health", icon: "🧭", label: "분석" },
-  { to: "/challenges", icon: "✅", label: "챌린지" },
-  { to: "/diets", icon: "🥗", label: "식단" },
-  { to: "/ocr/exam", icon: "📄", label: "검진표" },
+  { to: "/", icon: <HouseHeart size={20} />, label: "홈" },
+  { to: "/health", icon: <HeartPulse size={20} />, label: "분석" },
+  { to: "/challenges", icon: <Trophy size={20} />, label: "챌린지" },
+  { to: "/diets", icon: <Salad size={20} />, label: "식단" },
+  { to: "/ocr/exam", icon: <FileText size={20} />, label: "검진표" },
 ];
 
 const linkByPath = new Map(sidebarLinks.map((link) => [link.to, link]));
