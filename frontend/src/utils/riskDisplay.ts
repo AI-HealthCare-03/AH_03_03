@@ -202,7 +202,7 @@ export function getLatestAnalysisMode<T extends AnalysisResultLike>(
 export function getUnavailableAnalysisReason(analysisType: unknown, mode: unknown): string {
   const key = normalizeKey(analysisType);
   if (normalizeKey(mode) !== "PRECISION") {
-    return "이번 간편분석 결과에 포함되지 않았습니다.";
+    return "필요한 검진 수치가 입력되지 않아 이번 간편분석 결과에 포함되지 않았습니다.";
   }
   return x2UnavailableReasons[key] ?? "필요한 검진 수치가 입력되지 않아 이번 정밀 분석에서 제외되었습니다.";
 }

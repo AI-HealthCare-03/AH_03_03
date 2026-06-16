@@ -259,6 +259,11 @@ export default function AnalysisHistoryPage() {
                         <span className="badge badge-reference">판정 불가</span>
                       </div>
                       <p className="muted">{slot.unavailableReason}</p>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                        <Link className="btn-primary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/health/profile">
+                          추가 정보 입력
+                        </Link>
+                      </div>
                     </div>
                   );
                 }
