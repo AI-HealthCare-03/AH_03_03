@@ -550,6 +550,34 @@ SMTP 설정 누락 여부를 확인합니다.
 
 값 자체는 출력하지 않습니다.
 
+### Aerich old format of migration file detected
+
+`make prod-migrate`에서 아래 오류가 발생하면 migration 파일의 `MODELS_STATE` 포맷이 현재 Aerich 버전과 맞지 않는 상태입니다.
+
+```text
+Old format of migration file detected, run `aerich fix-migrations` to upgrade format
+```
+
+운영 DB나 volume을 삭제하지 않습니다. 서버에서 임의로 migration 파일을 고치거나 `down -v`를 실행하지 말고, 로컬 코드에서 해당 migration 파일 포맷을 수정한 뒤 새 image로 재배포합니다.
+
+로컬 확인 절차:
+
+```bash
+uv run ruff check app scripts ai_runtime tests
+uv run pytest -q tests/exams/test_exam_confirm_to_health_record.py tests/jobs/test_async_job_skeleton.py
+uv run aerich history
+git diff --check
+```
+
+수정이 main에 반영되면 GitHub Actions 자동배포 또는 수동 image build/push 후 EC2에서 다시 실행합니다.
+
+```bash
+make prod-pull
+make prod-up
+make prod-migrate
+make prod-health
+```
+
 ### network ai-health-shared declared as external, but could not be found
 
 `make prod-up`은 `prod-network`를 먼저 실행해 network를 보장합니다. 수동 compose 명령을 쓰는 경우에는 아래를 먼저 실행합니다.
