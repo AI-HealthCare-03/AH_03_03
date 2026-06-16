@@ -2341,6 +2341,14 @@ a:hover .mini-card {
 
 .result-summary-card {
   grid-template-columns: 1fr;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.result-summary-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 .health-record-summary-card {
