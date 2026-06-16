@@ -11,7 +11,7 @@ import {
 } from "../api/diets";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
-import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
+import { formatDateTime, mealTypeLabel } from "../utils/format";
 
 type Item = Record<string, unknown>;
 
@@ -416,23 +416,6 @@ export default function DietResultPage() {
               </strong>
             </div>
           )}
-          <div className="score-panel">
-            <span>{needsFoodConfirmation ? "참고 식단 점수" : "식단 점수"}</span>
-            {record?.diet_score != null ? (
-              <strong className={scoreBadgeClass(Number(record.diet_score))}>{String(record.diet_score)}점</strong>
-            ) : isManual ? (
-              <strong>점수 미산정</strong>
-            ) : (
-              <strong>-</strong>
-            )}
-            <p>
-              {needsFoodConfirmation
-                ? "음식 후보 확인 전 점수입니다. 음식명을 확인하면 질환별 평가를 더 정확하게 볼 수 있습니다."
-                : isManual
-                  ? "배포 전 MVP에서는 새 직접 입력은 제공하지 않으며, 기존 기록은 조회만 지원합니다."
-                  : String(record?.diet_feedback ?? "식단 분석 결과를 확인해보세요.")}
-            </p>
-          </div>
         </div>
       </Card>
       {isManual ? (
