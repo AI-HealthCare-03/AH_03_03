@@ -135,24 +135,7 @@ export default function ChatbotPage() {
         </Link>
       </div>
 
-      <Card title="상담 주제">
-        <div className="chat-context-tabs">
-          {contextOptions.map((option) => (
-            <button
-              className={selectedContext.label === option.label ? "filter-tab active" : "filter-tab"}
-              key={option.label}
-              onClick={() => setSelectedContext(option)}
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {error && <ErrorMessage message={error} />}
-
-      <Card title="대화">
+      <Card title="AI 대화">
         <div className="chat-window">
           {messages.length === 0 && (
             <div className="chat-empty">
@@ -178,15 +161,7 @@ export default function ChatbotPage() {
               <div className="chat-bubble">
                 <span className="chat-role">{chatMessage.role === "user" ? "나" : "AI 건강 상담"}</span>
                 <p>{chatMessage.text}</p>
-                {chatMessage.response?.recommended_actions && chatMessage.response.recommended_actions.length > 0 && (
-                  <div className="chip-list">
-                    {chatMessage.response.recommended_actions.map((action) => (
-                      <span className="badge badge-reference" key={action}>
-                        {action}
-                      </span>
-                    ))}
-                  </div>
-                )}
+
                 {chatMessage.response?.safety_notice && (
                   <p className="chat-safety-notice">{chatMessage.response.safety_notice}</p>
                 )}
@@ -221,12 +196,15 @@ export default function ChatbotPage() {
             보내기
           </button>
         </form>
+        <p className="muted" style={{ fontSize: "13px", marginTop: 8, textAlign: "left" }}>
+          *서비스 이용 관련 문의는 <Link to="/inquiries" style={{ color: "inherit", textDecoration: "underline" }}>문의/FAQ</Link>를 이용해 주세요.
+        </p>
       </Card>
 
       <Card title="이용 안내">
         <p className="warning-text">
-          AI 건강 상담은 참고용 안내이며, 진단/처방 또는 치료 변경을 대신하지 않습니다. 증상이 있거나 약 복용을
-          변경하려면 의료진과 상담해주세요.
+          AI 건강 상담의 답변은 참고용 정보이며, 의료진의 진단·처방을 대체할 수 없습니다. <br/>
+          건강 이상 증상이나 복약 관련 결정이 필요한 경우 의료진과 상담하시기 바랍니다.
         </p>
       </Card>
     </div>
