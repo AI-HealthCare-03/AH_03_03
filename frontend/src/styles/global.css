@@ -3395,7 +3395,7 @@ a:hover .mini-card {
 .family-invite-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, minmax(200px, 1fr));
 }
 
 .family-toggle-row {
@@ -5061,34 +5061,27 @@ input:-webkit-autofill:focus {
   .button-row {
     align-items: stretch;
   }
-
   .button-row > .button,
   .button-row > button {
     flex: 1 1 140px;
   }
-
   .card {
     padding: 16px;
   }
-
   .card-header {
     align-items: stretch;
   }
-
   .day-button-grid,
   .stepper,
   .upload-action-grid {
     grid-template-columns: 1fr;
   }
-
   .risk-stage-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
   .landing-preview-dashboard {
     grid-template-columns: 1fr;
   }
-
   .filter-tabs {
     margin-bottom: 12px;
     flex-wrap: nowrap;
@@ -5096,87 +5089,76 @@ input:-webkit-autofill:focus {
     overflow-x: auto;
     padding: 0 2px 4px;
   }
-
   .filter-tab {
     flex: 0 0 auto;
   }
-
   .metric-grid strong,
   .stat-card strong {
     font-size: 21px;
   }
-
   .topbar {
     min-width: 0;
   }
-
   .hero-panel {
     padding: 24px;
     gap: 20px;
   }
-
   .hero-panel h1 {
     font-size: 28px;
   }
-
   .upload-mobile-hint {
     width: 100%;
   }
-
   .brand {
     font-size: 16px;
   }
-
   .nav-logout-btn,
   .desktop-nav-action {
     display: none;
   }
-
   .health-tab-group {
     flex-direction: column;
   }
-
   .health-tab-group > a {
     align-self: flex-start;
   }
-
   .ocr-hint {
     flex-direction: column !important;
     align-items: stretch !important;
   }
-
   .ocr-hint .button {
     align-self: flex-end;
   }
-
   .form.two-col {
     grid-template-columns: 1fr;
   }
-
   .profile-action-row button {
     font-size: 13px;
     padding: 8px 10px;
     white-space: nowrap;
   }
-
   .profile-action-analyze {
     display: flex;
     gap: 8px;
   }
-
   .profile-action-analyze button {
     flex: 1;
   }
-
   .step-indicator__label {
     display: none;
   }
-
   .mypage-health-grid {
     grid-template-columns: 1fr !important;
   }
   .profile-actions-desktop { display: none !important; }
   .profile-actions-mobile { display: flex !important; }
+  .family-intro,
+  .family-header,
+  .page-header {
+    padding-right: 1rem;
+    overflow-wrap: break-word;
+    word-break: keep-all;
+  }
 }
 
 @media (max-width: 420px) {
