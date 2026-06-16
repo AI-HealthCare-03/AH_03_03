@@ -112,6 +112,30 @@ function normalizePhone(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+function familyMemberDisplayName(member: FamilyMember | undefined, fallbackUserId: number): string {
+  if (!member) {
+    return `가족 #${fallbackUserId}`;
+  }
+  const candidates = [
+    member.display_name,
+    (member as FamilyMember & { nickname?: string | null }).nickname,
+    (member as FamilyMember & { name?: string | null }).name,
+    member.email,
+    member.phone_number,
+  ];
+  return candidates.map((value) => String(value ?? "").trim()).find(Boolean) ?? `가족 #${fallbackUserId}`;
+}
+
+function familyMemberSubLabel(member: FamilyMember | undefined): string {
+  if (!member) {
+    return "가족 구성원 정보를 찾을 수 없습니다.";
+  }
+  const relation = relationLabelMap[member.relation_type] ?? member.relation_type;
+  const role = roleLabelMap[member.member_role] ?? member.member_role;
+  const status = statusLabelMap[member.status] ?? member.status;
+  return `${relation} · ${role} · ${status}`;
+}
+
 function getInviteFailureDialog(err: unknown): InviteFeedbackDialog {
   const detail = err instanceof Error ? err.message : "";
 
@@ -224,6 +248,15 @@ export default function FamilyPage() {
 
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
   const isSelectedGroupOwner = selectedGroup?.owner_user_id === backendUser?.id;
+  const membersByUserId = useMemo(() => {
+    const map = new Map<number, FamilyMember>();
+    members.forEach((member) => {
+      if (member.user_id !== null && member.user_id !== undefined) {
+        map.set(Number(member.user_id), member);
+      }
+    });
+    return map;
+  }, [members]);
 
   const summary = useMemo(() => {
     const activeMembers = members.filter((member) => member.status === "ACTIVE").length;
@@ -556,6 +589,55 @@ export default function FamilyPage() {
         await loadSelectedGroupData(selectedGroupId);
       }
     }, "공유 권한을 변경했습니다.");
+  };
+
+  const renderShareSettingCard = (setting: FamilyShareSetting) => {
+    const ownerMember = membersByUserId.get(Number(setting.owner_user_id));
+    const viewerMember = membersByUserId.get(Number(setting.viewer_user_id));
+    const ownerName =
+      setting.owner_user_id === backendUser?.id
+        ? "내 정보"
+        : familyMemberDisplayName(ownerMember, setting.owner_user_id);
+    const viewerName =
+      setting.viewer_user_id === backendUser?.id
+        ? "나"
+        : familyMemberDisplayName(viewerMember, setting.viewer_user_id);
+
+    return (
+      <div className="family-share-card" key={setting.id}>
+        <div className="family-share-header">
+          <div>
+            <strong>
+              {ownerName} → {viewerName}
+            </strong>
+            <p className="muted">
+              {setting.viewer_user_id === backendUser?.id
+                ? `${familyMemberSubLabel(ownerMember)}의 공유 설정입니다.`
+                : familyMemberSubLabel(viewerMember)}
+            </p>
+          </div>
+          {setting.owner_user_id === backendUser?.id ? (
+            <span className="badge badge-saved">변경 가능</span>
+          ) : (
+            <span className="badge badge-reference">조회 전용</span>
+          )}
+        </div>
+        {shareSettingLabels.map((item) => (
+          <label className="toggle-row family-toggle-row" key={`${setting.id}-${String(item.key)}`}>
+            <span>
+              <strong>{item.label}</strong>
+              <small>{item.helper}</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={Boolean(setting[item.key])}
+              disabled={busy || setting.owner_user_id !== backendUser?.id}
+              onChange={() => handleToggleShareSetting(setting, item.key)}
+            />
+          </label>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -935,34 +1017,7 @@ export default function FamilyPage() {
               <div className="empty-state">연결된 가입 가족이 생기면 공유 권한을 설정할 수 있습니다.</div>
             ) : (
               <div className="settings-list">
-                {shareSettings.map((setting) => (
-                  <div className="family-share-card" key={setting.id}>
-                    <div className="family-share-header">
-                      <strong>
-                        내 정보 #{setting.owner_user_id} → 가족 #{setting.viewer_user_id}
-                      </strong>
-                      {setting.owner_user_id === backendUser?.id ? (
-                        <span className="badge badge-saved">변경 가능</span>
-                      ) : (
-                        <span className="badge badge-reference">조회 전용</span>
-                      )}
-                    </div>
-                    {shareSettingLabels.map((item) => (
-                      <label className="toggle-row family-toggle-row" key={`${setting.id}-${String(item.key)}`}>
-                        <span>
-                          <strong>{item.label}</strong>
-                          <small>{item.helper}</small>
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(setting[item.key])}
-                          disabled={busy || setting.owner_user_id !== backendUser?.id}
-                          onChange={() => handleToggleShareSetting(setting, item.key)}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                ))}
+                {shareSettings.map(renderShareSettingCard)}
               </div>
             )}
           </Card>
