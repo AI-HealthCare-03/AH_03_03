@@ -88,9 +88,9 @@ def generate_main_health_rag_response(
         except Exception:
             answer = build_context_based_fallback_answer(retrieved_context)
 
-    final_answer = ensure_caution_message(answer)
+    final_answer = remove_caution_message(answer)
     safety_result = add_rag_metadata(
-        check_medical_safety(final_answer),
+        check_medical_safety(final_answer, require_disclaimer=False),
         context_source_count=context_source_count,
     )
 
@@ -272,17 +272,14 @@ def remove_limited_evidence_prefix(answer: str) -> str:
     return _LIMITED_EVIDENCE_PREFIX_RE.sub("", answer.strip()).strip()
 
 
-def ensure_caution_message(answer: str) -> str:
-    final_answer = answer.strip()
-    if "진단이 아니" not in final_answer or "의료진 상담" not in final_answer:
-        final_answer = f"{final_answer} {CAUTION_MESSAGE}"
-    return final_answer
+def remove_caution_message(answer: str) -> str:
+    return answer.replace(CAUTION_MESSAGE, "").strip()
 
 
 def build_fallback_response(reason: str, context_source_count: int) -> MainHealthChatbotOutput:
     answer = render_prompt("fallback_safe_response_prompt")
     safety_result = add_rag_metadata(
-        check_medical_safety(answer),
+        check_medical_safety(answer, require_disclaimer=False),
         context_source_count=context_source_count,
         fallback_reason=reason,
         prompt_version=FALLBACK_SAFE_RESPONSE_PROMPT_VERSION,

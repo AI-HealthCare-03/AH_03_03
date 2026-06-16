@@ -30,7 +30,7 @@ def test_general_health_question_passes_through_langgraph_without_real_llm(monke
     assert result.source == "rule_engine"
     assert result.intent == "diabetes_guidance"
     assert result.safety_level is None
-    assert "진단이 아니" in result.answer
+    assert "진단이 아니" not in result.answer
     assert "의료진 상담" in result.caution_message
     assert any("건강 분석" in action for action in result.recommended_actions)
 
@@ -212,7 +212,8 @@ def test_rag_disabled_uses_existing_rule_based_fallback(monkeypatch) -> None:
     assert result.reference_sources == []
     assert result.reference_summary is None
     assert result.trace_metadata["retrieval"]["reason"] == "rag_disabled"
-    assert "진단이 아니" in result.answer
+    assert "진단이 아니" not in result.answer
+    assert "의료진 상담" in result.caution_message
 
 
 def test_langgraph_rag_node_wraps_keyword_context_as_reference_sources(monkeypatch) -> None:
@@ -244,7 +245,8 @@ def test_langgraph_rag_node_wraps_keyword_context_as_reference_sources(monkeypat
     assert result.safety_result["metadata"]["trace_metadata"]["generation"]["prompt_version"] == (
         RAG_GROUNDED_ANSWER_PROMPT_VERSION
     )
-    assert "진단이 아니" in result.answer
+    assert "진단이 아니" not in result.answer
+    assert "의료진 상담" in result.caution_message
 
 
 def test_langgraph_rag_node_uses_retriever_interface(monkeypatch) -> None:

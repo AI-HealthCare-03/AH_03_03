@@ -95,7 +95,7 @@ def generate_main_health_chatbot_llm_response(
         source = "rule_based_llm_fallback"
         intent = infer_main_fallback_intent(input_data.user_message)
 
-    final_answer, safety_result = ensure_safe_answer(answer)
+    final_answer, safety_result = ensure_safe_answer(answer, include_caution_in_answer=False)
     safety_result = add_llm_metadata(
         safety_result,
         prompt_version=HEALTH_CHAT_PROMPT_VERSION,
@@ -193,7 +193,7 @@ def rewrite_main_health_chatbot_response_with_llm(
         answer = rewrite_main_health_chatbot_answer_fallback(rule_engine_output)
         source = "rule_based_rewrite"
 
-    final_answer, safety_result = ensure_safe_answer(answer)
+    final_answer, safety_result = ensure_safe_answer(answer, include_caution_in_answer=False)
     safety_result = add_llm_metadata(
         safety_result,
         prompt_version=MAIN_REWRITE_PROMPT_VERSION,
@@ -487,19 +487,20 @@ def extract_answer_from_json_response(raw_response: str) -> str:
     return answer
 
 
-def ensure_safe_answer(answer: str) -> tuple[str, dict]:
-    final_answer = answer.strip()
-    if "진단이 아니" not in final_answer or "의료진 상담" not in final_answer:
+def ensure_safe_answer(answer: str, *, include_caution_in_answer: bool = True) -> tuple[str, dict]:
+    final_answer = remove_caution_message(answer)
+    if include_caution_in_answer and ("진단이 아니" not in final_answer or "의료진 상담" not in final_answer):
         final_answer = f"{final_answer} {CAUTION_MESSAGE}"
 
-    safety_result = check_medical_safety(final_answer)
+    safety_result = check_medical_safety(final_answer, require_disclaimer=include_caution_in_answer)
     if safety_result["is_safe"]:
         return final_answer, safety_result
 
     safe_answer = (
         "건강 관련 판단은 입력된 정보만으로 확정하기 어렵습니다. "
-        "생활습관 관리 방향은 참고용으로만 활용해 주세요. "
-        f"{CAUTION_MESSAGE}"
+        "생활습관 관리 방향은 참고용으로만 활용해 주세요."
     )
-    safe_result = check_medical_safety(safe_answer)
+    if include_caution_in_answer:
+        safe_answer = f"{safe_answer} {CAUTION_MESSAGE}"
+    safe_result = check_medical_safety(safe_answer, require_disclaimer=include_caution_in_answer)
     return safe_answer, safe_result

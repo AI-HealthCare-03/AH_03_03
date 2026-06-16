@@ -56,10 +56,10 @@ class MentalHealthSafetyResult:
     response: str
 
 
-def check_medical_safety(text: str) -> dict:
+def check_medical_safety(text: str, *, require_disclaimer: bool = True) -> dict:
     detected_forbidden = [keyword for keyword in FORBIDDEN_KEYWORDS if keyword in text]
 
-    missing_required_keywords = [keyword for keyword in REQUIRED_KEYWORDS if keyword not in text]
+    missing_required_keywords = [keyword for keyword in REQUIRED_KEYWORDS if require_disclaimer and keyword not in text]
 
     return {
         "is_safe": len(detected_forbidden) == 0 and len(missing_required_keywords) == 0,

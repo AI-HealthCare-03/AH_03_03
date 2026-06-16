@@ -42,6 +42,8 @@ function toUserFacingText(text: string) {
   return text;
 }
 
+const chatSafetyNotice = "AI 상담은 건강관리 참고용이며, 진단·치료는 의료진 상담이 필요합니다.";
+
 export default function ChatbotPage() {
   const location = useLocation();
   const [selectedContext, setSelectedContext] = useState<ContextOption>(contextOptions[0]);
@@ -136,6 +138,9 @@ export default function ChatbotPage() {
       </div>
 
       <Card title="상담 주제">
+        <div className="state-box" style={{ marginBottom: "12px" }}>
+          {chatSafetyNotice}
+        </div>
         <div className="chat-context-tabs">
           {contextOptions.map((option) => (
             <button
@@ -187,9 +192,6 @@ export default function ChatbotPage() {
                     ))}
                   </div>
                 )}
-                {chatMessage.response?.safety_notice && (
-                  <p className="chat-safety-notice">{chatMessage.response.safety_notice}</p>
-                )}
               </div>
             </div>
           ))}
@@ -221,13 +223,6 @@ export default function ChatbotPage() {
             보내기
           </button>
         </form>
-      </Card>
-
-      <Card title="이용 안내">
-        <p className="warning-text">
-          AI 건강 상담은 참고용 안내이며, 진단/처방 또는 치료 변경을 대신하지 않습니다. 증상이 있거나 약 복용을
-          변경하려면 의료진과 상담해주세요.
-        </p>
       </Card>
     </div>
   );

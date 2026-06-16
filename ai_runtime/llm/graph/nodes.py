@@ -343,8 +343,8 @@ def _context_text_with_domain_context(retrieved_context: str, user_context: dict
 async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     if state.get("safety_response"):
-        final_answer = _with_caution(str(state["safety_response"]))
-        safety_result = check_medical_safety(final_answer)
+        final_answer = _without_caution(str(state["safety_response"]))
+        safety_result = check_medical_safety(final_answer, require_disclaimer=False)
         prompt_version = FALLBACK_SAFE_RESPONSE_PROMPT_VERSION
         next_state = {
             **state,
@@ -487,12 +487,12 @@ async def generate_llm_answer(state: HealthChatbotGraphState) -> HealthChatbotGr
 def check_grounding_or_fallback(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     answer = str(state.get("llm_answer") or "")
-    safety_result = check_medical_safety(answer)
+    safety_result = check_medical_safety(answer, require_disclaimer=False)
     grounding_metadata = _build_grounding_metadata(state, safety_result=safety_result)
     grounded_answer = _answer_with_grounding_guardrails(answer, grounding_metadata)
     if grounded_answer != answer:
         answer = grounded_answer
-        safety_result = check_medical_safety(answer)
+        safety_result = check_medical_safety(answer, require_disclaimer=False)
         grounding_metadata = _build_grounding_metadata(state, safety_result=safety_result)
 
     if safety_result["is_safe"]:
@@ -535,10 +535,9 @@ def check_grounding_or_fallback(state: HealthChatbotGraphState) -> HealthChatbot
 
     fallback_answer = (
         "건강 관련 판단은 입력된 정보만으로 확정하기 어렵습니다. "
-        "생활습관 관리 방향은 참고용으로만 활용해 주세요. "
-        f"{CAUTION_MESSAGE}"
+        "생활습관 관리 방향은 참고용으로만 활용해 주세요."
     )
-    fallback_safety = check_medical_safety(fallback_answer)
+    fallback_safety = check_medical_safety(fallback_answer, require_disclaimer=False)
     grounding_metadata = {
         **grounding_metadata,
         "grounding_status": "medical_safety_fallback",
@@ -617,8 +616,8 @@ def build_recommended_actions(state: HealthChatbotGraphState) -> HealthChatbotGr
 def format_final_response(state: HealthChatbotGraphState) -> HealthChatbotGraphState:
     node_started_at = perf_counter()
     answer = state.get("llm_answer") or state.get("safety_response") or ""
-    final_answer = _with_caution(answer)
-    safety_result = check_medical_safety(final_answer)
+    final_answer = _without_caution(answer)
+    safety_result = check_medical_safety(final_answer, require_disclaimer=False)
     actions = state.get("recommended_actions") or _recommended_actions(
         message=state["user_message"],
         intent=state.get("intent"),
@@ -920,11 +919,8 @@ def _reference_source_ids(reference_sources: list[dict[str, Any]]) -> list[str]:
     return source_ids
 
 
-def _with_caution(answer: str) -> str:
-    final_answer = answer.strip()
-    if "진단이 아니" not in final_answer or "의료진 상담" not in final_answer:
-        final_answer = f"{final_answer} {CAUTION_MESSAGE}"
-    return final_answer
+def _without_caution(answer: str) -> str:
+    return answer.replace(CAUTION_MESSAGE, "").strip()
 
 
 def _with_graph_metadata(safety_result: dict[str, Any], state: HealthChatbotGraphState, *, node: str) -> dict[str, Any]:
