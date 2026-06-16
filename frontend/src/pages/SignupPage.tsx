@@ -42,6 +42,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [privacyConsentAgreed, setPrivacyConsentAgreed] = useState(false);
+  const [sensitiveDataAgreed, setSensitiveDataAgreed] = useState(false);
   const [privacyDetailsOpen, setPrivacyDetailsOpen] = useState(false);
   const [lifestyle, setLifestyle] = useState({
     smoking_status: "NON_SMOKER",
@@ -167,6 +168,9 @@ export default function SignupPage() {
       }
       if (!privacyConsentAgreed) {
         nextErrors.privacy_consent = "개인정보 수집·이용 안내를 확인하고 동의해주세요.";
+      }
+      if (!sensitiveDataAgreed) {
+        nextErrors.sensitive_data_consent = "건강정보 등 민감정보 처리 안내를 확인하고 동의해주세요.";
       }
     }
 
@@ -443,7 +447,7 @@ export default function SignupPage() {
         ...(hasPhoneInput ? { phone_number: normalizedPhoneNumber } : {}),
         nickname: nickname.trim(),
         privacy_consent_agreed: privacyConsentAgreed,
-        sensitive_data_agreed: true,
+        sensitive_data_agreed: sensitiveDataAgreed,
       });
       try {
         await createHealthRecord<unknown>(buildInitialHealthPayload());
@@ -806,23 +810,44 @@ export default function SignupPage() {
                     </section>
                   </div>
                 )}
-                <label className="checkbox-row privacy-consent-check">
-                  <input
-                    checked={privacyConsentAgreed}
-                    onChange={(event) => {
-                      setPrivacyConsentAgreed(event.target.checked);
-                      setFieldErrors((prev) => {
-                        const { privacy_consent, ...rest } = prev;
-                        return rest;
-                      });
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                  위 내용을 모두 확인하였으며, 개인정보 수집 및 이용에 동의합니다.
-                  </span>
-                </label>
+                <div className="privacy-required-consents" aria-label="필수 동의 항목">
+                  <label className="checkbox-row privacy-consent-check">
+                    <input
+                      checked={privacyConsentAgreed}
+                      onChange={(event) => {
+                        setPrivacyConsentAgreed(event.target.checked);
+                        setFieldErrors((prev) => {
+                          const { privacy_consent, ...rest } = prev;
+                          return rest;
+                        });
+                      }}
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong>[필수]</strong> 개인정보 수집 및 이용에 동의합니다.
+                    </span>
+                  </label>
+                  <label className="checkbox-row privacy-consent-check">
+                    <input
+                      checked={sensitiveDataAgreed}
+                      onChange={(event) => {
+                        setSensitiveDataAgreed(event.target.checked);
+                        setFieldErrors((prev) => {
+                          const { sensitive_data_consent, ...rest } = prev;
+                          return rest;
+                        });
+                      }}
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong>[필수]</strong> 건강검진, 식단, 복약 등 건강정보 처리에 동의합니다.
+                    </span>
+                  </label>
+                </div>
                 {fieldErrors.privacy_consent && <span className="field-error">{fieldErrors.privacy_consent}</span>}
+                {fieldErrors.sensitive_data_consent && (
+                  <span className="field-error">{fieldErrors.sensitive_data_consent}</span>
+                )}
               </div>
             </>
           )}

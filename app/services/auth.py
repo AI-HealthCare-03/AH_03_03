@@ -40,6 +40,7 @@ EMAIL_VERIFICATION_SIGNUP_TTL_MINUTES = 30
 PHONE_AUTH_DEFERRED_MESSAGE = "휴대폰 인증은 현재 MVP 범위에서 제공하지 않습니다. 이메일 인증을 사용해주세요."
 PRIVACY_CONSENT_VERSION = "2026-05-30"
 PRIVACY_CONSENT_REQUIRED_MESSAGE = "개인정보 수집·이용 동의가 필요합니다."
+SENSITIVE_DATA_CONSENT_REQUIRED_MESSAGE = "건강정보 등 민감정보 처리 동의가 필요합니다."
 
 
 class AuthService:
@@ -51,6 +52,8 @@ class AuthService:
     async def signup(self, data: SignUpRequest) -> User:
         if not data.privacy_consent_agreed:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PRIVACY_CONSENT_REQUIRED_MESSAGE)
+        if not data.sensitive_data_agreed:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=SENSITIVE_DATA_CONSENT_REQUIRED_MESSAGE)
 
         login_id = data.login_id or self._default_login_id(str(data.email))
         await self.check_login_id_exists(login_id)

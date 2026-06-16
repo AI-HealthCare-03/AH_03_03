@@ -106,6 +106,7 @@ def test_signup_api_success_uses_current_signup_contract() -> None:
                     "birth_date": "1990-01-01",
                     "phone_number": "01012345678",
                     "privacy_consent_agreed": True,
+                    "sensitive_data_agreed": True,
                 },
             )
     finally:
@@ -116,6 +117,7 @@ def test_signup_api_success_uses_current_signup_contract() -> None:
     assert auth_service.signup_request.email == "signup-api@example.com"
     assert auth_service.signup_request.nickname == "테스트닉"
     assert auth_service.signup_request.privacy_consent_agreed is True
+    assert auth_service.signup_request.sensitive_data_agreed is True
 
 
 def test_token_refresh_api_returns_new_access_token_from_refresh_cookie() -> None:

@@ -85,6 +85,7 @@ async def test_signup_without_phone_number_stores_none(signup_service):
             gender="MALE",
             birth_date=date(1990, 1, 1),
             privacy_consent_agreed=True,
+            sensitive_data_agreed=True,
         )
     )
 
@@ -110,6 +111,7 @@ async def test_signup_with_phone_number_stores_normalized_value(signup_service):
             birth_date=date(1990, 1, 1),
             phone_number="+82 10-1234-5678",
             privacy_consent_agreed=True,
+            sensitive_data_agreed=True,
         )
     )
 
@@ -139,6 +141,30 @@ async def test_signup_requires_privacy_consent(signup_service):
     assert repository.created_user_payload is None
 
 
+@pytest.mark.asyncio
+async def test_signup_requires_sensitive_data_consent(signup_service):
+    service, repository = signup_service
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.signup(
+            SignUpRequest(
+                login_id="signupsensitive",
+                email="signup-sensitive@example.com",
+                password="Password123!",
+                name="테스터",
+                nickname="민감동의거부",
+                gender="MALE",
+                birth_date=date(1990, 1, 1),
+                privacy_consent_agreed=True,
+                sensitive_data_agreed=False,
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "건강정보 등 민감정보 처리 동의가 필요합니다."
+    assert repository.created_user_payload is None
+
+
 def test_signup_requires_non_blank_nickname() -> None:
     with pytest.raises(ValidationError):
         SignUpRequest(
@@ -150,6 +176,7 @@ def test_signup_requires_non_blank_nickname() -> None:
             gender="MALE",
             birth_date=date(1990, 1, 1),
             privacy_consent_agreed=True,
+            sensitive_data_agreed=True,
         )
 
 
@@ -163,6 +190,7 @@ def test_signup_trims_nickname() -> None:
         gender="MALE",
         birth_date=date(1990, 1, 1),
         privacy_consent_agreed=True,
+        sensitive_data_agreed=True,
     )
 
     assert request.nickname == "표시명"
