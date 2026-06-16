@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import {
   createMedication,
+  createMedicationRecord,
   deactivateMedication,
   deleteMedication,
   getMedication,
@@ -64,6 +65,16 @@ function buildMedicationPayload(draft: MedicationPayload): MedicationPayload {
   };
 }
 
+function formatMedicationDateTime(value: unknown): string {
+  if (!value) return "일정 없음";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function MedicationPage() {
   const [registerDraft, setRegisterDraft] = useState<MedicationPayload>({
     name: "",
@@ -79,19 +90,26 @@ export default function MedicationPage() {
   const [error, setError] = useState("");
   const [registerErrors, setRegisterErrors] = useState<MedicationFormErrors>({});
   const [selectedMedicationId, setSelectedMedicationId] = useState<number | null>(null);
+  const [recordMedicationId, setRecordMedicationId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<MedicationPayload>({});
   const [pendingAction, setPendingAction] = useState<null | { type: "deactivate" | "delete"; medicationId: number }>(
     null,
   );
   const [isMutating, setIsMutating] = useState(false);
 
-  const load = async () => {
+  const load = async (nextRecordMedicationId?: number | null) => {
     setError("");
     try {
       const medications = await listMedications<Item[]>();
       setItems(medications);
-      if (medications[0]?.id) {
-        setRecords(await listMedicationRecords<Item[]>(Number(medications[0].id)));
+      const fallbackId = medications[0]?.id ? Number(medications[0].id) : null;
+      const requestedId = nextRecordMedicationId ?? recordMedicationId ?? fallbackId;
+      const targetId = medications.some((medication) => Number(medication.id) === requestedId)
+        ? requestedId
+        : fallbackId;
+      setRecordMedicationId(targetId);
+      if (targetId) {
+        setRecords(await listMedicationRecords<Item[]>(targetId));
       } else {
         setRecords([]);
       }
@@ -124,6 +142,7 @@ export default function MedicationPage() {
       setIsMutating(true);
       const created = await createMedication<Item>(payload);
       setItems((prev) => [created, ...prev.filter((item) => Number(item.id) !== Number(created.id))]);
+      setRecordMedicationId(Number(created.id));
       setRecords([]);
       setRegisterDraft({
         name: "",
@@ -135,7 +154,7 @@ export default function MedicationPage() {
         is_active: true,
       });
       setRegisterErrors({});
-      await load();
+      await load(Number(created.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 등록에 실패했습니다.");
     } finally {
@@ -146,6 +165,40 @@ export default function MedicationPage() {
   const getMedicationName = (record: Item) => {
     const medication = items.find((item) => Number(item.id) === Number(record.medication_id));
     return String(medication?.name ?? "복약 기록");
+  };
+
+  const recordMedicationName =
+    items.find((item) => Number(item.id) === recordMedicationId)?.name ?? (items.length > 0 ? items[0]?.name : null);
+
+  const showMedicationRecords = async (medicationId: number) => {
+    setError("");
+    setRecordMedicationId(medicationId);
+    try {
+      setRecords(await listMedicationRecords<Item[]>(medicationId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "복약 기록을 불러오지 못했습니다.");
+    }
+  };
+
+  const recordMedicationTaken = async (medicationId: number) => {
+    if (isMutating) return;
+    setError("");
+    const now = new Date().toISOString();
+    try {
+      setIsMutating(true);
+      setRecordMedicationId(medicationId);
+      await createMedicationRecord<Item>(medicationId, {
+        scheduled_at: now,
+        taken_at: now,
+        is_taken: true,
+        status: "TAKEN",
+      });
+      await load(medicationId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "복약 완료 기록을 저장하지 못했습니다.");
+    } finally {
+      setIsMutating(false);
+    }
   };
 
   const startEdit = async (medicationId: number) => {
@@ -322,6 +375,10 @@ export default function MedicationPage() {
 
       {/* ── 복약 목록 ── */}
       <Card title="복약 목록">
+        <div className="state-box">
+          등록한 약과 영양제의 기본 정보입니다. 실제 복용 여부는 각 항목의 “오늘 복용 완료”를 눌러
+          아래 복약 수행 기록에 남길 수 있습니다.
+        </div>
         {items.length === 0 && (
           <div className="state-box">등록된 복약 정보가 없습니다.</div>
         )}
@@ -354,6 +411,22 @@ export default function MedicationPage() {
                   <button
                     className="secondary"
                     disabled={isMutating}
+                    onClick={() => void showMedicationRecords(Number(item.id))}
+                    type="button"
+                  >
+                    기록 보기
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={isMutating || !isActive}
+                    onClick={() => void recordMedicationTaken(Number(item.id))}
+                    type="button"
+                  >
+                    오늘 복용 완료
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={isMutating}
                     onClick={() => void startEdit(Number(item.id))}
                     type="button"
                   >
@@ -375,7 +448,7 @@ export default function MedicationPage() {
                       className="secondary"
                       disabled={isMutating}
                       onClick={() =>
-                        void updateMedication(Number(item.id), { is_active: true }).then(load)
+                        void updateMedication(Number(item.id), { is_active: true }).then(() => load())
                       }
                       type="button"
                     >
@@ -465,17 +538,24 @@ export default function MedicationPage() {
       </Card>
 
       {/* ── 복약 기록 ── */}
-      <Card title="복약 기록">
+      <Card title="복약 수행 기록">
+        <div className="state-box">
+          {recordMedicationName
+            ? `${String(recordMedicationName)}의 복용 완료/대기 기록입니다.`
+            : "약이나 영양제를 등록한 뒤 복용 완료를 기록하면 여기에 표시됩니다."}
+        </div>
         <div className="card-list">
           {records.length === 0 && (
-            <div className="state-box">최근 복약 기록이 없습니다.</div>
+            <div className="state-box">
+              아직 복약 수행 기록이 없습니다. 복약 목록에서 “오늘 복용 완료”를 누르면 복용 기록이 생성됩니다.
+            </div>
           )}
           {records.map((record) => (
             <div className="mini-card" key={String(record.id)}>
               <div className="record-row">
                 <div>
                   <strong>{getMedicationName(record)}</strong>
-                  <p className="muted">{String(record.scheduled_at ?? record.created_at ?? "일정 없음")}</p>
+                  <p className="muted">{formatMedicationDateTime(record.scheduled_at ?? record.created_at)}</p>
                 </div>
                 <span className={record.is_taken ? "badge badge-saved" : "badge badge-missing"}>
                   {record.is_taken ? "복용 완료" : "복용 대기"}
@@ -487,10 +567,11 @@ export default function MedicationPage() {
                     is_taken: true,
                     status: "TAKEN",
                     taken_at: new Date().toISOString(),
-                  }).then(load)
+                  }).then(() => load(recordMedicationId))
                 }
+                disabled={isMutating || Boolean(record.is_taken)}
               >
-                복약 완료
+                {record.is_taken ? "기록 완료" : "복약 완료"}
               </button>
             </div>
           ))}
