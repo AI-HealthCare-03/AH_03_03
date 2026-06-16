@@ -146,9 +146,7 @@ class EmailService:
         if action_url:
             escaped_action_url = escape(action_url, quote=True)
             html_body += (
-                f'<p><a href="{escaped_action_url}" target="_blank" rel="noopener noreferrer">'
-                "알림 확인하기"
-                "</a></p>"
+                f'<p><a href="{escaped_action_url}" target="_blank" rel="noopener noreferrer">알림 확인하기</a></p>'
             )
         html_body += (
             "<p>본 메일은 <strong>Health Ladder</strong> 서비스 알림 설정에 따라 발송되었습니다.</p>"

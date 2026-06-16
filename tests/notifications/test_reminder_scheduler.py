@@ -142,7 +142,9 @@ async def test_email_channel_reminder_records_skipped_when_email_is_not_sent(mon
         )
 
     monkeypatch.setattr(notification_service, "notification_repository", repository)
-    monkeypatch.setattr(notification_service, "deliver_notification_email_to_user", fake_deliver_notification_email_to_user)
+    monkeypatch.setattr(
+        notification_service, "deliver_notification_email_to_user", fake_deliver_notification_email_to_user
+    )
 
     created_count = await notification_service.process_due_reminder_schedules(now=now)
 

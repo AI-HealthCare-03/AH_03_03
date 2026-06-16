@@ -77,4 +77,3 @@ async def deliver_notification_email_to_user(
         provider="smtp",
         sent_at=datetime.now(config.TIMEZONE),
     )
-

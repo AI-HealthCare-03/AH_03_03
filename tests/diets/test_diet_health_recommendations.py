@@ -135,6 +135,16 @@ def _build(
     )
 
 
+@pytest.fixture(autouse=True)
+def _stable_diet_recommendation_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(service.config, "RAG_ENABLED", True)
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_RAG_STRATEGY", "keyword_only")
+    monkeypatch.setattr(service.config, "DIET_RECOMMENDATION_LLM_REWRITE_ENABLED", False)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_ENABLED", False)
+    monkeypatch.setattr(service.config, "RAG_EMBEDDING_PROVIDER", "disabled")
+    monkeypatch.setattr(service.config, "OPENAI_API_KEY", None)
+
+
 @pytest.mark.parametrize(
     ("name", "nutrition", "analysis_types", "expected_issue", "expected_challenge"),
     [

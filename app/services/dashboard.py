@@ -174,7 +174,9 @@ async def _build_user_challenge_dashboard_responses(user_challenges: list[Any]) 
                     "challenge_difficulty": challenge.difficulty.value
                     if hasattr(challenge.difficulty, "value")
                     else challenge.difficulty,
-                    "challenge_status": challenge.status.value if hasattr(challenge.status, "value") else challenge.status,
+                    "challenge_status": challenge.status.value
+                    if hasattr(challenge.status, "value")
+                    else challenge.status,
                     "challenge_duration_days": challenge.duration_days,
                 }
             )
