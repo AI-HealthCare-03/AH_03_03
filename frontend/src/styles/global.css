@@ -1455,7 +1455,7 @@ pre {
 .metric-summary-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(5, minmax(132px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .dashboard-summary-card,
@@ -1804,6 +1804,8 @@ pre {
 
 .dashboard-chart-panel .line-chart {
   min-width: 0;
+  width: 100%;
+  height: auto;
 }
 
 .dashboard-chart-stat {
@@ -3167,8 +3169,8 @@ a:hover .mini-card {
 
 .line-chart {
   display: block;
-  max-width: 100%;
-  height: auto;
+  width: 100%;
+  height: 180px;
 }
 
 .line-chart-grid {
@@ -5158,6 +5160,30 @@ input:-webkit-autofill:focus {
     padding-right: 1rem;
     overflow-wrap: break-word;
     word-break: keep-all;
+  }
+  .dashboard-summary-strip,
+  .metric-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-analysis-layout {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-chart-panels {
+    grid-template-columns: 1fr;
+  }
+  .line-chart-wrap {
+    overflow-x: auto;
+  }
+
+  .line-chart {
+    width: 100%;
+    height: 180px;
+  }
+  .dashboard-chart-panel {
+    min-height: 0;
+  }
+  .chat-example-grid {
+    grid-template-columns: 1fr;
   }
 }
 
