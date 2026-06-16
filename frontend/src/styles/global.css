@@ -1416,7 +1416,7 @@ pre {
 .metric-summary-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  grid-template-columns: repeat(5, minmax(132px, 1fr));
 }
 
 .dashboard-summary-card,
@@ -1559,7 +1559,7 @@ pre {
 .dashboard-analysis-layout {
   display: grid;
   gap: 16px;
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: 190px minmax(0, 1fr);
 }
 
 .dashboard-analysis-board {
@@ -1619,7 +1619,6 @@ pre {
 .dashboard-tip-list {
   display: grid;
   gap: 10px;
-  overflow: hidden;
 }
 
 .dashboard-metric-menu button,
@@ -1918,12 +1917,12 @@ pre {
   align-items: center;
   display: grid;
   gap: 16px;
-  grid-template-columns: 150px minmax(0, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
 }
 
 .dashboard-primary-grid .dashboard-diet-summary {
   align-items: stretch;
-  grid-template-columns: 150px minmax(0, 1.1fr) minmax(240px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
 }
 
 .dashboard-diet-summary p {
@@ -4243,6 +4242,7 @@ input:-webkit-autofill:focus {
 }
 
 .filter-tabs {
+  margin-bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -5006,6 +5006,7 @@ input:-webkit-autofill:focus {
   }
 
   .filter-tabs {
+  margin-bottom: 12px;
     flex-wrap: nowrap;
     margin-inline: -2px;
     overflow-x: auto;

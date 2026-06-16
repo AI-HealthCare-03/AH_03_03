@@ -13,7 +13,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 import { isHeicFile } from "../utils/files";
-import { formatDateTime, mealTypeLabel, scoreBadgeClass } from "../utils/format";
+import { formatDateTime, mealTypeLabel } from "../utils/format";
 
 type DietRecord = Record<string, unknown>;
 
@@ -397,7 +397,7 @@ export default function DietPage() {
           <p>식단 사진을 등록하고 영양 정보와 개선 포인트를 확인합니다.</p>
         </div>
       </header>
-    <div className="page-grid">
+    <div className="page-grid" style={{ gridTemplateColumns: "1fr" }}>
       {error && <ErrorMessage message={error} />}
       {canRetryAnalysis ? (
         <div className="button-row">
@@ -507,12 +507,10 @@ export default function DietPage() {
         )}
         {analysisResult && (
           <div className="card-list">
-            <div className="score-panel">
-              <span>식단 점수</span>
-              <strong>{String(analysisResult.diet_score ?? "-")}</strong>
+            <div className="mini-card">
               <p>{String(analysisResult.diet_feedback ?? "분석 결과를 확인해보세요.")}</p>
             </div>
-            <div className="mini-card">
+            <div className="mini-card" style={{ padding: "10px 14px" }}>
               {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
                 <img
                   alt="업로드한 식단 사진"
@@ -670,7 +668,6 @@ export default function DietPage() {
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
           {records.slice(0, 5).map((record) => {
-            const scoreRaw = record.diet_score != null ? Number(record.diet_score) : null;
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
@@ -681,16 +678,10 @@ export default function DietPage() {
                   {isManual && <span className="badge badge-reference">직접 기록</span>}
                   {needsConfirmation && <span className="badge badge-reference">음식 후보 확인 필요</span>}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                  <strong>{dietRecordDisplayTitle(record)}</strong>
-                  {scoreRaw !== null ? (
-                    <span className={`badge ${needsConfirmation ? "badge-reference" : scoreBadgeClass(scoreRaw)}`}>
-                      {needsConfirmation ? `참고 ${scoreRaw}점` : `${scoreRaw}점`}
-                    </span>
-                  ) : isManual ? (
-                    <span className="badge badge-reference">점수 미산정</span>
-                  ) : null}
-                </div>
+                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                    <strong>{dietRecordDisplayTitle(record)}</strong>
+                    <span className="muted" style={{ fontSize: "12px" }}>상세보기 →</span>
+                  </div>
                 {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
             );
