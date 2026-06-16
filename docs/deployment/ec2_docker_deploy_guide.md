@@ -40,7 +40,7 @@ Nginx :80 / :443
 - Docker Engine과 Docker Compose plugin 사용
 - EC2 public IPv4 확인
 - EBS/volume 삭제 전 PostgreSQL backup 계획 수립
-- S3 storage 사용 시 private bucket과 EC2 IAM Role 권한 준비
+- MVP local storage 기준으로 Docker volume 보존 계획 수립. S3 storage로 전환할 때만 private bucket과 EC2 IAM Role 권한 준비
 
 EC2 내부에서 `postgres`, `redis`, `fastapi`, `ai-worker`, `frontend`, `nginx`, `certbot` 컨테이너를 Compose로 실행합니다. 이번 MVP 배포 기준에서는 RDS/ElastiCache가 아니라 EC2 내부 Compose service를 사용합니다.
 
@@ -143,9 +143,20 @@ NGINX_CONF=../nginx/prod_https.conf
 - `SMTP_FROM_EMAIL`
 - `OPENAI_API_KEY` 또는 사용하는 LLM provider secret
 - `LANGFUSE_*`를 사용하는 경우
-- `S3_BUCKET_NAME`
+- `S3_BUCKET_NAME`은 `STORAGE_BACKEND=s3`를 선택할 때만 필요
 
 Brevo를 쓰는 경우에도 이 프로젝트에서는 전용 Brevo API key 연동이 아니라 SMTP provider 설정으로 취급합니다. Twilio/SMS는 현재 MVP 운영 필수 범위가 아니며, 관련 값은 optional로 둡니다.
+
+MVP 운영 기준 storage:
+
+```env
+STORAGE_BACKEND=local
+UPLOAD_STORAGE_DIR=var/uploads
+LOCAL_STORAGE_ROOT=var/storage
+S3_BUCKET_NAME=
+```
+
+local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다. OCR/검진 업로드가 500으로 실패하면 먼저 운영 `.prod.env`의 storage 값을 확인합니다.
 
 ## 8. Docker image pull/build 정책
 
@@ -164,7 +175,14 @@ EC2에서는 pull:
 make prod-pull
 ```
 
-기본 이미지 tag는 README와 Makefile의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 기준을 따릅니다.
+운영 서버가 실제로 pull하는 이미지 tag는 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 기준을 따릅니다. 같은 tag를 반복 재사용하면 EC2 release 브랜치는 최신이어도 예전 frontend image가 계속 서빙될 수 있으므로, 배포마다 `v1.0.1` 또는 `20260616-1` 같은 새 tag를 발급하고 Docker Hub push 후 `.prod.env`의 세 version 값을 함께 갱신합니다.
+
+frontend 정적 bundle 반영 여부는 배포 후 컨테이너 내부 asset hash로 확인합니다.
+
+```bash
+docker inspect frontend --format 'IMAGE={{.Config.Image}} CREATED={{.Created}}'
+docker exec frontend ls -al /usr/share/nginx/html/assets | grep -E 'index-|ExamOcrPage|AdminDashboard|AdminFaq' || true
+```
 
 ## 9. Docker Compose prod 실행
 
@@ -229,9 +247,10 @@ prod compose의 Nginx는 외부 `80/443`을 노출합니다.
 4. `make prod-health` 또는 `curl -fsS http://localhost/api/v1/system/health`로 HTTP health를 확인합니다.
 5. `/.well-known/acme-challenge/`가 Nginx에서 webroot로 제공되는지 확인합니다.
 6. certbot webroot 방식으로 인증서를 발급합니다.
-7. `NGINX_CONF=../nginx/prod_https.conf`로 전환합니다.
-8. Nginx를 재시작하거나 reload합니다.
-9. HTTPS health check를 확인합니다.
+7. `make prod-certbot-tls-assets`로 Nginx HTTPS 보조 TLS 파일을 certbot volume에 준비합니다.
+8. `NGINX_CONF=../nginx/prod_https.conf`로 전환합니다.
+9. Nginx를 재시작하거나 reload합니다.
+10. HTTPS health check를 확인합니다.
 
 certbot 예시:
 
@@ -252,6 +271,8 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml run 
 ```
 
 `scripts/certbot.sh`는 legacy interactive reference입니다. 현재 표준 배포 흐름은 `.prod.env`와 `infra/docker/docker-compose.prod.yml` 기준 문서를 따릅니다.
+
+인증서 발급과 HTTPS 전환의 실제 운영 절차는 `docs/deployment/release_deploy_runbook.md`를 우선 확인합니다.
 
 ## 13. health check
 

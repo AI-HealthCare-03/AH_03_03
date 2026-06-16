@@ -19,6 +19,16 @@ kdu0312/ai-health:ai-v1.0.0
 kdu0312/ai-health:frontend-v1.0.0
 ```
 
+운영 compose가 pull하는 image version은 `.prod.env`의 아래 값으로 결정합니다.
+
+```env
+APP_VERSION=v1.0.1
+AI_WORKER_VERSION=v1.0.1
+FRONTEND_VERSION=v1.0.1
+```
+
+같은 tag(`v1.0.0` 등)를 반복해서 재사용하면 EC2의 release 브랜치는 최신이어도 Docker Hub의 frontend image가 예전 build일 수 있습니다. 운영 배포마다 `v1.0.1` 같은 증가 tag 또는 `20260616-1` 같은 배포 날짜 tag를 새로 만들고, 로컬 build/push와 EC2 `.prod.env`를 같은 값으로 맞춥니다.
+
 최종 운영 확인 결과 기준:
 
 ```bash
@@ -54,6 +64,30 @@ git log --oneline -5
 git push origin release
 ```
 
+운영 image build/push는 release 브랜치에서 새 tag로 수행합니다. 아래 예시는 세 image를 같은 배포 tag로 맞추는 방식입니다.
+Makefile image target은 `.prod.env` 전체를 자동으로 source하지 않습니다. secret 노출을 피하기 위해 build/push에 필요한 version 값만 shell에서 export하거나 command line 변수로 넘깁니다.
+
+```bash
+export APP_VERSION=v1.0.1
+export AI_WORKER_VERSION=v1.0.1
+export FRONTEND_VERSION=v1.0.1
+make image-tags
+make image-build-check
+make image-push
+```
+
+날짜 tag를 쓸 때도 세 값을 같은 배포 단위로 맞춥니다.
+
+```bash
+export APP_VERSION=20260616-1
+export AI_WORKER_VERSION=20260616-1
+export FRONTEND_VERSION=20260616-1
+make image-tags
+make image-build-push
+```
+
+`make image-push`와 `make image-build-push`는 app, ai-worker, frontend 세 image를 모두 대상으로 합니다. Docker Hub token/password는 shell history나 문서에 남기지 않습니다.
+
 ## 3. EC2 반영 절차
 
 운영 서버의 실제 `.prod.env`는 Git에 없으므로 먼저 백업합니다.
@@ -75,6 +109,25 @@ compose 유효성 확인:
 ```bash
 docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml config --quiet
 ```
+
+새 image tag를 배포하는 경우 `.prod.env`에서 image version만 새 tag로 맞춥니다. 값 자체는 운영 서버의 `.prod.env`에만 저장하고 Git에 커밋하지 않습니다.
+
+```env
+APP_VERSION=v1.0.1
+AI_WORKER_VERSION=v1.0.1
+FRONTEND_VERSION=v1.0.1
+```
+
+MVP 운영 storage는 local 기준으로 맞춥니다. OCR/검진 파일 업로드가 S3 설정 누락 때문에 500으로 실패하지 않도록 아래 값을 확인합니다.
+
+```env
+STORAGE_BACKEND=local
+UPLOAD_STORAGE_DIR=var/uploads
+LOCAL_STORAGE_ROOT=var/storage
+S3_BUCKET_NAME=
+```
+
+local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다. S3로 전환할 때만 `STORAGE_BACKEND=s3`와 private bucket/IAM 권한을 준비합니다.
 
 ## 4. Docker 권한 확인
 
@@ -106,9 +159,12 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml ps
 `make prod-up`은 `ai-health-shared` external network가 없으면 먼저 생성합니다.
 
 ```bash
+make prod-pull
 make prod-up
 make prod-migrate
 ```
+
+`make prod-pull`은 `infra/docker/docker-compose.prod.yml`에 정의된 service image를 pull합니다. 이때 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 값이 Docker Hub에 push된 tag와 일치해야 합니다.
 
 최초 운영 DB에 챌린지 seed가 꼭 필요하고 운영자가 명시적으로 승인한 경우에만 실행합니다.
 
@@ -123,6 +179,15 @@ make prod-health
 curl -fsS http://localhost/api/v1/system/health
 curl -fsS http://healthladder.duckdns.org/api/v1/system/health
 ```
+
+frontend image가 최신 build인지 asset hash를 확인합니다.
+
+```bash
+docker inspect frontend --format 'IMAGE={{.Config.Image}} CREATED={{.Created}}'
+docker exec frontend ls -al /usr/share/nginx/html/assets | grep -E 'index-|ExamOcrPage|AdminDashboard|AdminFaq' || true
+```
+
+로컬 최신 build의 `frontend/dist/assets` hash와 EC2 frontend 컨테이너의 hash가 다르면, EC2 코드가 최신이어도 frontend Docker image tag가 예전 build를 가리키는 상태입니다. 예전 admin asset(`AdminDashboard`, `AdminFaq`)이 남아 있으면 stale frontend image를 우선 의심합니다. 이 경우 새 frontend tag를 build/push하고 `.prod.env`의 `FRONTEND_VERSION`을 새 tag로 바꾼 뒤 다시 pull/up 합니다.
 
 ## 6. HTTP Bootstrap
 
@@ -288,6 +353,45 @@ curl -I https://healthladder.duckdns.org
 - `strict-transport-security` 헤더 확인
 
 ## 12. 자주 발생한 장애 대응
+
+### EC2 release는 최신인데 화면이 예전 버전으로 보임
+
+Git branch 최신화는 compose 파일과 문서만 갱신합니다. 브라우저에 보이는 정적 파일은 `frontend` Docker image 안에 들어 있으므로 Docker Hub의 `frontend-${FRONTEND_VERSION}` image가 최신 release build여야 합니다.
+
+확인:
+
+```bash
+docker inspect frontend --format 'IMAGE={{.Config.Image}} CREATED={{.Created}}'
+docker exec frontend ls -al /usr/share/nginx/html/assets | grep -E 'index-|ExamOcrPage|AdminDashboard|AdminFaq' || true
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml images
+```
+
+대응:
+
+1. 로컬 release에서 새 `FRONTEND_VERSION` tag로 frontend를 포함한 세 image를 build/push합니다.
+2. EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`을 새 tag로 맞춥니다.
+3. EC2에서 image를 다시 pull하고 컨테이너를 재생성합니다.
+
+```bash
+make prod-pull
+make prod-up
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml up -d --force-recreate frontend nginx
+```
+
+### OCR 또는 검진 업로드가 500으로 실패
+
+MVP 운영 기준은 local storage입니다. S3를 쓰지 않는 상태에서 `STORAGE_BACKEND=s3`이거나 `S3_BUCKET_NAME`이 필요한 경로로 동작하면 OCR/업로드가 500으로 실패할 수 있습니다.
+
+운영 `.prod.env`에서 아래 값을 확인합니다. 실제 secret 값은 출력하지 않습니다.
+
+```env
+STORAGE_BACKEND=local
+UPLOAD_STORAGE_DIR=var/uploads
+LOCAL_STORAGE_ROOT=var/storage
+S3_BUCKET_NAME=
+```
+
+local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다.
 
 ### SECRET_KEY must be set to a strong non-default value in production
 

@@ -67,19 +67,24 @@ make dev-restart-nginx
 
 운영 compose는 EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다.
 배포 전 app, ai-worker, frontend image가 같은 tag 규칙으로 준비되어야 합니다.
+같은 `v1.0.0` tag를 반복 재사용하지 말고 배포마다 새 version을 정합니다.
 
 - [ ] 배포용 이미지 build 검증
 
 ```bash
+export APP_VERSION=v1.0.1
+export AI_WORKER_VERSION=v1.0.1
+export FRONTEND_VERSION=v1.0.1
+make image-tags
 make image-build-check
 ```
 
 - [ ] 이미지 architecture 확인
 
 ```bash
-docker image inspect kdu0312/ai-health:app-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-docker image inspect kdu0312/ai-health:ai-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:app-${APP_VERSION} --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:ai-${AI_WORKER_VERSION} --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:frontend-${FRONTEND_VERSION} --format '{{.Os}}/{{.Architecture}}'
 ```
 
 기대값:
@@ -91,9 +96,15 @@ linux/amd64
 - [ ] Docker Hub push
 
 ```bash
-docker push kdu0312/ai-health:app-v1.0.0
-docker push kdu0312/ai-health:ai-v1.0.0
-docker push kdu0312/ai-health:frontend-v1.0.0
+make image-push
+```
+
+- [ ] EC2 `.prod.env`의 image version 갱신
+
+```env
+APP_VERSION=v1.0.1
+AI_WORKER_VERSION=v1.0.1
+FRONTEND_VERSION=v1.0.1
 ```
 
 ## 4. .prod.env 확인

@@ -230,7 +230,7 @@ langfuse-restart:
 
 # Prod compose convenience
 # Uses infra/docker/docker-compose.prod.yml and pulls prebuilt registry images.
-.PHONY: prod-network prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed danger-prod-seed prod-health prod-release-db
+.PHONY: prod-network prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed danger-prod-seed prod-health prod-certbot-tls-assets prod-release-db
 prod-network:
 	docker network inspect $(PROD_NETWORK) >/dev/null 2>&1 || docker network create $(PROD_NETWORK) >/dev/null
 
@@ -260,12 +260,16 @@ prod-health:
 	port=$${port:-80}; \
 	curl -fsS http://localhost:$${port}/api/v1/system/health
 
+prod-certbot-tls-assets: prod-network
+	$(PROD_COMPOSE) run --rm --no-deps --entrypoint sh certbot -c 'mkdir -p /etc/letsencrypt && printf "%s\n" "ssl_session_cache shared:le_nginx_SSL:10m;" "ssl_session_timeout 1440m;" "ssl_session_tickets off;" "ssl_protocols TLSv1.2 TLSv1.3;" "ssl_prefer_server_ciphers off;" > /etc/letsencrypt/options-ssl-nginx.conf'
+	$(PROD_COMPOSE) run --rm --no-deps --entrypoint python certbot -c 'from pathlib import Path; from cryptography.hazmat.primitives.asymmetric import dh; from cryptography.hazmat.primitives import serialization; p=Path("/etc/letsencrypt"); p.mkdir(parents=True, exist_ok=True); dh_path=p/"ssl-dhparams.pem"; dh_path.exists() or dh_path.write_bytes(dh.generate_parameters(generator=2, key_size=2048).parameter_bytes(serialization.Encoding.PEM, serialization.ParameterFormat.PKCS3)); print("certbot TLS assets ready")'
+
 prod-release-db: prod-migrate
 	@echo "prod-release-db now runs migration only. Use danger-prod-seed separately when production seed is explicitly approved."
 
 # Release image build
-# prod compose is pull-only; these targets verify the images that will be pushed separately.
-.PHONY: image-build-check image-build-native-check image-build-app image-build-ai image-build-frontend image-buildx-amd64-check image-tags
+# prod compose is pull-only; build/push all three service images before EC2 pulls them.
+.PHONY: image-build-check image-build-native-check image-build-app image-build-ai image-build-frontend image-buildx-amd64-check image-push image-build-push image-tags
 # Deployment build check alias. Uses linux/amd64 buildx for EC2 Ubuntu amd64 targets.
 image-build-check: image-buildx-amd64-check
 
@@ -289,6 +293,14 @@ image-buildx-amd64-check:
 	docker buildx build --platform $(DOCKER_PLATFORM) -f frontend/Dockerfile -t $(FRONTEND_IMAGE) --load \
 		--build-arg VITE_API_BASE_URL=$(VITE_API_BASE_URL) \
 		.
+
+image-push:
+	@echo "Pushing release images. Set APP_VERSION, AI_WORKER_VERSION, and FRONTEND_VERSION to a fresh tag for production deploys."
+	docker push $(APP_IMAGE)
+	docker push $(AI_WORKER_IMAGE)
+	docker push $(FRONTEND_IMAGE)
+
+image-build-push: image-buildx-amd64-check image-push
 
 image-tags:
 	@printf '%s\n' "$(APP_IMAGE)" "$(AI_WORKER_IMAGE)" "$(FRONTEND_IMAGE)"

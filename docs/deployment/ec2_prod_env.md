@@ -8,11 +8,11 @@
 
 - 시연/운영 스택 기준 파일: `infra/docker/docker-compose.prod.yml`
 - 로컬 개발 스택 기준 파일: `infra/docker/docker-compose.dev.yml`
-- 이번 부트캠프 데모 운영 범위는 AWS `EC2 + S3`만 사용합니다.
+- 이번 MVP 운영 범위는 AWS `EC2 + Docker Compose + local storage` 기준입니다.
 - EC2 단일 서버에서 Docker Compose로 `nginx`, `frontend`, `fastapi`, `ai-worker`, `postgres`, `redis` 컨테이너를 실행합니다.
 - PostgreSQL은 EC2 내부 `postgres` 컨테이너와 `postgres_data` Docker volume으로 운영합니다.
 - Redis Stream은 EC2 내부 `redis` 컨테이너와 `redis_data` Docker volume으로 운영합니다.
-- 업로드 파일은 S3 private bucket에 저장합니다.
+- 업로드 파일은 기본적으로 EC2 Docker volume의 local storage에 저장합니다.
 - RDS와 ElastiCache는 이번 데모 운영 범위에서 제외합니다. 장기 운영 전환 시 별도 운영 설계로 검토할 수 있습니다.
 - prod compose는 외부에 `nginx:80`, `nginx:443`만 노출합니다.
 - Postgres와 Redis는 Docker network 내부 `expose`만 사용하며 EC2 보안 그룹에서 직접 열지 않습니다.
@@ -37,7 +37,7 @@ cp envs/example.prod.env .prod.env
 - `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`
 - `OPENAI_API_KEY` 또는 사용하는 LLM provider secret
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`를 사용하는 경우
-- `S3_BUCKET_NAME`
+- `S3_BUCKET_NAME`은 `STORAGE_BACKEND=s3`를 선택할 때만 필요
 - `NGINX_CONF`는 기본 `../nginx/prod_https.conf`, 최초 인증서 발급 전에는 `../nginx/prod_http.conf`
 
 `healthladder.duckdns.org` 배포 기준 URL 값:
@@ -71,9 +71,14 @@ VITE_API_BASE_URL=/api/v1
 | AI Worker | `${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}` | `ai_runtime/Dockerfile` | repo root |
 | Frontend | `${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}` | `frontend/Dockerfile` | repo root |
 
+운영 배포마다 같은 tag를 재사용하지 말고 `v1.0.1` 또는 `20260616-1` 같은 새 tag를 정한다. EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`은 Docker Hub에 push된 tag와 일치해야 한다.
+
 로컬 build 검증:
 
 ```bash
+export APP_VERSION=v1.0.1
+export AI_WORKER_VERSION=v1.0.1
+export FRONTEND_VERSION=v1.0.1
 make image-tags
 make image-build-check
 ```
@@ -114,9 +119,7 @@ docker image inspect ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VER
 Docker Hub push는 build 검증과 tag 확인 후 별도로 실행한다. push 전에는 Docker Hub 계정/레포/tag가 prod compose와 일치하는지 확인한다.
 
 ```bash
-docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:app-${APP_VERSION}
-docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:ai-${AI_WORKER_VERSION}
-docker push ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
+make image-push
 ```
 
 ### Frontend build args
@@ -161,7 +164,20 @@ docker run --rm ${DOCKER_USER}/${DOCKER_REPOSITORY}:frontend-${FRONTEND_VERSION}
 
 ## Storage 기준
 
-운영에서는 `STORAGE_BACKEND=s3`를 기본으로 사용합니다. 업로드 파일은 DB backup에 포함되지 않고 S3 bucket에 별도로 보존됩니다.
+MVP 운영에서는 `STORAGE_BACKEND=local`을 기본으로 사용합니다. OCR/검진 파일 업로드가 S3 설정 누락 때문에 500으로 실패하지 않도록 운영 `.prod.env`에는 아래 값을 명시합니다.
+
+```env
+STORAGE_BACKEND=local
+UPLOAD_STORAGE_DIR=var/uploads
+LOCAL_STORAGE_ROOT=var/storage
+S3_BUCKET_NAME=
+```
+
+`S3_BUCKET_NAME`은 local storage 사용 시 비어 있어도 됩니다. prod compose는 `/app/var/uploads`, `/app/var/storage`를 Docker volume으로 보존합니다.
+
+### S3 storage
+
+S3로 전환할 때만 `STORAGE_BACKEND=s3`와 private bucket 이름을 설정합니다.
 
 ```env
 STORAGE_BACKEND=s3
@@ -172,17 +188,6 @@ S3_PRESIGNED_URL_EXPIRES_SECONDS=3600
 ```
 
 S3 object는 private 전제로 사용합니다. EC2에는 S3 접근 권한을 가진 IAM Role을 붙이고, AWS access key/secret을 `.prod.env`에 넣지 않는 구성을 우선합니다.
-
-### Local storage
-
-로컬 개발 또는 S3 준비 전 임시 확인에서는 `STORAGE_BACKEND=local`을 사용할 수 있습니다. 다만 이번 데모 운영 기준은 S3입니다.
-
-```env
-STORAGE_BACKEND=local
-LOCAL_STORAGE_ROOT=var/storage
-```
-
-local backend는 public URL을 만들지 않으며, prod compose는 `/app/var/storage`를 Docker volume으로 보존합니다. EC2 인스턴스나 volume이 삭제되면 local 파일도 함께 사라질 수 있으므로 운영 업로드 파일은 S3에 저장합니다.
 
 ## Database and Redis 기준
 
@@ -391,7 +396,7 @@ cat var/backups/postgres/backup.sql | docker compose --env-file .prod.env -f inf
 
 복구는 대상 DB 상태를 확인한 뒤 진행합니다. 기존 데이터가 있는 DB에 그대로 복구하면 충돌이 날 수 있습니다. `restore_postgres.sh`는 파일 경로 인자를 요구하고 확인 문구를 입력해야 진행됩니다.
 
-S3 업로드 파일은 S3 bucket에 저장되므로 PostgreSQL dump에는 포함되지 않습니다. DB 백업과 S3 bucket 보존/버전 관리 정책은 별도로 관리해야 합니다. 백업 파일을 S3에 올리는 자동화는 이번 데모 운영 필수 범위가 아니며, 필요하면 운영자가 별도 CLI/cron으로 구성합니다.
+local storage 업로드 파일은 PostgreSQL dump에 포함되지 않고 Docker volume에 남습니다. DB backup과 별도로 `upload_volume`, `storage_volume` 보존 정책을 관리해야 합니다. S3로 전환한 경우에는 S3 bucket 보존/버전 관리 정책을 별도로 관리합니다.
 
 ## Health check
 
@@ -450,7 +455,7 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml logs
 - OCR/식단/분석 job 멈춤: `ai-worker` 로그, `redis` ping, Redis Stream pending/DLQ 상태
 - Redis Stream 처리 지연: `ai-worker` 로그와 `redis` 로그를 함께 확인
 - DB 연결 실패: `postgres` 로그, `pg_isready`, `.prod.env`의 `DB_HOST=postgres` 확인
-- S3 업로드 실패: `fastapi` 또는 `ai-worker` 로그, `STORAGE_BACKEND=s3`, `S3_BUCKET_NAME`, EC2 IAM Role 권한 확인
+- OCR/업로드 500: MVP 운영 기준 `STORAGE_BACKEND=local`, `UPLOAD_STORAGE_DIR=var/uploads`, `LOCAL_STORAGE_ROOT=var/storage` 확인. S3를 쓰는 경우에만 `S3_BUCKET_NAME`, EC2 IAM Role 권한 확인
 
 ## EC2 보안 그룹 포트
 
@@ -492,6 +497,6 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml conf
 - `PASSWORD_RESET_DEBUG=false`
 - `REFRESH_TOKEN_COOKIE_SECURE=true`
 - `CORS_ALLOW_ORIGINS`는 실제 프론트 도메인만 포함
-- `STORAGE_BACKEND=s3` 사용 시 private bucket과 IAM Role 권한 확인
+- MVP 기준은 `STORAGE_BACKEND=local`; S3 전환 시에만 private bucket과 IAM Role 권한 확인
 - AI provider flag는 비용/관측/secret 준비 후 단계적으로 활성화
 - Redis/Postgres는 EC2 외부로 직접 노출하지 않음
