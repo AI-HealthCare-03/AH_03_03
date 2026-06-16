@@ -135,7 +135,7 @@ export default function ChatbotPage() {
         </Link>
       </div>
 
-      <Card title="AI 대화">
+      <Card title="AI 건강 대화">
         <div className="chat-window">
           {messages.length === 0 && (
             <div className="chat-empty">
