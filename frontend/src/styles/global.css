@@ -4160,6 +4160,7 @@ input:-webkit-autofill:focus {
 }
 
 .filter-tabs {
+  margin-bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -4923,6 +4924,7 @@ input:-webkit-autofill:focus {
   }
 
   .filter-tabs {
+  margin-bottom: 12px;
     flex-wrap: nowrap;
     margin-inline: -2px;
     overflow-x: auto;
