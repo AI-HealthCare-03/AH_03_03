@@ -5175,6 +5175,8 @@ input:-webkit-autofill:focus {
   .mypage-health-grid {
     grid-template-columns: 1fr !important;
   }
+  .profile-actions-desktop { display: none !important; }
+  .profile-actions-mobile { display: flex !important; }
 }
 
 @media (max-width: 420px) {
