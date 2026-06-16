@@ -104,3 +104,35 @@ async def test_family_invite_message_includes_numeric_code_and_family_page_link(
     assert "/family/invitations/accept" not in html_body
     assert "거절" not in html_body
     assert "<strong>Health Ladder</strong>" in html_body
+
+
+@pytest.mark.asyncio
+async def test_notification_email_message_includes_plain_text_and_html_action_link(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, MIMEMultipart] = {}
+    action_url = "http://localhost:8080/notifications"
+
+    def fake_send_smtp(self: EmailService, message: MIMEMultipart) -> None:
+        captured["message"] = message
+
+    monkeypatch.setattr("app.services.email_service.config.EMAIL_ENABLED", True)
+    monkeypatch.setattr(EmailService, "_is_configured", lambda self: True)
+    monkeypatch.setattr(EmailService, "_send_smtp", fake_send_smtp)
+
+    sent = await EmailService().send_notification_email(
+        "user@example.com",
+        title="챌린지 알림",
+        message="오늘 챌린지를 기록해보세요.",
+        action_url=action_url,
+    )
+
+    assert sent is True
+    message = captured["message"]
+    assert message["Subject"] == "[Health Ladder] 챌린지 알림"
+    text_body, html_body = [part.get_payload(decode=True).decode("utf-8") for part in message.get_payload()]
+    assert "챌린지 알림" in text_body
+    assert "오늘 챌린지를 기록해보세요." in text_body
+    assert action_url in text_body
+    assert f'<a href="{action_url}" target="_blank" rel="noopener noreferrer">알림 확인하기</a>' in html_body
+    assert "<strong>Health Ladder</strong>" in html_body

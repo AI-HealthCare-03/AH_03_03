@@ -19,12 +19,21 @@ from app.models.notifications import (
     ReminderSchedule,
 )
 from app.repositories import notification_repository
+from app.services.notification_email import NotificationEmailDeliveryResult, deliver_notification_email_to_user
 
 logger = logging.getLogger(__name__)
 
 
 async def create_notification(user_id: int, request: NotificationCreateRequest) -> Notification:
-    return await notification_repository.create_notification(user_id, request.model_dump())
+    notification_data = request.model_dump(exclude={"send_email", "action_url"})
+    notification = await notification_repository.create_notification(user_id, notification_data)
+    if request.send_email:
+        await _enqueue_notification_email_delivery(
+            user_id=user_id,
+            notification=notification,
+            action_url=request.action_url,
+        )
+    return notification
 
 
 async def get_notification(notification_id: int) -> Notification | None:
@@ -147,6 +156,14 @@ async def _process_due_reminder_schedule(schedule: ReminderSchedule, now: dateti
     )
 
     channel = _notification_channel(schedule.channel)
+    delivery_result = None
+    if channel == NotificationChannel.EMAIL:
+        delivery_result = await deliver_notification_email_to_user(
+            user_id=int(schedule.user_id),
+            title=schedule.title,
+            message=schedule.message,
+        )
+
     await record_notification_log(
         user_id=int(schedule.user_id),
         notification_id=int(notification.id),
@@ -157,8 +174,12 @@ async def _process_due_reminder_schedule(schedule: ReminderSchedule, now: dateti
         message_summary=_summary(schedule.message),
         related_type=schedule.related_type,
         related_id=schedule.related_id,
-        status=NotificationLogStatus.SENT,
-        sent_at=now,
+        status=delivery_result.status if delivery_result is not None else NotificationLogStatus.SENT,
+        provider=delivery_result.provider if delivery_result is not None else None,
+        error_code=delivery_result.error_code if delivery_result is not None else None,
+        error_message=delivery_result.error_message if delivery_result is not None else None,
+        sent_at=delivery_result.sent_at if delivery_result is not None else now,
+        failed_at=delivery_result.failed_at if delivery_result is not None else None,
     )
 
     await _advance_reminder_schedule(schedule, now)
@@ -280,3 +301,61 @@ async def record_notification_log(
         "failed_at": failed_at,
     }
     return await notification_repository.create_notification_log(user_id, data)
+
+
+async def update_notification_log_with_email_result(
+    notification_log_id: int,
+    delivery_result: NotificationEmailDeliveryResult,
+) -> NotificationLog | None:
+    return await notification_repository.update_notification_log(
+        notification_log_id,
+        {
+            "status": delivery_result.status,
+            "provider": delivery_result.provider,
+            "error_code": delivery_result.error_code,
+            "error_message": delivery_result.error_message,
+            "sent_at": delivery_result.sent_at,
+            "failed_at": delivery_result.failed_at,
+        },
+    )
+
+
+async def _enqueue_notification_email_delivery(
+    *,
+    user_id: int,
+    notification: Notification,
+    action_url: str | None,
+) -> None:
+    log = await record_notification_log(
+        user_id=user_id,
+        notification_id=int(notification.id),
+        notification_type=notification.notification_type,
+        channel=NotificationChannel.EMAIL,
+        title=notification.title,
+        message_summary=_summary(notification.message),
+        related_type=notification.related_type,
+        related_id=notification.related_id,
+        status=NotificationLogStatus.PENDING,
+    )
+    try:
+        from app.services import service_jobs as service_job_service
+
+        await service_job_service.enqueue_notification_email_send(
+            user_id=user_id,
+            notification_id=int(notification.id),
+            notification_log_id=int(log.id),
+            title=notification.title,
+            message=notification.message,
+            action_url=action_url,
+        )
+    except Exception:
+        logger.exception("Failed to enqueue notification email job", extra={"notification_id": notification.id})
+        await notification_repository.update_notification_log(
+            int(log.id),
+            {
+                "status": NotificationLogStatus.FAILED,
+                "error_code": "notification_email_enqueue_failed",
+                "error_message": "notification_email_enqueue_failed",
+                "failed_at": datetime.now(config.TIMEZONE),
+            },
+        )

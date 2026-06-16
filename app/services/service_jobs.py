@@ -11,6 +11,7 @@ EMAIL_VERIFICATION_SEND_JOB_TYPE = "email.verification.send"
 PASSWORD_RESET_EMAIL_SEND_JOB_TYPE = "password_reset.email.send"
 FAMILY_INVITE_EMAIL_SEND_JOB_TYPE = "family.invite.email.send"
 FAMILY_NOTIFICATION_CREATE_JOB_TYPE = "family.notification.create"
+NOTIFICATION_EMAIL_SEND_JOB_TYPE = "notification.email.send"
 
 
 class ServiceJobNonRetryableError(RuntimeError):
@@ -72,6 +73,32 @@ async def enqueue_family_notification_create(*, alert_type: str, user_challenge_
     )
 
 
+async def enqueue_notification_email_send(
+    *,
+    user_id: int,
+    notification_id: int,
+    notification_log_id: int,
+    title: str,
+    message: str,
+    action_url: str | None = None,
+) -> None:
+    await _create_service_job(
+        job_type=NOTIFICATION_EMAIL_SEND_JOB_TYPE,
+        user_id=user_id,
+        resource_id=notification_id,
+        request_payload={
+            "user_id": user_id,
+            "notification_id": notification_id,
+            "notification_log_id": notification_log_id,
+            "title": title,
+            "message": message,
+            "action_url": action_url,
+            "resource_type": "notification_email",
+            "idempotency_key": f"notification_email:{notification_id}:{notification_log_id}",
+        },
+    )
+
+
 async def handle_email_verification_send(job_id: int) -> dict[str, Any]:
     payload = await _job_payload(job_id)
     email = _required_str(payload, "email")
@@ -121,6 +148,32 @@ async def handle_family_invite_email_send(job_id: int) -> dict[str, Any]:
     except EmailDeliveryError:
         raise
     result = {"sent": sent, "recipient": recipient_email, "kind": "family_invite"}
+    await async_job_service.mark_success(job_id, result)
+    return result
+
+
+async def handle_notification_email_send(job_id: int) -> dict[str, Any]:
+    payload = await _job_payload(job_id)
+    user_id = _required_int(payload, "user_id")
+    notification_log_id = _required_int(payload, "notification_log_id")
+    await async_job_service.mark_processing(job_id)
+
+    from app.services import notification_email as notification_email_service
+    from app.services import notifications as notification_service
+
+    delivery_result = await notification_email_service.deliver_notification_email_to_user(
+        user_id=user_id,
+        title=_required_str(payload, "title"),
+        message=_required_str(payload, "message"),
+        action_url=_optional_str(payload, "action_url"),
+    )
+    await notification_service.update_notification_log_with_email_result(notification_log_id, delivery_result)
+
+    result = {
+        "sent": delivery_result.sent,
+        "status": delivery_result.status.value,
+        "kind": "notification_email",
+    }
     await async_job_service.mark_success(job_id, result)
     return result
 
@@ -177,6 +230,13 @@ def _required_str(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
     if value in (None, ""):
         raise ServiceJobNonRetryableError(f"missing_{key}")
+    return str(value)
+
+
+def _optional_str(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    if value in (None, ""):
+        return None
     return str(value)
 
 

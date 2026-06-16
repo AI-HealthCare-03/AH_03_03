@@ -19,6 +19,8 @@ class NotificationCreateRequest(BaseModel):
     message: str
     related_type: str | None = None
     related_id: int | None = None
+    send_email: bool = False
+    action_url: str | None = Field(default=None, max_length=500)
 
 
 class NotificationUpdateRequest(BaseModel):
