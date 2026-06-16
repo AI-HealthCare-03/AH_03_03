@@ -1,7 +1,7 @@
-"""Seed FAQ records for local MVP frontend demos.
+"""Seed FAQ records for MVP frontend demos.
 
-This script is for local MVP testing only. It is not intended for production or
-shared databases. FAQ rows are created idempotently by question.
+FAQ rows are created idempotently by question. For production/shared databases,
+run only through an explicitly approved danger target.
 """
 
 import asyncio
@@ -154,7 +154,7 @@ async def seed_faqs() -> None:
         await Tortoise.close_connections()
 
     print("===== MVP FAQ Seed =====")
-    print("This seed is for local MVP demos only.")
+    print("FAQ rows are created idempotently by question.")
     print(f"created_count: {created_count}")
     print(f"skipped_count: {skipped_count}")
 

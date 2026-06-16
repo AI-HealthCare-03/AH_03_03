@@ -27,6 +27,7 @@ COPY ./ai_runtime ./ai_runtime
 COPY ./docs/rag_sources ./docs/rag_sources
 COPY ./docs/data/challenges ./docs/data/challenges
 COPY ./scripts/seed_mvp_challenges.py ./scripts/seed_mvp_challenges.py
+COPY ./scripts/seed_mvp_faqs.py ./scripts/seed_mvp_faqs.py
 COPY ./scripts/rag ./scripts/rag
 
 # 5. 해당 이미지를 활용하여 도커컨테이너 실행시 실행되는 명령어입니다.

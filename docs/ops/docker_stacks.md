@@ -269,7 +269,7 @@ make prod-health
 
 `make prod-health`는 `.prod.env`의 `NGINX_HTTP_PORT`를 읽고, 값이 없으면 운영 기본 `80`으로 `http://localhost:80/api/v1/system/health`를 확인한다. HTTPS/certbot 전환 전에는 HTTP health가 먼저 성공해야 한다.
 
-운영 배포 target은 seed와 RAG ingest를 자동 실행하지 않는다. 초기 운영 DB에 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 `make danger-prod-seed`를 별도로 실행한다. 하위 호환용 `make prod-release-db`는 migration만 수행한다.
+운영 배포 target은 seed와 RAG ingest를 자동 실행하지 않는다. 초기 운영 DB에 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 `make danger-prod-seed-challenges`를 별도로 실행한다. FAQ 테이블은 migration으로 생성되지만 FAQ row는 별도 seed이므로, FAQ 목록이 비어 있고 운영자가 승인한 경우에만 `make danger-prod-seed-faqs`를 실행한다. 하위 호환용 `make danger-prod-seed`는 챌린지 seed alias이며, `make prod-release-db`는 migration만 수행한다.
 
 운영 실행 전 확인할 것:
 

@@ -222,7 +222,13 @@ make prod-migrate
 챌린지 seed가 꼭 필요한 초기 환경에서는 운영자가 명시적으로 승인한 뒤 danger target으로만 실행합니다.
 
 ```bash
-make danger-prod-seed
+make danger-prod-seed-challenges
+```
+
+FAQ 테이블은 migration으로 생성되지만 FAQ 목록 row는 별도 seed입니다. FAQ 목록이 비어 있고 초기 FAQ seed가 필요할 때만 실행합니다.
+
+```bash
+make danger-prod-seed-faqs
 ```
 
 ## 11. Nginx reverse proxy 구조

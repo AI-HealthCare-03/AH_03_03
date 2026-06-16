@@ -331,7 +331,13 @@ curl -fsS https://healthladder.duckdns.org/api/v1/system/health
 초기 환경에서 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 아래 danger target을 따로 실행합니다.
 
 ```bash
-make danger-prod-seed
+make danger-prod-seed-challenges
+```
+
+FAQ 테이블은 migration으로 생성되지만 FAQ row는 별도 seed입니다. FAQ 목록이 비어 있고 운영자가 승인한 경우에만 실행합니다.
+
+```bash
+make danger-prod-seed-faqs
 ```
 
 `make prod-release-db`는 하위 호환용으로 남아 있지만 이제 migration만 실행합니다. 운영/배포용 target에서는 seed와 RAG ingest를 자동 실행하지 않습니다.

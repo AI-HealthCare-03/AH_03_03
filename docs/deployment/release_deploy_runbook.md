@@ -166,10 +166,18 @@ make prod-migrate
 
 `make prod-pull`은 `infra/docker/docker-compose.prod.yml`에 정의된 service image를 pull합니다. 이때 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 값이 Docker Hub에 push된 tag와 일치해야 합니다.
 
+`make prod-migrate`는 FAQ 테이블을 만들지만 FAQ row를 넣지는 않습니다. FAQ 목록 데이터는 migration이 아니라 별도 seed입니다.
+
 최초 운영 DB에 챌린지 seed가 꼭 필요하고 운영자가 명시적으로 승인한 경우에만 실행합니다.
 
 ```bash
-make danger-prod-seed
+make danger-prod-seed-challenges
+```
+
+FAQ 목록이 비어 있고 운영자가 초기 FAQ seed를 승인한 경우에만 실행합니다.
+
+```bash
+make danger-prod-seed-faqs
 ```
 
 health 확인:

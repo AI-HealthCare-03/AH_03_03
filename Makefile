@@ -230,7 +230,7 @@ langfuse-restart:
 
 # Prod compose convenience
 # Uses infra/docker/docker-compose.prod.yml and pulls prebuilt registry images.
-.PHONY: prod-network prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed danger-prod-seed prod-health prod-certbot-tls-assets prod-release-db
+.PHONY: prod-network prod-pull prod-up prod-ps prod-logs prod-migrate prod-seed danger-prod-seed danger-prod-seed-challenges danger-prod-seed-faqs prod-health prod-certbot-tls-assets prod-release-db
 prod-network:
 	docker network inspect $(PROD_NETWORK) >/dev/null 2>&1 || docker network create $(PROD_NETWORK) >/dev/null
 
@@ -249,11 +249,17 @@ prod-logs:
 prod-migrate:
 	$(PROD_COMPOSE) exec -T fastapi uv run --no-sync aerich upgrade
 
-prod-seed: danger-prod-seed
+prod-seed: danger-prod-seed-challenges
 
-danger-prod-seed:
+danger-prod-seed: danger-prod-seed-challenges
+
+danger-prod-seed-challenges:
 	@echo "DANGER: this writes challenge seed data to the production DB. Run only for an explicitly approved initial seed."
 	$(PROD_COMPOSE) exec -T fastapi uv run --no-sync python scripts/seed_mvp_challenges.py
+
+danger-prod-seed-faqs:
+	@echo "DANGER: this writes FAQ seed data to the production DB. Run only for an explicitly approved initial seed."
+	$(PROD_COMPOSE) exec -T fastapi uv run --no-sync python scripts/seed_mvp_faqs.py
 
 prod-health:
 	@port=$$(awk -F= '/^NGINX_HTTP_PORT=/{print $$2; exit}' "$(PROD_ENV_FILE)" 2>/dev/null | tr -d '[:space:]"'); \
@@ -265,7 +271,7 @@ prod-certbot-tls-assets: prod-network
 	$(PROD_COMPOSE) run --rm --no-deps --entrypoint python certbot -c 'from pathlib import Path; from cryptography.hazmat.primitives.asymmetric import dh; from cryptography.hazmat.primitives import serialization; p=Path("/etc/letsencrypt"); p.mkdir(parents=True, exist_ok=True); dh_path=p/"ssl-dhparams.pem"; dh_path.exists() or dh_path.write_bytes(dh.generate_parameters(generator=2, key_size=2048).parameter_bytes(serialization.Encoding.PEM, serialization.ParameterFormat.PKCS3)); print("certbot TLS assets ready")'
 
 prod-release-db: prod-migrate
-	@echo "prod-release-db now runs migration only. Use danger-prod-seed separately when production seed is explicitly approved."
+	@echo "prod-release-db now runs migration only. Use danger-prod-seed-challenges or danger-prod-seed-faqs separately when production seed is explicitly approved."
 
 # Release image build
 # prod compose is pull-only; build/push all three service images before EC2 pulls them.
