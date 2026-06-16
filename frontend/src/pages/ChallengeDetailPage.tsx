@@ -485,6 +485,7 @@ export default function ChallengeDetailPage() {
   const { challengeId } = useParams();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [userChallenge, setUserChallenge] = useState<Challenge | null>(null);
+  const [hasRejoinableChallenge, setHasRejoinableChallenge] = useState(false);
   const [logs, setLogs] = useState<ChallengeLog[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -502,6 +503,7 @@ export default function ChallengeDetailPage() {
       setChallenge(challengeItem);
     } catch {
       setUserChallenge(null);
+      setHasRejoinableChallenge(false);
       setLogs([]);
       setError("챌린지 상세를 불러오지 못했습니다.");
       setLoading(false);
@@ -513,7 +515,11 @@ export default function ChallengeDetailPage() {
         myItems.find(
           (item) => Number(item.challenge_id) === Number(challengeId) && !isRejoinableChallengeStatus(item.status),
         ) ?? null;
+      const rejoinable = myItems.some(
+        (item) => Number(item.challenge_id) === Number(challengeId) && isRejoinableChallengeStatus(item.status),
+      );
       setUserChallenge(matched);
+      setHasRejoinableChallenge(!matched && rejoinable);
       if (matched?.id) {
         setLogs(await listChallengeLogs<ChallengeLog[]>(Number(matched.id)));
       } else {
@@ -521,6 +527,7 @@ export default function ChallengeDetailPage() {
       }
     } catch {
       setUserChallenge(null);
+      setHasRejoinableChallenge(false);
       setLogs([]);
     } finally {
       setLoading(false);
@@ -540,7 +547,11 @@ export default function ChallengeDetailPage() {
     setActionLoading("join");
     try {
       await joinChallenge(Number(challengeId));
-      setMessage("챌린지에 참여했습니다. 오늘 수행 기록을 남길 수 있습니다.");
+      setMessage(
+        hasRejoinableChallenge
+          ? "챌린지를 다시 시작했습니다. 오늘 수행 기록을 남길 수 있습니다."
+          : "챌린지에 참여했습니다. 오늘 수행 기록을 남길 수 있습니다.",
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "챌린지 참여 처리에 실패했습니다.");
@@ -734,7 +745,7 @@ export default function ChallengeDetailPage() {
             )}
             {!userChallenge && (
               <button disabled={actionLoading !== null} onClick={join} type="button">
-                {actionLoading === "join" ? "시작 중..." : "지금 수행하기"}
+                {actionLoading === "join" ? "시작 중..." : hasRejoinableChallenge ? "다시 참여하기" : "지금 수행하기"}
               </button>
             )}
             {active && (
