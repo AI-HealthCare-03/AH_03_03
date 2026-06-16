@@ -5090,7 +5090,7 @@ input:-webkit-autofill:focus {
   }
 
   .filter-tabs {
-  margin-bottom: 12px;
+    margin-bottom: 12px;
     flex-wrap: nowrap;
     margin-inline: -2px;
     overflow-x: auto;
@@ -5122,35 +5122,58 @@ input:-webkit-autofill:focus {
   .upload-mobile-hint {
     width: 100%;
   }
-  .brand { font-size: 16px; }
+
+  .brand {
+    font-size: 16px;
+  }
+
   .nav-logout-btn,
-  .desktop-nav-action { display: none; }
-  .health-tab-group { flex-direction: column; }
-  .health-tab-group > a { align-self: flex-start; }
+  .desktop-nav-action {
+    display: none;
+  }
+
+  .health-tab-group {
+    flex-direction: column;
+  }
+
+  .health-tab-group > a {
+    align-self: flex-start;
+  }
+
   .ocr-hint {
     flex-direction: column !important;
     align-items: stretch !important;
   }
+
   .ocr-hint .button {
     align-self: flex-end;
   }
+
   .form.two-col {
     grid-template-columns: 1fr;
   }
+
   .profile-action-row button {
     font-size: 13px;
     padding: 8px 10px;
     white-space: nowrap;
   }
+
   .profile-action-analyze {
     display: flex;
     gap: 8px;
   }
+
   .profile-action-analyze button {
     flex: 1;
   }
+
   .step-indicator__label {
     display: none;
+  }
+
+  .mypage-health-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 

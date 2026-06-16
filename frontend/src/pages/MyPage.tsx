@@ -445,7 +445,7 @@ export default function MyPage() {
           </Card>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        <div className="mypage-health-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         <Card
           title="기본 건강정보"
           actions={
