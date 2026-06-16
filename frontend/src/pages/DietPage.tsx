@@ -397,7 +397,7 @@ export default function DietPage() {
           <p>식단 사진을 등록하고 영양 정보와 개선 포인트를 확인합니다.</p>
         </div>
       </header>
-    <div className="page-grid">
+    <div className="page-grid" style={{ gridTemplateColumns: "1fr" }}>
       {error && <ErrorMessage message={error} />}
       {canRetryAnalysis ? (
         <div className="button-row">
