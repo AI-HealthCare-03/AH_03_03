@@ -678,9 +678,10 @@ export default function DietPage() {
                   {isManual && <span className="badge badge-reference">직접 기록</span>}
                   {needsConfirmation && <span className="badge badge-reference">음식 후보 확인 필요</span>}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                  <strong>{dietRecordDisplayTitle(record)}</strong>
-                </div>
+                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                    <strong>{dietRecordDisplayTitle(record)}</strong>
+                    <span className="muted" style={{ fontSize: "12px" }}>상세보기 →</span>
+                  </div>
                 {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
             );
