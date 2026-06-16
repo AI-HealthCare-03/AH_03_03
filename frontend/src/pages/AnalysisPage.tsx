@@ -351,10 +351,10 @@ export default function AnalysisPage() {
         </Card>
       )}
       {precisionMissingFields.length > 0 && (
-        <Card title="정밀 분석 선택 입력">
+        <Card title="건강 정보 추가 입력">
           <div className="readiness-card">
-            <p>정밀 분석은 혈압/혈당/지질/허리둘레 등 검진 수치를 함께 반영합니다.</p>
-            <p>부족한 검진값을 입력하면 정밀 분석을 실행할 수 있습니다.</p>
+            <p style={{ margin: 0 }}>기본 정보로 간편 분석 이용이 가능합니다.</p>
+            <p style={{ margin: "4px 0 0" }}>검진 수치를 추가로 입력하시면 정밀 분석 결과를 확인할 수 있습니다.</p>
             <div className="chip-list">
               {precisionMissingFields.map((field) => (
                 <span className="badge badge-reference" key={field}>
@@ -363,7 +363,7 @@ export default function AnalysisPage() {
               ))}
             </div>
             <Link className="button secondary" to="/health/profile">
-              검진값 입력하기
+              추가 정보 입력하기
             </Link>
           </div>
         </Card>
