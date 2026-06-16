@@ -2252,6 +2252,14 @@ pre {
   padding: 14px;
 }
 
+.mini-card h3 {
+  margin: 0;
+}
+
+.mini-card > p {
+  margin: 0;
+}
+
 a .mini-card {
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
@@ -2340,6 +2348,14 @@ a:hover .mini-card {
 
 .result-summary-card {
   grid-template-columns: 1fr;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.result-summary-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 .health-record-summary-card {
@@ -3202,6 +3218,8 @@ a:hover .mini-card {
 
 .chat-message {
   display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .chat-message.user {
@@ -3212,6 +3230,39 @@ a:hover .mini-card {
   justify-content: flex-start;
 }
 
+.chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.chat-bubble-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(720px, 86%);
+}
+
+.chat-message.user .chat-bubble-wrapper {
+  align-items: flex-end;
+}
+
+.chat-role {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 4px;
+}
+
 .chat-bubble {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -3219,19 +3270,12 @@ a:hover .mini-card {
   box-shadow: var(--shadow-soft);
   display: grid;
   gap: 8px;
-  max-width: min(720px, 86%);
   padding: 14px;
 }
 
 .chat-message.user .chat-bubble {
   background: var(--color-primary-soft);
   border-color: var(--color-secondary);
-}
-
-.chat-role {
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 900;
 }
 
 .chat-bubble p {
@@ -3305,7 +3349,7 @@ a:hover .mini-card {
 .family-invite-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(200px, 1fr));
 }
 
 .family-toggle-row {
@@ -3334,8 +3378,18 @@ a:hover .mini-card {
   gap: 10px;
 }
 
-.inline-form-row .input {
+.inline-form-row .input,
+.inline-form-row input {
+  flex: 1;
   min-width: 0;
+}
+
+.inline-form-row button,
+.inline-form-row .btn-primary,
+.inline-form-row .btn-secondary,
+.inline-form-row .btn-danger-outline {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .btn-danger-outline {
@@ -3355,10 +3409,19 @@ a:hover .mini-card {
 
 .family-group-list,
 .family-member-list,
-.family-form-panel,
 .family-share-card {
   display: grid;
   gap: 12px;
+}
+
+.family-form-panel {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.family-form-panel > button {
+  grid-column: 1 / -1;
 }
 
 .family-group-item {
@@ -3370,7 +3433,7 @@ a:hover .mini-card {
   display: grid;
   gap: 4px;
   padding: 14px;
-  text-align: left;
+  text-align: center;
 }
 
 .family-group-item span {

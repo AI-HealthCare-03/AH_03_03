@@ -248,44 +248,6 @@ export default function AnalysisPage() {
         </div>
       </div>
       {error && <ErrorMessage message={error} />}
-      {pollingError && <ErrorMessage message={pollingError.message} />}
-      {notice && <div className="state-box">{notice}</div>}
-      {feedbackDialog}
-      {missingFields.length > 0 && (
-        <Card title="분석에 필요한 정보가 부족합니다">
-          <div className="readiness-card">
-            <p>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 기본 위험도 분석을 실행할 수 있습니다.</p>
-            <div className="chip-list">
-              {missingFields.map((field) => (
-                <span className="badge badge-missing" key={field}>
-                  {missingFieldLabels[field] ?? field}
-                </span>
-              ))}
-            </div>
-            <Link className="button" to="/health/profile">
-              필수 건강정보 입력하기
-            </Link>
-          </div>
-        </Card>
-      )}
-      {precisionMissingFields.length > 0 && (
-        <Card title="건강 정보 추가 입력">
-          <div className="readiness-card">
-            <p style={{ margin: 0 }}>기본 정보로 간편 분석 이용이 가능합니다.</p>
-            <p style={{ margin: "4px 0 0" }}>검진 수치를 추가로 입력하시면 정밀 분석 결과를 확인할 수 있습니다.</p>
-            <div className="chip-list">
-              {precisionMissingFields.map((field) => (
-                <span className="badge badge-reference" key={field}>
-                  {missingFieldLabels[field] ?? field}
-                </span>
-              ))}
-            </div>
-            <Link className="button secondary" to="/health/profile">
-              추가 정보 입력하기
-            </Link>
-          </div>
-        </Card>
-      )}
       <div className="page-grid">
         <Card title="분석결과 기반 AI 건강 코멘트">
           <p>{analysisComment}</p>
