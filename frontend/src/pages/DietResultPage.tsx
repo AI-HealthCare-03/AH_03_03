@@ -655,7 +655,7 @@ export default function DietResultPage() {
           </div>
           {recommendation?.rag_comment && (
             <div className="mini-card">
-              <strong>참고 문서 기반 코멘트</strong>
+              <strong>식사 기반 건강 조언</strong>
               {recommendation.rag_comment.rewrite_used && <span className="badge badge-reference">문장 다듬기 적용</span>}
               <span>{publicNutritionText(recommendation.rag_comment.summary)}</span>
               {recommendation.rag_comment.disease_comments.length > 0 && (
@@ -664,7 +664,6 @@ export default function DietResultPage() {
                     <div className="mini-card" key={comment.disease_code}>
                       <span className="badge badge-reference">{comment.label}</span>
                       <span>{publicNutritionText(comment.comment)}</span>
-                      <span className="muted">{publicNutritionText(comment.basis)}</span>
                     </div>
                   ))}
                 </div>
@@ -678,7 +677,6 @@ export default function DietResultPage() {
                   ))}
                 </div>
               )}
-              <span className="muted">{publicNutritionText(recommendation.rag_comment.safety_notice)}</span>
             </div>
           )}
           {recommendationLoading && <div className="state-box">식단 기반 건강관리 추천을 불러오는 중입니다.</div>}
@@ -690,19 +688,6 @@ export default function DietResultPage() {
           {!recommendationLoading && !recommendationError && !hasDietRecommendationContent(recommendation) && (
             <div className="state-box">
               표시할 건강관리 추천이 아직 없습니다. 식단 사진의 음식명과 영양성분 후보가 확인되면 참고용 추천이 표시됩니다.
-            </div>
-          )}
-          {recommendation && recommendation.disease_context.length > 0 && (
-            <div className="mini-card">
-              <strong>건강상태 참고</strong>
-              <div className="card-list">
-                {recommendation.disease_context.map((context) => (
-                  <div className="mini-card" key={context.disease_code}>
-                    <span className="badge badge-reference">{context.label}</span>
-                    <span>{publicNutritionText(context.message)}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
           {recommendation && recommendation.recommended_challenges.length > 0 && (
