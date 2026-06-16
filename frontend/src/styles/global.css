@@ -1559,7 +1559,7 @@ pre {
 .dashboard-analysis-layout {
   display: grid;
   gap: 16px;
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: 190px minmax(0, 1fr);
 }
 
 .dashboard-analysis-board {
@@ -1619,7 +1619,6 @@ pre {
 .dashboard-tip-list {
   display: grid;
   gap: 10px;
-  overflow: hidden;
 }
 
 .dashboard-metric-menu button,
