@@ -5495,3 +5495,7 @@ input:-webkit-autofill:focus {
 .toggle-row input[type="checkbox"]:checked::after {
   left: 23px;
 }
+
+.pagination-row > button {
+  flex: 0 0 auto;
+}
