@@ -33,6 +33,18 @@ type HealthRecord = Record<string, unknown>;
 type TrendItem = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
 
+type DashboardTrendsData = {
+  period?: string;
+  date_from?: string | null;
+  date_to?: string | null;
+  glucose?: TrendItem[];
+  blood_pressure?: TrendItem[];
+  weight?: TrendItem[];
+  bmi?: TrendItem[];
+  challenge_completion_rate?: TrendItem[];
+  diet_score?: TrendItem[];
+};
+
 type ChartPoint = {
   date: string;
   label: string;
@@ -167,6 +179,15 @@ const periodOptions = [
   { label: "6개월", value: "year" },
   { label: "전체", value: "all" },
 ];
+
+const periodDays: Record<string, number | null> = {
+  week: 7,
+  month: 30,
+  quarter: 90,
+  three_months: 90,
+  year: 365,
+  all: null,
+};
 
 function averageValue(items: Record<string, unknown>[] | undefined): string {
   const values = (items ?? []).map((item) => Number(item.value)).filter((value) => Number.isFinite(value));
@@ -318,6 +339,62 @@ function formatDateTime(value: unknown): string {
   return `${mo}.${day} ${hour}:${minute}`;
 }
 
+function formatAxisDate(value: unknown): string {
+  if (!value) return "-";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return formatDate(value);
+  return `${d.getMonth() + 1}.${d.getDate()}`;
+}
+
+function formatPeriodRangeDate(value: unknown): string {
+  if (!value) return "-";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return formatDate(value);
+  return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
+}
+
+function getPeriodLabel(value: string): string {
+  return `최근 ${periodOptions.find((period) => period.value === value)?.label ?? "기간"}`;
+}
+
+function getFallbackPeriodRange(period: string): { start: Date | null; end: Date } {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const days = periodDays[period];
+  if (!days) {
+    return { start: null, end };
+  }
+  const start = new Date(end);
+  start.setDate(start.getDate() - days + 1);
+  return { start, end };
+}
+
+function getPeriodAxisLabels(
+  period: string,
+  dateFrom?: string | null,
+  dateTo?: string | null,
+): { axisStartLabel?: string; axisMiddleLabel?: string; axisEndLabel?: string; periodLabel: string } {
+  if (period === "all" && !dateFrom) {
+    return { periodLabel: "전체 기간" };
+  }
+  const fallback = getFallbackPeriodRange(period);
+  const start = dateFrom ? new Date(dateFrom) : fallback.start;
+  const end = dateTo ? new Date(dateTo) : fallback.end;
+  if (start === null) {
+    return {
+      axisEndLabel: formatAxisDate(end),
+      periodLabel: "전체 기간",
+    };
+  }
+  const middle = new Date((start.getTime() + end.getTime()) / 2);
+  return {
+    axisStartLabel: formatAxisDate(start),
+    axisMiddleLabel: formatAxisDate(middle),
+    axisEndLabel: formatAxisDate(end),
+    periodLabel: `${formatPeriodRangeDate(start)} ~ ${formatPeriodRangeDate(end)}`,
+  };
+}
+
 function EmptyChartState() {
   return (
     <div className="empty-state chart-empty-state">
@@ -335,7 +412,23 @@ function EmptyChartState() {
   );
 }
 
-function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean; connectPairs?: boolean }) {
+function LineChart({
+  axisEndLabel,
+  axisMiddleLabel,
+  axisStartLabel,
+  axisTicks,
+  series,
+  clampTo100,
+  connectPairs,
+}: {
+  axisEndLabel?: string;
+  axisMiddleLabel?: string;
+  axisStartLabel?: string;
+  axisTicks?: ChartAxisTick[];
+  series: ChartSeries[];
+  clampTo100?: boolean;
+  connectPairs?: boolean;
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(640);
 
@@ -423,10 +516,15 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
           {uniqueDates.length > 0 && (
             <>
               <text className="line-chart-axis" x={padding.left} y={height - 8}>
-                {axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
+                {axisStartLabel ?? axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
               </text>
+              {axisMiddleLabel ? (
+                <text className="line-chart-axis" textAnchor="middle" x={padding.left + innerWidth / 2} y={height - 8}>
+                  {axisMiddleLabel}
+                </text>
+              ) : null}
               <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
-                {axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
+                {axisEndLabel ?? axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
               </text>
             </>
           )}
@@ -690,7 +788,7 @@ export default function DashboardPage() {
   const [challengeSection, setChallengeSection] = useState<DashboardData>({});
   const [dietSection, setDietSection] = useState<DashboardData>({});
   const [medicationSection, setMedicationSection] = useState<DashboardData>({});
-  const [trends, setTrends] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [trends, setTrends] = useState<DashboardTrendsData>({});
   const [riskTrend, setRiskTrend] = useState<DashboardRiskTrend>({ period: "all", series: [] });
   const [todayRecommendations, setTodayRecommendations] = useState<TodayRecommendations>({ date: "", items: [] });
   const [activeMetricKey, setActiveMetricKey] = useState<(typeof analysisMetrics)[number]["key"]>("blood");
@@ -709,7 +807,7 @@ export default function DashboardPage() {
         medicationResult,
       ] = await Promise.allSettled([
           getDashboardSummary<DashboardSummary>(),
-          getDashboardTrends<Record<string, Record<string, unknown>[]>>(selectedPeriod),
+          getDashboardTrends<DashboardTrendsData>(selectedPeriod),
           getDashboardRiskTrend<DashboardRiskTrend>(selectedPeriod),
           getTodayRecommendations(),
           getDashboardHealth<DashboardData>(),
@@ -772,6 +870,12 @@ export default function DashboardPage() {
       )
     : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
+  const trendPeriodLabels = getPeriodAxisLabels(
+    selectedPeriod,
+    typeof trends.date_from === "string" ? trends.date_from : null,
+    typeof trends.date_to === "string" ? trends.date_to : null,
+  );
+  const chartPeriodDisplay = trendPeriodLabels.periodLabel || getPeriodLabel(selectedPeriod);
   const latestDiet = dashboardDiets[0];
   const bloodPressureSeries = [
     makeValueSeries(trends.blood_pressure, "수축기 혈압", diseaseChartColors.HYPERTENSION, {
@@ -1017,7 +1121,7 @@ export default function DashboardPage() {
                 <h2>{activeMetric.label} 요약</h2>
                 <p>{activeMetric.description}</p>
               </div>
-              <span>{formatDate(new Date())}</span>
+              <span>{chartPeriodDisplay}</span>
             </div>
             <div className={`dashboard-chart-panels${activeChartCards.length === 1 ? " single-panel" : ""}`}>
               {activeChartCards.map((item) => (
@@ -1026,7 +1130,14 @@ export default function DashboardPage() {
                     <strong>{item.title}</strong>
                     <span>{item.unit}</span>
                   </div>
-                  <LineChart series={item.series} clampTo100={activeMetricKey === "exercise"} connectPairs={activeMetricKey === "blood"} />
+                  <LineChart
+                    axisEndLabel={trendPeriodLabels.axisEndLabel}
+                    axisMiddleLabel={trendPeriodLabels.axisMiddleLabel}
+                    axisStartLabel={trendPeriodLabels.axisStartLabel}
+                    series={item.series}
+                    clampTo100={activeMetricKey === "exercise"}
+                    connectPairs={activeMetricKey === "blood"}
+                  />
                   <div className="dashboard-chart-stat">
                     <span>현재</span>
                     <strong>
@@ -1086,7 +1197,13 @@ export default function DashboardPage() {
             {riskTrendSeries.map((series) => (
               <div key={series.key} className="risk-trend-chart-item">
                 <span className="risk-trend-chart-label" style={{ color: series.color }}>{series.label}</span>
-                <LineChart axisTicks={riskStageAxisTicks} series={[series]} />
+                <LineChart
+                  axisEndLabel={trendPeriodLabels.axisEndLabel}
+                  axisMiddleLabel={trendPeriodLabels.axisMiddleLabel}
+                  axisStartLabel={trendPeriodLabels.axisStartLabel}
+                  axisTicks={riskStageAxisTicks}
+                  series={[series]}
+                />
               </div>
             ))}
           </div>
