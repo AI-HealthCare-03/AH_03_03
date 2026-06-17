@@ -15,20 +15,20 @@
 Docker image tag 예시:
 
 ```bash
-kdu0312/ai-health:app-v1.0.0
-kdu0312/ai-health:ai-v1.0.0
-kdu0312/ai-health:frontend-v1.0.0
+kdu0312/ai-health:app-v1.1.0
+kdu0312/ai-health:ai-v1.1.0
+kdu0312/ai-health:frontend-v1.1.0
 ```
 
-운영 compose가 pull하는 image version은 `.prod.env`의 아래 값으로 결정합니다.
+`envs/example.prod.env`는 v1.1.0 수동 검증 기준을 반영한 bootstrap/template입니다. 실제 운영 설정과 secret은 EC2의 `.prod.env`가 기준이며 Git에 커밋하지 않습니다. 운영 compose가 pull하는 image version은 `.prod.env`의 아래 값으로 결정합니다.
 
 ```env
-APP_VERSION=v1.0.1
-AI_WORKER_VERSION=v1.0.1
-FRONTEND_VERSION=v1.0.1
+APP_VERSION=v1.1.0
+AI_WORKER_VERSION=v1.1.0
+FRONTEND_VERSION=v1.1.0
 ```
 
-같은 tag(`v1.0.0` 등)를 반복해서 재사용하면 EC2의 `main` 브랜치는 최신이어도 Docker Hub의 frontend image가 예전 build일 수 있습니다. GitHub Actions 자동배포는 `main-<short-sha>` tag를 매번 새로 만들고, EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`만 같은 tag로 갱신합니다.
+같은 tag(`v1.1.0` 등)를 반복해서 재사용하면 EC2의 `main` 브랜치는 최신이어도 Docker Hub의 frontend image가 예전 build일 수 있습니다. GitHub Actions 자동배포는 `main-<short-sha>` tag를 매번 새로 만들고, EC2 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION`만 같은 tag로 갱신합니다. 따라서 main 자동배포 후 운영 tag는 `v1.1.0`이 아니라 `main-<short-sha>`로 바뀔 수 있습니다.
 
 최종 운영 확인 결과 기준:
 
@@ -95,6 +95,8 @@ workflow는 `.prod.env`의 실제 secret 값을 생성하거나 덮어쓰지 않
 
 실패 시에도 `docker compose down -v`나 volume 삭제 명령은 실행하지 않습니다. `make prod-up`은 새 container 재생성을 시도하며, pull/build/migration/health 중 실패하면 workflow가 실패합니다.
 
+RAG ingest/embed와 FAQ/challenge seed는 자동배포에서 실행하지 않습니다. RAG chunks와 embedding 데이터는 PostgreSQL Docker volume에 유지되며, 새 문서를 반영해야 할 때만 운영자가 별도 절차로 ingest/embed를 승인해 실행합니다.
+
 ## 3. 로컬 배포 전 검증
 
 `main` push 전에 로컬에서 확인합니다.
@@ -120,9 +122,9 @@ git push origin main
 Makefile image target은 `.prod.env` 전체를 자동으로 source하지 않습니다. secret 노출을 피하기 위해 build/push에 필요한 version 값만 shell에서 export하거나 command line 변수로 넘깁니다.
 
 ```bash
-export APP_VERSION=v1.0.1
-export AI_WORKER_VERSION=v1.0.1
-export FRONTEND_VERSION=v1.0.1
+export APP_VERSION=v1.1.0
+export AI_WORKER_VERSION=v1.1.0
+export FRONTEND_VERSION=v1.1.0
 make image-tags
 make image-build-check
 make image-check-ai-ocr-import
@@ -166,10 +168,12 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml conf
 새 image tag를 배포하는 경우 `.prod.env`에서 image version만 새 tag로 맞춥니다. 값 자체는 운영 서버의 `.prod.env`에만 저장하고 Git에 커밋하지 않습니다.
 
 ```env
-APP_VERSION=v1.0.1
-AI_WORKER_VERSION=v1.0.1
-FRONTEND_VERSION=v1.0.1
+APP_VERSION=v1.1.0
+AI_WORKER_VERSION=v1.1.0
+FRONTEND_VERSION=v1.1.0
 ```
+
+수동 검증 tag는 `v1.1.0`처럼 고정 버전을 사용할 수 있지만, main 자동배포는 같은 위치를 `main-<short-sha>`로 갱신합니다. `.prod.env`의 나머지 AI/RAG/OCR/SMTP/DB 값은 자동배포가 덮어쓰지 않습니다.
 
 MVP 운영 storage는 local 기준으로 맞춥니다. OCR/검진 파일 업로드가 S3 설정 누락 때문에 500으로 실패하지 않도록 아래 값을 확인합니다.
 
@@ -229,7 +233,7 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec
   uv run --no-sync python -c "import cv2; import paddleocr; print('ocr imports ok')"
 ```
 
-import가 통과하면 운영자가 `.prod.env`에서 아래 OCR provider 조합으로 전환할 수 있습니다.
+import가 통과하면 운영자가 `.prod.env`에서 아래 OCR provider 조합으로 전환할 수 있습니다. PaddleOCR는 ai-worker에서만 사용하며 FastAPI image에는 무거운 OCR dependency를 넣지 않습니다.
 
 ```env
 EXAM_OCR_PROVIDER=auto

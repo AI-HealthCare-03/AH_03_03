@@ -111,12 +111,17 @@ curl -I http://healthladder.duckdns.org
 cp envs/example.prod.env .prod.env
 ```
 
-`.prod.env`는 운영 서버 로컬 secret 파일이며 Git에 올리지 않습니다. 실제 값은 화면 공유/로그/PR에 노출하지 않습니다.
+`envs/example.prod.env`는 v1.1.0 수동 검증 기준을 반영한 bootstrap/template입니다. `.prod.env`는 운영 서버 로컬 secret 파일이며 Git에 올리지 않습니다. 실제 값은 화면 공유/로그/PR에 노출하지 않습니다.
+
+GitHub Actions 자동배포는 EC2 `.prod.env` 전체를 덮어쓰지 않고 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 세 값만 `main-<short-sha>` tag로 갱신합니다. 나머지 AI/RAG/OCR/SMTP/DB 설정은 운영 서버의 `.prod.env`에 유지됩니다.
 
 중요 값:
 
 ```env
 ENV=prod
+APP_VERSION=v1.1.0
+AI_WORKER_VERSION=v1.1.0
+FRONTEND_VERSION=v1.1.0
 COOKIE_DOMAIN=healthladder.duckdns.org
 FRONTEND_BASE_URL=https://healthladder.duckdns.org
 CORS_ALLOW_ORIGINS=https://healthladder.duckdns.org
@@ -128,6 +133,8 @@ REFRESH_TOKEN_COOKIE_SECURE=true
 REFRESH_TOKEN_COOKIE_SAMESITE=lax
 NGINX_CONF=../nginx/prod_https.conf
 ```
+
+main 자동배포 이후 위 version 값은 `main-<short-sha>`로 바뀔 수 있습니다. 수동 검증 tag인 `v1.1.0`을 반복 재사용하지 말고, 자동배포 또는 새 수동 tag로 이미지를 갱신합니다.
 
 `ENV`는 코드상 `prod`와 `production`을 모두 production 모드로 처리합니다. 현재 `envs/example.prod.env`와 prod compose 표준은 `ENV=prod`입니다.
 
@@ -158,10 +165,22 @@ S3_BUCKET_NAME=
 
 local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다. OCR/검진 업로드가 500으로 실패하면 먼저 운영 `.prod.env`의 storage 값을 확인합니다.
 
-식단 이미지 분석은 실제 provider가 준비되어야 합니다. `DIET_GPT_VISION_ENABLED=false`, `DIET_VISION_PROVIDER=rule_based`, `DIET_DEMO_FALLBACK_ENABLED=false` 조합에서는 더미 음식/점수를 저장하지 않고 service unavailable로 종료됩니다. 운영에서 GPT Vision을 사용할 때만 아래 값을 `.prod.env`에 설정합니다.
+식단 이미지 분석은 실제 provider가 준비되어야 합니다. `DIET_GPT_VISION_ENABLED=false`, `DIET_VISION_PROVIDER=rule_based`, `DIET_DEMO_FALLBACK_ENABLED=false` 조합에서는 더미 음식/점수를 저장하지 않고 service unavailable로 종료됩니다. v1.1.0 운영 검증 기준은 GPT Vision 식단 분석과 식단 RAG/rewrite 활성화입니다.
 
 ```env
 OPENAI_API_KEY=<SET_IN_PROD>
+OPENAI_MODEL=gpt-4o
+CHATBOT_USE_REAL_LLM=true
+RAG_ENABLED=true
+RAG_RETRIEVAL_STRATEGY=hybrid_parallel
+MAIN_CHATBOT_RAG_STRATEGY=hybrid_parallel
+RAG_EMBEDDING_ENABLED=true
+RAG_EMBEDDING_PROVIDER=openai
+RAG_EMBEDDING_MODEL=text-embedding-3-small
+RAG_EMBEDDING_DIMENSION=1536
+DIET_RECOMMENDATION_RAG_STRATEGY=keyword_first_vector_fallback
+DIET_RECOMMENDATION_LLM_REWRITE_ENABLED=true
+ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED=true
 DIET_VISION_PROVIDER=gpt_vision
 DIET_GPT_VISION_ENABLED=true
 DIET_GPT_VISION_MODEL=gpt-4o
@@ -195,12 +214,13 @@ docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec
   uv run --no-sync python -c "import cv2; import paddleocr; print('ocr imports ok')"
 ```
 
-import가 통과하면 운영자가 아래 조합으로 전환할 수 있습니다.
+import가 통과하면 운영자가 아래 조합으로 전환할 수 있습니다. PaddleOCR는 ai-worker image에만 포함하며 FastAPI image에는 무거운 OCR dependency를 넣지 않습니다.
 
 ```env
 EXAM_OCR_PROVIDER=auto
 PADDLE_OCR_ENABLED=true
 EXAM_GPT_VISION_ENABLED=true
+EXAM_GPT_VISION_MODEL=gpt-4o
 GPT_VISION_FALLBACK_ENABLED=true
 ```
 
@@ -223,7 +243,9 @@ EC2에서는 pull:
 make prod-pull
 ```
 
-운영 서버가 실제로 pull하는 이미지 tag는 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 기준을 따릅니다. 같은 tag를 반복 재사용하면 EC2 `main` 브랜치는 최신이어도 예전 frontend image가 계속 서빙될 수 있으므로, 배포마다 `main-<short-sha>`, `v1.0.1`, `20260616-1` 같은 새 tag를 발급하고 Docker Hub push 후 `.prod.env`의 세 version 값을 함께 갱신합니다.
+운영 서버가 실제로 pull하는 이미지 tag는 `.prod.env`의 `APP_VERSION`, `AI_WORKER_VERSION`, `FRONTEND_VERSION` 기준을 따릅니다. 같은 tag를 반복 재사용하면 EC2 `main` 브랜치는 최신이어도 예전 frontend image가 계속 서빙될 수 있으므로, 배포마다 `main-<short-sha>`, `v1.1.0`, `20260616-1` 같은 새 tag를 발급하고 Docker Hub push 후 `.prod.env`의 세 version 값을 함께 갱신합니다.
+
+RAG ingest/embed는 자동배포에서 자동 실행되지 않습니다. 이미 적재된 RAG chunks와 embedding은 PostgreSQL Docker volume에 유지됩니다. 문서가 바뀌어 RAG DB를 갱신해야 할 때만 운영자가 별도 RAG runbook에 따라 ingest/embed를 승인해 실행합니다.
 
 frontend 정적 bundle 반영 여부는 배포 후 컨테이너 내부 asset hash로 확인합니다.
 

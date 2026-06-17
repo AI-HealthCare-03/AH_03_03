@@ -280,7 +280,7 @@ make qa-frontend
 
 운영 배포 기준 브랜치는 `main`입니다. `main`에 push되면 GitHub Actions `deploy-prod` workflow가 CI 검증, Docker image build/push, EC2 image tag 반영, `make prod-pull`, `make prod-up`, `make prod-migrate`, health check를 순서대로 실행합니다.
 
-운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `.prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
+운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `.prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요. `envs/example.prod.env`는 v1.1.0 수동 검증 기준의 bootstrap 예시이며, main 자동배포 후 EC2 `.prod.env`의 image version은 `main-<short-sha>`로 갱신될 수 있습니다.
 
 GitHub Actions 운영 자동배포에는 repository secrets가 필요합니다.
 
@@ -292,18 +292,18 @@ GitHub Actions 운영 자동배포에는 repository secrets가 필요합니다.
 
 기본 이미지 tag:
 
-- `kdu0312/ai-health:app-v1.0.0`
-- `kdu0312/ai-health:ai-v1.0.0`
-- `kdu0312/ai-health:frontend-v1.0.0`
+- `kdu0312/ai-health:app-v1.1.0`
+- `kdu0312/ai-health:ai-v1.1.0`
+- `kdu0312/ai-health:frontend-v1.1.0`
 
 배포 전 로컬 build 검증:
 
 ```bash
 make image-tags
 make image-build-check
-docker image inspect kdu0312/ai-health:app-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-docker image inspect kdu0312/ai-health:ai-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:app-v1.1.0 --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:ai-v1.1.0 --format '{{.Os}}/{{.Architecture}}'
+docker image inspect kdu0312/ai-health:frontend-v1.1.0 --format '{{.Os}}/{{.Architecture}}'
 ```
 
 기대값은 `linux/amd64`입니다. Apple Silicon 로컬에서도 EC2 Ubuntu 배포 이미지는 `make image-build-check`의 buildx `linux/amd64` 기준으로 확인합니다.

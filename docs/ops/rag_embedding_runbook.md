@@ -5,6 +5,8 @@
 ## 원칙
 
 - RAG embedding은 식단 추천 API, LangGraph, 챗봇과 별도 단계로 운영한다.
+- GitHub Actions 자동배포는 RAG ingest/embed를 실행하지 않는다.
+- 운영 RAG chunks와 embedding 데이터는 PostgreSQL Docker volume에 유지된다.
 - `mock` embedding은 개발/테스트 검증용이다.
 - 운영 환경에서는 `mock` embedding apply를 사용하지 않는다.
 - OpenAI embedding 저장 전에는 반드시 dry-run으로 대상 chunk 수와 batch 수를 확인한다.
@@ -16,33 +18,33 @@
 
 Docker compose로 실행할 때는 `fastapi`와 `ai-worker` service의 `environment`에 아래 값들이 전달되어야 한다. compose에 빠져 있으면 컨테이너 안의 `app.core.config` module-level 상수는 안전 기본값만 보게 된다.
 
-기본 운영값은 keyword RAG를 유지하고 embedding/vector는 비활성화한다.
+v1.1.0 수동 검증 기준 운영값은 hybrid/vector RAG와 OpenAI embedding provider를 사용한다.
 
 ```env
 RAG_ENABLED=true
-RAG_RETRIEVAL_STRATEGY=keyword_only
-MAIN_CHATBOT_RAG_STRATEGY=keyword_only
-ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED=false
-DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only
-RAG_EMBEDDING_ENABLED=false
-RAG_EMBEDDING_PROVIDER=disabled
+RAG_RETRIEVAL_STRATEGY=hybrid_parallel
+MAIN_CHATBOT_RAG_STRATEGY=hybrid_parallel
+ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED=true
+DIET_RECOMMENDATION_RAG_STRATEGY=keyword_first_vector_fallback
+DIET_RECOMMENDATION_LLM_REWRITE_ENABLED=true
+RAG_EMBEDDING_ENABLED=true
+RAG_EMBEDDING_PROVIDER=openai
 RAG_EMBEDDING_MODEL=text-embedding-3-small
 RAG_EMBEDDING_DIMENSION=1536
 RAG_EMBEDDING_BATCH_SIZE=64
 ```
 
-로컬에서 hybrid/vector RAG를 수동 검증할 때만 아래처럼 전환한다.
+로컬 개발이나 비용 제한 환경에서는 keyword-only 또는 disabled embedding으로 낮춰서 사용한다.
 
 ```env
-MAIN_CHATBOT_RAG_STRATEGY=keyword_first_vector_fallback
-RAG_RETRIEVAL_STRATEGY=keyword_first_vector_fallback
+RAG_RETRIEVAL_STRATEGY=keyword_only
+MAIN_CHATBOT_RAG_STRATEGY=keyword_only
 DIET_RECOMMENDATION_RAG_STRATEGY=keyword_first_vector_fallback
-RAG_EMBEDDING_ENABLED=true
-RAG_EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=<openai-api-key>
+RAG_EMBEDDING_ENABLED=false
+RAG_EMBEDDING_PROVIDER=disabled
 ```
 
-production 기본값은 `RAG_RETRIEVAL_STRATEGY=keyword_only`, `MAIN_CHATBOT_RAG_STRATEGY=keyword_only`, `DIET_RECOMMENDATION_RAG_STRATEGY=keyword_only`, `ANALYSIS_EXPLANATION_LLM_REWRITE_ENABLED=false`, `RAG_EMBEDDING_ENABLED=false`, `RAG_EMBEDDING_PROVIDER=disabled`로 유지한다. 실제 `.env`와 secret 값은 커밋하지 않는다.
+실제 `.env`, `.prod.env`, OpenAI key는 커밋하지 않는다. `envs/example.prod.env`는 bootstrap/template이고 실제 운영 설정은 EC2 `.prod.env`가 기준이다.
 
 Langfuse trace를 확인하려면 Langfuse 설정도 필요하다.
 
