@@ -291,7 +291,7 @@ class AuthService:
     def _password_reset_url(self, token: str) -> str:
         base_url = config.FRONTEND_BASE_URL.rstrip("/")
         encoded_token = urllib.parse.quote(token, safe="")
-        return f"{base_url}/password-reset/confirm?token={encoded_token}"
+        return f"{base_url}/auth/password-reset/confirm?token={encoded_token}"
 
     def _ensure_email_delivery_available(self) -> None:
         email_status = self.email_service.status()
