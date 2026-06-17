@@ -299,26 +299,24 @@ export default function AnalysisHistoryPage() {
             </div>
           )}
           {visiblePrecisionMeasurements.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ marginBottom: 8, marginTop: 16 }}>분석에 사용된 검진 수치</h3>
-              <div className="state-box">
-                <p style={{ margin: "0 0 8px" }}>
-                  정밀분석에 반영된 검진표 기반 수치입니다. 건강정보 수기 입력 항목에 저장되지 않은 값도 검진표 확정 결과에서 보강될 수 있습니다.
-                </p>
-                <div className="chip-list">
-                  {x2MeasurementSource && (
-                    <span className="badge badge-reference">
-                      출처 {x2MeasurementSource === "exam_measurements" ? "검진표 OCR" : x2MeasurementSource}
-                    </span>
-                  )}
-                  {selectedExamReportId && (
-                    <span className="badge badge-reference">검진표 #{selectedExamReportId}</span>
-                  )}
-                </div>
+            <section className="precision-measurement-section">
+              <div className="section-heading compact">
+                <h3>분석에 사용된 검진 수치</h3>
+                <p>정밀분석에 반영된 검진표 기반 수치입니다.</p>
               </div>
-              <div className="readonly-health-grid" style={{ marginTop: 12 }}>
+              <div className="chip-list" style={{ marginBottom: 10 }}>
+                {x2MeasurementSource && (
+                  <span className="badge badge-reference">
+                    출처 {x2MeasurementSource === "exam_measurements" ? "검진표 OCR" : x2MeasurementSource}
+                  </span>
+                )}
+                {selectedExamReportId && (
+                  <span className="badge badge-reference">검진표 #{selectedExamReportId}</span>
+                )}
+              </div>
+              <div className="precision-measurement-grid">
                 {visiblePrecisionMeasurements.map((item) => (
-                  <div className="readonly-health-item" key={item.key}>
+                  <div className="precision-measurement-item" key={item.key}>
                     <div className="item-header">
                       <span>{item.label}</span>
                       {snapshotX2Sources[item.key] === "exam_measurements" && (
@@ -331,7 +329,7 @@ export default function AnalysisHistoryPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
         </Card>
         {detailSlots.length > 0 && (

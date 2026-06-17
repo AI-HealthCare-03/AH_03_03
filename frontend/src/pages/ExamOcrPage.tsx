@@ -485,23 +485,6 @@ export default function ExamOcrPage() {
           </h2>
         </div>
         <p className="muted" style={{ marginBottom: "12px", fontSize: "16px" }}>인식된 결과는 반드시 직접 확인해 주세요.</p>
-        {precisionMeasurements.length > 0 && (
-          <div className="state-box" style={{ marginBottom: 12 }}>
-            <strong>정밀검사 항목</strong>
-            <p style={{ margin: "4px 0 8px" }}>
-              AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소 등은 정밀분석 입력으로 활용될 수 있습니다.
-            </p>
-            <div className="chip-list">
-              {precisionMeasurements.map((measurement) => (
-                <span className="badge badge-reference" key={measurement.id}>
-                  {getPrecisionMeasurementLabel(measurement) ?? measurement.measurement_name}
-                  {measurement.value ? ` ${measurement.value}` : ""}
-                  {measurement.unit ? ` ${formatUnit(measurement.unit)}` : ""}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="ocr-result-table">
           {measurements.length === 0 ? (
             <div className="state-box">
@@ -512,14 +495,7 @@ export default function ExamOcrPage() {
           ) : (
             measurements.map((m) => (
               <label className="ocr-result-row" key={m.id}>
-                <span>
-                  {m.measurement_name}
-                  {isPrecisionMeasurement(m) && (
-                    <em className="badge badge-reference" style={{ marginLeft: 8 }}>
-                      정밀검사
-                    </em>
-                  )}
-                </span>
+                <span>{m.measurement_name}</span>
                 <input
                   onChange={(e) => updateLocalMeasurement(m.id, e.target.value)}
                   value={m.value ?? ""}
@@ -529,6 +505,22 @@ export default function ExamOcrPage() {
             ))
           )}
         </div>
+        {precisionMeasurements.length > 0 && (
+          <details className="ocr-precision-summary">
+            <summary>정밀검사 수치 {precisionMeasurements.length}개</summary>
+            <div className="precision-measurement-grid compact">
+              {precisionMeasurements.map((measurement) => (
+                <div className="precision-measurement-item" key={measurement.id}>
+                  <span>{getPrecisionMeasurementLabel(measurement) ?? measurement.measurement_name}</span>
+                  <strong>
+                    {measurement.value ? String(measurement.value) : "-"}
+                    {measurement.unit ? ` ${formatUnit(measurement.unit)}` : ""}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
 
         {/* 하단 액션 영역 */}
         <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap", gap: 8 }}>

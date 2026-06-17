@@ -84,6 +84,20 @@ function getPairedHealthText(
   return `${first || "-"}/${second || "-"}${unit ? ` ${unit}` : ""}`;
 }
 
+function formatBmiText(item: Item | undefined | null, fallback = "-"): string {
+  const explicit = Number(item?.bmi);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit.toFixed(1);
+  }
+  const heightCm = Number(item?.height_cm);
+  const weightKg = Number(item?.weight_kg);
+  if (Number.isFinite(heightCm) && heightCm > 0 && Number.isFinite(weightKg) && weightKg > 0) {
+    const heightM = heightCm / 100;
+    return (weightKg / (heightM * heightM)).toFixed(1);
+  }
+  return fallback;
+}
+
 function getDateLabel(value: unknown): string {
   if (!value) {
     return "-";
@@ -270,7 +284,7 @@ export default function MyPage() {
       ["생년월일", backendUser?.birthday],
       ["성별", backendUser?.gender === "FEMALE" ? "여성" : backendUser?.gender === "MALE" ? "남성" : "-"],
       ["키/몸무게", `${latestHealth?.height_cm != null ? Number(latestHealth.height_cm).toFixed(1) : "-"}cm / ${getText(latestHealth, "weight_kg")}kg`],
-      ["BMI", getText(latestHealth, "bmi")],
+      ["BMI", formatBmiText(latestHealth)],
       ["AST/ALT", getPairedHealthText(latestHealth, "ast", "alt", "U/L")],
       ["크레아티닌/eGFR", getPairedHealthText(latestHealth, "creatinine", "egfr")],
       ["혈색소", latestHealth?.hemoglobin != null ? `${getText(latestHealth, "hemoglobin")} g/dL` : "-"],
@@ -495,7 +509,7 @@ export default function MyPage() {
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                   <Gauge size={14} /> BMI
                 </span>
-                <strong>{getText(latestHealth, "bmi", "기록 없음")}</strong>
+                <strong>{formatBmiText(latestHealth, "기록 없음")}</strong>
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>

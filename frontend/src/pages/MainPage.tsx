@@ -208,6 +208,33 @@ function formatBloodPressure(record: AnyRecord): string {
   return `${String(record.systolic_bp ?? "-")}/${String(record.diastolic_bp ?? "-")} mmHg`;
 }
 
+function formatBmiFromHealth(record: AnyRecord): string {
+  const explicit = Number(record.bmi);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit.toFixed(1);
+  }
+  const heightCm = Number(record.height_cm);
+  const weightKg = Number(record.weight_kg);
+  if (Number.isFinite(heightCm) && heightCm > 0 && Number.isFinite(weightKg) && weightKg > 0) {
+    const heightM = heightCm / 100;
+    return (weightKg / (heightM * heightM)).toFixed(1);
+  }
+  return "-";
+}
+
+function formatBmiValue(value: unknown): string {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric.toFixed(1) : "-";
+}
+
+function formatHealthValue(record: AnyRecord, key: string, suffix = ""): string {
+  const value = record[key];
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  return `${String(value)}${suffix}`;
+}
+
 function getCategoryLabel(value: unknown): string {
   const category = String(value ?? "COMMON").toUpperCase();
   return categoryLabel[category] ?? "공통";
@@ -421,7 +448,7 @@ export default function MainPage() {
             ? "기본 건강정보를 입력하면 건강 관리 단계 확인을 실행할 수 있습니다."
             : "저장된 건강정보를 확인하고 필요한 항목을 보완해보세요.",
         buttonLabel: "건강정보 입력하기",
-        to: "/health",
+        to: "/health?step=basic",
       },
       {
         title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "만성질환 위험도 예측 결과 확인",
@@ -451,13 +478,6 @@ export default function MainPage() {
         to: "/medications",
       },
     ];
-    // Extract safe numeric values from health records
-    const glucoseVal = latestHealthRecord.fasting_glucose != null ? Number(latestHealthRecord.fasting_glucose) : null;
-    const systolicVal = latestHealthRecord.systolic_bp != null ? Number(latestHealthRecord.systolic_bp) : null;
-    const diastolicVal = latestHealthRecord.diastolic_bp != null ? Number(latestHealthRecord.diastolic_bp) : null;
-    const weightVal = latestHealthRecord.weight_kg != null ? Number(latestHealthRecord.weight_kg) : null;
-    const bmiVal = latestHealthRecord.bmi != null ? Number(latestHealthRecord.bmi) : null;
-
     const challengeCount = activeMyChallenges.length;
     const challengeRate = getAveragePercent(activeMyChallenges.map(getChallengeProgress));
     const medicationActiveCount = medications.filter((item) => item.is_active !== false).length;
@@ -504,7 +524,7 @@ export default function MainPage() {
               </span>
             </Link>
             <div className="home-action-links">
-              <Link to="/health">건강정보 입력</Link>
+              <Link to="/health?step=basic">건강정보 입력</Link>
               <Link to="/ocr/exam">검진표 등록</Link>
             </div>
           </div>
@@ -590,12 +610,16 @@ export default function MainPage() {
                       </div>
                     );
                   })()}
+                  <div className="viz-stat-row">
+                    <span>현재 건강정보 BMI</span>
+                    <strong>{formatBmiFromHealth(latestHealth)}</strong>
+                  </div>
                   {(() => {
                     const bmi = getExamMeasurement(examMeasurements, "bmi");
                     return (
                       <div className="viz-stat-row">
-                        <span>BMI</span>
-                        <strong>{bmi?.value ? String(bmi.value) : "-"}</strong>
+                        <span>최근 검진표 BMI</span>
+                        <strong>{formatBmiValue(bmi?.value)}</strong>
                       </div>
                     );
                   })()}
@@ -603,7 +627,7 @@ export default function MainPage() {
                     <span>AST / ALT</span>
                     <strong>
                       {latestHealth.ast != null || latestHealth.alt != null
-                        ? `${String(latestHealth.ast ?? "-")} / ${String(latestHealth.alt ?? "-")} U/L`
+                        ? `${formatHealthValue(latestHealth, "ast")} / ${formatHealthValue(latestHealth, "alt")} U/L`
                         : "-"}
                     </strong>
                   </div>
@@ -611,7 +635,7 @@ export default function MainPage() {
                     <span>eGFR / 혈색소</span>
                     <strong>
                       {latestHealth.egfr != null || latestHealth.hemoglobin != null
-                        ? `${String(latestHealth.egfr ?? "-")} / ${String(latestHealth.hemoglobin ?? "-")}`
+                        ? `${formatHealthValue(latestHealth, "egfr")} / ${formatHealthValue(latestHealth, "hemoglobin")}`
                         : "-"}
                     </strong>
                   </div>

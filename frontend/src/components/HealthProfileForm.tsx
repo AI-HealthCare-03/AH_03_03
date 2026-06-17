@@ -62,6 +62,7 @@ export const healthProfileSectionTitles = [
   "신체계측",
   "가족력/생활정보",
   "혈액/검진 정보",
+  "간·신장·혈액 검사",
 ] as const;
 
 const dayOptions = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -171,7 +172,7 @@ const sections: Array<{
   },
   {
     title: "혈액/검진 정보",
-    description: "정밀 예측 분석을 위한 검진 수치 입력 칸입니다. 미입력 시 정밀 분석이 불가능합니다.",
+    description: "혈압, 혈당, 지질 수치는 건강정보 기준값으로 저장됩니다.",
     fields: [
       { key: "systolic_bp", label: "수축기 혈압", type: "number", placeholder: "mmHg", required: true },
       { key: "diastolic_bp", label: "이완기 혈압", type: "number", placeholder: "mmHg", required: true },
@@ -181,13 +182,19 @@ const sections: Array<{
       { key: "triglyceride", label: "중성지방", type: "number", placeholder: "mg/dL" },
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
+      { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm", required: true },
+    ],
+  },
+  {
+    title: "간·신장·혈액 검사",
+    description: "검진표 OCR로 불러온 정밀검사 값은 비어 있는 항목에 보충되며, 직접 확인하거나 수정할 수 있습니다.",
+    fields: [
       { key: "ast", label: "AST", type: "number", placeholder: "U/L" },
       { key: "alt", label: "ALT", type: "number", placeholder: "U/L" },
       { key: "gamma_gtp", label: "감마GTP", type: "number", placeholder: "U/L" },
       { key: "creatinine", label: "크레아티닌", type: "number", placeholder: "mg/dL" },
       { key: "egfr", label: "eGFR", type: "number", placeholder: "mL/min/1.73m²" },
       { key: "hemoglobin", label: "혈색소", type: "number", placeholder: "g/dL" },
-      { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm", required: true },
     ],
   },
 ];
@@ -208,7 +215,6 @@ export default function HealthProfileForm({ form, bmi, onChange, visibleSections
           <div className="section-heading">
             <h3>{section.title}</h3>
             {section.description && <p>{section.description}</p>}
-            {section.title === "혈액/검진 정보"}
           </div>
           <div className="form two-col">
             {section.fields.map((field) => (

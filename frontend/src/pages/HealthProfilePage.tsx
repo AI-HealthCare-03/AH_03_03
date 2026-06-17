@@ -182,7 +182,7 @@ const readOnlySections: Array<{
     ],
   },
   {
-    title: "정밀 분석 정보",
+    title: "혈액/검진 정보",
     items: [
       { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
@@ -193,6 +193,11 @@ const readOnlySections: Array<{
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
+    ],
+  },
+  {
+    title: "간·신장·혈액 검사",
+    items: [
       { key: "ast", label: "AST", unit: "U/L", referenceOnly: true },
       { key: "alt", label: "ALT", unit: "U/L", referenceOnly: true },
       { key: "gamma_gtp", label: "감마GTP", unit: "U/L", referenceOnly: true },
@@ -240,6 +245,15 @@ function getReadOnlyValue(form: HealthProfileFormState, key: keyof HealthProfile
   }
   const raw = form[key];
   return displayValueMap[key]?.[raw] ?? raw;
+}
+
+function formatBmiValue(value: unknown): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed.toFixed(1) : "";
+}
+
+function getDisplayBmi(record: HealthRecord | null, fallbackBmi: number | null): string {
+  return formatBmiValue(record?.bmi) || (fallbackBmi ? fallbackBmi.toFixed(1) : "");
 }
 
 function formFromRecord(record: HealthRecord | null, userGender?: string | null, userBirth?: string | null): HealthProfileFormState {
@@ -485,6 +499,7 @@ export default function HealthProfilePage() {
     .filter(({ key }) => !isRequiredFilled(form, key, bmi))
     .map(({ label }) => label);
   const completedX2Count = x2Fields.filter(({ key }) => form[key] !== "").length;
+  const displayBmi = getDisplayBmi(latestRecord, bmi);
   const backendMissingLabels = (readiness?.missing_basic_fields ?? readiness?.missing_fields ?? []).map(
     (field) => backendMissingLabelMap[field] ?? field,
   );
@@ -493,17 +508,27 @@ export default function HealthProfilePage() {
   ).filter((label) => label !== "당화혈색소");
 
   const load = async () => {
-    const [record, readinessResult] = await Promise.all([
+    setError("");
+    const [recordResult, readinessResult] = await Promise.allSettled([
       getLatestHealthRecord<HealthRecord | null>(),
       getAnalysisReadiness<Readiness>(),
     ]);
+    const record = recordResult.status === "fulfilled" ? recordResult.value : null;
     setLatestRecord(record);
     setForm(formFromRecord(record, backendUser?.gender, backendUser?.birthday));
-    setReadiness(readinessResult);
+    setReadiness(readinessResult.status === "fulfilled" ? readinessResult.value : null);
+    if (recordResult.status === "rejected" || readinessResult.status === "rejected") {
+      setError("일부 건강정보를 불러오지 못했습니다. 입력값을 확인한 뒤 다시 저장해 주세요.");
+    }
   };
 
   useEffect(() => {
-    void load().catch(() => setError("건강정보를 불러오지 못했습니다."));
+    void load().catch(() => {
+      setLatestRecord(null);
+      setForm(formFromRecord(null, backendUser?.gender, backendUser?.birthday));
+      setReadiness(null);
+      setError("건강정보를 불러오지 못했습니다. 기본 입력은 계속 사용할 수 있습니다.");
+    });
   }, [backendUser?.id]);
 
   const save = async (): Promise<boolean> => {
@@ -698,7 +723,7 @@ export default function HealthProfilePage() {
             {[
               ["키(cm)", form.height_cm],
               ["몸무게(kg)", form.weight_kg],
-              ["BMI", bmi ? bmi.toFixed(1) : ""],
+              ["BMI", displayBmi],
               ["직업군", displayValueMap.occupation?.[form.occupation] ?? ""],
               [
                 "가족력",
@@ -790,11 +815,11 @@ export default function HealthProfilePage() {
               <section className="profile-section" key={section.title}>
                 <div className="section-heading">
                   <h3>{section.title}</h3>
-                  {section.title === "정밀 검진값" && <p>당화혈색소는 선택값이며, 입력되어 있으면 분석에 함께 반영됩니다.</p>}
+                  {section.title === "간·신장·혈액 검사" && <p>선택 입력값이며, 검진표 OCR 확정값을 확인하거나 직접 수정할 수 있습니다.</p>}
                 </div>
                 <div className="readonly-health-grid">
                   {section.items.map((item) => {
-                    const value = getReadOnlyValue(form, item.key, bmi);
+                    const value = item.key === "bmi" ? displayBmi : getReadOnlyValue(form, item.key, bmi);
                     return (
                       <div className="readonly-health-item" key={`${section.title}-${item.key}`}>
                         <div className="item-header">

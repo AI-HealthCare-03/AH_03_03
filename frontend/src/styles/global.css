@@ -4330,6 +4330,65 @@ input:-webkit-autofill:focus {
   font-size: 18px;
 }
 
+.precision-measurement-section {
+  border-top: 1px solid var(--color-border);
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.precision-measurement-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.precision-measurement-grid.compact {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.precision-measurement-item {
+  background: var(--color-muted-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.precision-measurement-item .item-header,
+.precision-measurement-item .item-value-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.precision-measurement-item span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.precision-measurement-item strong {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.ocr-precision-summary {
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.ocr-precision-summary summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .readonly-calculated-field {
 
   border: 1px solid rgba(79, 138, 91, 0.22);
@@ -4831,6 +4890,8 @@ input:-webkit-autofill:focus {
   .notification-management-grid,
   .manual-food-row,
   .nutrition-input-grid,
+  .precision-measurement-grid,
+  .precision-measurement-grid.compact,
   .metric-grid {
     grid-template-columns: 1fr;
   }

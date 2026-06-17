@@ -74,7 +74,7 @@ const steps = [
 
 const stepToSection: Record<number, string[]> = {
   0: [healthProfileSectionTitles[0], healthProfileSectionTitles[1], healthProfileSectionTitles[2]],
-  1: [healthProfileSectionTitles[3]],
+  1: [healthProfileSectionTitles[3], healthProfileSectionTitles[4]],
 };
 
 const healthFieldLabels: Record<string, string> = {
@@ -367,16 +367,23 @@ function getRecordSummary(record: HealthRecord): string {
   if (record.fasting_glucose !== undefined && record.fasting_glucose !== null) {
     items.push(`공복혈당 ${record.fasting_glucose}mg/dL`);
   }
-  if (record.ldl_cholesterol !== undefined && record.ldl_cholesterol !== null) {
-    items.push(`LDL ${record.ldl_cholesterol}mg/dL`);
-  }
   if (record.ast !== undefined && record.ast !== null) {
     items.push(`AST ${record.ast}U/L`);
   }
-  if (record.creatinine !== undefined && record.creatinine !== null) {
-    items.push(`Cr ${record.creatinine}mg/dL`);
+  return items.length > 0 ? items.slice(0, 3).join(" · ") : "주요 수치 미입력";
+}
+
+function formatBmiForDisplay(record: HealthRecord | null): string {
+  const direct = Number(record?.bmi);
+  if (Number.isFinite(direct) && direct > 0) {
+    return direct.toFixed(1);
   }
-  return items.length > 0 ? items.join(" · ") : "주요 수치 미입력";
+  const height = Number(record?.height_cm);
+  const weight = Number(record?.weight_kg);
+  if (!Number.isFinite(height) || !Number.isFinite(weight) || height <= 0 || weight <= 0) {
+    return "-";
+  }
+  return (weight / (height / 100) ** 2).toFixed(1);
 }
 
 const recordDetailItems: Array<{ key: string; label: string; unit?: string; display?: boolean }> = [
@@ -467,11 +474,14 @@ export default function HealthRecordPage() {
   });
 
   const load = async () => {
-    const [latest, list, readinessResult] = await Promise.all([
+    setError("");
+    const [latestResult, listResult, readinessResult] = await Promise.allSettled([
       getLatestHealthRecord<HealthRecord | null>(),
       listHealthRecords<HealthRecord[]>(),
       getAnalysisReadiness<Readiness>(),
     ]);
+    const latest = latestResult.status === "fulfilled" ? latestResult.value : null;
+    const list = listResult.status === "fulfilled" ? listResult.value : [];
     setLatestRecord(latest);
     setRecords(list);
     setSelectedRecord((current) => {
@@ -480,12 +490,22 @@ export default function HealthRecordPage() {
       }
       return list.find((record) => Number(record.id) === Number(current.id)) ?? null;
     });
-    setReadiness(readinessResult);
+    setReadiness(readinessResult.status === "fulfilled" ? readinessResult.value : null);
     setForm(formFromRecord(latest, backendUser));
+    if (latestResult.status === "rejected" || listResult.status === "rejected" || readinessResult.status === "rejected") {
+      setError("일부 건강정보를 불러오지 못했습니다. 입력값을 확인한 뒤 다시 저장해 주세요.");
+    }
   };
 
   useEffect(() => {
-    void load().catch(() => setError("건강정보를 불러오지 못했습니다."));
+    void load().catch(() => {
+      setLatestRecord(null);
+      setRecords([]);
+      setSelectedRecord(null);
+      setReadiness(null);
+      setForm(formFromRecord(null, backendUser));
+      setError("건강정보를 불러오지 못했습니다. 기본 입력은 계속 사용할 수 있습니다.");
+    });
   }, [backendUser?.id]);
 
   useEffect(() => {
@@ -596,6 +616,8 @@ export default function HealthRecordPage() {
   const missingPrecisionFields = (readiness?.missing_precision_fields ?? []).filter(
     (field) => field !== "hba1c" && field !== "당화혈색소",
   );
+  const stepParam = searchParams.get("step");
+  const isHistoryTab = stepParam !== "basic" && stepParam !== "precision";
 
   return (
     <div className="page-stack">
@@ -606,7 +628,6 @@ export default function HealthRecordPage() {
         </div>
       </header>
 
-      {/* 입력 단계 탭 */}
       <div className="health-tab-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Link
           className="filter-tab"
@@ -617,21 +638,32 @@ export default function HealthRecordPage() {
         </Link>
 
         <div className="health-tab-sub-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {steps.map((step, index) => (
-            <button
-              className={index === activeStep ? "filter-tab active" : "filter-tab"}
-              key={step}
-              onClick={() => setActiveStep(index)}
-              style={{ fontSize: "15px", padding: "8px 18px" }}
-              type="button"
-            >
-              {step}
-            </button>
-          ))}
+          <Link
+            className={!isHistoryTab && activeStep === 0 ? "filter-tab active" : "filter-tab"}
+            style={{ fontSize: "15px", padding: "8px 18px" }}
+            to="/health?step=basic"
+          >
+            간편 분석 정보 입력
+          </Link>
+          <Link
+            className={!isHistoryTab && activeStep === 1 ? "filter-tab active" : "filter-tab"}
+            style={{ fontSize: "15px", padding: "8px 18px" }}
+            to="/health?step=precision"
+          >
+            정밀 분석 정보 입력
+          </Link>
+          <Link
+            className={isHistoryTab ? "filter-tab active" : "filter-tab"}
+            style={{ fontSize: "15px", padding: "8px 18px" }}
+            to="/health"
+          >
+            건강정보 기록
+          </Link>
         </div>
       </div>
 
     <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
+      {!isHistoryTab && (
       <Card
         title="건강정보 입력"
         actions={
@@ -728,6 +760,8 @@ export default function HealthRecordPage() {
           </div>
         </form>
       </Card>
+      )}
+      {isHistoryTab && (
       <Card title="건강정보 기록">
         {records.length === 0 ? (
           <div className="state-box">아직 저장된 건강정보 기록이 없습니다.</div>
@@ -743,7 +777,7 @@ export default function HealthRecordPage() {
                     <th>저장일</th>
                     <th>기록일</th>
                     <th>입력 방식</th>
-                    <th>주요 수치</th>
+                    <th>요약</th>
                     <th>상세</th>
                   </tr>
                 </thead>
@@ -780,7 +814,7 @@ export default function HealthRecordPage() {
                 <div className="section-heading">
                   <h3>기록 상세</h3>
                   <p>
-                    {formatDateTime(selectedRecord.created_at)} · {getSourceLabel(selectedRecord.source)}
+                    {formatDateTime(selectedRecord.created_at)} · {getSourceLabel(selectedRecord.source)} · BMI {formatBmiForDisplay(selectedRecord)}
                   </p>
                 </div>
                 <div className="readonly-health-grid">
@@ -804,6 +838,7 @@ export default function HealthRecordPage() {
           </div>
         )}
       </Card>
+      )}
       {deleteTargetId && (
         <ConfirmDialog
           cancelLabel="취소"
