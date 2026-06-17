@@ -188,6 +188,22 @@ EXAM_GPT_VISION_MODEL=gpt-4o
 GPT_VISION_FALLBACK_ENABLED=true
 ```
 
+PaddleOCR을 건강검진 OCR 주기능으로 쓰고 GPT Vision을 fallback으로 둘 때는 OCR dependency가 포함된 ai-worker image tag를 먼저 배포합니다. 배포 후 아래 smoke가 통과해야 합니다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec -T ai-worker \
+  uv run --no-sync python -c "import cv2; import paddleocr; print('ocr imports ok')"
+```
+
+import가 통과하면 운영자가 아래 조합으로 전환할 수 있습니다.
+
+```env
+EXAM_OCR_PROVIDER=auto
+PADDLE_OCR_ENABLED=true
+EXAM_GPT_VISION_ENABLED=true
+GPT_VISION_FALLBACK_ENABLED=true
+```
+
 `EXAM_OCR_PROVIDER`는 `fallback`, `auto`, `paddleocr`, `gpt_vision` 값을 사용합니다. `fallback`은 OCR provider 후보가 없다는 뜻이며 성공용 더미 provider가 아닙니다. OCR 측정값 조회 시 실제 FK 컬럼명은 `exam_report_id`입니다.
 
 ## 8. Docker image pull/build 정책

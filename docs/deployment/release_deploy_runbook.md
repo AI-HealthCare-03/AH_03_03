@@ -125,6 +125,7 @@ export AI_WORKER_VERSION=v1.0.1
 export FRONTEND_VERSION=v1.0.1
 make image-tags
 make image-build-check
+make image-check-ai-ocr-import
 make image-push
 ```
 
@@ -138,7 +139,7 @@ make image-tags
 make image-build-push
 ```
 
-`make image-push`와 `make image-build-push`는 app, ai-worker, frontend 세 image를 모두 대상으로 합니다. Docker Hub token/password는 shell history나 문서에 남기지 않습니다.
+`make image-check-ai-ocr-import`는 build된 ai-worker image에서 `cv2`와 `paddleocr` import를 확인합니다. `make image-push`와 `make image-build-push`는 app, ai-worker, frontend 세 image를 모두 대상으로 합니다. Docker Hub token/password는 shell history나 문서에 남기지 않습니다.
 
 ## 4. EC2 반영 절차
 
@@ -218,6 +219,22 @@ OPENAI_API_KEY=<SET_IN_PROD>
 EXAM_OCR_PROVIDER=gpt_vision
 EXAM_GPT_VISION_ENABLED=true
 EXAM_GPT_VISION_MODEL=gpt-4o
+GPT_VISION_FALLBACK_ENABLED=true
+```
+
+PaddleOCR을 건강검진 OCR 주기능으로 쓰고 GPT Vision을 fallback으로 둘 때는 ai-worker image가 OCR dependency를 포함한 새 tag로 배포되어 있어야 합니다. 배포 후 아래 import smoke가 통과하는지 먼저 확인합니다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec -T ai-worker \
+  uv run --no-sync python -c "import cv2; import paddleocr; print('ocr imports ok')"
+```
+
+import가 통과하면 운영자가 `.prod.env`에서 아래 OCR provider 조합으로 전환할 수 있습니다.
+
+```env
+EXAM_OCR_PROVIDER=auto
+PADDLE_OCR_ENABLED=true
+EXAM_GPT_VISION_ENABLED=true
 GPT_VISION_FALLBACK_ENABLED=true
 ```
 
@@ -521,6 +538,15 @@ local storage 사용 시 `S3_BUCKET_NAME`은 비어 있어도 됩니다.
 `exam_reports.ocr_status=FAILED`이고 `exam_measurements`가 비어 있으면 provider 설정 또는 업로드 파일 문제입니다. `EXAM_OCR_PROVIDER=fallback`, `EXAM_GPT_VISION_ENABLED=false`, `PADDLE_OCR_ENABLED=false` 조합은 더미 결과를 만들지 않는 안전 기본값입니다.
 
 GPT Vision OCR을 운영에서 사용하려면 `OPENAI_API_KEY`, `EXAM_OCR_PROVIDER=gpt_vision`, `EXAM_GPT_VISION_ENABLED=true`, `EXAM_GPT_VISION_MODEL`, `GPT_VISION_FALLBACK_ENABLED=true`를 확인합니다. 값 자체는 출력하지 않습니다.
+
+PaddleOCR을 운영 주기능으로 쓰려면 ai-worker image에 `cv2`와 `paddleocr`가 설치되어 있어야 합니다. 새 worker image tag 배포 후 아래 smoke가 실패하면 `.prod.env`만 켜지 말고 worker image를 다시 build/push/deploy합니다.
+
+```bash
+docker compose --env-file .prod.env -f infra/docker/docker-compose.prod.yml exec -T ai-worker \
+  uv run --no-sync python -c "import cv2; import paddleocr; print('ocr imports ok')"
+```
+
+PaddleOCR 주기능 + GPT Vision fallback 조합은 `EXAM_OCR_PROVIDER=auto`, `PADDLE_OCR_ENABLED=true`, `EXAM_GPT_VISION_ENABLED=true`, `GPT_VISION_FALLBACK_ENABLED=true`입니다.
 
 측정값 조회 SQL은 `report_id`가 아니라 `exam_report_id`를 사용합니다.
 

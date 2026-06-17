@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,6 +21,7 @@ COPY pyproject.toml uv.lock ./
 
 # 3. Redis Stream consumer가 DB 상태를 갱신하고 OCR을 실행하므로 app + ai + ocr 그룹을 함께 설치합니다.
 RUN uv sync --group app --group ai --group ocr --no-dev --frozen
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 4. 로컬 소스 코드를 컨테이너 내부로 복사합니다.
 COPY ./ai_runtime ./ai_runtime
