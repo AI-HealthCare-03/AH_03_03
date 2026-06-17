@@ -28,6 +28,12 @@ HEALTH_RECORD_SNAPSHOT_FIELDS = (
     "ldl_cholesterol",
     "hdl_cholesterol",
     "triglyceride",
+    "ast",
+    "alt",
+    "gamma_gtp",
+    "creatinine",
+    "egfr",
+    "hemoglobin",
     "has_diabetes",
     "has_obesity",
     "has_dyslipidemia",
@@ -77,11 +83,27 @@ REQUIRED_PRECISION_ANALYSIS_FIELDS = {
 
 OPTIONAL_PRECISION_ANALYSIS_FIELDS = {
     "hba1c": "당화혈색소",
+    "ast": "AST",
+    "alt": "ALT",
+    "gamma_gtp": "감마GTP",
+    "creatinine": "크레아티닌",
+    "egfr": "eGFR",
+    "hemoglobin": "혈색소",
 }
+
+HEALTH_RECORD_PRECISION_EXTENSION_FIELDS = (
+    "ast",
+    "alt",
+    "gamma_gtp",
+    "creatinine",
+    "egfr",
+    "hemoglobin",
+)
 
 
 async def create_health_record(user_id: int, request: HealthRecordCreateRequest) -> HealthRecord:
     data = _with_calculated_bmi(request.model_dump())
+    data = await _with_preserved_precision_extension_fields(user_id, data)
     data["source"] = normalize_health_record_source(data.get("source"), HEALTH_RECORD_SOURCE_MANUAL)
     return await health_repository.create_health_record(user_id, data)
 
@@ -182,6 +204,21 @@ def normalize_health_record_source(value: object, default: str = HEALTH_RECORD_S
 
 def build_health_record_snapshot_data(record: HealthRecord) -> dict[str, object]:
     return {field_name: getattr(record, field_name, None) for field_name in HEALTH_RECORD_SNAPSHOT_FIELDS}
+
+
+async def _with_preserved_precision_extension_fields(user_id: int, data: dict) -> dict:
+    latest_record = await health_repository.get_latest_health_record_by_user(user_id)
+    if latest_record is None:
+        return data
+
+    preserved = dict(data)
+    for field_name in HEALTH_RECORD_PRECISION_EXTENSION_FIELDS:
+        if not _is_missing_value(preserved.get(field_name)):
+            continue
+        latest_value = getattr(latest_record, field_name, None)
+        if not _is_missing_value(latest_value):
+            preserved[field_name] = latest_value
+    return preserved
 
 
 def _is_missing_value(value: object) -> bool:

@@ -70,6 +70,20 @@ function getText(item: Item | undefined | null, key: string, fallback = "-"): st
   return String(value);
 }
 
+function getPairedHealthText(
+  item: Item | undefined | null,
+  firstKey: string,
+  secondKey: string,
+  unit = "",
+): string {
+  const first = getText(item, firstKey, "");
+  const second = getText(item, secondKey, "");
+  if (!first && !second) {
+    return "-";
+  }
+  return `${first || "-"}/${second || "-"}${unit ? ` ${unit}` : ""}`;
+}
+
 function getDateLabel(value: unknown): string {
   if (!value) {
     return "-";
@@ -257,6 +271,9 @@ export default function MyPage() {
       ["성별", backendUser?.gender === "FEMALE" ? "여성" : backendUser?.gender === "MALE" ? "남성" : "-"],
       ["키/몸무게", `${latestHealth?.height_cm != null ? Number(latestHealth.height_cm).toFixed(1) : "-"}cm / ${getText(latestHealth, "weight_kg")}kg`],
       ["BMI", getText(latestHealth, "bmi")],
+      ["AST/ALT", getPairedHealthText(latestHealth, "ast", "alt", "U/L")],
+      ["크레아티닌/eGFR", getPairedHealthText(latestHealth, "creatinine", "egfr")],
+      ["혈색소", latestHealth?.hemoglobin != null ? `${getText(latestHealth, "hemoglobin")} g/dL` : "-"],
     ],
     [backendUser, latestHealth],
   );
@@ -499,6 +516,18 @@ export default function MyPage() {
                   <Moon size={14} /> 수면
                 </span>
                 <strong>{getText(latestHealth, "sleep_hours", "기록 없음")}</strong>
+              </div>
+              <div>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Activity size={14} /> 간기능(AST/ALT)
+                </span>
+                <strong>{getText(latestHealth, "ast")}/{getText(latestHealth, "alt")}</strong>
+              </div>
+              <div>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Droplet size={14} /> 신장기능(eGFR)
+                </span>
+                <strong>{getText(latestHealth, "egfr", "기록 없음")}</strong>
               </div>
             </div>
           </Card>

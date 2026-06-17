@@ -19,6 +19,12 @@ class HealthRecordCreateRequest(BaseModel):
     ldl_cholesterol: int | None = None
     hdl_cholesterol: int | None = None
     triglyceride: int | None = None
+    ast: int | None = None
+    alt: int | None = None
+    gamma_gtp: int | None = None
+    creatinine: Decimal | None = None
+    egfr: Decimal | None = None
+    hemoglobin: Decimal | None = None
     has_diabetes: bool | None = None
     has_obesity: bool | None = None
     has_dyslipidemia: bool | None = None
@@ -50,6 +56,12 @@ class HealthRecordUpdateRequest(BaseModel):
     ldl_cholesterol: int | None = None
     hdl_cholesterol: int | None = None
     triglyceride: int | None = None
+    ast: int | None = None
+    alt: int | None = None
+    gamma_gtp: int | None = None
+    creatinine: Decimal | None = None
+    egfr: Decimal | None = None
+    hemoglobin: Decimal | None = None
     has_diabetes: bool | None = None
     has_obesity: bool | None = None
     has_dyslipidemia: bool | None = None
@@ -83,6 +95,12 @@ class HealthRecordResponse(BaseSerializerModel):
     ldl_cholesterol: int | None
     hdl_cholesterol: int | None
     triglyceride: int | None
+    ast: int | None
+    alt: int | None
+    gamma_gtp: int | None
+    creatinine: Decimal | None
+    egfr: Decimal | None
+    hemoglobin: Decimal | None
     has_diabetes: bool | None
     has_obesity: bool | None
     has_dyslipidemia: bool | None

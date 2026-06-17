@@ -56,6 +56,12 @@ const initialForm: HealthProfileFormState = {
   triglyceride: "",
   hdl_cholesterol: "",
   ldl_cholesterol: "",
+  ast: "",
+  alt: "",
+  gamma_gtp: "",
+  creatinine: "",
+  egfr: "",
+  hemoglobin: "",
   waist_cm: "",
   education_level: "",
   income_level: "",
@@ -92,6 +98,12 @@ const healthFieldLabels: Record<string, string> = {
   triglyceride: "중성지방",
   hdl_cholesterol: "HDL 콜레스테롤",
   ldl_cholesterol: "LDL 콜레스테롤",
+  ast: "AST",
+  alt: "ALT",
+  gamma_gtp: "감마GTP",
+  creatinine: "크레아티닌",
+  egfr: "eGFR",
+  hemoglobin: "혈색소",
   waist_cm: "허리둘레",
 };
 
@@ -170,6 +182,12 @@ function formFromRecord(
     triglyceride: toStringValue(record?.triglyceride),
     hdl_cholesterol: toStringValue(record?.hdl_cholesterol),
     ldl_cholesterol: toStringValue(record?.ldl_cholesterol),
+    ast: toStringValue(record?.ast),
+    alt: toStringValue(record?.alt),
+    gamma_gtp: toStringValue(record?.gamma_gtp),
+    creatinine: toStringValue(record?.creatinine),
+    egfr: toStringValue(record?.egfr),
+    hemoglobin: toStringValue(record?.hemoglobin),
     waist_cm: toStringValue(record?.waist_cm),
   };
 }
@@ -206,6 +224,12 @@ function buildHealthPayload(
     "triglyceride",
     "hdl_cholesterol",
     "ldl_cholesterol",
+    "ast",
+    "alt",
+    "gamma_gtp",
+    "creatinine",
+    "egfr",
+    "hemoglobin",
   ];
   numericFields.forEach((field) => {
     const value = parseNumber(form[field]);
@@ -235,6 +259,12 @@ function hasMeaningfulHealthData(form: HealthProfileFormState): boolean {
     form.triglyceride,
     form.hdl_cholesterol,
     form.ldl_cholesterol,
+    form.ast,
+    form.alt,
+    form.gamma_gtp,
+    form.creatinine,
+    form.egfr,
+    form.hemoglobin,
     form.waist_cm,
   ];
   return values.some((value) => value !== "") || [form.family_htn, form.family_dm, form.family_dyslipidemia].some((value) => value !== "UNKNOWN");
@@ -253,6 +283,12 @@ function validateHealthInput(form: HealthProfileFormState): string[] {
     ["triglyceride", "중성지방", 20, 1000],
     ["hdl_cholesterol", "HDL 콜레스테롤", 10, 150],
     ["ldl_cholesterol", "LDL 콜레스테롤", 10, 400],
+    ["ast", "AST", 0, 1000],
+    ["alt", "ALT", 0, 1000],
+    ["gamma_gtp", "감마GTP", 0, 2000],
+    ["creatinine", "크레아티닌", 0, 20],
+    ["egfr", "eGFR", 0, 200],
+    ["hemoglobin", "혈색소", 0, 30],
     ["walking_days", "걷기 일수", 0, 7],
     ["strength_days", "근력운동 일수", 0, 7],
   ];
@@ -334,6 +370,12 @@ function getRecordSummary(record: HealthRecord): string {
   if (record.ldl_cholesterol !== undefined && record.ldl_cholesterol !== null) {
     items.push(`LDL ${record.ldl_cholesterol}mg/dL`);
   }
+  if (record.ast !== undefined && record.ast !== null) {
+    items.push(`AST ${record.ast}U/L`);
+  }
+  if (record.creatinine !== undefined && record.creatinine !== null) {
+    items.push(`Cr ${record.creatinine}mg/dL`);
+  }
   return items.length > 0 ? items.join(" · ") : "주요 수치 미입력";
 }
 
@@ -350,6 +392,12 @@ const recordDetailItems: Array<{ key: string; label: string; unit?: string; disp
   { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL" },
   { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL" },
   { key: "triglyceride", label: "중성지방", unit: "mg/dL" },
+  { key: "ast", label: "AST", unit: "U/L" },
+  { key: "alt", label: "ALT", unit: "U/L" },
+  { key: "gamma_gtp", label: "감마GTP", unit: "U/L" },
+  { key: "creatinine", label: "크레아티닌", unit: "mg/dL" },
+  { key: "egfr", label: "eGFR", unit: "mL/min/1.73m²" },
+  { key: "hemoglobin", label: "혈색소", unit: "g/dL" },
   { key: "occupation_code", label: "직업군" },
   { key: "family_htn", label: "고혈압 가족력", display: true },
   { key: "family_dm", label: "당뇨병 가족력", display: true },
@@ -628,7 +676,7 @@ export default function HealthRecordPage() {
               <p style={{ margin: "2px 0 0" }}>정밀 분석 정보를 추가로 입력하시면 예측 정확도가 높아집니다.</p>
               {activeStep === 1 && (
                 <p style={{ margin: "2px 0 0" }}>
-                  AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소 같은 확장 정밀검사 수치는 검진표 OCR 결과와 분석 상세에서 확인할 수 있습니다.
+                  AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소는 검진표 OCR 확정 시 비어 있는 건강정보에 보충되며 직접 입력도 가능합니다.
                 </p>
               )}
               <p style={{ margin: "2px 0 0" }}>

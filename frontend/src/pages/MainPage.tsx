@@ -599,6 +599,22 @@ export default function MainPage() {
                       </div>
                     );
                   })()}
+                  <div className="viz-stat-row">
+                    <span>AST / ALT</span>
+                    <strong>
+                      {latestHealth.ast != null || latestHealth.alt != null
+                        ? `${String(latestHealth.ast ?? "-")} / ${String(latestHealth.alt ?? "-")} U/L`
+                        : "-"}
+                    </strong>
+                  </div>
+                  <div className="viz-stat-row">
+                    <span>eGFR / 혈색소</span>
+                    <strong>
+                      {latestHealth.egfr != null || latestHealth.hemoglobin != null
+                        ? `${String(latestHealth.egfr ?? "-")} / ${String(latestHealth.hemoglobin ?? "-")}`
+                        : "-"}
+                    </strong>
+                  </div>
                 </>
               ) : (
                 <div className="viz-empty">

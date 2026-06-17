@@ -113,6 +113,8 @@ async def test_precision_input_payload_keeps_health_record_values_over_exam_meas
             _measurement("diastolic_bp", "73 mmHg"),
             _measurement("LDL", "95 mg/dL"),
             _measurement("HbA1c", "5.3 %"),
+            _measurement("AST", "30 U/L"),
+            _measurement("creatinine", "0.9 mg/dL"),
         ],
     )
 
@@ -123,6 +125,8 @@ async def test_precision_input_payload_keeps_health_record_values_over_exam_meas
             diastolic_bp=90,
             ldl_cholesterol=150,
             hba1c=Decimal("6.1"),
+            ast=40,
+            creatinine=Decimal("1.1"),
         ),
     )
 
@@ -131,8 +135,11 @@ async def test_precision_input_payload_keeps_health_record_values_over_exam_meas
     assert x2_payload["diastolic_bp"] == 90
     assert x2_payload["ldl_cholesterol"] == 150
     assert x2_payload["hba1c"] == Decimal("6.1")
+    assert x2_payload["ast"] == 40
+    assert x2_payload["creatinine"] == Decimal("1.1")
     assert payload["x2_field_sources"]["systolic_bp"] == "health_record"
     assert payload["x2_field_sources"]["ldl_cholesterol"] == "health_record"
+    assert payload["x2_field_sources"]["ast"] == "health_record"
     assert payload["x2_merge_policy"] == "health_record_first_missing_only_exam_fallback"
 
 

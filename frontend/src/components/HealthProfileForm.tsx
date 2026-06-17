@@ -24,6 +24,12 @@ export type HealthProfileFormState = {
   triglyceride: string;
   hdl_cholesterol: string;
   ldl_cholesterol: string;
+  ast: string;
+  alt: string;
+  gamma_gtp: string;
+  creatinine: string;
+  egfr: string;
+  hemoglobin: string;
   waist_cm: string;
   education_level: string;
   income_level: string;
@@ -175,6 +181,12 @@ const sections: Array<{
       { key: "triglyceride", label: "중성지방", type: "number", placeholder: "mg/dL" },
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", type: "number", placeholder: "mg/dL" },
+      { key: "ast", label: "AST", type: "number", placeholder: "U/L" },
+      { key: "alt", label: "ALT", type: "number", placeholder: "U/L" },
+      { key: "gamma_gtp", label: "감마GTP", type: "number", placeholder: "U/L" },
+      { key: "creatinine", label: "크레아티닌", type: "number", placeholder: "mg/dL" },
+      { key: "egfr", label: "eGFR", type: "number", placeholder: "mL/min/1.73m²" },
+      { key: "hemoglobin", label: "혈색소", type: "number", placeholder: "g/dL" },
       { key: "waist_cm", label: "허리둘레", type: "number", placeholder: "cm", required: true },
     ],
   },
@@ -242,7 +254,14 @@ export default function HealthProfileForm({ form, bmi, onChange, visibleSections
                     max={undefined}
                     onChange={(event) => onChange(field.key, event.target.value)}
                     placeholder={field.placeholder}
-                    step={field.key === "hba1c" ? "0.1" : "1"}
+                    step={
+                      field.key === "hba1c" ||
+                      field.key === "creatinine" ||
+                      field.key === "egfr" ||
+                      field.key === "hemoglobin"
+                        ? "0.1"
+                        : "1"
+                    }
                     type={field.type ?? "text"}
                     value={form[field.key]}
                   />

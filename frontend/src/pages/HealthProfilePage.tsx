@@ -63,6 +63,12 @@ const emptyForm: HealthProfileFormState = {
   triglyceride: "",
   hdl_cholesterol: "",
   ldl_cholesterol: "",
+  ast: "",
+  alt: "",
+  gamma_gtp: "",
+  creatinine: "",
+  egfr: "",
+  hemoglobin: "",
   waist_cm: "",
   education_level: "",
   income_level: "",
@@ -94,6 +100,12 @@ const x2Fields: Array<{ key: keyof HealthProfileFormState; label: string }> = [
   { key: "hdl_cholesterol", label: "HDL 콜레스테롤" },
   { key: "ldl_cholesterol", label: "LDL 콜레스테롤" },
   { key: "waist_cm", label: "허리둘레" },
+  { key: "ast", label: "AST" },
+  { key: "alt", label: "ALT" },
+  { key: "gamma_gtp", label: "감마GTP" },
+  { key: "creatinine", label: "크레아티닌" },
+  { key: "egfr", label: "eGFR" },
+  { key: "hemoglobin", label: "혈색소" },
 ];
 
 const backendMissingLabelMap: Record<string, string> = {
@@ -108,6 +120,12 @@ const backendMissingLabelMap: Record<string, string> = {
   triglyceride: "중성지방",
   hdl_cholesterol: "HDL 콜레스테롤",
   ldl_cholesterol: "LDL 콜레스테롤",
+  ast: "AST",
+  alt: "ALT",
+  gamma_gtp: "감마GTP",
+  creatinine: "크레아티닌",
+  egfr: "eGFR",
+  hemoglobin: "혈색소",
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
@@ -175,6 +193,12 @@ const readOnlySections: Array<{
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
+      { key: "ast", label: "AST", unit: "U/L", referenceOnly: true },
+      { key: "alt", label: "ALT", unit: "U/L", referenceOnly: true },
+      { key: "gamma_gtp", label: "감마GTP", unit: "U/L", referenceOnly: true },
+      { key: "creatinine", label: "크레아티닌", unit: "mg/dL", referenceOnly: true },
+      { key: "egfr", label: "eGFR", unit: "mL/min/1.73m²", referenceOnly: true },
+      { key: "hemoglobin", label: "혈색소", unit: "g/dL", referenceOnly: true },
     ],
   },
 ];
@@ -243,6 +267,12 @@ function formFromRecord(record: HealthRecord | null, userGender?: string | null,
     triglyceride: toStringValue(record?.triglyceride),
     hdl_cholesterol: toStringValue(record?.hdl_cholesterol),
     ldl_cholesterol: toStringValue(record?.ldl_cholesterol),
+    ast: toStringValue(record?.ast),
+    alt: toStringValue(record?.alt),
+    gamma_gtp: toStringValue(record?.gamma_gtp),
+    creatinine: toStringValue(record?.creatinine),
+    egfr: toStringValue(record?.egfr),
+    hemoglobin: toStringValue(record?.hemoglobin),
     smoking_status: normalizeCode(
       record?.smoking_status,
       ["NON_SMOKER", "PAST_SMOKER", "CURRENT_SMOKER"],
@@ -275,6 +305,12 @@ function hasMeaningfulHealthData(form: HealthProfileFormState): boolean {
     form.triglyceride,
     form.hdl_cholesterol,
     form.ldl_cholesterol,
+    form.ast,
+    form.alt,
+    form.gamma_gtp,
+    form.creatinine,
+    form.egfr,
+    form.hemoglobin,
     form.waist_cm,
   ];
   return values.some((value) => value !== "") || [form.family_htn, form.family_dm, form.family_dyslipidemia].some((value) => value !== "UNKNOWN");
@@ -320,6 +356,12 @@ function buildHealthPayload(
     "triglyceride",
     "hdl_cholesterol",
     "ldl_cholesterol",
+    "ast",
+    "alt",
+    "gamma_gtp",
+    "creatinine",
+    "egfr",
+    "hemoglobin",
   ];
   numericFields.forEach((field) => {
     const value = parseNumber(form[field]);
@@ -345,6 +387,12 @@ function validateForm(form: HealthProfileFormState): string | null {
     ["triglyceride", "중성지방", 20, 1000],
     ["hdl_cholesterol", "HDL 콜레스테롤", 10, 150],
     ["ldl_cholesterol", "LDL 콜레스테롤", 10, 400],
+    ["ast", "AST", 0, 1000],
+    ["alt", "ALT", 0, 1000],
+    ["gamma_gtp", "감마GTP", 0, 2000],
+    ["creatinine", "크레아티닌", 0, 20],
+    ["egfr", "eGFR", 0, 200],
+    ["hemoglobin", "혈색소", 0, 30],
     ["walking_days", "1주일간 걷기 일수", 0, 7],
     ["strength_days", "1주일간 근력운동 일수", 0, 7],
   ];
@@ -637,7 +685,7 @@ export default function HealthProfilePage() {
               )}
               <p>(※ 선택 입력 항목: 총콜레스테롤, LDL, HDL, 중성지방, 당화혈색소)</p>
               <p>
-                AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소는 검진표 OCR 결과와 분석 상세의 “분석에 사용된 검진 수치”에서 확인할 수 있습니다.
+                AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소는 검진표 OCR 확정 시 비어 있는 건강정보에 보충되며 직접 입력도 가능합니다.
               </p>
               <p>
                 검진표 값은 기존 건강정보를 자동으로 덮어쓰지 않습니다. 비어 있는 항목만 보충될 수 있으며, 검진표 기반 수치는 분석 상세에서 확인할 수 있습니다.
@@ -660,6 +708,9 @@ export default function HealthProfilePage() {
               ["공복혈당(mg/dL)", form.fasting_glucose],
               ["HDL(mg/dL)", form.hdl_cholesterol],
               ["LDL(mg/dL)", form.ldl_cholesterol],
+              ["AST(U/L)", form.ast],
+              ["ALT(U/L)", form.alt],
+              ["eGFR", form.egfr],
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>
