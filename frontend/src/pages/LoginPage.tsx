@@ -35,14 +35,14 @@ export default function LoginPage() {
     setError("");
 
     if (email.trim().length < 6) {
-    setError("아이디/이메일 또는 비밀번호를 확인해주세요.");
-    return;
-  }
+      setError("아이디/이메일 또는 비밀번호를 확인해주세요.");
+      return;
+    }
 
-  if (!password.trim()) {
-    setError("비밀번호를 입력해주세요.");
-    return;
-  }
+    if (!password.trim()) {
+      setError("비밀번호를 입력해주세요.");
+      return;
+    }
 
     try {
       await login(email, password);
@@ -82,16 +82,16 @@ export default function LoginPage() {
           </label>
           <button type="submit">로그인</button>
         </form>
-        <div className="button-row" style={{ marginTop: 12 }}>
-          <Link className="muted" to="/auth/find-login-id">
+        <div className="auth-helper-links">
+          <Link className="auth-helper-link" to="/auth/find-login-id">
             아이디 찾기
           </Link>
-          <Link className="muted" to="/auth/password-reset">
+          <Link className="auth-helper-link" to="/auth/password-reset">
             비밀번호 찾기
           </Link>
         </div>
-        <p className="muted">
-          계정이 없다면{" "}
+        <p className="auth-signup-prompt">
+          계정이 없다면
           <Link className="signup-link" to="/signup">
             회원가입
           </Link>
