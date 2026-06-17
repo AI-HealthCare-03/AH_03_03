@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production
+  group: ${{ github.event_name == 'pull_request' && format('deploy-prod-pr-{0}', github.event.pull_request.number) || 'deploy-prod-production' }}
   cancel-in-progress: false
 
 env:
@@ -19,11 +22,9 @@ env:
   VITE_API_BASE_URL: /api/v1
 
 jobs:
-  ci-build-push:
-    name: CI, build, and push images
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.version.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,6 +68,17 @@ jobs:
 
       - name: Compose config check
         run: docker compose --env-file envs/example.prod.env -f infra/docker/docker-compose.prod.yml config --quiet
+
+  build-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    outputs:
+      image_tag: ${{ steps.version.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Compute image tag
         id: version
@@ -115,7 +127,8 @@ jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
-    needs: ci-build-push
+    needs: build-push
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     steps:
       - name: Prepare SSH key
         run: |
@@ -128,7 +141,7 @@ jobs:
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
-          DEPLOY_TAG: ${{ needs.ci-build-push.outputs.image_tag }}
+          DEPLOY_TAG: ${{ needs.build-push.outputs.image_tag }}
         run: |
           ssh -i ~/.ssh/prod_deploy_key "$EC2_USER@$EC2_HOST" "DEPLOY_TAG='$DEPLOY_TAG' bash -s" <<'REMOTE'
           set -euo pipefail
