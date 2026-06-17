@@ -17,7 +17,8 @@ import { Salad, Dumbbell, Moon, Pill, Droplets, Droplet, Activity, Medal, Leaf, 
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const PAGE_SIZE = 4;
+const PAGE_SIZE = 10;
+const MY_CHALLENGE_PAGE_SIZE = 2;
 
 const challengeTabs = ["전체", "식단", "운동", "수면", "복약", "수분섭취", "혈압", "혈당", "생활습관"];
 
@@ -458,6 +459,7 @@ export default function ChallengePage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [myChallengePage, setMyChallengePage] = useState(1);
   const activeTab = getTabFromQuery(searchParams.get("category"));
   const activeDifficulty = getDifficultyFromQuery(searchParams.get("difficulty"));
   const page = getPageFromQuery(searchParams.get("page"));
@@ -575,11 +577,24 @@ export default function ChallengePage() {
   const pagedChallenges = filteredChallenges.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const activeMyChallenges = myChallenges.filter(isActiveChallengeStatus);
+  const myChallengePageCount = Math.max(1, Math.ceil(activeMyChallenges.length / MY_CHALLENGE_PAGE_SIZE));
+  const currentMyChallengePage = Math.min(myChallengePage, myChallengePageCount);
+  const pagedMyChallenges = activeMyChallenges.slice(
+    (currentMyChallengePage - 1) * MY_CHALLENGE_PAGE_SIZE,
+    currentMyChallengePage * MY_CHALLENGE_PAGE_SIZE,
+  );
   const activeUserChallengeIds = new Set(
     activeMyChallenges
       .map((item) => Number(item.id))
       .filter((id) => Number.isFinite(id)),
   );
+
+  useEffect(() => {
+    if (myChallengePage > myChallengePageCount) {
+      setMyChallengePage(myChallengePageCount);
+    }
+  }, [myChallengePage, myChallengePageCount]);
+
   const todayDoneCount = activeMyChallenges.filter((item) => getTodayCompletedCount(item) >= getDailyGoalCount(item, challenges)).length;
   const averageProgress =
     activeMyChallenges.length > 0
@@ -868,7 +883,7 @@ export default function ChallengePage() {
               {!loading && activeMyChallenges.length === 0 && (
                 <div className="compact-empty-state">아직 참여 중인 챌린지가 없습니다. 관심 있는 챌린지를 시작해보세요.</div>
               )}
-              {activeMyChallenges.slice(0, 4).map((challenge) => {
+              {pagedMyChallenges.map((challenge) => {
                 const master = findMasterChallenge(challenge, challenges);
                 const category = getCategory(master ?? challenge);
                 const progress = getProgress(challenge, challenges);
@@ -930,6 +945,29 @@ export default function ChallengePage() {
                 );
               })}
             </div>
+            {activeMyChallenges.length > MY_CHALLENGE_PAGE_SIZE ? (
+              <div className="pagination-row my-challenge-pagination">
+                <button
+                  className="secondary compact-button"
+                  disabled={currentMyChallengePage <= 1}
+                  onClick={() => setMyChallengePage((prev) => Math.max(1, prev - 1))}
+                  type="button"
+                >
+                  이전
+                </button>
+                <span>
+                  {currentMyChallengePage} / {myChallengePageCount}
+                </span>
+                <button
+                  className="secondary compact-button"
+                  disabled={currentMyChallengePage >= myChallengePageCount}
+                  onClick={() => setMyChallengePage((prev) => Math.min(myChallengePageCount, prev + 1))}
+                  type="button"
+                >
+                  다음
+                </button>
+              </div>
+            ) : null}
           </Card>
           <Card title="챌린지 달력">
             <div className="challenge-calendar-header">
