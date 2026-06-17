@@ -534,8 +534,7 @@ def check_grounding_or_fallback(state: HealthChatbotGraphState) -> HealthChatbot
         return next_state
 
     fallback_answer = (
-        "건강 관련 판단은 입력된 정보만으로 확정하기 어렵습니다. "
-        "생활습관 관리 방향은 참고용으로만 활용해 주세요."
+        "건강 관련 판단은 입력된 정보만으로 확정하기 어렵습니다. 생활습관 관리 방향은 참고용으로만 활용해 주세요."
     )
     fallback_safety = check_medical_safety(fallback_answer, require_disclaimer=False)
     grounding_metadata = {

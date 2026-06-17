@@ -497,8 +497,7 @@ def ensure_safe_answer(answer: str, *, include_caution_in_answer: bool = True) -
         return final_answer, safety_result
 
     safe_answer = (
-        "건강 관련 판단은 입력된 정보만으로 확정하기 어렵습니다. "
-        "생활습관 관리 방향은 참고용으로만 활용해 주세요."
+        "건강 관련 판단은 입력된 정보만으로 확정하기 어렵습니다. 생활습관 관리 방향은 참고용으로만 활용해 주세요."
     )
     if include_caution_in_answer:
         safe_answer = f"{safe_answer} {CAUTION_MESSAGE}"
