@@ -526,7 +526,7 @@ export default function MainPage() {
             <h2>건강 리포트 요약</h2>
             <p>최근 기록된 건강 지표를 시각적으로 확인합니다.</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+          <div className="main-report-grid">
             {/* 왼쪽: 질환별 관리 필요도 - main-dashboard-grid에서 이동 */}
             <div className="viz-card">
               <div className="viz-card-row">
@@ -628,9 +628,9 @@ export default function MainPage() {
           </div>
 
           {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
-          <div className="viz-card" style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "16px", alignItems: "start" }}>
+          <div className="viz-card challenge-summary-card" style={{ marginTop: "14px" }}>
             {/* 챌린지 현황 작은 카드 */}
-            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", width: "220px", flexShrink: 0 }}>
+            <div className="challenge-status-panel">
               <span className="viz-card-label">챌린지 현황</span>
               <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
                 <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>

@@ -328,18 +328,7 @@ export default function MyPage() {
         {notice && <div className="state-box">{notice}</div>}
         {error && <ErrorMessage message={error} />}
 
-        <Card title="프로필/기본 내역" actions={
-          !isEditingProfile ? (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Link className="btn-primary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/family">
-                가족 설정
-              </Link>
-              <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
-                수정
-              </button>
-            </div>
-          ) : undefined
-        }>
+        <Card title="프로필/기본 내역">
           <div className="profile-card-row">
             <span className="avatar avatar-large">{profileInitial}</span>
             <div className="profile-card-main">
@@ -380,8 +369,7 @@ export default function MyPage() {
               )}
             </div>
           </div>
-
-          <div className="button-row" style={{ marginTop: 16 }}>
+          <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end" }}>
             {isEditingProfile ? (
               <>
                 <button onClick={() => void saveProfileDraft()} type="button">
@@ -401,8 +389,16 @@ export default function MyPage() {
                   취소
                 </button>
               </>
-            ) : null}
-
+            ) : (
+              <>
+                <Link className="button" to="/family">
+                  가족 설정
+                </Link>
+                <button className="button secondary" onClick={() => setIsEditingProfile(true)} type="button">
+                  수정
+                </button>
+              </>
+            )}
           </div>
         </Card>
 
@@ -445,7 +441,7 @@ export default function MyPage() {
           </Card>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        <div className="mypage-health-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         <Card
           title="기본 건강정보"
           actions={

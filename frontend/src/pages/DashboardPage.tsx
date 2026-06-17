@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
+import { type CSSProperties, useEffect, useState, useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -253,6 +253,23 @@ function EmptyChartState() {
 }
 
 function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean; connectPairs?: boolean }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(640);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      requestAnimationFrame(() => {
+        const w = el.getBoundingClientRect().width;
+        if (w > 0) setChartWidth(Math.floor(w));
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   const visibleSeries = series
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
@@ -270,7 +287,7 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
   const rangePadding = rawMin === rawMax ? Math.max(rawMax * 0.1, 1) : (rawMax - rawMin) * 0.12;
   const min = clampTo100 ? 0 : Math.max(0, rawMin - rangePadding);
   const max = clampTo100 ? 100 : rawMax + rangePadding;
-  const width = 640;
+  const width = chartWidth;
   const height = 180;
   const padding = { top: 20, right: 24, bottom: 34, left: axisTicks?.length ? 76 : 44 };
   const innerWidth = width - padding.left - padding.right;
@@ -286,8 +303,15 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
 
   return (
     <div className="line-chart-card">
-      <div className="line-chart-wrap">
-        <svg aria-label="추적 꺾은선 그래프" className="line-chart" viewBox={`0 0 ${width} ${height}`} role="img">
+      <div className="line-chart-wrap" ref={wrapRef}>
+       <svg
+        aria-label="추적 꺾은선 그래프"
+        className="line-chart"
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        role="img"
+      >
           {gridValues.map((value) => {
             const y = yFor(value);
             return (
@@ -1042,3 +1066,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

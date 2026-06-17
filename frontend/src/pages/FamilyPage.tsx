@@ -705,7 +705,7 @@ export default function FamilyPage() {
 
           <div style={{ gridColumn: "1 / -1" }}>
           <Card title="가족 초대">
-            <div className="family-invite-grid" style={{ gridTemplateColumns: "repeat(2, minmax(200px, 1fr))" }}>
+            <div className="family-invite-grid">
               <form className="mini-card form" onSubmit={handleCreateInvite}>
                 <h3>초대 생성</h3>
                 <label>

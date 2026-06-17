@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { HouseHeart, HeartPulse, Trophy, Salad, FileText, Bell, User } from "lucide-react";
 
 import { useAuth } from "../auth/AuthContext";
 import { sidebarLinks } from "./Sidebar";
@@ -10,11 +11,11 @@ type MobileNavProps = {
 };
 
 const bottomLinks = [
-  { to: "/", icon: "🏠", label: "홈" },
-  { to: "/health", icon: "🧭", label: "분석" },
-  { to: "/challenges", icon: "✅", label: "챌린지" },
-  { to: "/diets", icon: "🥗", label: "식단" },
-  { to: "/ocr/exam", icon: "📄", label: "검진표" },
+  { to: "/", icon: <HouseHeart size={20} />, label: "홈" },
+  { to: "/health", icon: <HeartPulse size={20} />, label: "분석" },
+  { to: "/challenges", icon: <Trophy size={20} />, label: "챌린지" },
+  { to: "/diets", icon: <Salad size={20} />, label: "식단" },
+  { to: "/ocr/exam", icon: <FileText size={20} />, label: "검진표" },
 ];
 
 const linkByPath = new Map(sidebarLinks.map((link) => [link.to, link]));
@@ -25,17 +26,12 @@ const pickLinks = (paths: string[]) => paths.flatMap((path) => {
 
 const drawerSections = [
   {
-    links: pickLinks(["/", "/health", "/ocr/exam", "/diets", "/challenges", "/chatbot"]),
-    title: "주요 기능",
-  },
-  {
-    links: pickLinks(["/dashboard", "/medications", "/family"]),
+    links: pickLinks(["/chatbot", "/dashboard", "/medications", "/family"]),
     title: "기록/관리",
   },
   {
     links: [
-      { to: "/notifications", icon: "🔔", label: "알림" },
-      { to: "/mypage", icon: "👤", label: "마이페이지" },
+      { to: "/mypage", icon: <User size={20} />, label: "마이페이지" },
       ...pickLinks(["/inquiries", "/faq", "/settings"]),
     ],
     title: "계정/지원",

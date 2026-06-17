@@ -561,31 +561,28 @@ export default function HealthProfilePage() {
           <h1>건강 분석</h1>
           <p>건강정보를 입력하고 만성질환 위험도를 분석합니다.</p>
         </div>
-        <div className="button-row">
-          {!editing && (
-            <button className="btn-primary" onClick={() => setEditing(true)} type="button">
-              수정하기
-            </button>
-          )}
+        <div className="profile-action-row">
           <button className="btn-secondary" disabled={runningMode !== null} onClick={() => void runAnalysis("BASIC")} type="button">
-            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석하기"}
+            {runningMode === "BASIC" ? "간편 분석 중..." : "간편 분석"}
           </button>
           <button className="btn-secondary" disabled={runningMode !== null} onClick={() => void runAnalysis("PRECISION")} type="button">
-            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석하기"}
+            {runningMode === "PRECISION" ? "정밀 분석 중..." : "정밀 분석"}
           </button>
         </div>
       </header>
       {/* 입력 단계 탭 */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health/profile">
+      <div className="health-tab-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Link className="filter-tab active" style={{ fontSize: "15px", padding: "8px 18px", alignSelf: "flex-start" }} to="/health/profile">
           한눈에 보기
         </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=basic">
-          간편 분석 정보 입력
-        </Link>
-        <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=precision">
-          정밀 분석 정보 입력
-        </Link>
+        <div className="health-tab-sub-group" style={{ display: "flex", gap: "8px" }}>
+          <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=basic">
+            간편 분석 정보 입력
+          </Link>
+          <Link className="filter-tab" style={{ fontSize: "15px", padding: "8px 18px" }} to="/health?step=precision">
+            정밀 분석 정보 입력
+          </Link>
+        </div>
       </div>
 
       {error && <ErrorMessage message={error} />}

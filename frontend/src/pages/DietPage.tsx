@@ -192,6 +192,8 @@ export default function DietPage() {
   const [analysisMealType, setAnalysisMealType] = useState(getDefaultMealType());
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [dietPage, setDietPage] = useState(0);
+  const DIET_PAGE_SIZE = 5;
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -667,7 +669,7 @@ export default function DietPage() {
       <Card title="최근 식단">
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
-          {records.slice(0, 5).map((record) => {
+          {records.slice(dietPage * DIET_PAGE_SIZE, (dietPage + 1) * DIET_PAGE_SIZE).map((record) => {
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
@@ -687,6 +689,13 @@ export default function DietPage() {
             );
           })}
         </div>
+        {records.length > DIET_PAGE_SIZE && (
+          <div className="button-row pagination-row" style={{ justifyContent: "center", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <button className="button secondary" disabled={dietPage === 0} onClick={() => setDietPage(p => p - 1)} style={{ flex: "0 0 auto" }} type="button">이전</button>
+            <span className="muted">{dietPage + 1} / {Math.ceil(records.length / DIET_PAGE_SIZE)}</span>
+            <button className="button secondary" disabled={(dietPage + 1) * DIET_PAGE_SIZE >= records.length} onClick={() => setDietPage(p => p + 1)} style={{ flex: "0 0 auto" }} type="button">다음</button>
+          </div>
+        )}
       </Card>
     </div>
     </div>
