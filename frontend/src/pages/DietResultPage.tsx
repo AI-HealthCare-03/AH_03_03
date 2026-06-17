@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -12,6 +12,8 @@ import {
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import { formatDateTime, mealTypeLabel } from "../utils/format";
+import { categoryIcon } from "./ChallengePage";
+import { Trophy } from "lucide-react";
 
 type Item = Record<string, unknown>;
 
@@ -382,7 +384,7 @@ export default function DietResultPage() {
   const isManual = isManualRecord(record);
 
   return (
-    <div className="page-grid">
+    <div className="page-grid" style={{ gridTemplateColumns: "1fr" }}>
       {error && <ErrorMessage message={error} />}
       <div style={{ marginBottom: "8px", gridColumn: "1 / -1" }}>
         <button className="button secondary" onClick={() => navigate(-1)} type="button">
@@ -428,25 +430,7 @@ export default function DietResultPage() {
             </p>
           </div>
         </div>
-      </Card>
-      {isManual ? (
-        <Card title="입력한 음식 목록">
-          <div className="card-list">
-            {detectedFoods.length === 0 && <div className="state-box">입력된 음식 목록이 없습니다.</div>}
-            {detectedFoods.map((food, index) => (
-              <div className="mini-card" key={`${String(food.name ?? "food")}-${index}`}>
-                <strong>{String(food.name ?? "음식")}</strong>
-                <span className="muted">
-                  {[food.quantity ? `수량: ${String(food.quantity)}` : "", food.memo ? `메모: ${String(food.memo)}` : ""]
-                    .filter(Boolean)
-                    .join(" · ") || "추가 정보 없음"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        <Card title="감지된 음식">
+        {!isManual && (
           <div className="card-list">
             {displayImageUrl && !detailImageFailed && (
               <div className="mini-card">
@@ -529,8 +513,8 @@ export default function DietResultPage() {
               </>
             )}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
       {!isManual && hasCandidateSection && (
         <Card title="음식 후보 확인">
           <div className="card-list">
@@ -614,7 +598,7 @@ export default function DietResultPage() {
       {!isManual && (
         <Card title="내 상태에 맞춘 식단 관리 포인트">
           <div className="card-list">
-            <div className="state-box">
+            <div className="state-box" style={{ marginBottom: 0 }}>
               현재 식단에서 조절하거나 보완할 성분을 중심으로 확인해 주세요. 이 내용은 진단이나 처방이
               아닌 생활관리 참고 정보입니다.
             </div>
@@ -623,7 +607,7 @@ export default function DietResultPage() {
             ) : recommendationError ? (
               <div className="state-box">식단 평가를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
             ) : needsFoodConfirmation ? (
-              <div className="state-box">
+              <div className="state-box" style={{ marginTop: "-6px" }}>
                 음식 후보 확인이 필요합니다. 영양성분은 후보 기준이며, 음식명을 확인하면 더 정확한 식단 조언을 볼 수
                 있습니다.
               </div>
@@ -635,7 +619,6 @@ export default function DietResultPage() {
             )}
             {recommendation?.rag_comment?.summary && (
               <div className="mini-card">
-                <strong>요약</strong>
                 <span>{publicNutritionText(recommendation.rag_comment.summary)}</span>
               </div>
             )}
@@ -660,7 +643,7 @@ export default function DietResultPage() {
                     <div className="mini-card" key={`caution-${finding.issue_key}-${finding.label}`}>
                       <span className="badge badge-reference">{finding.label}</span>
                       <span>{publicNutritionText(finding.message)}</span>
-                      {finding.basis && <span className="muted">{publicNutritionText(finding.basis)}</span>}
+                      {finding.basis && <span className="muted" style={{ fontSize: "11px" }}>{publicNutritionText(finding.basis)}</span>}
                     </div>
                   ))}
                 </div>
@@ -671,11 +654,11 @@ export default function DietResultPage() {
                 <strong>보완하면 좋은 점</strong>
                 <div className="card-list">
                   {supportFindings.map((finding) => (
-                    <div className="mini-card" key={`support-${finding.issue_key}-${finding.label}`}>
-                      <span className="badge risk-low">{finding.label}</span>
+                    <Fragment key={`support-${finding.issue_key}-${finding.label}`}>
+                      <span className="badge risk-low" style={{ fontSize: "14px" }}>{finding.label}</span>
                       <span>{publicNutritionText(finding.message)}</span>
-                      {finding.basis && <span className="muted">{publicNutritionText(finding.basis)}</span>}
-                    </div>
+                      {finding.basis && <span className="muted" style={{ fontSize: "11px" }}>{publicNutritionText(finding.basis)}</span>}
+                    </Fragment>
                   ))}
                 </div>
               </div>
@@ -685,10 +668,10 @@ export default function DietResultPage() {
                 <strong>다음 식사에서 참고할 선택</strong>
                 {recommendedFoods.length > 0 && (
                   <>
-                    <span className="muted">보완하면 좋은 선택</span>
+                    <span className="muted" style={{ fontSize: "12px" }}>보완하면 좋은 선택</span>
                     <div className="chip-list">
                       {recommendedFoods.map((food) => (
-                        <span className="badge risk-low" key={`management-recommended-${food}`}>
+                        <span className="badge risk-low" style={{ fontSize: "14px" }} key={`management-recommended-${food}`}>
                           {publicNutritionText(food)}
                         </span>
                       ))}
@@ -697,7 +680,7 @@ export default function DietResultPage() {
                 )}
                 {cautionFoods.length > 0 && (
                   <>
-                    <span className="muted">양을 조절해 볼 선택</span>
+                    <span className="muted" style={{ fontSize: "12px" }}>양을 조절해 볼 선택</span>
                     <div className="chip-list">
                       {cautionFoods.map((food) => (
                         <span className="badge badge-reference" key={`management-caution-${food}`}>
@@ -719,8 +702,7 @@ export default function DietResultPage() {
           </div>
           {recommendation?.rag_comment && (
             <div className="mini-card">
-              <strong>참고 문서 기반 코멘트</strong>
-              {recommendation.rag_comment.rewrite_used && <span className="badge badge-reference">문장 다듬기 적용</span>}
+              <strong>식사 기반 건강 조언</strong>
               <span>{publicNutritionText(recommendation.rag_comment.summary)}</span>
               {recommendation.rag_comment.disease_comments.length > 0 && (
                 <div className="card-list">
@@ -742,7 +724,6 @@ export default function DietResultPage() {
                   ))}
                 </div>
               )}
-              <span className="muted">{publicNutritionText(recommendation.rag_comment.safety_notice)}</span>
             </div>
           )}
           {recommendationLoading && <div className="state-box">식단 기반 건강관리 추천을 불러오는 중입니다.</div>}
@@ -756,70 +737,16 @@ export default function DietResultPage() {
               표시할 건강관리 추천이 아직 없습니다. 식단 사진의 음식명과 영양성분 후보가 확인되면 참고용 추천이 표시됩니다.
             </div>
           )}
-          {recommendation && recommendation.nutrition_findings.length > 0 && (
-            <div className="mini-card">
-              <strong>영양 참고 포인트</strong>
-              <div className="card-list">
-                {recommendation.nutrition_findings.map((finding) => (
-                  <div className="mini-card" key={`${finding.issue_key}-${finding.label}`}>
-                    <span className="badge badge-reference">{finding.label}</span>
-                    <span>{publicNutritionText(finding.message)}</span>
-                    {finding.basis && <span className="muted">{publicNutritionText(finding.basis)}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {recommendation && recommendation.disease_context.length > 0 && (
-            <div className="mini-card">
-              <strong>건강상태 참고</strong>
-              <div className="card-list">
-                {recommendation.disease_context.map((context) => (
-                  <div className="mini-card" key={context.disease_code}>
-                    <span className="badge badge-reference">{context.label}</span>
-                    <span>{publicNutritionText(context.message)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {recommendation &&
-            (recommendation.recommended_foods.length > 0 || recommendation.caution_foods.length > 0) && (
-              <div className="mini-card">
-                <strong>음식 선택 참고</strong>
-                {recommendation.recommended_foods.length > 0 && (
-                  <>
-                    <span className="muted">보완하면 좋은 음식</span>
-                    <div className="chip-list">
-                      {recommendation.recommended_foods.map((food) => (
-                        <span className="badge risk-low" key={`recommended-${food}`}>
-                          {publicNutritionText(food)}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {recommendation.caution_foods.length > 0 && (
-                  <>
-                    <span className="muted">주의해서 살펴볼 음식</span>
-                    <div className="chip-list">
-                      {recommendation.caution_foods.map((food) => (
-                        <span className="badge badge-reference" key={`caution-${food}`}>
-                          {publicNutritionText(food)}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           {recommendation && recommendation.recommended_challenges.length > 0 && (
             <div className="mini-card">
               <strong>추천 챌린지</strong>
               <div className="card-list">
                 {recommendation.recommended_challenges.map((challenge) => (
                   <div className="mini-card" key={challenge.challenge_id}>
-                    <strong>{challenge.title}</strong>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {categoryIcon[String(challenge.category ?? "").toUpperCase()] ?? <Trophy size={20} />}
+                      <strong>{challenge.title}</strong>
+                    </div>
                     <span className="muted">{truncateText(challenge.reason)}</span>
                     {challenge.challenge_id ? (
                       <Link className="button secondary compact-button" to={`/challenges/${challenge.challenge_id}`}>
@@ -833,48 +760,22 @@ export default function DietResultPage() {
           )}
         </div>
       </Card>
-      <Card title="추천 액션">
+      <Card title="더 알아보기">
         <div className="button-row">
           {dietRecordId && (
             <Link
               className="button secondary"
               to={`/chatbot?context_type=DIET&target_id=${dietRecordId}&initial_question=${encodeURIComponent("이 식단에서 조심할 점을 알려줘")}`}
             >
-              이 식단에 대해 질문하기
+              AI에게 질문하기
             </Link>
           )}
-          <button onClick={() => navigate("/diets/history")}>기록 완료</button>
           <Link className="button secondary" to="/dashboard">
-            추적 대시보드 이동
+            건강 리포트 보러가기
           </Link>
           <Link className="button secondary" to="/challenges">
-            추천 챌린지
+            챌린지 보러가기
           </Link>
-        </div>
-      </Card>
-      <Card title="분석 요약">
-        <div className="card-list">
-          <div className="mini-card">
-            <span className="muted">분석 일시</span>
-            <strong>{formatDateTime(record?.meal_time ?? record?.created_at)}</strong>
-          </div>
-          <div className="mini-card">
-            <span className="muted">식사 구분</span>
-            <strong>{mealTypeLabel(record?.meal_type)}</strong>
-          </div>
-          <div className="mini-card">
-            <span className="muted">기록 방식</span>
-            <strong>{analysisMethodLabel(record?.analysis_method)}</strong>
-          </div>
-          <div className="mini-card">
-            <span className="muted">식단 메모</span>
-            <strong>{String(record?.description ?? record?.memo ?? "기록된 메모가 없습니다.")}</strong>
-          </div>
-          <div className="state-box">
-            {isManual
-              ? "기존 직접 입력 기록입니다. 새 식단 분석은 사진 업로드 기반으로 진행됩니다."
-              : "자동 분석 결과는 참고용이며, 실제 진단이나 처방을 대신하지 않습니다."}
-          </div>
         </div>
       </Card>
     </div>

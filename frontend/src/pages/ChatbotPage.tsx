@@ -157,7 +157,7 @@ export default function ChatbotPage() {
 
       {error && <ErrorMessage message={error} />}
 
-      <Card title="대화">
+      <Card title="AI 건강 대화">
         <div className="chat-window">
           {messages.length === 0 && (
             <div className="chat-empty">
@@ -180,18 +180,25 @@ export default function ChatbotPage() {
 
           {messages.map((chatMessage) => (
             <div className={`chat-message ${chatMessage.role}`} key={chatMessage.id}>
-              <div className="chat-bubble">
+              {chatMessage.role === "assistant" && (
+                <div className="chat-avatar">
+                  <span>H</span>
+                </div>
+              )}
+              <div className="chat-bubble-wrapper">
                 <span className="chat-role">{chatMessage.role === "user" ? "나" : "AI 건강 상담"}</span>
-                <p>{chatMessage.text}</p>
-                {chatMessage.response?.recommended_actions && chatMessage.response.recommended_actions.length > 0 && (
-                  <div className="chip-list">
-                    {chatMessage.response.recommended_actions.map((action) => (
-                      <span className="badge badge-reference" key={action}>
-                        {action}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <div className="chat-bubble">
+                  <p>{chatMessage.text}</p>
+                  {chatMessage.response?.recommended_actions && chatMessage.response.recommended_actions.length > 0 && (
+                    <div className="chip-list">
+                      {chatMessage.response.recommended_actions.map((action) => (
+                        <span className="badge badge-reference" key={action}>
+                          {action}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -223,6 +230,9 @@ export default function ChatbotPage() {
             보내기
           </button>
         </form>
+        <p className="muted" style={{ fontSize: "13px", marginTop: 8, textAlign: "left" }}>
+          *서비스 이용 관련 문의는 <Link to="/inquiries" style={{ color: "inherit", textDecoration: "underline" }}>문의/FAQ</Link>를 이용해 주세요.
+        </p>
       </Card>
     </div>
   );

@@ -559,25 +559,28 @@ export default function HealthRecordPage() {
       </header>
 
       {/* 입력 단계 탭 */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <div className="health-tab-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <Link
           className="filter-tab"
-          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center" }}
+          style={{ fontSize: "15px", padding: "8px 18px", textAlign: "center", alignSelf: "flex-start" }}
           to="/health/profile"
         >
           한눈에 보기
         </Link>
-        {steps.map((step, index) => (
-          <button
-            className={index === activeStep ? "filter-tab active" : "filter-tab"}
-            key={step}
-            onClick={() => setActiveStep(index)}
-            style={{ fontSize: "15px", padding: "8px 18px" }}
-            type="button"
-          >
-            {step}
-          </button>
-        ))}
+
+        <div className="health-tab-sub-group" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {steps.map((step, index) => (
+            <button
+              className={index === activeStep ? "filter-tab active" : "filter-tab"}
+              key={step}
+              onClick={() => setActiveStep(index)}
+              style={{ fontSize: "15px", padding: "8px 18px" }}
+              type="button"
+            >
+              {step}
+            </button>
+          ))}
+        </div>
       </div>
 
     <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
@@ -619,7 +622,7 @@ export default function HealthRecordPage() {
         )}
         {notice && <div className="state-box">{notice}</div>}
         {activeStep < 4 && (
-          <div className="state-box" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 12px" }}>
+          <div className="state-box ocr-hint" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, padding: "8px 12px" }}>
             <div style={{ lineHeight: "1.4" }}>
               <p style={{ margin: 0 }}>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 간편 분석을 진행할 수 있습니다.</p>
               <p style={{ margin: "2px 0 0" }}>정밀 분석 정보를 추가로 입력하시면 예측 정확도가 높아집니다.</p>
@@ -640,9 +643,10 @@ export default function HealthRecordPage() {
           />
           <div className="button-row" style={{ justifyContent: "flex-end" }}>
             <button
-              className="secondary"
+              className="button secondary"
               disabled={isSaving || runningMode !== null}
               onClick={() => void save().catch(() => undefined)}
+              style={{ padding: "10px 14px", fontSize: "14px" }}
               type="button"
             >
               {isSaving ? "저장 중..." : "저장"}

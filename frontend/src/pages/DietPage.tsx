@@ -192,6 +192,8 @@ export default function DietPage() {
   const [analysisMealType, setAnalysisMealType] = useState(getDefaultMealType());
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [dietPage, setDietPage] = useState(0);
+  const DIET_PAGE_SIZE = 5;
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -416,7 +418,7 @@ export default function DietPage() {
           <p>식단 사진을 등록하고 영양 정보와 개선 포인트를 확인합니다.</p>
         </div>
       </header>
-    <div className="page-grid">
+    <div className="page-grid" style={{ gridTemplateColumns: "1fr" }}>
       {error && <ErrorMessage message={error} />}
       {canRetryAnalysis ? (
         <div className="button-row">
@@ -533,7 +535,7 @@ export default function DietPage() {
               <strong>{analysisResult.needs_user_confirmation ? "음식 후보 확인 필요" : "음식 후보 분석 완료"}</strong>
               <p>{String(analysisResult.diet_feedback ?? "음식 후보와 영양성분 후보를 확인해보세요.")}</p>
             </div>
-            <div className="mini-card">
+            <div className="mini-card" style={{ padding: "10px 14px" }}>
               {analysisResultImageUrl && !detectedFoodsImagePreviewFailed && (
                 <img
                   alt="업로드한 식단 사진"
@@ -690,7 +692,7 @@ export default function DietPage() {
       <Card title="최근 식단">
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
-          {records.slice(0, 5).map((record) => {
+          {records.slice(dietPage * DIET_PAGE_SIZE, (dietPage + 1) * DIET_PAGE_SIZE).map((record) => {
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
@@ -703,13 +705,40 @@ export default function DietPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <strong>{dietRecordDisplayTitle(record)}</strong>
-                  {!isManual && <span className="badge badge-reference">분석 기록</span>}
+                  <span className="muted" style={{ fontSize: "12px" }}>
+                    상세보기 →
+                  </span>
                 </div>
                 {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
             );
           })}
         </div>
+        {records.length > DIET_PAGE_SIZE && (
+          <div className="button-row pagination-row" style={{ justifyContent: "center", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <button
+              className="button secondary"
+              disabled={dietPage === 0}
+              onClick={() => setDietPage((page) => page - 1)}
+              style={{ flex: "0 0 auto" }}
+              type="button"
+            >
+              이전
+            </button>
+            <span className="muted">
+              {dietPage + 1} / {Math.ceil(records.length / DIET_PAGE_SIZE)}
+            </span>
+            <button
+              className="button secondary"
+              disabled={(dietPage + 1) * DIET_PAGE_SIZE >= records.length}
+              onClick={() => setDietPage((page) => page + 1)}
+              style={{ flex: "0 0 auto" }}
+              type="button"
+            >
+              다음
+            </button>
+          </div>
+        )}
       </Card>
     </div>
     </div>

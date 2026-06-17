@@ -9,7 +9,7 @@ import { getMainSummary } from "../api/main";
 import { listMedications } from "../api/medications";
 import { useAuth } from "../auth/AuthContext";
 import Card from "../components/Card";
-import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp } from "lucide-react";
+import { HeartPulse, FileText, Salad, Dumbbell, Pill, BotMessageSquare, ClipboardList, ChartBar, Trophy, Bell, TrendingUp, Moon, Droplets, Droplet, Activity, ListChecks, Leaf, Gauge } from "lucide-react";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import { getAnalysisTypeLabel, getLatestResultsByAnalysisType, isKnownAnalysisType } from "../utils/riskDisplay";
 
@@ -124,6 +124,20 @@ const personaIcons: Record<string, React.ReactNode> = {
   exam: <ClipboardList size={24} />,
   habit: <Dumbbell size={24} />,
   record: <Pill size={24} />,
+};
+
+const categoryIcon: Record<string, React.ReactNode> = {
+  DIET: <Salad size={20} />,
+  EXERCISE: <Dumbbell size={20} />,
+  SLEEP: <Moon size={20} />,
+  MEDICATION: <Pill size={20} />,
+  WATER: <Droplets size={20} />,
+  BLOOD_SUGAR: <Droplet size={20} />,
+  BLOOD_GLUCOSE: <Droplet size={20} />,
+  BLOOD_PRESSURE: <Activity size={20} />,
+  HABIT: <ListChecks size={20} />,
+  COMMON: <Leaf size={20} />,
+  WEIGHT: <Gauge size={20} />,
 };
 
 const serviceFlow = [
@@ -372,9 +386,6 @@ export default function MainPage() {
     const latestHealth = Object.keys(latestHealthRecord).length > 0 ? latestHealthRecord : asRecord(data.latest_health_summary);
     const latestAnalysis = asRecord(data.latest_analysis_summary);
     const dashboardSummary = asRecord(data.dashboard_summary);
-    const recentRecords = asRecord(data.recent_records);
-    const recentDietRecords = Array.isArray(recentRecords.diet_records) ? (recentRecords.diet_records as AnyRecord[]) : [];
-    const latestDietScore = recentDietRecords[0]?.diet_score ?? null;
     const effectiveAnalysisResults =
       analysisResults.length > 0 ? analysisResults : latestAnalysis.analysis_type ? [latestAnalysis] : [];
     const hasAnalysisResults = effectiveAnalysisResults.length > 0;
@@ -440,25 +451,6 @@ export default function MainPage() {
     const diastolicVal = latestHealthRecord.diastolic_bp != null ? Number(latestHealthRecord.diastolic_bp) : null;
     const weightVal = latestHealthRecord.weight_kg != null ? Number(latestHealthRecord.weight_kg) : null;
     const bmiVal = latestHealthRecord.bmi != null ? Number(latestHealthRecord.bmi) : null;
-
-    const latestDietDate = (() => {
-      const raw = recentDietRecords[0]?.recorded_at ?? recentDietRecords[0]?.created_at ?? recentDietRecords[0]?.meal_date;
-      if (!raw) return null;
-      const d = new Date(String(raw));
-      if (Number.isNaN(d.getTime())) return null;
-      const y = d.getFullYear();
-      const mo = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const h = String(d.getHours()).padStart(2, "0");
-      const min = String(d.getMinutes()).padStart(2, "0");
-      return `${y}.${mo}.${day} ${h}:${min}`;
-    })();
-
-    // Diet score bars (last 5, oldest → newest left → right)
-    const dietScoreBars = recentDietRecords
-      .slice(0, 5)
-      .reverse()
-      .map((r) => Number(r.diet_score ?? 0));
 
     const challengeCount = myChallenges.length;
     const challengeRate = getAveragePercent(myChallenges.map(getChallengeProgress));
@@ -534,7 +526,7 @@ export default function MainPage() {
             <h2>건강 리포트 요약</h2>
             <p>최근 기록된 건강 지표를 시각적으로 확인합니다.</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+          <div className="main-report-grid">
             {/* 왼쪽: 질환별 관리 필요도 - main-dashboard-grid에서 이동 */}
             <div className="viz-card">
               <div className="viz-card-row">
@@ -609,20 +601,11 @@ export default function MainPage() {
                 </div>
               )}
 
-              {/* 식단 점수 작은 카드 */}
+              {/* 식단 분석 작은 카드 */}
               <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "12px" }}>
                 <div className="viz-card-row">
-                  <span className="viz-card-label">식단 점수</span>
+                  <span className="viz-card-label">식단 분석</span>
                   <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
-                </div>
-                <div className="viz-stat-row">
-                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
-                    {latestDietScore != null ? (latestDietDate ?? "식단 점수") : "최근 기록 없음"}
-                  </span>
-                  {latestDietScore != null
-                    ? <strong>{`${String(latestDietScore)}점`}</strong>
-                    : <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 900 }}>식단 분석하기</Link>
-                  }
                 </div>
               </div>
 
@@ -645,9 +628,9 @@ export default function MainPage() {
           </div>
 
           {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
-          <div className="viz-card" style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "16px", alignItems: "start" }}>
+          <div className="viz-card challenge-summary-card" style={{ marginTop: "14px" }}>
             {/* 챌린지 현황 작은 카드 */}
-            <div style={{ background: "var(--color-muted-surface)", borderRadius: "var(--radius-md)", padding: "16px", width: "220px", flexShrink: 0 }}>
+            <div className="challenge-status-panel">
               <span className="viz-card-label">챌린지 현황</span>
               <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
                 <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
@@ -687,9 +670,14 @@ export default function MainPage() {
                   const challengeId = Number(challenge.id);
                   return (
                   <div className="compact-list-item" key={String(challenge.id ?? challenge.title)}>
-                    <div>
-                      <strong>{getChallengeTitle(challenge)}</strong>
-                      <p>{getCategoryLabel(challenge.category)} · {getChallengeDuration(challenge)}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ color: "var(--color-primary)", flexShrink: 0 }}>
+                        {categoryIcon[String(challenge.category ?? "").toUpperCase()] ?? <Trophy size={20} />}
+                      </span>
+                      <div>
+                        <strong>{getChallengeTitle(challenge)}</strong>
+                        <p>{getCategoryLabel(challenge.category)} · {getChallengeDuration(challenge)}</p>
+                      </div>
                     </div>
                     <Link className="button secondary" to={Number.isFinite(challengeId) ? `/challenges/${String(challengeId)}` : "/challenges"}>참여하기</Link>
                   </div>

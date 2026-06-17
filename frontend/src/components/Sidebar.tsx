@@ -17,7 +17,7 @@ export const sidebarSections: SidebarSection[] = [
     title: "핵심 기능",
     links: [
       { to: "/", icon: <HouseHeart size={20} />, label: "홈" },
-      { to: "/health", icon: <HeartPulse size={20} />, label: "건강 분석" },
+      { to: "/health/profile", icon: <HeartPulse size={20} />, label: "건강 분석" },
       { to: "/analysis", icon: <ActivitySquare size={20} />, label: "분석 결과" },
       { to: "/dashboard", icon: <ChartBar size={20} />, label: "건강 리포트" },
     ],
