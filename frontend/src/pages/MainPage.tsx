@@ -255,6 +255,11 @@ function getChallengeProgress(challenge: AnyRecord): number {
   return 0;
 }
 
+function isActiveUserChallenge(challenge: AnyRecord): boolean {
+  const status = String(challenge.status ?? "").toUpperCase();
+  return ["JOINED", "ACTIVE", "IN_PROGRESS"].includes(status) && !challenge.canceled_at && !challenge.completed_at;
+}
+
 function getAveragePercent(values: number[]): number {
   const valid = values.filter((value) => Number.isFinite(value));
   if (valid.length === 0) {
@@ -299,7 +304,7 @@ export default function MainPage() {
             getAnalysisReadiness<AnyRecord>(),
             listChallenges<AnyRecord[]>({ limit: 20 }),
             listChallengeRecommendations<AnyRecord[]>({ limit: 3 }),
-            listMyChallenges<AnyRecord[]>({ limit: 3 }),
+            listMyChallenges<AnyRecord[]>({ limit: 100 }),
             listMedications<AnyRecord[]>(),
             listExams<AnyRecord[]>({ limit: 1 }),
           ]);
@@ -407,6 +412,7 @@ export default function MainPage() {
       service_band_label: result.service_band_label,
     }));
     const basicReady = readiness.basic_ready ?? readiness.is_ready;
+    const activeMyChallenges = myChallenges.filter(isActiveUserChallenge);
     const todayCards = [
       {
         title: basicReady === false ? "기본 건강정보 입력" : "건강정보 확인",
@@ -427,9 +433,9 @@ export default function MainPage() {
         to: effectiveAnalysisResults.length > 0 ? "/analysis/history" : "/analysis",
       },
       {
-        title: challenges.length > 0 || myChallenges.length > 0 ? "추천 챌린지 시작" : "챌린지 둘러보기",
+        title: challenges.length > 0 || activeMyChallenges.length > 0 ? "추천 챌린지 시작" : "챌린지 둘러보기",
         description:
-          myChallenges.length > 0
+          activeMyChallenges.length > 0
             ? "진행 중인 챌린지를 이어가고 오늘 실천을 기록해보세요."
             : "추천 챌린지를 시작하고 작은 건강 습관을 만들어보세요.",
         buttonLabel: "챌린지 보기",
@@ -452,8 +458,8 @@ export default function MainPage() {
     const weightVal = latestHealthRecord.weight_kg != null ? Number(latestHealthRecord.weight_kg) : null;
     const bmiVal = latestHealthRecord.bmi != null ? Number(latestHealthRecord.bmi) : null;
 
-    const challengeCount = myChallenges.length;
-    const challengeRate = getAveragePercent(myChallenges.map(getChallengeProgress));
+    const challengeCount = activeMyChallenges.length;
+    const challengeRate = getAveragePercent(activeMyChallenges.map(getChallengeProgress));
     const medicationActiveCount = medications.filter((item) => item.is_active !== false).length;
     const medicationRate = medications.length > 0 ? clampPercent((medicationActiveCount / medications.length) * 100) : 0;
     const RING_R = 28;

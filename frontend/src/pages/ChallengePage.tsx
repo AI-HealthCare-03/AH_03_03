@@ -575,6 +575,11 @@ export default function ChallengePage() {
   const pagedChallenges = filteredChallenges.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const activeMyChallenges = myChallenges.filter(isActiveChallengeStatus);
+  const activeUserChallengeIds = new Set(
+    activeMyChallenges
+      .map((item) => Number(item.id))
+      .filter((id) => Number.isFinite(id)),
+  );
   const todayDoneCount = activeMyChallenges.filter((item) => getTodayCompletedCount(item) >= getDailyGoalCount(item, challenges)).length;
   const averageProgress =
     activeMyChallenges.length > 0
@@ -583,8 +588,9 @@ export default function ChallengePage() {
   const weekStart = new Date();
   weekStart.setHours(0, 0, 0, 0);
   weekStart.setDate(weekStart.getDate() - 6);
-  const weeklyLogCount = Object.values(logsByUserChallengeId)
-    .flat()
+  const weeklyLogCount = Object.entries(logsByUserChallengeId)
+    .filter(([rawId]) => activeUserChallengeIds.has(Number(rawId)))
+    .flatMap(([, logs]) => logs)
     .filter((log) => {
       const rawDate = String(log.log_date ?? "");
       const parsed = rawDate ? new Date(`${rawDate.slice(0, 10)}T00:00:00`) : null;
