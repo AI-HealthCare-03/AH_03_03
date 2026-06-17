@@ -232,7 +232,9 @@ class AuthService:
         user = await self.user_repo.get_user_by_email(str(email))
         token = secrets.token_urlsafe(32)
         if user is not None:
-            expires_at = datetime.now(config.TIMEZONE) + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)
+            now = datetime.now(config.TIMEZONE)
+            expires_at = now + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)
+            await self.user_repo.mark_active_password_reset_tokens_used(user.id, now)
             await self.user_repo.create_password_reset_token(
                 user_id=user.id,
                 token_hash=self._digest(token),
