@@ -192,10 +192,13 @@ export default function DietPage() {
   const [analysisMealType, setAnalysisMealType] = useState(getDefaultMealType());
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [dietPage, setDietPage] = useState(0);
+  const DIET_PAGE_SIZE = 5;
   const [records, setRecords] = useState<DietRecord[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState("");
+  const [analysisResultImageUrl, setAnalysisResultImageUrl] = useState("");
   const [detectedFoodsImagePreviewFailed, setDetectedFoodsImagePreviewFailed] = useState(false);
   const [imagePreviewMessage, setImagePreviewMessage] = useState("");
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
@@ -207,6 +210,9 @@ export default function DietPage() {
     useAnalysisFeedbackDialog();
   const analysisRequestInFlightRef = useRef(false);
   const analysisStartedAtRef = useRef<number | null>(null);
+  const pendingAnalysisImageUrlRef = useRef("");
+  const selectedImagePreviewUrlRef = useRef("");
+  const analysisResultImageUrlRef = useRef("");
   const handledAnalysisJobIdsRef = useRef<Set<number>>(new Set());
 
   const load = async () => {
@@ -223,12 +229,21 @@ export default function DietPage() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (selectedImagePreviewUrl) {
-        URL.revokeObjectURL(selectedImagePreviewUrl);
-      }
-    };
+    selectedImagePreviewUrlRef.current = selectedImagePreviewUrl;
   }, [selectedImagePreviewUrl]);
+
+  useEffect(() => {
+    analysisResultImageUrlRef.current = analysisResultImageUrl;
+  }, [analysisResultImageUrl]);
+
+  useEffect(() => {
+    return () => {
+      const urls = new Set([selectedImagePreviewUrlRef.current, analysisResultImageUrlRef.current]);
+      urls.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -267,6 +282,7 @@ export default function DietPage() {
           throw new Error("식단 분석 결과를 불러오지 못했습니다.");
         }
         setAnalysisResult(result as unknown as Record<string, unknown>);
+        setAnalysisResultImageUrl(pendingAnalysisImageUrlRef.current);
         setCanRetryAnalysis(false);
         showSuccess({ message: "저장된 식단 분석 결과를 확인해 주세요." });
         await load();
@@ -297,7 +313,7 @@ export default function DietPage() {
 
   const handleDietImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (selectedImagePreviewUrl) {
+    if (selectedImagePreviewUrl && selectedImagePreviewUrl !== analysisResultImageUrl) {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setImagePreviewMessage("");
@@ -330,7 +346,7 @@ export default function DietPage() {
   };
 
   const clearSelectedImage = () => {
-    if (selectedImagePreviewUrl) {
+    if (selectedImagePreviewUrl && selectedImagePreviewUrl !== analysisResultImageUrl) {
       URL.revokeObjectURL(selectedImagePreviewUrl);
     }
     setSelectedImageFile(null);
@@ -354,7 +370,12 @@ export default function DietPage() {
       return;
     }
     setAnalysisResult(null);
+    if (analysisResultImageUrl && analysisResultImageUrl !== selectedImagePreviewUrl) {
+      URL.revokeObjectURL(analysisResultImageUrl);
+    }
+    setAnalysisResultImageUrl("");
     setCanRetryAnalysis(false);
+    pendingAnalysisImageUrlRef.current = selectedImagePreviewUrl;
     analysisRequestInFlightRef.current = true;
     analysisStartedAtRef.current = Date.now();
     setIsAnalyzing(true);
@@ -397,7 +418,7 @@ export default function DietPage() {
           <p>식단 사진을 등록하고 영양 정보와 개선 포인트를 확인합니다.</p>
         </div>
       </header>
-    <div className="page-grid">
+    <div className="page-grid" style={{ gridTemplateColumns: "1fr" }}>
       {error && <ErrorMessage message={error} />}
       {canRetryAnalysis ? (
         <div className="button-row">
@@ -514,13 +535,13 @@ export default function DietPage() {
               <strong>{analysisResult.needs_user_confirmation ? "음식 후보 확인 필요" : "음식 후보 분석 완료"}</strong>
               <p>{String(analysisResult.diet_feedback ?? "음식 후보와 영양성분 후보를 확인해보세요.")}</p>
             </div>
-            <div className="mini-card">
-              {selectedImagePreviewUrl && !detectedFoodsImagePreviewFailed && (
+            <div className="mini-card" style={{ padding: "10px 14px" }}>
+              {analysisResultImageUrl && !detectedFoodsImagePreviewFailed && (
                 <img
                   alt="업로드한 식단 사진"
                   className="upload-preview"
                   onError={() => setDetectedFoodsImagePreviewFailed(true)}
-                  src={selectedImagePreviewUrl}
+                  src={analysisResultImageUrl}
                   style={{ maxHeight: 140 }}
                 />
               )}
@@ -671,7 +692,7 @@ export default function DietPage() {
       <Card title="최근 식단">
         <div className="card-list">
           {records.length === 0 && <div className="state-box">최근 식단 기록이 없습니다.</div>}
-          {records.slice(0, 5).map((record) => {
+          {records.slice(dietPage * DIET_PAGE_SIZE, (dietPage + 1) * DIET_PAGE_SIZE).map((record) => {
             const isManual = String(record.analysis_method ?? "").toUpperCase() === "MANUAL";
             const needsConfirmation = recordNeedsFoodConfirmation(record);
             return (
@@ -684,13 +705,40 @@ export default function DietPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <strong>{dietRecordDisplayTitle(record)}</strong>
-                  {!isManual && <span className="badge badge-reference">분석 기록</span>}
+                  <span className="muted" style={{ fontSize: "12px" }}>
+                    상세보기 →
+                  </span>
                 </div>
                 {needsConfirmation && <span className="muted">영양성분은 후보 기준입니다.</span>}
               </Link>
             );
           })}
         </div>
+        {records.length > DIET_PAGE_SIZE && (
+          <div className="button-row pagination-row" style={{ justifyContent: "center", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <button
+              className="button secondary"
+              disabled={dietPage === 0}
+              onClick={() => setDietPage((page) => page - 1)}
+              style={{ flex: "0 0 auto" }}
+              type="button"
+            >
+              이전
+            </button>
+            <span className="muted">
+              {dietPage + 1} / {Math.ceil(records.length / DIET_PAGE_SIZE)}
+            </span>
+            <button
+              className="button secondary"
+              disabled={(dietPage + 1) * DIET_PAGE_SIZE >= records.length}
+              onClick={() => setDietPage((page) => page + 1)}
+              style={{ flex: "0 0 auto" }}
+              type="button"
+            >
+              다음
+            </button>
+          </div>
+        )}
       </Card>
     </div>
     </div>

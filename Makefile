@@ -275,7 +275,7 @@ prod-release-db: prod-migrate
 
 # Release image build
 # prod compose is pull-only; build/push all three service images before EC2 pulls them.
-.PHONY: image-build-check image-build-native-check image-build-app image-build-ai image-build-frontend image-buildx-amd64-check image-push image-build-push image-tags
+.PHONY: image-build-check image-build-native-check image-build-app image-build-ai image-build-frontend image-buildx-amd64-check image-check-ai-ocr-import image-push image-build-push image-tags
 # Deployment build check alias. Uses linux/amd64 buildx for EC2 Ubuntu amd64 targets.
 image-build-check: image-buildx-amd64-check
 
@@ -299,6 +299,9 @@ image-buildx-amd64-check:
 	docker buildx build --platform $(DOCKER_PLATFORM) -f frontend/Dockerfile -t $(FRONTEND_IMAGE) --load \
 		--build-arg VITE_API_BASE_URL=$(VITE_API_BASE_URL) \
 		.
+
+image-check-ai-ocr-import:
+	docker run --rm $(AI_WORKER_IMAGE) uv run --no-sync python -c "import cv2; import paddleocr; print('ocr imports ok')"
 
 image-push:
 	@echo "Pushing release images. Set APP_VERSION, AI_WORKER_VERSION, and FRONTEND_VERSION to a fresh tag for production deploys."

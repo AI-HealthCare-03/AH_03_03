@@ -1,12 +1,101 @@
-# AI HealthCare MVP
+# Health Ladder
 
-AI HealthCare MVP는 건강정보 입력, 건강검진 OCR, 식단/복약 분석, 챗봇, 만성질환 위험 안내를 하나의 웹 서비스 흐름으로 묶은 FastAPI + React 기반 시연 프로젝트입니다.
+Health Ladder는 건강검진 결과와 식단 기록을 바탕으로 건강 위험 신호를 이해하고, AI 상담과 생활습관 챌린지로 연결하는 AI 헬스케어 서비스입니다.
 
-이 README는 팀원이 clone 후 바로 실행할 수 있는 Quick Start 문서입니다. 상세 설계와 운영 설명은 하단의 참고 문서를 확인하세요.
+핵심 흐름은 `건강정보 입력/OCR -> 위험 분석 -> AI 설명/RAG 상담 -> 식단 분석 -> 챌린지 추천 -> 가족 공유`입니다. 이 서비스는 의료 진단, 치료, 처방을 제공하지 않으며 건강관리 참고와 생활습관 개선을 돕는 보조 도구입니다.
 
-## 빠른 실행 요약
+현재 운영 검증 기준: `v1.1.0`
 
-Docker 통합 개발:
+## Service Overview
+
+Health Ladder는 사용자가 흩어진 건강 데이터를 앱 안에서 연결해 볼 수 있도록 설계되었습니다. 건강검진표를 업로드하면 OCR로 주요 수치를 추출하고, 직접 입력한 건강정보와 함께 위험 신호를 분석합니다. 분석 결과는 AI 설명, RAG 기반 건강상담, 식단 분석, 맞춤 챌린지, 가족 공유 흐름으로 이어집니다.
+
+서비스의 목표는 사용자가 자신의 건강 상태를 더 쉽게 이해하고, 다음 행동으로 이어질 수 있는 작은 생활습관 개선 과제를 제안하는 것입니다.
+
+## Why Health Ladder?
+
+- 건강검진 결과는 어렵고, 식단과 생활습관 기록은 따로 흩어져 있습니다.
+- 단순 점수보다 “왜 이런 위험 신호가 보이는지”와 “오늘 무엇을 바꾸면 좋을지”가 중요합니다.
+- AI 답변은 의료 판단을 대신하면 안 되므로, 공식 지식 기반과 안전 문구, fallback 정책이 필요합니다.
+- 가족 공유와 알림은 혼자 관리하기 어려운 건강관리 루틴을 함께 유지하는 데 도움을 줍니다.
+
+## Core Features
+
+| 기능 | 설명 |
+|---|---|
+| 건강검진 OCR | 건강검진표 이미지에서 혈압, 혈당, 지질, 간수치, 신장기능 등 주요 항목 후보를 추출합니다. |
+| 건강위험 분석 | 입력 건강정보와 검진 수치를 바탕으로 만성질환 위험 신호와 관리 포인트를 안내합니다. |
+| AI 건강상담 | `gpt-4o` 기반 상담과 RAG 검색을 결합해 건강관리 참고 답변을 제공합니다. |
+| 식단 분석 | 식단 이미지 또는 음식 입력을 바탕으로 음식 후보, 영양 포인트, 질환별 주의사항을 정리합니다. |
+| 맞춤 챌린지 | 분석 결과와 생활습관 목표를 챌린지로 연결해 실천 루틴을 만들 수 있게 합니다. |
+| 가족 공유 | 가족 구성원과 건강 기록, 알림, 관리 상태를 공유할 수 있는 MVP 흐름을 제공합니다. |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User[User Browser] --> React[React Frontend]
+    React --> Nginx[Nginx HTTPS]
+    Nginx --> FastAPI[FastAPI API]
+    FastAPI --> Postgres[(PostgreSQL + pgvector)]
+    FastAPI --> Redis[(Redis Stream)]
+    Redis --> Worker[AI Worker]
+    Worker --> PaddleOCR[PaddleOCR Primary OCR]
+    Worker --> GPTVision[GPT Vision Fallback]
+    Worker --> OpenAI[OpenAI gpt-4o]
+    Worker --> RAG[RAG Retrieval]
+    RAG --> Postgres
+    FastAPI --> Email[SMTP Email]
+    React --> Family[Family Sharing UI]
+```
+
+운영 구성은 `React Frontend`, `Nginx`, `FastAPI`, `PostgreSQL + pgvector`, `Redis Stream`, `AI Worker`로 나뉩니다. AI Worker는 OCR, 분석, RAG, 이메일/알림 service job을 처리하며, FastAPI는 API 인증, DB 저장, job enqueue, 조회 흐름을 담당합니다.
+
+## AI Pipeline
+
+운영 검증 기준 `v1.1.0`의 AI 구성은 다음과 같습니다.
+
+- 건강검진 OCR: PaddleOCR primary, GPT Vision fallback
+- 식단 Vision: GPT Vision 기반 음식 후보 추출
+- 챗봇: `gpt-4o` 기반 AI 건강상담
+- RAG: `hybrid_parallel` 검색 전략과 `pgvector` 기반 embedding 검색
+- Embedding: OpenAI `text-embedding-3-small`, 1536 dimension
+- 식단 추천: `keyword_first_vector_fallback` RAG 전략과 LLM rewrite
+- 분석 설명: rule 기반 결과를 우선하고, 설정이 켜진 경우 LLM rewrite로 문장을 보조
+
+RAG ingest/embed는 자동배포에서 자동 실행되지 않습니다. RAG chunks와 embedding 데이터는 PostgreSQL Docker volume에 유지되며, 문서가 바뀌었을 때만 운영자가 별도 절차로 적용합니다.
+
+## Tech Stack
+
+| 영역 | 기술 |
+|---|---|
+| Frontend | React, TypeScript, Vite |
+| Backend | FastAPI, Python 3.13, Tortoise ORM, Aerich |
+| Database | PostgreSQL, pgvector |
+| Queue | Redis Stream |
+| AI/OCR Worker | Python, PaddleOCR, OpenCV, OpenAI Vision |
+| LLM/RAG | OpenAI `gpt-4o`, OpenAI Embedding, hybrid/vector RAG |
+| Infra | Docker Compose, Nginx, Certbot, GitHub Actions |
+| Observability | Langfuse optional |
+
+## Deployment
+
+운영 배포 기준 브랜치는 `main`입니다. `main`에 push되면 GitHub Actions `deploy-prod` workflow가 CI 검증, Docker image build/push, EC2 배포, migration, health check를 순서대로 실행합니다.
+
+운영 인프라:
+
+- EC2
+- Docker Compose
+- Nginx HTTPS
+- DuckDNS 도메인: `healthladder.duckdns.org`
+- GitHub Actions `main` 자동배포
+- Docker Hub image tag: 수동 검증 `v1.1.0`, 자동배포 `main-<short-sha>`
+
+자세한 운영 절차는 [운영 배포 runbook](docs/deployment/release_deploy_runbook.md)과 [EC2 Docker 배포 가이드](docs/deployment/ec2_docker_deploy_guide.md)를 참고하세요.
+
+## Local Development
+
+팀원이 처음 실행할 때 필요한 최소 명령입니다.
 
 ```bash
 cp envs/example.local.env .env
@@ -22,452 +111,35 @@ make dev-health
 - API Docs: `http://localhost:8080/api/docs`
 - Health: `http://localhost:8080/api/v1/system/health`
 
-프론트 로컬 개발:
-
-```bash
-# 터미널 1
-make dev-stack
-
-# 터미널 2
-make dev-front
-```
-
-접속:
-
-- Frontend Vite dev server: `http://localhost:5173`
-- Docker/Nginx 통합 확인: `http://localhost:8080`
-
-## 사전 준비
-
-- Docker Desktop 또는 Docker Engine
-- Python 3.13 이상
-- `uv`
-
-Full Docker dev stack은 프론트엔드, Nginx, FastAPI, AI Worker, PostgreSQL, Redis를 함께 실행합니다. 웹 시연만 할 때는 Node.js/npm을 직접 실행할 필요가 없습니다. 프론트엔드는 Docker build 단계에서 정적 파일로 빌드되고, frontend 컨테이너 내부 Nginx가 이를 서빙합니다.
-
-프론트 개발 중에는 Docker frontend를 매번 rebuild하지 않고 로컬 Vite dev server를 권장합니다. 이때 Backend/FastAPI, Postgres, Redis, ai-worker, Nginx는 Docker로 실행하고, 화면은 `http://localhost:5173`에서 확인합니다.
-
-로컬에서 테스트나 스크립트를 직접 실행할 때만 의존성을 동기화합니다.
-
-```bash
-uv sync --group app --group ai --group dev
-```
-
-## 환경변수 준비
-
-팀원/시연 기준은 루트 `.env`입니다.
-
-```bash
-cp envs/example.local.env .env
-```
-
-주의:
-
-- `.env`와 secret은 절대 commit하지 않습니다.
-- `.prod.env`도 절대 commit하지 않습니다.
-- 실제 OpenAI key, SMTP password, Langfuse secret 값은 README나 PR에 넣지 않습니다.
-- secret 예시는 `<SET_IN_PROD>`, `<SET_FOR_LOCAL_IF_NEEDED>`, `<SET_IN_GITHUB_SECRET>`처럼 placeholder로만 작성합니다.
-- `docker compose config` 전체 출력은 secret이 펼쳐질 수 있으므로 문서/화면공유에 사용하지 마세요.
-- 운영 배포용 `.prod.env`도 GitHub에 올리지 않습니다. `envs/example.prod.env`는 변수명과 placeholder를 보여주는 템플릿입니다.
-
-최소 dev 예시:
-
-```env
-ENV=local
-DB_HOST=postgres
-DB_PORT=5432
-DB_USER=ozcoding
-DB_PASSWORD=pw1234
-DB_NAME=ai_health
-
-EMAIL_ENABLED=false
-EMAIL_VERIFICATION_DEBUG=true
-PASSWORD_RESET_DEBUG=false
-
-OPENAI_API_KEY=<SET_FOR_LOCAL_IF_NEEDED>
-CHATBOT_USE_REAL_LLM=false
-RAG_ENABLED=false
-RAG_RETRIEVAL_STRATEGY=keyword_only
-
-DIET_VISION_PROVIDER=rule_based
-DIET_GPT_VISION_ENABLED=false
-DIET_DEMO_FALLBACK_ENABLED=false
-
-EXAM_OCR_PROVIDER=auto
-EXAM_GPT_VISION_ENABLED=false
-PADDLE_OCR_ENABLED=false
-
-LANGFUSE_ENABLED=false
-LANGFUSE_PUBLIC_KEY=<LANGFUSE_PUBLIC_KEY>
-LANGFUSE_SECRET_KEY=<LANGFUSE_SECRET_KEY>
-```
-
-## Full Docker Dev Stack 실행
-
-팀원/시연 표준은 `infra/docker/docker-compose.dev.yml`입니다.
-
-| 용도 | Compose 파일 | 실행 기준 | 비고 |
-|---|---|---|---|
-| 개발/시연 표준 | `infra/docker/docker-compose.dev.yml` | `make dev-up` | frontend, nginx, fastapi, ai-worker, postgres, redis 포함 |
-| 운영 배포 | `infra/docker/docker-compose.prod.yml` | Docker Hub image pull | app, ai-worker, frontend 이미지를 먼저 push해야 함 |
-| legacy/minimal 검증 | `docker-compose.yml` | `make app-*` | backend/AI 빠른 확인용, 표준 dev stack 아님 |
-
-```bash
-make dev-up
-```
-
-동일한 Docker 통합 stack을 직접 compose로 실행해야 할 때는 아래 명령을 사용합니다.
-
-```bash
-cp envs/example.local.env .env
-docker compose --env-file .env -f infra/docker/docker-compose.dev.yml up -d --build
-make dev-health
-```
-
-접속:
-
-- Docker 통합 Web: `http://localhost:8080`
-
-중지:
-
-```bash
-make dev-down
-```
-
-중요:
-
-- 루트 `docker-compose.yml`은 legacy/minimal backend/AI 검증용입니다.
-- 팀원/시연 표준 실행은 반드시 `infra/docker/docker-compose.dev.yml`을 사용합니다.
-- Docker Compose 직접 명령 대신 README의 `make dev-*`, `make prod-*` 명령을 사용하세요.
-- `docker compose up -d`만 단독 실행하지 마세요. 의도와 다른 루트 compose가 실행될 수 있습니다.
-- `docker rm -f redis postgres fastapi ai-worker nginx` 방식으로 컨테이너를 직접 지우지 마세요.
-- `down -v`는 DB volume을 삭제할 수 있으므로 시연/협업 중 사용하지 마세요.
-
-## 프론트 로컬 개발
-
-프론트 팀원이 UI를 빠르게 개발할 때는 Docker frontend rebuild 대신 로컬 Vite dev server를 사용합니다.
-
-터미널 1에서 Docker 백엔드 개발 스택을 실행합니다.
-
-```bash
-make dev-stack
-```
-
-터미널 2에서 로컬 Vite dev server를 실행합니다.
-
-```bash
-make dev-front
-```
-
-한 터미널에서 이어서 실행하려면 아래 명령을 사용할 수 있습니다. `npm run dev`가 foreground로 실행되므로 터미널을 점유합니다.
-
-```bash
-make dev-local
-```
-
-접속:
-
-- 프론트 로컬 개발: `http://localhost:5173`
-- API/Nginx 통합: `http://localhost:8080`
-- Docker frontend 빌드 결과 확인: `http://localhost:8080`
-
-`localhost:5173`은 Vite dev server라 프론트 수정사항이 바로 반영됩니다. `frontend/vite.config.ts`에서 `/api` 요청은 `http://localhost:8080`으로 proxy됩니다. 따라서 화면은 `localhost:5173`으로 접속하되, API는 Docker Nginx/FastAPI를 사용합니다.
-
-프론트 개발 중에는 매번 Docker frontend를 rebuild하지 않아도 됩니다. 최종 통합 확인이 필요할 때만 Docker frontend 이미지를 다시 빌드합니다.
-
-```bash
-make dev-rebuild-frontend
-make dev-health
-```
-
-## DB Migration / Seed
-
-DB migration:
-
-```bash
-make dev-migrate
-```
-
-챌린지 seed:
-
-```bash
-make dev-seed
-```
-
-`make dev-seed`는 `docs/data/challenges/team_challenge_master.csv` 기준으로 챌린지를 반영합니다. CSV에 없는 기존 active 챌린지는 seed 정책상 inactive 처리됩니다. DB migration이 아니라 seed 데이터 반영입니다.
-
-데모 seed:
-
-```bash
-DB_HOST=localhost uv run python scripts/setup_local_mvp_db.py
-```
-
-## 접속 주소
-
-- Frontend local dev: `http://localhost:5173`
-- Docker integrated Web: `http://localhost:8080`
-- API Docs: `http://localhost:8080/api/docs`
-- API Health: `http://localhost:8080/api/v1/system/health`
-- FastAPI 직접 접근: `http://localhost:8000`
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
-
-## Health Check
-
-```bash
-make dev-health
-```
-
-컨테이너 상태 확인:
-
-```bash
-make dev-ps
-```
-
-로그 확인 예시:
-
-```bash
-make dev-logs
-```
-
-백엔드/AI Worker 코드나 env를 수정한 뒤 빠르게 반영:
-
-```bash
-make dev-rebuild-api
-```
-
-AI Worker만 빠르게 재빌드:
-
-```bash
-make dev-rebuild-worker
-```
-
-프론트엔드 UI/정적 빌드 변경만 Docker에 반영:
-
-```bash
-make dev-rebuild-frontend
-```
-
-프론트엔드, 백엔드, worker 변경이 섞였을 때 전체 dev stack 재빌드:
-
-```bash
-make dev-rebuild-all
-```
-
-Nginx 502 또는 upstream 캐시가 꼬였을 때 복구:
-
-```bash
-make dev-restart-nginx
-```
-
-dev compose 설정 검증:
-
-```bash
-make dev-config-check
-```
-
-`make dev-config-check`는 `docker compose config --quiet`만 실행해 compose 유효성만 확인합니다. secret이 펼쳐질 수 있는 `docker compose config` 전체 출력은 문서/화면공유에 사용하지 마세요.
-
-로컬 QA 검증:
-
-```bash
-make qa-diff
-make qa-backend
-make qa-frontend
-```
-
-## Prod Image / EC2 배포 준비
-
-운영 배포 기준 브랜치는 `main`입니다. `main`에 push되면 GitHub Actions `deploy-prod` workflow가 CI 검증, Docker image build/push, EC2 image tag 반영, `make prod-pull`, `make prod-up`, `make prod-migrate`, health check를 순서대로 실행합니다.
-
-운영 compose는 `infra/docker/docker-compose.prod.yml` 기준입니다. EC2에서 이미지를 build하지 않고 Docker Hub에서 pull합니다. secret, password, 서버별 URL은 이미지에 넣지 않고 `.prod.env` 같은 배포 환경 파일로 주입합니다. 실제 `.prod.env`는 commit하지 않고, `envs/example.prod.env`를 템플릿으로 사용하세요.
-
-GitHub Actions 운영 자동배포에는 repository secrets가 필요합니다.
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
-- `EC2_HOST`
-- `EC2_USER`
-- `EC2_SSH_KEY`
-
-기본 이미지 tag:
-
-- `kdu0312/ai-health:app-v1.0.0`
-- `kdu0312/ai-health:ai-v1.0.0`
-- `kdu0312/ai-health:frontend-v1.0.0`
-
-배포 전 로컬 build 검증:
-
-```bash
-make image-tags
-make image-build-check
-docker image inspect kdu0312/ai-health:app-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-docker image inspect kdu0312/ai-health:ai-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-docker image inspect kdu0312/ai-health:frontend-v1.0.0 --format '{{.Os}}/{{.Architecture}}'
-```
-
-기대값은 `linux/amd64`입니다. Apple Silicon 로컬에서도 EC2 Ubuntu 배포 이미지는 `make image-build-check`의 buildx `linux/amd64` 기준으로 확인합니다.
-
-수동 운영 배포 env 준비와 실행:
-
-```bash
-cp envs/example.prod.env .prod.env
-# .prod.env 실제 운영값 수정
-make prod-pull
-make prod-up
-make prod-migrate
-make prod-health
-make prod-ps
-make prod-logs
-```
-
-위 수동 절차는 장애 대응 또는 workflow 우회가 필요한 경우에만 사용합니다. 일반 운영 배포는 `main` push 기준 자동배포를 사용하세요.
-
-DuckDNS 배포 기준 도메인은 `healthladder.duckdns.org`입니다. `.prod.env`에는 같은 도메인 기준으로 아래 public URL 값을 맞춥니다.
-
-```env
-COOKIE_DOMAIN=healthladder.duckdns.org
-CORS_ALLOW_ORIGINS=https://healthladder.duckdns.org
-FRONTEND_BASE_URL=https://healthladder.duckdns.org
-VITE_API_BASE_URL=/api/v1
-```
-
-DuckDNS token은 secret이므로 README, PR, issue, shell history, 배포 로그에 남기지 않습니다. DNS/HTTP 확인은 실제 배포 전 운영자가 아래처럼 확인합니다.
-
-```bash
-nslookup healthladder.duckdns.org
-curl -I http://healthladder.duckdns.org
-curl -I https://healthladder.duckdns.org
-curl -fsS https://healthladder.duckdns.org/api/v1/system/health
-```
-
-초기 환경에서 챌린지 seed가 반드시 필요하고 운영자가 명시적으로 승인한 경우에만 아래 danger target을 따로 실행합니다.
-
-```bash
-make danger-prod-seed-challenges
-```
-
-FAQ 테이블은 migration으로 생성되지만 FAQ row는 별도 seed입니다. FAQ 목록이 비어 있고 운영자가 승인한 경우에만 실행합니다.
-
-```bash
-make danger-prod-seed-faqs
-```
-
-`make prod-release-db`는 하위 호환용으로 남아 있지만 이제 migration만 실행합니다. 운영/배포용 target에서는 seed와 RAG ingest를 자동 실행하지 않습니다.
-
-QA/smoke 스크립트는 로컬 검증용입니다. `scripts/qa/smoke_notification_email.py` 같은 파일은 운영 이미지 런타임 필수 파일이 아니며, 실제 발송 smoke는 운영자가 명시적으로 허용한 별도 절차에서만 실행합니다.
-
-운영 배포 runbook은 `docs/deployment/release_deploy_runbook.md`를 참고하세요. 상세 배포/환경 문서는 `docs/deployment/ec2_docker_deploy_guide.md`, `docs/deployment/ec2_prod_env.md`, `docs/ops/docker_stacks.md`를 참고하세요.
-
-## 주요 Provider Flag 요약
-
-| 기능 | 주요 flag | 기본 방향 |
-|---|---|---|
-| 챗봇 LLM | `CHATBOT_USE_REAL_LLM`, `OPENAI_API_KEY` | 기본 mock/rule, 필요 시 OpenAI |
-| RAG | `RAG_ENABLED`, `RAG_RETRIEVAL_STRATEGY` | 기본 keyword-only, 필요 시 vector fallback/hybrid |
-| 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED`, `DIET_DEMO_FALLBACK_ENABLED`, `OPENAI_API_KEY` | 운영은 실제 provider 필요, 데모 fallback은 명시 opt-in |
-| 건강검진 OCR | `EXAM_OCR_PROVIDER`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED` | 기본 auto |
-| 복약 정보 | 별도 OCR provider 없음 | MVP에서는 사용자가 직접 입력 |
-| Langfuse | `LANGFUSE_ENABLED`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | 기본 off |
-| 이메일 | `EMAIL_ENABLED`, `SMTP_*`, `EMAIL_VERIFICATION_DEBUG` | local은 debug 또는 SMTP |
-
-provider별 상세 정책은 `docs/design/*`, `docs/ops/*` 문서를 참고하세요.
-
-챗봇 응답은 현재 `/api/v1/chatbot/ask`의 POST JSON 응답을 사용합니다. SSE/streaming은 아직
-미구현이며, Bearer token 인증에서는 브라우저 `EventSource`에 Authorization header를 붙이기
-어렵기 때문에 추후에는 `POST + fetch ReadableStream` 방식을 우선 검토합니다.
-
-복약 정보는 사용자가 직접 입력합니다. 약물 정보 확인은 약학정보원/약찾기 서비스를 참고하고,
-본 서비스는 처방, 복용량 판단, 약물 변경 안내를 제공하지 않습니다. 복약 관련 의사결정은
-의사 또는 약사와 상담해야 합니다.
-
-## 이메일 인증 / ai-worker 주의사항
-
-이메일 발송 job은 FastAPI가 직접 처리하지 않습니다.
-
-흐름:
-
-```text
-FastAPI 요청
-→ async_jobs DB row 생성
-→ Redis Stream service job enqueue
-→ ai-worker가 SMTP service job 처리
-```
-
-따라서 실제 이메일 발송을 켜려면 SMTP 환경변수가 `fastapi`와 `ai-worker` 양쪽에 전달되어야 합니다. 서비스 내부 알림은 앱 DB에 저장되며, 브라우저 Push 알림과 SMS 알림은 MVP 범위에서 제외합니다. 표준 dev stack은 `make dev-up`으로 실행합니다.
-
-```bash
-make dev-up
-```
-
-로컬에서 실제 SMTP를 쓰지 않을 때는 다음처럼 debug 모드를 사용합니다.
-
-```env
-EMAIL_ENABLED=false
-EMAIL_VERIFICATION_DEBUG=true
-```
-
-실제 SMTP 발송 예시:
-
-```env
-EMAIL_ENABLED=true
-EMAIL_VERIFICATION_DEBUG=false
-SMTP_HOST=smtp-relay.brevo.com
-SMTP_PORT=587
-SMTP_USERNAME=<SET_IN_PROD>
-SMTP_PASSWORD=<SET_IN_PROD>
-SMTP_FROM_EMAIL=<SET_IN_PROD>
-SMTP_FROM_NAME=Health Ladder
-SMTP_USE_TLS=true
-```
-
-현재 MVP에서는 별도 `email-worker`, `notification-worker`, `scheduler-worker` 없이 `ai-worker` 하나가 AI/OCR/ML job과 service job을 함께 처리합니다. service job에는 이메일 인증, 비밀번호 재설정, 가족 초대, 가족 알림 생성이 포함됩니다. `SCHEDULER_ENABLED=true`이면 notification scheduler도 `ai-worker` 안에서 함께 실행됩니다.
-
-운영 안정화 단계에서는 AI/OCR job 적체가 인증 이메일이나 가족 알림 생성을 지연시키지 않도록 `email-worker`, `notification-worker`, `scheduler-worker` 분리를 목표 구조로 둡니다. 현재 구조와 분리 계획은 `docs/ops/docker_stacks.md`, 배포 전 확인 항목은 `docs/deployment/pre_deploy_checklist.md`를 참고하세요.
-
-## 자주 막히는 문제
-
-### `docker compose up -d`만 실행해서 서비스가 이상하게 뜸
-
-루트 `docker-compose.yml`은 표준 dev stack이 아닙니다. 아래 명령을 사용하세요.
-
-```bash
-make dev-up
-```
-
-### 이메일 인증 버튼은 눌리지만 메일이 안 옴
-
-- `ai-worker`가 떠 있는지 확인합니다.
-- `--env-file .env`로 compose를 실행했는지 확인합니다.
-- `EMAIL_ENABLED`, `SMTP_*`, `EMAIL_VERIFICATION_DEBUG` 설정을 확인합니다.
-- `docker compose config` 전체 출력은 secret 노출 위험이 있으므로 공유하지 않습니다.
-
-```bash
-make dev-ps
-make dev-logs
-```
-
-### migration 명령에서 `aerich`를 못 찾음
-
-컨테이너 내부에서 실행하세요.
-
-```bash
-make dev-migrate
-```
-
-### DB를 초기화하고 싶음
-
-시연/협업 중에는 `down -v`를 쓰지 마세요. DB volume이 삭제될 수 있습니다. 필요한 경우 팀원과 먼저 합의하고 `docs/ops/database_migration_policy.md`를 확인하세요.
-
-## 참고 문서 링크
-
-- Docker stack 정책: `docs/ops/docker_stacks.md`
-- 운영 배포 runbook: `docs/deployment/release_deploy_runbook.md`
-- Secret 처리: `docs/ops/secrets_handling.md`
-- DB migration 정책: `docs/ops/database_migration_policy.md`
-- Langfuse self-host: `docs/ops/langfuse_self_host.md`
-- AI Worker / Redis Stream 구조: `docs/design/ai_worker_structure.md`
-- LLM / LangGraph runtime 계획: `docs/design/llm_langgraph_runtime_plan.md`
-- CV food fallback 정책: `docs/design/cv_food_fallback_policy.md`
-- 시연 시나리오: `docs/demo/scenario.md`
-- 시연 준비 체크리스트: `docs/demo/ready_checklist.md`
+프론트 로컬 개발, rebuild, logs, QA, migration/seed 세부 명령은 [Docker stack 정책](docs/ops/docker_stacks.md)과 [운영 배포 runbook](docs/deployment/release_deploy_runbook.md)을 참고하세요.
+
+## Production Notes
+
+- 실제 운영 env 파일은 EC2 서버의 `.prod.env`에만 존재합니다.
+- `.env`, `.prod.env`, API key, SMTP password, DB password, DuckDNS token은 절대 commit하지 않습니다.
+- `envs/example.prod.env`는 v1.1.0 운영 검증 기준을 반영한 bootstrap/template입니다.
+- GitHub Actions는 `.prod.env` 전체를 덮어쓰지 않고 image version key만 갱신합니다.
+- RAG ingest/embed는 자동배포 때 자동 실행되지 않습니다.
+- 의료 진단, 치료, 처방 표현은 사용하지 않습니다. 사용자 안내는 건강관리 참고와 의료진 상담 권고 범위에서 유지합니다.
+
+## Version
+
+- 현재 운영 검증 기준: `v1.1.0`
+- 운영 자동배포 기준 브랜치: `main`
+- 자동배포 image tag: `main-<short-sha>`
+
+## Documentation
+
+- Docker stack 정책: [docs/ops/docker_stacks.md](docs/ops/docker_stacks.md)
+- 운영 배포 runbook: [docs/deployment/release_deploy_runbook.md](docs/deployment/release_deploy_runbook.md)
+- EC2 Docker 배포 가이드: [docs/deployment/ec2_docker_deploy_guide.md](docs/deployment/ec2_docker_deploy_guide.md)
+- 운영 env 가이드: [docs/deployment/ec2_prod_env.md](docs/deployment/ec2_prod_env.md)
+- Secret 처리: [docs/ops/secrets_handling.md](docs/ops/secrets_handling.md)
+- DB migration 정책: [docs/ops/database_migration_policy.md](docs/ops/database_migration_policy.md)
+- RAG embedding runbook: [docs/ops/rag_embedding_runbook.md](docs/ops/rag_embedding_runbook.md)
+- Langfuse self-host: [docs/ops/langfuse_self_host.md](docs/ops/langfuse_self_host.md)
+- AI Worker / Redis Stream 구조: [docs/design/ai_worker_structure.md](docs/design/ai_worker_structure.md)
+- LLM / LangGraph runtime 계획: [docs/design/llm_langgraph_runtime_plan.md](docs/design/llm_langgraph_runtime_plan.md)
+- CV food fallback 정책: [docs/design/cv_food_fallback_policy.md](docs/design/cv_food_fallback_policy.md)
+- 시연 시나리오: [docs/demo/scenario.md](docs/demo/scenario.md)
+- 시연 준비 체크리스트: [docs/demo/ready_checklist.md](docs/demo/ready_checklist.md)

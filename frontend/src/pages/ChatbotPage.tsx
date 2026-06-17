@@ -42,6 +42,8 @@ function toUserFacingText(text: string) {
   return text;
 }
 
+const chatSafetyNotice = "AI 상담은 건강관리 참고용이며, 진단·치료는 의료진 상담이 필요합니다.";
+
 export default function ChatbotPage() {
   const location = useLocation();
   const [selectedContext, setSelectedContext] = useState<ContextOption>(contextOptions[0]);
@@ -136,6 +138,9 @@ export default function ChatbotPage() {
       </div>
 
       <Card title="상담 주제">
+        <div className="state-box" style={{ marginBottom: "12px" }}>
+          {chatSafetyNotice}
+        </div>
         <div className="chat-context-tabs">
           {contextOptions.map((option) => (
             <button
@@ -152,7 +157,7 @@ export default function ChatbotPage() {
 
       {error && <ErrorMessage message={error} />}
 
-      <Card title="대화">
+      <Card title="AI 건강 대화">
         <div className="chat-window">
           {messages.length === 0 && (
             <div className="chat-empty">
@@ -175,21 +180,25 @@ export default function ChatbotPage() {
 
           {messages.map((chatMessage) => (
             <div className={`chat-message ${chatMessage.role}`} key={chatMessage.id}>
-              <div className="chat-bubble">
+              {chatMessage.role === "assistant" && (
+                <div className="chat-avatar">
+                  <span>H</span>
+                </div>
+              )}
+              <div className="chat-bubble-wrapper">
                 <span className="chat-role">{chatMessage.role === "user" ? "나" : "AI 건강 상담"}</span>
-                <p>{chatMessage.text}</p>
-                {chatMessage.response?.recommended_actions && chatMessage.response.recommended_actions.length > 0 && (
-                  <div className="chip-list">
-                    {chatMessage.response.recommended_actions.map((action) => (
-                      <span className="badge badge-reference" key={action}>
-                        {action}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {chatMessage.response?.safety_notice && (
-                  <p className="chat-safety-notice">{chatMessage.response.safety_notice}</p>
-                )}
+                <div className="chat-bubble">
+                  <p>{chatMessage.text}</p>
+                  {chatMessage.response?.recommended_actions && chatMessage.response.recommended_actions.length > 0 && (
+                    <div className="chip-list">
+                      {chatMessage.response.recommended_actions.map((action) => (
+                        <span className="badge badge-reference" key={action}>
+                          {action}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -221,12 +230,8 @@ export default function ChatbotPage() {
             보내기
           </button>
         </form>
-      </Card>
-
-      <Card title="이용 안내">
-        <p className="warning-text">
-          AI 건강 상담은 참고용 안내이며, 진단/처방 또는 치료 변경을 대신하지 않습니다. 증상이 있거나 약 복용을
-          변경하려면 의료진과 상담해주세요.
+        <p className="muted" style={{ fontSize: "13px", marginTop: 8, textAlign: "left" }}>
+          *서비스 이용 관련 문의는 <Link to="/inquiries" style={{ color: "inherit", textDecoration: "underline" }}>문의/FAQ</Link>를 이용해 주세요.
         </p>
       </Card>
     </div>

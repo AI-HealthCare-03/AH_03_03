@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import {
   FamilyGroup,
@@ -110,6 +110,30 @@ function formatDateTime(value: string | null | undefined): string {
 
 function normalizePhone(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+function familyMemberDisplayName(member: FamilyMember | undefined, fallbackUserId: number): string {
+  if (!member) {
+    return `가족 #${fallbackUserId}`;
+  }
+  const candidates = [
+    member.display_name,
+    (member as FamilyMember & { nickname?: string | null }).nickname,
+    (member as FamilyMember & { name?: string | null }).name,
+    member.email,
+    member.phone_number,
+  ];
+  return candidates.map((value) => String(value ?? "").trim()).find(Boolean) ?? `가족 #${fallbackUserId}`;
+}
+
+function familyMemberSubLabel(member: FamilyMember | undefined): string {
+  if (!member) {
+    return "가족 구성원 정보를 찾을 수 없습니다.";
+  }
+  const relation = relationLabelMap[member.relation_type] ?? member.relation_type;
+  const role = roleLabelMap[member.member_role] ?? member.member_role;
+  const status = statusLabelMap[member.status] ?? member.status;
+  return `${relation} · ${role} · ${status}`;
 }
 
 function getInviteFailureDialog(err: unknown): InviteFeedbackDialog {
@@ -224,6 +248,15 @@ export default function FamilyPage() {
 
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
   const isSelectedGroupOwner = selectedGroup?.owner_user_id === backendUser?.id;
+  const membersByUserId = useMemo(() => {
+    const map = new Map<number, FamilyMember>();
+    members.forEach((member) => {
+      if (member.user_id !== null && member.user_id !== undefined) {
+        map.set(Number(member.user_id), member);
+      }
+    });
+    return map;
+  }, [members]);
 
   const summary = useMemo(() => {
     const activeMembers = members.filter((member) => member.status === "ACTIVE").length;
@@ -233,9 +266,9 @@ export default function FamilyPage() {
     }, 0);
     return [
       { label: "가족 그룹", value: `${groups.length}개`, helper: "내가 속한 가족 그룹입니다." },
-      { label: "연결된 가족", value: `${activeMembers}명`, helper: "선택한 그룹의 연결된 가족입니다." },
-      { label: "초대 대기", value: `${pendingInvites}건`, helper: "내게 도착한 대기 중 초대입니다." },
-      { label: "활성 공유 권한", value: `${enabledShares}개`, helper: "명시적으로 켠 공유 권한입니다." },
+      { label: "일촌 수", value: `${activeMembers}명`, helper: "맺은 일촌 수입니다." },
+      { label: "초대 대기", value: `${pendingInvites}건`, helper: "나에게 도착한 그룹 초대 요청입니다." },
+      { label: "활성 공유 권한", value: `${enabledShares}개`, helper: "내 건강 정보를 공유 중인 항목의 개수입니다." },
     ];
   }, [groups.length, invites, members, shareSettings]);
 
@@ -351,7 +384,7 @@ export default function FamilyPage() {
   };
 
   const handleDeleteGroup = () => {
-    if (!selectedGroup || !window.confirm("가족 그룹을 해제하시겠습니까? 연결된 구성원과 대기 초대가 비활성화됩니다.")) {
+    if (!selectedGroup || !window.confirm("가족 그룹을 해제하시겠습니까? 연결된 구성원과 대기가 중인 초대가 삭제됩니다.")) {
       return;
     }
     void runAction(async () => {
@@ -558,6 +591,55 @@ export default function FamilyPage() {
     }, "공유 권한을 변경했습니다.");
   };
 
+  const renderShareSettingCard = (setting: FamilyShareSetting) => {
+    const ownerMember = membersByUserId.get(Number(setting.owner_user_id));
+    const viewerMember = membersByUserId.get(Number(setting.viewer_user_id));
+    const ownerName =
+      setting.owner_user_id === backendUser?.id
+        ? "내 정보"
+        : familyMemberDisplayName(ownerMember, setting.owner_user_id);
+    const viewerName =
+      setting.viewer_user_id === backendUser?.id
+        ? "나"
+        : familyMemberDisplayName(viewerMember, setting.viewer_user_id);
+
+    return (
+      <div className="family-share-card" key={setting.id}>
+        <div className="family-share-header">
+          <div>
+            <strong>
+              {ownerName} → {viewerName}
+            </strong>
+            <p className="muted">
+              {setting.viewer_user_id === backendUser?.id
+                ? `${familyMemberSubLabel(ownerMember)}의 공유 설정입니다.`
+                : familyMemberSubLabel(viewerMember)}
+            </p>
+          </div>
+          {setting.owner_user_id === backendUser?.id ? (
+            <span className="badge badge-saved">변경 가능</span>
+          ) : (
+            <span className="badge badge-reference">조회 전용</span>
+          )}
+        </div>
+        {shareSettingLabels.map((item) => (
+          <label className="toggle-row family-toggle-row" key={`${setting.id}-${String(item.key)}`}>
+            <span>
+              <strong>{item.label}</strong>
+              <small>{item.helper}</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={Boolean(setting[item.key])}
+              disabled={busy || setting.owner_user_id !== backendUser?.id}
+              onChange={() => handleToggleShareSetting(setting, item.key)}
+            />
+          </label>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="page-stack">
       {inviteFeedback && (
@@ -572,14 +654,11 @@ export default function FamilyPage() {
       )}
       <div className="page-header">
         <div>
-          <span className="badge badge-reference">Family</span>
-          <h1>가족 관리</h1>
-          <p>가족과 건강 정보를 안전하게 공유하고, 보호자 알림을 관리합니다.</p>
+          <span className="badge badge-reference">Health Family</span>
+          <h1>건강 일촌</h1>
+          <p>소중한 사람들과 일촌을 맺고 가족 그룹을 생성해보세요. 건강 정보를 안전하게 공유하고, 보호자 알림 등 서비스를 제공합니다.</p>
+          <p> 일촌 등록/가족 결성만으로 건강정보가 자동 공유되지 않습니다. 공유 권한을 켠 그룹에만 공개됩니다.</p>
         </div>
-      </div>
-
-      <div className="state-box">
-        가족 연결만으로 건강정보가 자동 공유되지 않습니다. 공유 권한을 켠 항목만 가족에게 공개됩니다.
       </div>
       {notice && <div className="state-box">{notice}</div>}
       {error && <div className="error-box">{error}</div>}
@@ -596,20 +675,20 @@ export default function FamilyPage() {
 
       {loading ? (
         <Card>
-          <p className="muted">가족 정보를 불러오는 중입니다...</p>
+          <p className="muted">일촌 정보를 불러오는 중입니다...</p>
         </Card>
       ) : (
         <div className="family-section-grid">
           <Card title="가족 그룹">
             <form className="form compact-form" onSubmit={handleCreateGroup}>
               <label>
-                새 가족 그룹 이름
+                새 가족 이름
                 <div className="inline-form-row">
                   <input
                     className="input"
                     value={groupName}
                     onChange={(event) => setGroupName(event.target.value)}
-                    placeholder="예: 우리 가족"
+                    placeholder="예: 장구네 가족"
                   />
                   <button className="btn-primary" type="submit" disabled={busy}>
                     생성
@@ -640,9 +719,10 @@ export default function FamilyPage() {
             )}
 
             {selectedGroup && (
-              <form className="form compact-form" onSubmit={handleRenameGroup}>
+              <form className="form compact-form" style={{ marginTop: 20 }} onSubmit={handleRenameGroup}>
                 <label>
-                  선택한 그룹 이름 변경
+                  그룹 이름 변경 / 그룹 해제
+                  <p className="muted" style={{ fontSize: "13px", margin: "2px 0 8px" }}>변경을 원하는 그룹을 선택해 주세요.</p>
                   <div className="inline-form-row">
                     <input
                       className="input"
@@ -668,12 +748,13 @@ export default function FamilyPage() {
           </Card>
 
           <Card title="가족 목록">
+            <p className="muted" style={{ fontSize: "14px", marginBottom: 12, marginTop: -4 }}>좌측에서 가족 그룹을 선택하면 구성원을 확인할 수 있습니다.</p>
             {!selectedGroup ? (
               <div className="empty-state">가족 그룹을 선택하면 구성원을 확인할 수 있습니다.</div>
             ) : members.length === 0 ? (
               <div className="empty-state">
-                <strong>아직 연결된 가족이 없습니다.</strong>
-                <p>가족을 초대하거나 미가입 가족을 직접 등록해보세요.</p>
+                <strong>아직 연결된 일촌이 없습니다.</strong>
+                <p>일촌을 초대해 보세요.</p>
               </div>
             ) : (
               <div className="family-member-list">
@@ -702,63 +783,13 @@ export default function FamilyPage() {
               </div>
             )}
 
-            <form className="form two-col family-form-panel" onSubmit={handleAddUnregistered}>
-              <label>
-                미가입 가족 이름
-                <input
-                  className="input"
-                  value={unregisteredForm.display_name}
-                  onChange={(event) => setUnregisteredForm((prev) => ({ ...prev, display_name: event.target.value }))}
-                  placeholder="가족 이름"
-                  disabled={!selectedGroup || !isSelectedGroupOwner}
-                />
-              </label>
-              <label>
-                관계
-                <select
-                  className="input"
-                  value={unregisteredForm.relation_type}
-                  onChange={(event) =>
-                    setUnregisteredForm((prev) => ({ ...prev, relation_type: event.target.value as FamilyRelationType }))
-                  }
-                  disabled={!selectedGroup || !isSelectedGroupOwner}
-                >
-                  {relationOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                이메일
-                <input
-                  className="input"
-                  type="email"
-                  value={unregisteredForm.email}
-                  onChange={(event) => setUnregisteredForm((prev) => ({ ...prev, email: event.target.value }))}
-                  disabled={!selectedGroup || !isSelectedGroupOwner}
-                />
-              </label>
-              <label>
-                휴대폰 번호
-                <input
-                  className="input"
-                  value={unregisteredForm.phone_number}
-                  onChange={(event) => setUnregisteredForm((prev) => ({ ...prev, phone_number: normalizePhone(event.target.value) }))}
-                  disabled={!selectedGroup || !isSelectedGroupOwner}
-                />
-              </label>
-              <button className="btn-secondary" type="submit" disabled={busy || !selectedGroup || !isSelectedGroupOwner}>
-                미가입 가족 등록
-              </button>
-            </form>
           </Card>
 
+          <div style={{ gridColumn: "1 / -1" }}>
           <Card title="가족 초대">
             <div className="family-invite-grid">
               <form className="mini-card form" onSubmit={handleCreateInvite}>
-                <span className="badge badge-reference">초대 생성</span>
+                <h3>초대 생성</h3>
                 <label>
                   이메일(필수)
                   <input
@@ -811,13 +842,13 @@ export default function FamilyPage() {
                 <button className="btn-primary" type="submit" disabled={busy || !selectedGroup || !isSelectedGroupOwner}>
                   이메일로 초대코드 발송
                 </button>
-                <p className="muted">초대코드는 입력한 이메일로 발송됩니다.</p>
+                <p className="muted">입력한 이메일로 초대코드가 발송됩니다.</p>
               </form>
 
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <form className="mini-card form" onSubmit={handlePreviewCode}>
-                <span className="badge badge-reference">코드 입력</span>
-                <strong>초대 코드로 연결</strong>
-                <p className="muted">받은 초대 코드를 입력한 뒤 초대 정보를 확인하고 수락 여부를 선택합니다.</p>
+                <h3>초대 수락</h3>
+                <p className="muted">초대 코드를 입력한 뒤 그룹 정보를 확인하고 수락 여부를 선택합니다.</p>
                 <input
                   className="input"
                   value={inviteCodeInput}
@@ -825,10 +856,10 @@ export default function FamilyPage() {
                     setInviteCodeInput(event.target.value);
                     setInvitePreview(null);
                   }}
-                  placeholder="초대 코드"
+                  placeholder="초대 코드(8자리 숫자)"
                 />
                 <button className="btn-secondary" type="submit" disabled={busy}>
-                  초대 확인
+                  확인
                 </button>
                 {invitePreview && (
                   <div className="state-box">
@@ -851,126 +882,89 @@ export default function FamilyPage() {
                   </div>
                 )}
               </form>
-
               <div className="mini-card">
-                <span className="badge badge-reference">초대 코드</span>
-                {latestInviteCode ? (
-                  <>
-                    <strong className="invite-code-box">{latestInviteCode}</strong>
-                    <p className="muted">초대 코드는 생성 직후 한 번만 표시되며, 입력한 이메일로도 발송됩니다.</p>
-                  </>
-                ) : (
-                  <>
-                    <strong>초대코드는 이메일로 발송됩니다.</strong>
-                    <p className="muted">운영 환경에서는 보안을 위해 화면에 초대코드가 표시되지 않을 수 있습니다.</p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="card-list">
-              <div>
                 <h3>보낸 초대 기록</h3>
-                <p className="muted">최근 발송한 가족 초대 요청입니다. 초대코드 원문은 보안을 위해 표시하지 않습니다.</p>
-              </div>
-              {sentInvites.length === 0 ? (
-                <div className="empty-state">아직 보낸 가족 초대가 없습니다.</div>
-              ) : (
-                sentInvites.map((invite) => (
-                  <div className="family-member-card" key={invite.id}>
-                    <div>
-                      <strong>{invite.invitee_email || invite.invitee_phone || "초대 대상 미표시"}</strong>
-                      <p className="muted">
-                        {relationLabelMap[invite.relation_type]} · {roleLabelMap[invite.member_role]} ·{" "}
-                        {statusLabelMap[invite.status] ?? invite.status}
-                      </p>
-                      <p className="muted">
-                        생성 {formatDateTime(invite.created_at)} · 만료 {formatDateTime(invite.expires_at)}
-                      </p>
-                    </div>
-                    <div className="button-row">
-                      <span className="badge badge-reference">{statusLabelMap[invite.status] ?? invite.status}</span>
-                      {invite.status === "PENDING" && invite.invitee_email && isSelectedGroupOwner && (
-                        <button className="btn-secondary" type="button" disabled={busy} onClick={() => handleResendInvite(invite)}>
-                          재발송
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="card-list">
-              <div>
-                <h3>받은 초대</h3>
-                <p className="muted">이메일로 받은 초대코드나 대기 중인 초대를 연결할 수 있습니다.</p>
-              </div>
-              {invites.length === 0 ? (
-                <div className="empty-state">내게 도착한 가족 초대가 없습니다.</div>
-              ) : (
-                invites.map((invite) => (
-                  <div className="family-member-card" key={invite.id}>
-                    <div>
-                      <strong>가족 초대</strong>
-                      <p className="muted">
-                        {relationLabelMap[invite.relation_type]} · {roleLabelMap[invite.member_role]} · 만료{" "}
-                        {formatDateTime(invite.expires_at)}
-                      </p>
-                    </div>
-                    <div className="button-row">
-                      <button className="btn-primary" type="button" disabled={busy} onClick={() => handleAcceptInvite(invite)}>
-                        연결
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          <Card title="공유 권한">
-            <p className="muted">공유 권한은 기본적으로 꺼져 있습니다. 켠 항목만 가족에게 공유됩니다.</p>
-            {shareSettings.length === 0 ? (
-              <div className="empty-state">연결된 가입 가족이 생기면 공유 권한을 설정할 수 있습니다.</div>
-            ) : (
-              <div className="settings-list">
-                {shareSettings.map((setting) => (
-                  <div className="family-share-card" key={setting.id}>
-                    <div className="family-share-header">
-                      <strong>
-                        내 정보 #{setting.owner_user_id} → 가족 #{setting.viewer_user_id}
-                      </strong>
-                      {setting.owner_user_id === backendUser?.id ? (
-                        <span className="badge badge-saved">변경 가능</span>
-                      ) : (
-                        <span className="badge badge-reference">조회 전용</span>
-                      )}
-                    </div>
-                    {shareSettingLabels.map((item) => (
-                      <label className="toggle-row family-toggle-row" key={`${setting.id}-${String(item.key)}`}>
-                        <span>
-                          <strong>{item.label}</strong>
-                          <small>{item.helper}</small>
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(setting[item.key])}
-                          disabled={busy || setting.owner_user_id !== backendUser?.id}
-                          onChange={() => handleToggleShareSetting(setting, item.key)}
-                        />
-                      </label>
+                <p className="muted" style={{ marginBottom: 12 }}>최근 발송한 가족 초대 요청입니다.</p>
+                {sentInvites.length === 0 ? (
+                  <div className="empty-state">아직 보낸 가족 초대가 없습니다.</div>
+                ) : (
+                  <div className="card-list">
+                    {sentInvites.map((invite) => (
+                      <div className="family-member-card" key={invite.id}>
+                        <div>
+                          <strong>{invite.invitee_email || invite.invitee_phone || "초대 대상 미표시"}</strong>
+                          <p className="muted">
+                            {relationLabelMap[invite.relation_type]} · {roleLabelMap[invite.member_role]} ·{" "}
+                            {statusLabelMap[invite.status] ?? invite.status}
+                          </p>
+                          <p className="muted">
+                            생성 {formatDateTime(invite.created_at)} · 만료 {formatDateTime(invite.expires_at)}
+                          </p>
+                        </div>
+                        <div className="button-row">
+                          <span className="badge badge-reference">{statusLabelMap[invite.status] ?? invite.status}</span>
+                          {invite.status === "PENDING" && invite.invitee_email && isSelectedGroupOwner && (
+                            <button className="btn-secondary" type="button" disabled={busy} onClick={() => handleResendInvite(invite)}>
+                              재발송
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
-                ))}
+                )}
+              </div>
+
+              <div className="mini-card">
+                <h3>받은 초대</h3>
+                <p className="muted" style={{ marginBottom: 12 }}>이메일로 받은 초대코드나 대기 중인 초대를 수락할 수 있습니다.</p>
+                {invites.length === 0 ? (
+                  <div className="empty-state">내게 도착한 가족 초대가 없습니다.</div>
+                ) : (
+                  <div className="card-list">
+                    {invites.map((invite) => (
+                      <div className="family-member-card" key={invite.id}>
+                        <div>
+                          <strong>가족 초대</strong>
+                          <p className="muted">
+                            {relationLabelMap[invite.relation_type]} · {roleLabelMap[invite.member_role]} · 만료{" "}
+                            {formatDateTime(invite.expires_at)}
+                          </p>
+                        </div>
+                        <div className="button-row">
+                          <button className="btn-primary" type="button" disabled={busy} onClick={() => handleAcceptInvite(invite)}>
+                            연결
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              </div>
+            </div>
+          </Card>
+          </div>
+
+          <Card title="공유 권한">
+            <p className="muted">공유 권한은 기본적으로 꺼져 있습니다. 내가 직접 켠 항목만 가족에게 안전하게 공개됩니다.</p>
+            {shareSettings.length === 0 ? (
+              <div className="empty-state">연결된 가족이 생기면 공유 권한 설정이 가능합니다.</div>
+            ) : (
+              <div className="settings-list">
+                {shareSettings.map(renderShareSettingCard)}
               </div>
             )}
           </Card>
 
-          <Card title="가족 알림">
+          <Card title="가족 알림" actions={
+            <Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/settings">
+              알림 설정 바로가기
+            </Link>
+          }>
             <div className="empty-state">
               <strong>아직 표시할 가족 알림이 없습니다.</strong>
-              <p>가족 알림은 건강분석 결과, 이상 수치, 복약 미수행, 챌린지 미수행 흐름과 함께 단계적으로 연결됩니다.</p>
+              <p>가족 알림은 내가 설정한 범위 내에서만 안전하게 공유됩니다</p>
             </div>
           </Card>
         </div>

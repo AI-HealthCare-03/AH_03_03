@@ -38,6 +38,13 @@ export async function listMedicationRecords<T>(medicationId: number): Promise<T>
   return apiRequest<T>(`/medications/${medicationId}/records`);
 }
 
+export async function createMedicationRecord<T>(
+  medicationId: number,
+  payload: Record<string, ApiValue>,
+): Promise<T> {
+  return apiRequest<T>(`/medications/${medicationId}/records`, { method: "POST", body: payload });
+}
+
 export async function updateMedicationRecord<T>(recordId: number, payload: Record<string, ApiValue>): Promise<T> {
   return apiRequest<T>(`/medications/records/${recordId}`, { method: "PATCH", body: payload });
 }

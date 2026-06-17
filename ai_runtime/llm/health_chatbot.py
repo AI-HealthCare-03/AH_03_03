@@ -88,8 +88,8 @@ def generate_result_chatbot_response(
             )
         source = rule_result.source
 
-    final_answer = f"{answer} {CAUTION_MESSAGE}"
-    safety_result = check_medical_safety(final_answer)
+    final_answer = answer.strip()
+    safety_result = check_medical_safety(final_answer, require_disclaimer=False)
 
     return ResultChatbotOutput(
         answer=final_answer,
@@ -147,8 +147,8 @@ def generate_main_health_chatbot_response(
             )
         source = rule_result.source
 
-    final_answer = f"{answer} {CAUTION_MESSAGE}"
-    safety_result = check_medical_safety(final_answer)
+    final_answer = answer.strip()
+    safety_result = check_medical_safety(final_answer, require_disclaimer=False)
 
     return MainHealthChatbotOutput(
         answer=final_answer,

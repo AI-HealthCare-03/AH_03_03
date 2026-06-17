@@ -133,8 +133,8 @@ def test_rag_generator_uses_json_llm_and_returns_public_answer(monkeypatch) -> N
 
     assert output.source == "rag_llm"
     assert output.answer.startswith("혈압 관리가 필요한 경우")
-    assert "진단이 아니" in output.answer
-    assert "의료진 상담" in output.answer
+    assert "진단이 아니" not in output.answer
+    assert "의료진 상담" in output.caution_message
     assert '"answer":' not in output.answer
     assert '"intent":' not in output.answer
     assert '"source":' not in output.answer

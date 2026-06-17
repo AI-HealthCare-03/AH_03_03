@@ -62,7 +62,7 @@ def test_fallback_safe_response_prompt_avoids_diagnosis_or_prescription_instruct
     assert "현재 준비된 참고자료만으로는 이 주제에 대해 구체적으로 안내하기 어렵습니다" in rendered
     assert "참고용" in rendered
     assert "의료진과 상담" in rendered
-    assert "진단이 아니" in rendered
+    assert "진단이 아니" not in rendered
     assert "진단되었습니다" not in rendered
     assert "복용하세요" not in rendered
     assert "처방합니다" not in rendered

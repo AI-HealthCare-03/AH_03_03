@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState, type ReactNode } from "react";
+import { type CSSProperties, useEffect, useState, useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -26,7 +26,7 @@ import {
   isKnownAnalysisType,
 } from "../utils/riskDisplay";
 
-import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";  // ReactNode import 추가
+import { Salad, Pill, Dumbbell, Droplets, Trophy } from "lucide-react";
 
 type DashboardData = Record<string, unknown>;
 type HealthRecord = Record<string, unknown>;
@@ -143,12 +143,32 @@ function getTrendValue(item: TrendItem, key = "value"): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function toChartPoint(item: TrendItem, value: number, suffix = ""): ChartPoint {
-  const date = String(item.date ?? item.created_at ?? item.measured_at ?? "");
-  const label = date ? formatDate(date) : "-";
+function getTrendPointSortTime(item: TrendItem, fallbackIndex: number): number {
+  const parsed = Date.parse(String(item.measured_at ?? item.created_at ?? item.date ?? ""));
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  const id = Number(item.id);
+  return Number.isFinite(id) ? id : fallbackIndex;
+}
+
+function getTrendPointKey(item: TrendItem, fallbackIndex: number): string {
+  const timestamp = String(item.measured_at ?? item.created_at ?? item.date ?? "").trim();
+  const id = String(item.id ?? "").trim();
+  if (timestamp) {
+    return id ? `${timestamp}#${id}` : `${timestamp}#${fallbackIndex}`;
+  }
+  return id ? `id:${id}` : `index:${fallbackIndex}`;
+}
+
+function toChartPoint(item: TrendItem, value: number, suffix = "", fallbackIndex = 0): ChartPoint {
+  const key = getTrendPointKey(item, fallbackIndex);
+  const labelSource = String(item.measured_at ?? item.created_at ?? item.date ?? "");
+  const label = labelSource.includes("T") ? formatDateTime(labelSource) : formatDate(labelSource);
   return {
-    date,
+    date: key,
     label,
+    sortTime: getTrendPointSortTime(item, fallbackIndex),
     value,
     displayValue: `${Math.round(value * 10) / 10}${suffix}`,
   };
@@ -167,13 +187,21 @@ function makeValueSeries(
     label,
     color,
     points: (items ?? [])
-      .map((item) => {
+      .map((item, index) => {
         const value = getTrendValue(item, key);
-        return value === null ? null : toChartPoint(item, value, suffix);
+        return value === null ? null : toChartPoint(item, value, suffix, index);
       })
       .filter((point): point is ChartPoint => Boolean(point))
-      .sort((a, b) => a.date.localeCompare(b.date)),
+      .sort((a, b) => (a.sortTime ?? 0) - (b.sortTime ?? 0) || a.date.localeCompare(b.date)),
   };
+}
+
+function getChartPointSortTime(point: ChartPoint, fallbackIndex: number): number {
+  if (Number.isFinite(point.sortTime)) {
+    return point.sortTime ?? 0;
+  }
+  const parsed = Date.parse(point.date);
+  return Number.isFinite(parsed) ? parsed : fallbackIndex;
 }
 
 function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
@@ -270,11 +298,42 @@ function EmptyChartState() {
 }
 
 function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean; connectPairs?: boolean }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(640);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      requestAnimationFrame(() => {
+        const w = el.getBoundingClientRect().width;
+        if (w > 0) setChartWidth(Math.floor(w));
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   const visibleSeries = series
     .map((item) => ({ ...item, points: item.points.filter((point) => Number.isFinite(point.value)) }))
     .filter((item) => item.points.length > 0);
   const allPoints = visibleSeries.flatMap((item) => item.points);
-  const uniqueDates = Array.from(new Set(allPoints.map((point) => point.date || point.label))).sort();
+  const axisLabelByDate = new Map<string, string>();
+  allPoints.forEach((point) => {
+    if (!axisLabelByDate.has(point.date)) {
+      axisLabelByDate.set(point.date, point.label);
+    }
+  });
+  const uniqueDates = Array.from(new Set(allPoints.map((point) => point.date || point.label))).sort((a, b) => {
+    const pointA = allPoints.find((point) => (point.date || point.label) === a);
+    const pointB = allPoints.find((point) => (point.date || point.label) === b);
+    return (
+      getChartPointSortTime(pointA ?? { date: a, label: a, value: 0 }, 0) -
+        getChartPointSortTime(pointB ?? { date: b, label: b, value: 0 }, 0) ||
+      a.localeCompare(b)
+    );
+  });
   const hasEnoughData = uniqueDates.length >= 1 || visibleSeries.some((item) => item.points.length >= 1);
 
   if (!hasEnoughData) {
@@ -287,7 +346,7 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
   const rangePadding = rawMin === rawMax ? Math.max(rawMax * 0.1, 1) : (rawMax - rawMin) * 0.12;
   const min = clampTo100 ? 0 : Math.max(0, rawMin - rangePadding);
   const max = clampTo100 ? 100 : rawMax + rangePadding;
-  const width = 640;
+  const width = chartWidth;
   const height = 180;
   const padding = { top: 20, right: 24, bottom: 34, left: axisTicks?.length ? 76 : 44 };
   const innerWidth = width - padding.left - padding.right;
@@ -303,8 +362,15 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
 
   return (
     <div className="line-chart-card">
-      <div className="line-chart-wrap">
-        <svg aria-label="추적 꺾은선 그래프" className="line-chart" viewBox={`0 0 ${width} ${height}`} role="img">
+      <div className="line-chart-wrap" ref={wrapRef}>
+       <svg
+        aria-label="추적 꺾은선 그래프"
+        className="line-chart"
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        role="img"
+      >
           {gridValues.map((value) => {
             const y = yFor(value);
             return (
@@ -319,10 +385,10 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
           {uniqueDates.length > 0 && (
             <>
               <text className="line-chart-axis" x={padding.left} y={height - 8}>
-                {formatDate(uniqueDates[0])}
+                {axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
               </text>
               <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
-                {formatDate(uniqueDates[uniqueDates.length - 1])}
+                {axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
               </text>
             </>
           )}
@@ -407,7 +473,9 @@ function getSeriesDelta(series: ChartSeries[]): number | null {
   if (points.length < 2) {
     return null;
   }
-  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...points].sort(
+    (a, b) => (a.sortTime ?? 0) - (b.sortTime ?? 0) || a.date.localeCompare(b.date),
+  );
   return Math.round((sorted[sorted.length - 1].value - sorted[sorted.length - 2].value) * 10) / 10;
 }
 
@@ -666,6 +734,7 @@ export default function DashboardPage() {
       )
     : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
+  const latestDiet = dashboardDiets[0];
   const bloodPressureSeries = [
     makeValueSeries(trends.blood_pressure, "수축기 혈압", diseaseChartColors.HYPERTENSION, {
       key: "systolic",
@@ -685,7 +754,6 @@ export default function DashboardPage() {
   ];
   const lifestyleSeries = [
     makeValueSeries(trends.challenge_completion_rate, "챌린지 수행률", diseaseChartColors.OBESITY, { suffix: "%" }),
-    makeMedicationAdherenceSeries(dashboardMedicationRecords),
   ];
   const medicationAdherenceSeries = makeMedicationAdherenceSeries(dashboardMedicationRecords);
   const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
@@ -811,21 +879,20 @@ export default function DashboardPage() {
                     series: [medicationAdherenceSeries],
                   },
                 ]
-              : [
-                  {
-                    title: activeMetric.label,
-                    unit: "",
-                    value: "-",
-                    delta: null,
-                    series: activeMetricSeries,
-                  },
-                ];
+            : [
+                {
+                  title: activeMetric.label,
+                  unit: "",
+                  value: "-",
+                  delta: null,
+                  series: activeMetricSeries,
+                },
+              ];
   const aiComment =
     String((summary as AnyRecord).ai_comment ?? "").trim() ||
     (latestAnalysisResults.length > 0
       ? "최근 분석 결과와 건강 지표 변화를 함께 보면서 생활습관을 꾸준히 조정해보세요."
       : "아직 분석 결과가 없습니다. 건강정보를 입력하고 간편 분석을 실행하면 맞춤 코멘트를 확인할 수 있습니다.");
-  const latestDiet = dashboardDiets[0];
   const dietSummary = String(
     latestDiet?.summary ??
       latestDiet?.analysis_summary ??

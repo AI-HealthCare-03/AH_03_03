@@ -17,7 +17,7 @@ async def test_chatbot_uses_local_llm_rule_router_without_dummy_source(monkeypat
     )
 
     assert response.source == "rule_engine"
-    assert "진단이 아니" in response.answer
+    assert "진단이 아니" not in response.answer
     assert "의료진 상담" in response.safety_notice
 
 
@@ -50,7 +50,8 @@ async def test_chatbot_can_return_rag_llm_source_without_api_contract_change(mon
     assert response.source == "rag_llm"
     assert response.context_type == ChatbotContextType.MAIN
     assert response.recommended_actions
-    assert "진단이 아니" in response.answer
+    assert "진단이 아니" not in response.answer
+    assert "의료진 상담" in response.safety_notice
 
 
 @pytest.mark.asyncio
@@ -65,7 +66,8 @@ async def test_chatbot_real_llm_flag_without_openai_key_falls_back_to_rule_engin
     )
 
     assert response.source == "rule_engine"
-    assert "진단이 아니" in response.answer
+    assert "진단이 아니" not in response.answer
+    assert "의료진 상담" in response.safety_notice
 
 
 @pytest.mark.asyncio
@@ -84,7 +86,8 @@ async def test_chatbot_real_llm_flag_uses_openai_rewrite_when_configured(monkeyp
     )
 
     assert response.source == "openai_rewrite"
-    assert "진단이 아니" in response.answer
+    assert "진단이 아니" not in response.answer
+    assert "의료진 상담" in response.safety_notice
 
 
 @pytest.mark.asyncio
@@ -106,7 +109,8 @@ async def test_chatbot_crisis_keyword_prioritizes_immediate_support(monkeypatch)
     assert "챌린지 추천보다 안전 확보가 우선" in response.answer
     assert "보호자" in response.answer
     assert "전문기관" in response.answer
-    assert "진단이 아니" in response.answer
+    assert "진단이 아니" not in response.answer
+    assert "의료진 상담" in response.safety_notice
     assert all("챌린지" not in action for action in response.recommended_actions)
 
 

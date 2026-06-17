@@ -60,7 +60,6 @@ const myPageMenuItems: MyPageMenuItem[] = [
   { label: "기본 건강정보", to: "/health/profile" },
   { label: "복약/영양제", to: "/medications" },
   { label: "챌린지 현황", to: "/challenges" },
-  { label: "내 가족", to: "/family" },
 ];
 
 function getText(item: Item | undefined | null, key: string, fallback = "-"): string {
@@ -80,6 +79,17 @@ function getDateLabel(value: unknown): string {
     return String(value);
   }
   return date.toLocaleDateString("ko-KR");
+}
+
+function getDateTimeLabel(value: unknown): string {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function normalizeStatus(value: unknown): string {
@@ -245,7 +255,7 @@ export default function MyPage() {
     () => [
       ["생년월일", backendUser?.birthday],
       ["성별", backendUser?.gender === "FEMALE" ? "여성" : backendUser?.gender === "MALE" ? "남성" : "-"],
-      ["키/몸무게", `${getText(latestHealth, "height_cm")}cm / ${getText(latestHealth, "weight_kg")}kg`],
+      ["키/몸무게", `${latestHealth?.height_cm != null ? Number(latestHealth.height_cm).toFixed(1) : "-"}cm / ${getText(latestHealth, "weight_kg")}kg`],
       ["BMI", getText(latestHealth, "bmi")],
     ],
     [backendUser, latestHealth],
@@ -313,42 +323,12 @@ export default function MyPage() {
           <p>계정 정보와 건강 분석 내역을 확인하고 관리합니다.</p>
         </div>
       </header>
-    <div className="dashboard-grid">
-      <Card>
-        <div className="mypage-menu">
-          {myPageMenuItems.map((item) => {
-            if (item.to) {
-              return (
-                <Link className="mypage-menu-item" key={item.label} to={item.to}>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            }
-
-            return (
-              <button
-                className="mypage-menu-item"
-                key={item.label}
-                type="button"
-              >
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
+    <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr" }}>
       <div className="page-stack">
         {notice && <div className="state-box">{notice}</div>}
         {error && <ErrorMessage message={error} />}
 
-        <Card title="프로필/기본 내역" actions={
-          !isEditingProfile ? (
-            <button className="secondary" onClick={() => setIsEditingProfile(true)} type="button">
-              수정
-            </button>
-          ) : undefined
-        }>
+        <Card title="프로필/기본 내역">
           <div className="profile-card-row">
             <span className="avatar avatar-large">{profileInitial}</span>
             <div className="profile-card-main">
@@ -389,8 +369,7 @@ export default function MyPage() {
               )}
             </div>
           </div>
-
-          <div className="button-row" style={{ marginTop: 16 }}>
+          <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end" }}>
             {isEditingProfile ? (
               <>
                 <button onClick={() => void saveProfileDraft()} type="button">
@@ -410,8 +389,16 @@ export default function MyPage() {
                   취소
                 </button>
               </>
-            ) : null}
-
+            ) : (
+              <>
+                <Link className="button" to="/family">
+                  가족 설정
+                </Link>
+                <button className="button secondary" onClick={() => setIsEditingProfile(true)} type="button">
+                  수정
+                </button>
+              </>
+            )}
           </div>
         </Card>
 
@@ -454,30 +441,38 @@ export default function MyPage() {
           </Card>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-        <Card title="기본 건강정보">
+        <div className="mypage-health-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        <Card
+          title="기본 건강정보"
+          actions={
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className={profileRows.some(([, v]) => !v || v === "-") ? "badge badge-missing" : "badge badge-saved"}>
+                {profileRows.some(([, v]) => !v || v === "-") ? "미입력 있음" : "전체 저장됨"}
+              </span>
+<Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/health/profile">
+                건강정보 수정
+              </Link>
+            </div>
+          }
+        >
           <div className="table-list">
             {profileRows.map(([label, value]) => (
               <div className="table-row" key={String(label)}>
                 <span>{String(label)}</span>
                 <strong>{String(value ?? "-")}</strong>
-                <span className={value && value !== "-" ? "badge badge-saved" : "badge badge-missing"}>
-                  {value && value !== "-" ? "저장됨" : "미입력"}
-                </span>
               </div>
             ))}
           </div>
-          <div className="button-row" style={{ marginTop: 16 }}>
-            <Link className="button secondary" to="/health/profile">
-              건강정보 수정
-            </Link>
-            <Link className="button secondary" to="/health">
-              건강 분석 입력
-            </Link>
-          </div>
         </Card>
 
-        <Card title="현재 상태">
+        <Card
+          title="현재 상태"
+          actions={
+            <Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/dashboard">
+              건강 리포트 바로가기
+            </Link>
+          }
+        >
             <div className="metric-grid mypage-metric-grid">
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -487,7 +482,7 @@ export default function MyPage() {
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Activity size={14} /> 혈압
+                  <Activity size={14} /> 혈압(mmHg)
                 </span>
                 <strong>
                   {getText(latestHealth, "systolic_bp", "-")}/{getText(latestHealth, "diastolic_bp", "-")}
@@ -495,7 +490,7 @@ export default function MyPage() {
               </div>
               <div>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Droplet size={14} /> 공복혈당
+                  <Droplet size={14} /> 공복혈당(mg/dL)
                 </span>
                 <strong>{getText(latestHealth, "fasting_glucose", "기록 없음")}</strong>
               </div>
@@ -509,62 +504,90 @@ export default function MyPage() {
           </Card>
           </div>
 
-          <Card title="건강 목표">
+          <Card
+            title="건강 목표"
+            actions={
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="muted" style={{ fontSize: "13px" }}>건강 목표 설정이 어렵다면? →</span>
+                <Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/chatbot">
+                  AI와 상담하기
+                </Link>
+              </div>
+            }
+          >
             <div className="card-list">
               <div className="mini-card">
-                <strong>기본 건강정보 꾸준히 관리</strong>
-                <p className="muted">신장, 체중, 생활습관을 최신 상태로 유지하면 분석 결과를 더 안정적으로 확인할 수 있습니다.</p>
+                <strong>꾸준한 건강 기록 관리</strong>
+                <p className="muted">신장, 체중, 생활습관을 최신 상태로 기록해 주시면 누적 건강 데이터를 바탕으로 분석 결과를 더 안정적으로 예측해 드려요.</p>
               </div>
               <div className="mini-card">
-                <strong>생활습관 챌린지 실천</strong>
-                <p className="muted">걷기, 식단, 복약 기록을 함께 관리해 추적 대시보드에서 변화를 확인해보세요.</p>
+                <strong>일상 속 매일매일 생활습관 챌린지 실천</strong>
+                <p className="muted">걷기, 식단, 복약 기록과 함께 오늘의 챌린지 실천을 통해 개선되는 건강 리포트의 긍정적인 변화를 확인해보세요.</p>
               </div>
             </div>
           </Card>
 
         <div className="page-grid">
-          <Card title="최근 분석 결과">
+          <Card
+            title="최근 분석 결과"
+            actions={
+              <Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/analysis">
+                분석 결과 바로가기
+              </Link>
+            }
+          >
             <div className="card-list">
               {analysis.length === 0 && <div className="state-box">최근 분석 결과가 없습니다.</div>}
               {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
-              {latestDiseaseAnalysis.map((result) => {
+              {latestDiseaseAnalysis.slice(0, 5).map((result) => {
                 const resultId = Number(result.id);
                 const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
                 return (
-                  <div className="mini-card result-summary-card" key={String(result.id ?? result.analysis_type)}>
+                  <Link
+                    className="mini-card result-summary-card"
+                    key={String(result.id ?? result.analysis_type)}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                    to={Number.isFinite(resultId) ? `/analysis/${resultId}` : "/analysis"}
+                  >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong>{getAnalysisTypeLabel(result.analysis_type, "-")}</strong>
-                      {Number.isFinite(resultId) && (
-                        <Link className="muted" style={{ fontSize: "13px" }} to={`/analysis/${resultId}`}>
-                          상세보기 →
-                        </Link>
-                      )}
+                      <span className="muted" style={{ fontSize: "13px" }}>상세보기 →</span>
                     </div>
                     <div className="button-row" style={{ marginTop: "6px" }}>
                       <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
                       {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
                       <span className="badge badge-reference">{getDateLabel(result.created_at)}</span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
           </Card>
 
-          <Card title="진행 중 챌린지">
+          <Card
+            title="진행 중인 챌린지"
+            actions={
+              <Link className="button secondary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/challenges">
+                챌린지 바로가기
+              </Link>
+            }
+          >
             <div className="card-list">
               {visibleChallenges.length === 0 && <div className="state-box">진행 중인 챌린지가 없습니다.</div>}
               {visibleChallenges.map((challenge) => {
                 const progress = getChallengeProgress(challenge);
                 return (
-                  <div className="mini-card" key={String(challenge.id)}>
+                  <Link
+                    className="mini-card"
+                    key={String(challenge.id)}
+                    style={{ textDecoration: "none", color: "inherit", cursor: "pointer", transition: "border-color 0.15s, box-shadow 0.15s, transform 0.15s" }}
+                    to={getChallengeId(challenge) ? `/challenges/${String(getChallengeId(challenge))}` : "/challenges"}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-primary)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.transform = ""; }}
+                  >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong>{getChallengeTitle(challenge, challengeMasters)}</strong>
-                      {getChallengeId(challenge) && (
-                        <Link className="muted" style={{ fontSize: "13px" }} to={`/challenges/${String(getChallengeId(challenge))}`}>
-                          상세보기 →
-                        </Link>
-                      )}
+                      <span className="muted" style={{ fontSize: "13px" }}>상세보기 →</span>
                     </div>
                     <div style={{ marginTop: "6px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
@@ -575,7 +598,7 @@ export default function MyPage() {
                         <div className="progress-fill" style={{ width: `${progress}%` }} />
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

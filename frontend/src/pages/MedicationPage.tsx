@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import {
   createMedication,
+  createMedicationRecord,
   deactivateMedication,
   deleteMedication,
   getMedication,
@@ -64,6 +65,16 @@ function buildMedicationPayload(draft: MedicationPayload): MedicationPayload {
   };
 }
 
+function formatMedicationDateTime(value: unknown): string {
+  if (!value) return "일정 없음";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function MedicationPage() {
   const [registerDraft, setRegisterDraft] = useState<MedicationPayload>({
     name: "",
@@ -79,19 +90,27 @@ export default function MedicationPage() {
   const [error, setError] = useState("");
   const [registerErrors, setRegisterErrors] = useState<MedicationFormErrors>({});
   const [selectedMedicationId, setSelectedMedicationId] = useState<number | null>(null);
+  const [recordMedicationId, setRecordMedicationId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<MedicationPayload>({});
   const [pendingAction, setPendingAction] = useState<null | { type: "deactivate" | "delete"; medicationId: number }>(
     null,
   );
   const [isMutating, setIsMutating] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  const load = async () => {
+  const load = async (nextRecordMedicationId?: number | null) => {
     setError("");
     try {
       const medications = await listMedications<Item[]>();
       setItems(medications);
-      if (medications[0]?.id) {
-        setRecords(await listMedicationRecords<Item[]>(Number(medications[0].id)));
+      const fallbackId = medications[0]?.id ? Number(medications[0].id) : null;
+      const requestedId = nextRecordMedicationId ?? recordMedicationId ?? fallbackId;
+      const targetId = medications.some((medication) => Number(medication.id) === requestedId)
+        ? requestedId
+        : fallbackId;
+      setRecordMedicationId(targetId);
+      if (targetId) {
+        setRecords(await listMedicationRecords<Item[]>(targetId));
       } else {
         setRecords([]);
       }
@@ -124,6 +143,7 @@ export default function MedicationPage() {
       setIsMutating(true);
       const created = await createMedication<Item>(payload);
       setItems((prev) => [created, ...prev.filter((item) => Number(item.id) !== Number(created.id))]);
+      setRecordMedicationId(Number(created.id));
       setRecords([]);
       setRegisterDraft({
         name: "",
@@ -135,7 +155,7 @@ export default function MedicationPage() {
         is_active: true,
       });
       setRegisterErrors({});
-      await load();
+      await load(Number(created.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 등록에 실패했습니다.");
     } finally {
@@ -146,6 +166,40 @@ export default function MedicationPage() {
   const getMedicationName = (record: Item) => {
     const medication = items.find((item) => Number(item.id) === Number(record.medication_id));
     return String(medication?.name ?? "복약 기록");
+  };
+
+  const recordMedicationName =
+    items.find((item) => Number(item.id) === recordMedicationId)?.name ?? (items.length > 0 ? items[0]?.name : null);
+
+  const showMedicationRecords = async (medicationId: number) => {
+    setError("");
+    setRecordMedicationId(medicationId);
+    try {
+      setRecords(await listMedicationRecords<Item[]>(medicationId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "복약 기록을 불러오지 못했습니다.");
+    }
+  };
+
+  const recordMedicationTaken = async (medicationId: number) => {
+    if (isMutating) return;
+    setError("");
+    const now = new Date().toISOString();
+    try {
+      setIsMutating(true);
+      setRecordMedicationId(medicationId);
+      await createMedicationRecord<Item>(medicationId, {
+        scheduled_at: now,
+        taken_at: now,
+        is_taken: true,
+        status: "TAKEN",
+      });
+      await load(medicationId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "복약 완료 기록을 저장하지 못했습니다.");
+    } finally {
+      setIsMutating(false);
+    }
   };
 
   const startEdit = async (medicationId: number) => {
@@ -224,26 +278,26 @@ export default function MedicationPage() {
       {error && <ErrorMessage message={error} />}
 
       {/* ── 등록 카드 ── */}
-      <Card title="등록">
+      <Card>
+        <div className="card-header" style={{ marginBottom: 12 }}>
+          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            복약 등록
+            <button
+              aria-label="정확한 약물명 확인 방법 열기"
+              className="help-icon-button"
+              onClick={() => setIsHelpOpen(true)}
+              type="button"
+            >
+              ?
+            </button>
+          </h2>
+        </div>
+        <p className="muted" style={{ marginBottom: 12 }}>
+          약학정보원 웹사이트의 [식별 검색] 메뉴에서 약품 식별이 가능합니다. (자세한 방법은 위의 '?' 버튼을 참고해 주세요.)
+        </p>
         <div className="state-box" style={{ marginBottom: 12 }}>
-          <p style={{ marginBottom: 6 }}>
-            약물명 확인은 아래 사이트를 참고해 주세요.
-          </p>
-          <ul style={{ paddingLeft: 16, marginBottom: 8 }}>
-            <li>
-              <a href="https://www.health.kr" target="_blank" rel="noopener noreferrer">
-                약학정보원 (health.kr)
-              </a>
-            </li>
-            <li>
-              <a href="https://www.druginfo.co.kr" target="_blank" rel="noopener noreferrer">
-                드럭인포 (druginfo.co.kr)
-              </a>
-            </li>
-          </ul>
           <p style={{ color: "var(--color-danger, #e53e3e)", fontWeight: 600, fontSize: "0.85rem" }}>
-            ⚠️ 본 서비스는 처방·복용 판단을 제공하지 않습니다.
-            복약 관련 결정은 반드시 의사 또는 약사와 상담하세요.
+            ⚠️ 본 서비스는 처방 및 복용과 관련된 의학적 판단을 제공하지 않습니다. 복약과 관련된 의사결정은 반드시 의사 또는 약사와 상담 후 진행하세요.
           </p>
         </div>
 
@@ -252,7 +306,7 @@ export default function MedicationPage() {
             <label>
               <span style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
                 약 이름
-                <span style={{ color: "var(--color-danger, #e53e3e)" }}>*</span>
+                <em className="badge badge-required">필수</em>
               </span>
               <input
                 placeholder="약 이름 직접 입력"
@@ -292,7 +346,7 @@ export default function MedicationPage() {
             <label>
               복용 시간
               <input
-                placeholder="예: 08:00"
+                placeholder="예: 22:00"
                 value={String(registerDraft.reminder_time ?? "")}
                 onChange={(e) =>
                   setRegisterDraft((prev) => ({
@@ -322,6 +376,10 @@ export default function MedicationPage() {
 
       {/* ── 복약 목록 ── */}
       <Card title="복약 목록">
+        <div className="state-box">
+          등록한 약과 영양제의 기본 정보입니다. 실제 복용 여부는 각 항목의 “오늘 복용 완료”를 눌러
+          아래 복약 수행 기록에 남길 수 있습니다.
+        </div>
         {items.length === 0 && (
           <div className="state-box">등록된 복약 정보가 없습니다.</div>
         )}
@@ -354,6 +412,22 @@ export default function MedicationPage() {
                   <button
                     className="secondary"
                     disabled={isMutating}
+                    onClick={() => void showMedicationRecords(Number(item.id))}
+                    type="button"
+                  >
+                    기록 보기
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={isMutating || !isActive}
+                    onClick={() => void recordMedicationTaken(Number(item.id))}
+                    type="button"
+                  >
+                    오늘 복용 완료
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={isMutating}
                     onClick={() => void startEdit(Number(item.id))}
                     type="button"
                   >
@@ -368,18 +442,18 @@ export default function MedicationPage() {
                       }
                       type="button"
                     >
-                      중단
+                      복용 중단
                     </button>
                   ) : (
                     <button
                       className="secondary"
                       disabled={isMutating}
                       onClick={() =>
-                        void updateMedication(Number(item.id), { is_active: true }).then(load)
+                        void updateMedication(Number(item.id), { is_active: true }).then(() => load())
                       }
                       type="button"
                     >
-                      재개
+                      복용 재개
                     </button>
                   )}
                   <button
@@ -465,17 +539,24 @@ export default function MedicationPage() {
       </Card>
 
       {/* ── 복약 기록 ── */}
-      <Card title="복약 기록">
+      <Card title="복약 수행 기록">
+        <div className="state-box">
+          {recordMedicationName
+            ? `${String(recordMedicationName)}의 복용 완료/대기 기록입니다.`
+            : "약이나 영양제를 등록한 뒤 복용 완료를 기록하면 여기에 표시됩니다."}
+        </div>
         <div className="card-list">
           {records.length === 0 && (
-            <div className="state-box">최근 복약 기록이 없습니다.</div>
+            <div className="state-box">
+              아직 복약 수행 기록이 없습니다. 복약 목록에서 “오늘 복용 완료”를 누르면 복용 기록이 생성됩니다.
+            </div>
           )}
           {records.map((record) => (
             <div className="mini-card" key={String(record.id)}>
               <div className="record-row">
                 <div>
                   <strong>{getMedicationName(record)}</strong>
-                  <p className="muted">{String(record.scheduled_at ?? record.created_at ?? "일정 없음")}</p>
+                  <p className="muted">{formatMedicationDateTime(record.scheduled_at ?? record.created_at)}</p>
                 </div>
                 <span className={record.is_taken ? "badge badge-saved" : "badge badge-missing"}>
                   {record.is_taken ? "복용 완료" : "복용 대기"}
@@ -487,15 +568,62 @@ export default function MedicationPage() {
                     is_taken: true,
                     status: "TAKEN",
                     taken_at: new Date().toISOString(),
-                  }).then(load)
+                  }).then(() => load(recordMedicationId))
                 }
+                disabled={isMutating || Boolean(record.is_taken)}
               >
-                복약 완료
+                {record.is_taken ? "기록 완료" : "복약 완료"}
               </button>
             </div>
           ))}
         </div>
       </Card>
+
+      {/* 약물명 확인 도움말 모달 */}
+      {isHelpOpen && (
+        <div
+          onClick={() => setIsHelpOpen(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--color-surface)", borderRadius: "var(--radius-lg)",
+              padding: "28px", maxWidth: "520px", width: "100%",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h2 style={{ margin: 0, fontSize: "18px" }}>정확한 약물명 확인 방법</h2>
+              <button
+                onClick={() => setIsHelpOpen(false)}
+                type="button"
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--color-text-secondary)", lineHeight: 1 }}
+              >
+                ✕
+              </button>
+            </div>
+            <ol style={{ paddingLeft: "20px", lineHeight: "2", margin: 0 }}>
+              <li>
+                <a
+                  href="https://health.kr/searchIdentity/search.asp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-primary)", fontWeight: 600 }}
+                >
+                  약학정보원 식별검색 바로가기 ↗
+                </a>
+                에 접속합니다.
+              </li>
+              <li>'식별 정보 입력'에 알약의 외형 정보를 입력한 후 '검색' 버튼을 누릅니다.</li>
+            </ol>
+          </div>
+        </div>
+      )}
 
       {/* 확인 다이얼로그 */}
       {pendingAction && (
@@ -504,7 +632,7 @@ export default function MedicationPage() {
           confirmLabel={pendingAction.type === "deactivate" ? "중단하기" : "삭제하기"}
           message={
             pendingAction.type === "deactivate"
-              ? "이 복약/영양제 정보를 중단 처리하시겠습니까?"
+              ? "이 복약/영양제 정보를 복용 중단 처리하시겠습니까?"
               : "이 복약/영양제 정보를 삭제하시겠습니까? 삭제 후에는 목록에서 제거됩니다."
           }
           onCancel={() => setPendingAction(null)}

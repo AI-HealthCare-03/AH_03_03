@@ -228,18 +228,14 @@ export default function HealthProfileForm({ form, bmi, onChange, visibleSections
                     ))}
                   </select>
                 ) : isDayField(field.key) ? (
-                  <div className="day-button-grid" role="group" aria-label={field.label}>
+                  <select value={form[field.key]} onChange={(event) => onChange(field.key, event.target.value)}>
+                    <option value="">선택</option>
                     {dayOptions.map((day) => (
-                      <button
-                        className={form[field.key] === String(day) ? "day-button active" : "day-button"}
-                        key={day}
-                        onClick={() => onChange(field.key, String(day))}
-                        type="button"
-                      >
+                      <option key={day} value={String(day)}>
                         {day}일
-                      </button>
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 ) : (
                   <input
                     min={field.type === "number" ? 0 : undefined}

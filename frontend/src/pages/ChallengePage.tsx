@@ -17,7 +17,7 @@ import { Salad, Dumbbell, Moon, Pill, Droplets, Droplet, Activity, Medal, Leaf, 
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 4;
 
 const tabToCategory: Record<string, string | null> = {
   전체: null,
@@ -494,6 +494,19 @@ export default function ChallengePage() {
     });
     return mapped;
   }, [myChallenges]);
+  const rejoinableChallengeIds = useMemo(() => {
+    const ids = new Set<number>();
+    myChallenges.forEach((item) => {
+      if (!isRejoinableChallengeStatus(item.status)) {
+        return;
+      }
+      const challengeId = getChallengeId(item);
+      if (challengeId !== null) {
+        ids.add(challengeId);
+      }
+    });
+    return ids;
+  }, [myChallenges]);
   const myChallengeById = useMemo(() => {
     const mapped = new Map<number, Challenge>();
     myChallenges.forEach((item) => {
@@ -570,13 +583,18 @@ export default function ChallengePage() {
   };
 
   const handleJoin = async (challengeId: number) => {
+    const rejoin = rejoinableChallengeIds.has(challengeId);
     setActionId(`join-${challengeId}`);
     setError("");
     setMessage("");
     try {
       await joinChallenge(challengeId);
       await load();
-      setMessage("챌린지에 참여했습니다. 오늘 수행 기록을 남길 수 있습니다.");
+      setMessage(
+        rejoin
+          ? "챌린지를 다시 시작했습니다. 오늘 수행 기록을 남길 수 있습니다."
+          : "챌린지에 참여했습니다. 오늘 수행 기록을 남길 수 있습니다.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "챌린지 참여 처리에 실패했습니다.");
     } finally {
@@ -678,6 +696,7 @@ export default function ChallengePage() {
                 const category = getCategory(challenge);
                 const challengeId = Number(challenge.id);
                 const joinedChallenge = Number.isFinite(challengeId) ? myChallengeByMasterId.get(challengeId) : undefined;
+                const rejoinable = Number.isFinite(challengeId) && rejoinableChallengeIds.has(challengeId);
                 const joined = isJoinedStatus(joinedChallenge);
                 const activeJoined = isActiveChallengeStatus(joinedChallenge);
                 const progress = joinedChallenge ? getProgress(joinedChallenge, challenges) : 0;
@@ -697,7 +716,7 @@ export default function ChallengePage() {
                           <span className="badge badge-reference">{getDisplayCategory(category)}</span>
                           <span className="badge badge-reference">대상: {getDisplayTargetDisease(challenge)}</span>
                           <span className="badge badge-reference">
-                            참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : "참여 전"}
+                            참여 상태: {joinedChallenge ? getChallengeStatusLabel(joinedChallenge, challenges) : rejoinable ? "재참여 가능" : "참여 전"}
                           </span>
                         </div>
                       </div>
@@ -738,7 +757,7 @@ export default function ChallengePage() {
                         </button>
                       ) : (
                         <button disabled={actionId === `join-${String(challenge.id)}`} onClick={() => void handleJoin(Number(challenge.id))} type="button">
-                          {actionId === `join-${String(challenge.id)}` ? "시작 중..." : "지금 수행하기"}
+                          {actionId === `join-${String(challenge.id)}` ? "시작 중..." : rejoinable ? "다시 참여하기" : "지금 수행하기"}
                         </button>
                       )}
                     </div>

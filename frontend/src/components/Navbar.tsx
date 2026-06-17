@@ -4,6 +4,7 @@ import { Link, NavLink } from "react-router-dom";
 import { listUnreadNotifications } from "../api/notifications";
 import { useAuth } from "../auth/AuthContext";
 import ThemeToggle from "./ThemeToggle";
+import { Bell } from "lucide-react";
 
 type NavbarProps = {
   isMobileMenuOpen?: boolean;
@@ -46,16 +47,17 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
       </Link>
       <div className="navbar-actions">
         <ThemeToggle />
+        {isAuthenticated && (
+          <NavLink className="icon-button navbar-notification-link" to="/notifications">
+            <Bell size={20} />
+          </NavLink>
+        )}
         {isAuthenticated ? (
           <>
             <NavLink className="icon-button desktop-nav-action" to="/about">
               서비스 소개
             </NavLink>
-            <NavLink className={({ isActive }) => `icon-button navbar-notification-link desktop-nav-action${isActive ? " active" : ""}`} to="/notifications" aria-label="알림">
-              알림
-              {unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
-            </NavLink>
-            <button className="nav-logout-btn" type="button" onClick={logout}>
+            <button className="nav-logout-btn" onClick={logout} type="button">
               로그아웃
             </button>
             {showMobileMenuButton && (

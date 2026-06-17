@@ -203,11 +203,13 @@ async def get_dashboard_medications(user_id: int) -> dict[str, Any]:
 async def get_dashboard_trends(user_id: int, period: str) -> dict[str, Any]:
     normalized_period, date_from, date_to = normalize_period(period)
     query_limit = 1000 if date_from is None else TREND_PERIOD_DAYS[period] or 1000
-    health_records = [
-        record
-        for record in await health_service.list_health_records(user_id, limit=query_limit)
-        if _in_range(record.measured_at.date(), date_from, date_to)
-    ]
+    health_records = _sort_health_records_for_trend(
+        [
+            record
+            for record in await health_service.list_health_records(user_id, limit=query_limit)
+            if _in_range(record.measured_at.date(), date_from, date_to)
+        ]
+    )
     diet_records = [
         record
         for record in await diet_service.list_diet_records(user_id, limit=query_limit)
@@ -257,11 +259,38 @@ async def get_dashboard_risk_trend(user_id: int, period: str = "all") -> dict[st
     }
 
 
+def _health_record_sort_key(record: Any) -> tuple[datetime, datetime, int]:
+    measured_at = getattr(record, "measured_at", None)
+    created_at = getattr(record, "created_at", None)
+    record_id = getattr(record, "id", None)
+    fallback_datetime = datetime.min.replace(tzinfo=config.TIMEZONE)
+    return (
+        measured_at if isinstance(measured_at, datetime) else fallback_datetime,
+        created_at if isinstance(created_at, datetime) else fallback_datetime,
+        int(record_id) if record_id is not None else 0,
+    )
+
+
+def _sort_health_records_for_trend(health_records: list[Any]) -> list[Any]:
+    return sorted(health_records, key=_health_record_sort_key)
+
+
+def _health_record_trend_metadata(record: Any) -> dict[str, Any]:
+    measured_at = getattr(record, "measured_at", None)
+    created_at = getattr(record, "created_at", None)
+    return {
+        "id": getattr(record, "id", None),
+        "measured_at": measured_at.isoformat() if hasattr(measured_at, "isoformat") else None,
+        "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else None,
+    }
+
+
 def _build_glucose_series(health_records: list[Any]) -> list[dict[str, Any]]:
     return [
         {
             "date": record.measured_at.date().isoformat(),
             "value": record.fasting_glucose,
+            **_health_record_trend_metadata(record),
         }
         for record in health_records
         if record.fasting_glucose is not None
@@ -274,6 +303,7 @@ def _build_blood_pressure_series(health_records: list[Any]) -> list[dict[str, An
             "date": record.measured_at.date().isoformat(),
             "systolic": record.systolic_bp,
             "diastolic": record.diastolic_bp,
+            **_health_record_trend_metadata(record),
         }
         for record in health_records
         if record.systolic_bp is not None or record.diastolic_bp is not None
@@ -285,6 +315,7 @@ def _build_weight_series(health_records: list[Any]) -> list[dict[str, Any]]:
         {
             "date": record.measured_at.date().isoformat(),
             "value": float(record.weight_kg),
+            **_health_record_trend_metadata(record),
         }
         for record in health_records
         if record.weight_kg is not None

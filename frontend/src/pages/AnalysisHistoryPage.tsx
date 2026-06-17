@@ -217,7 +217,7 @@ export default function AnalysisHistoryPage() {
         <Card
           title="위험도 추론 결과 상세"
           actions={
-            <Link className="button secondary" to="/analysis/history">
+            <Link className="button" to="/analysis/history">
               전체 리스트
             </Link>
           }
@@ -226,7 +226,7 @@ export default function AnalysisHistoryPage() {
             <span>{getAnalysisTypeLabel(result?.analysis_type, "분석")}</span>
             <strong>{getDisplayRiskLabel(result)}</strong>
             <div className="button-row">
-              <span className={`badge ${detailRiskClassName}`}>{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
+              <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
               {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
             </div>
             <p>{String(result?.summary ?? "")}</p>
@@ -246,7 +246,8 @@ export default function AnalysisHistoryPage() {
           )}
         </Card>
         {detailSlots.length > 0 && (
-          <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 판정" : "간편분석 질환별 판정"}>
+          <Card title={result?.analysis_mode === "PRECISION" ? "정밀분석 질환별 예측 결과" : "간편분석 질환별 예측 결과"}>
+            <p className="muted" style={{ marginBottom: 12 }}>질환별 카드를 클릭하시면 해당 질병의 분석 결과를 바로 확인하실 수 있습니다.</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {detailSlots.map((slot) => {
                 if (slot.isUnavailable || !slot.result) {
@@ -258,6 +259,11 @@ export default function AnalysisHistoryPage() {
                         <span className="badge badge-reference">판정 불가</span>
                       </div>
                       <p className="muted">{slot.unavailableReason}</p>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                        <Link className="btn-primary" style={{ fontSize: "13px", padding: "4px 12px" }} to="/health/profile">
+                          추가 정보 입력
+                        </Link>
+                      </div>
                     </div>
                   );
                 }
@@ -289,7 +295,7 @@ export default function AnalysisHistoryPage() {
 
   return (
     <Card
-      title="위험도 추론 결과 전체 리스트"
+      title="위험도 예측 결과 전체 리스트"
       actions={
         <button className="button" onClick={() => navigate(-1)} type="button">
           뒤로가기
