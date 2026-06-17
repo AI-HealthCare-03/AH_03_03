@@ -34,6 +34,15 @@ function cleanOptionalText(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
+function cleanReminderTime(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(text);
+  return match ? `${match[1]}:${match[2]}` : text;
+}
+
 function validateMedicationDraft(draft: MedicationPayload): MedicationFormErrors {
   const errors: MedicationFormErrors = {};
   const name = String(draft.name ?? "").trim();
@@ -53,15 +62,20 @@ function validateMedicationDraft(draft: MedicationPayload): MedicationFormErrors
   return errors;
 }
 
-function buildMedicationPayload(draft: MedicationPayload): MedicationPayload {
-  return {
+function buildMedicationPayload(draft: MedicationPayload, options: { defaultActive?: boolean } = {}): MedicationPayload {
+  const payload: MedicationPayload = {
     name: String(draft.name ?? "").trim(),
     medication_type: String(draft.medication_type ?? "SUPPLEMENT").trim(),
     dosage: cleanOptionalText(draft.dosage),
     frequency: cleanOptionalText(draft.frequency),
-    reminder_time: cleanOptionalText(draft.reminder_time),
+    reminder_time: cleanReminderTime(draft.reminder_time),
     memo: cleanOptionalText(draft.memo),
-    is_active: draft.is_active !== false,
+  };
+  if (draft.is_active !== undefined || options.defaultActive) {
+    payload.is_active = draft.is_active !== false;
+  }
+  return {
+    ...payload,
   };
 }
 
@@ -89,6 +103,7 @@ export default function MedicationPage() {
   const [records, setRecords] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [registerErrors, setRegisterErrors] = useState<MedicationFormErrors>({});
+  const [editErrors, setEditErrors] = useState<MedicationFormErrors>({});
   const [selectedMedicationId, setSelectedMedicationId] = useState<number | null>(null);
   const [recordMedicationId, setRecordMedicationId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<MedicationPayload>({});
@@ -138,7 +153,7 @@ export default function MedicationPage() {
       return;
     }
 
-    const payload = buildMedicationPayload(registerDraft);
+    const payload = buildMedicationPayload(registerDraft, { defaultActive: true });
     try {
       setIsMutating(true);
       const created = await createMedication<Item>(payload);
@@ -207,12 +222,13 @@ export default function MedicationPage() {
     try {
       const medication = await getMedication<Item>(medicationId);
       setSelectedMedicationId(medicationId);
+      setEditErrors({});
       setEditDraft({
         name: String(medication.name ?? ""),
         medication_type: String(medication.medication_type ?? "SUPPLEMENT"),
         dosage: medication.dosage ? String(medication.dosage) : "",
         frequency: medication.frequency ? String(medication.frequency) : "",
-        reminder_time: medication.reminder_time ? String(medication.reminder_time) : null,
+        reminder_time: cleanReminderTime(medication.reminder_time),
         memo: medication.memo ? String(medication.memo) : "",
       });
     } catch (err) {
@@ -223,11 +239,19 @@ export default function MedicationPage() {
   const saveEdit = async () => {
     if (!selectedMedicationId || isMutating) return;
     setError("");
+    const validationErrors = validateMedicationDraft(editDraft);
+    setEditErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      setError("수정할 입력값을 확인해 주세요.");
+      return;
+    }
+    const payload = buildMedicationPayload(editDraft);
     try {
       setIsMutating(true);
-      await updateMedication(selectedMedicationId, editDraft);
+      await updateMedication(selectedMedicationId, payload);
       setSelectedMedicationId(null);
       setEditDraft({});
+      setEditErrors({});
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 수정에 실패했습니다.");
@@ -249,6 +273,7 @@ export default function MedicationPage() {
       if (selectedMedicationId === pendingAction.medicationId) {
         setSelectedMedicationId(null);
         setEditDraft({});
+        setEditErrors({});
       }
       setPendingAction(null);
       await load();
@@ -351,7 +376,7 @@ export default function MedicationPage() {
                 onChange={(e) =>
                   setRegisterDraft((prev) => ({
                     ...prev,
-                    reminder_time: e.target.value || null,
+                    reminder_time: e.target.value,
                   }))
                 }
               />
@@ -479,6 +504,7 @@ export default function MedicationPage() {
                           value={String(editDraft.name ?? "")}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, name: e.target.value }))}
                         />
+                        {editErrors.name && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.name}</span>}
                       </label>
                       <label>
                         구분
@@ -492,6 +518,7 @@ export default function MedicationPage() {
                           <option value="SUPPLEMENT">영양제</option>
                           <option value="PRESCRIPTION">처방약</option>
                         </select>
+                        {editErrors.medication_type && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.medication_type}</span>}
                       </label>
                       <label>
                         용량
@@ -510,6 +537,17 @@ export default function MedicationPage() {
                         />
                       </label>
                       <label>
+                        복용 시간
+                        <input
+                          placeholder="예: 22:00"
+                          value={String(editDraft.reminder_time ?? "")}
+                          onChange={(e) =>
+                            setEditDraft((prev) => ({ ...prev, reminder_time: e.target.value }))
+                          }
+                        />
+                        {editErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.reminder_time}</span>}
+                      </label>
+                      <label>
                         메모
                         <input
                           value={String(editDraft.memo ?? "")}
@@ -524,7 +562,7 @@ export default function MedicationPage() {
                       <button
                         className="secondary"
                         disabled={isMutating}
-                        onClick={() => { setSelectedMedicationId(null); setEditDraft({}); }}
+                        onClick={() => { setSelectedMedicationId(null); setEditDraft({}); setEditErrors({}); }}
                         type="button"
                       >
                         취소
