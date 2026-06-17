@@ -126,29 +126,20 @@ jobs:
 
   deploy:
     name: Deploy to EC2
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, healthladder-prod]
     needs: build-push
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Prepare SSH key
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/prod_deploy_key
-          chmod 600 ~/.ssh/prod_deploy_key
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy on EC2
+      - name: Deploy locally on EC2
         env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
           DEPLOY_TAG: ${{ needs.build-push.outputs.image_tag }}
         run: |
-          ssh -i ~/.ssh/prod_deploy_key "$EC2_USER@$EC2_HOST" "DEPLOY_TAG='$DEPLOY_TAG' bash -s" <<'REMOTE'
           set -euo pipefail
 
           cd ~/AH_03_03
 
           git fetch origin
+          git checkout main
           git reset --hard origin/main
 
           test -f .prod.env
@@ -173,4 +164,3 @@ jobs:
           make prod-migrate
           make prod-health
           curl -fsS https://healthladder.duckdns.org/api/v1/system/health
-          REMOTE
