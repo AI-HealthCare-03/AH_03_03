@@ -19,6 +19,13 @@ import ErrorMessage from "../components/ErrorMessage";
 type Item = Record<string, unknown>;
 type MedicationFormErrors = Partial<Record<"name" | "medication_type" | "reminder_time", string>>;
 
+const DOSAGE_AMOUNTS = ["0.5", "1", "2", "5", "10", "50", "100", "250", "500", "1000"];
+const DOSAGE_UNITS = ["mg", "g", "mL", "정", "캡슐", "포"];
+const FREQUENCY_OPTIONS = ["매일 1회", "매일 2회", "매일 3회", "아침 1회", "점심 1회", "저녁 1회", "필요 시"];
+const CUSTOM_VALUE = "__CUSTOM__";
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+const MINUTE_OPTIONS = ["00", "10", "20", "30", "40", "50"];
+
 const MEDICATION_TYPE_LABEL: Record<string, string> = {
   MEDICATION: "경구약",
   SUPPLEMENT: "영양제",
@@ -40,7 +47,7 @@ function cleanReminderTime(value: unknown): string | null {
     return null;
   }
   const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(text);
-  return match ? `${match[1]}:${match[2]}` : text;
+  return match ? `${match[1]}:${match[2]}` : null;
 }
 
 function validateMedicationDraft(draft: MedicationPayload): MedicationFormErrors {
@@ -87,6 +94,202 @@ function formatMedicationDateTime(value: unknown): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function parseReminderTimeParts(value: unknown): { hour: string; minute: string } {
+  const normalized = cleanReminderTime(value);
+  if (!normalized) {
+    return { hour: "", minute: "" };
+  }
+  const [hour, minute] = normalized.split(":");
+  return {
+    hour: HOUR_OPTIONS.includes(hour) ? hour : "",
+    minute: MINUTE_OPTIONS.includes(minute) ? minute : "00",
+  };
+}
+
+function parseDosageValue(value: unknown): { amount: string; unit: string; custom: string; isCustom: boolean } {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return { amount: "", unit: "mg", custom: "", isCustom: false };
+  }
+  const unitPattern = DOSAGE_UNITS.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const match = new RegExp(`^(${DOSAGE_AMOUNTS.join("|")})\\s*(${unitPattern})$`, "u").exec(text);
+  if (match) {
+    return { amount: match[1], unit: match[2], custom: "", isCustom: false };
+  }
+  return { amount: CUSTOM_VALUE, unit: CUSTOM_VALUE, custom: text, isCustom: true };
+}
+
+function buildDosageValue(amount: string, unit: string, custom: string): string {
+  if (amount === CUSTOM_VALUE || unit === CUSTOM_VALUE) {
+    return custom.trim();
+  }
+  if (!amount) {
+    return "";
+  }
+  return `${amount}${unit || ""}`;
+}
+
+function DosageFields({ value, onChange }: { value: unknown; onChange: (value: string) => void }) {
+  const parsed = parseDosageValue(value);
+  const [amount, setAmount] = useState(parsed.amount);
+  const [unit, setUnit] = useState(parsed.unit);
+  const [custom, setCustom] = useState(parsed.custom);
+
+  useEffect(() => {
+    const next = parseDosageValue(value);
+    setAmount(next.amount);
+    setUnit(next.unit);
+    setCustom(next.custom);
+  }, [value]);
+
+  const commit = (nextAmount: string, nextUnit: string, nextCustom: string) => {
+    onChange(buildDosageValue(nextAmount, nextUnit, nextCustom));
+  };
+  const customMode = amount === CUSTOM_VALUE || unit === CUSTOM_VALUE;
+
+  return (
+    <div className="form two-col">
+      <select
+        aria-label="용량 숫자"
+        value={amount}
+        onChange={(event) => {
+          const nextAmount = event.target.value;
+          const nextUnit = nextAmount === CUSTOM_VALUE ? CUSTOM_VALUE : unit === CUSTOM_VALUE ? "mg" : unit;
+          setAmount(nextAmount);
+          setUnit(nextUnit);
+          commit(nextAmount, nextUnit, custom);
+        }}
+      >
+        <option value="">용량 선택</option>
+        {DOSAGE_AMOUNTS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value={CUSTOM_VALUE}>직접입력</option>
+      </select>
+      <select
+        aria-label="용량 단위"
+        value={unit}
+        onChange={(event) => {
+          const nextUnit = event.target.value;
+          const nextAmount = nextUnit === CUSTOM_VALUE ? CUSTOM_VALUE : amount === CUSTOM_VALUE ? "" : amount;
+          setAmount(nextAmount);
+          setUnit(nextUnit);
+          commit(nextAmount, nextUnit, custom);
+        }}
+      >
+        {DOSAGE_UNITS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value={CUSTOM_VALUE}>직접입력</option>
+      </select>
+      {customMode && (
+        <input
+          aria-label="용량 직접입력"
+          className="span-2"
+          placeholder="예: 1스푼, 2방울"
+          value={custom}
+          onChange={(event) => {
+            setCustom(event.target.value);
+            commit(amount, unit, event.target.value);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FrequencyField({ value, onChange }: { value: unknown; onChange: (value: string) => void }) {
+  const text = String(value ?? "").trim();
+  const isPreset = !text || FREQUENCY_OPTIONS.includes(text);
+  const [selected, setSelected] = useState(isPreset ? text : CUSTOM_VALUE);
+  const [custom, setCustom] = useState(isPreset ? "" : text);
+
+  useEffect(() => {
+    const next = String(value ?? "").trim();
+    if (!next || FREQUENCY_OPTIONS.includes(next)) {
+      setSelected(next);
+      setCustom("");
+      return;
+    }
+    setSelected(CUSTOM_VALUE);
+    setCustom(next);
+  }, [value]);
+
+  return (
+    <div className="form">
+      <select
+        aria-label="복용 횟수"
+        value={selected}
+        onChange={(event) => {
+          const next = event.target.value;
+          setSelected(next);
+          onChange(next === CUSTOM_VALUE ? custom : next);
+        }}
+      >
+        <option value="">복용 횟수 선택</option>
+        {FREQUENCY_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value={CUSTOM_VALUE}>직접입력</option>
+      </select>
+      {selected === CUSTOM_VALUE && (
+        <input
+          aria-label="복용 횟수 직접입력"
+          placeholder="예: 격일 1회"
+          value={custom}
+          onChange={(event) => {
+            setCustom(event.target.value);
+            onChange(event.target.value);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReminderTimeSelect({ value, onChange }: { value: unknown; onChange: (value: string | null) => void }) {
+  const { hour, minute } = parseReminderTimeParts(value);
+
+  return (
+    <div className="form two-col">
+      <select
+        aria-label="복용 시간 시"
+        value={hour}
+        onChange={(event) => {
+          const nextHour = event.target.value;
+          onChange(nextHour ? `${nextHour}:${minute || "00"}` : null);
+        }}
+      >
+        <option value="">시간 선택 안 함</option>
+        {HOUR_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}시
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="복용 시간 분"
+        disabled={!hour}
+        value={hour ? minute || "00" : ""}
+        onChange={(event) => onChange(hour ? `${hour}:${event.target.value}` : null)}
+      >
+        <option value="">분 선택</option>
+        {MINUTE_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}분
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 export default function MedicationPage() {
@@ -252,7 +455,7 @@ export default function MedicationPage() {
       setSelectedMedicationId(null);
       setEditDraft({});
       setEditErrors({});
-      await load();
+      await load(selectedMedicationId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 수정에 실패했습니다.");
     } finally {
@@ -354,29 +557,26 @@ export default function MedicationPage() {
             </label>
             <label>
               용량
-              <input
-                placeholder="예: 500mg"
-                value={String(registerDraft.dosage ?? "")}
-                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, dosage: e.target.value }))}
+              <DosageFields
+                value={registerDraft.dosage}
+                onChange={(value) => setRegisterDraft((prev) => ({ ...prev, dosage: value }))}
               />
             </label>
             <label>
               복용 횟수
-              <input
-                placeholder="예: 매일 1회"
-                value={String(registerDraft.frequency ?? "")}
-                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, frequency: e.target.value }))}
+              <FrequencyField
+                value={registerDraft.frequency}
+                onChange={(value) => setRegisterDraft((prev) => ({ ...prev, frequency: value }))}
               />
             </label>
             <label>
               복용 시간
-              <input
-                placeholder="예: 22:00"
-                value={String(registerDraft.reminder_time ?? "")}
-                onChange={(e) =>
+              <ReminderTimeSelect
+                value={registerDraft.reminder_time}
+                onChange={(value) =>
                   setRegisterDraft((prev) => ({
                     ...prev,
-                    reminder_time: e.target.value,
+                    reminder_time: value,
                   }))
                 }
               />
@@ -522,28 +722,23 @@ export default function MedicationPage() {
                       </label>
                       <label>
                         용량
-                        <input
-                          value={String(editDraft.dosage ?? "")}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, dosage: e.target.value }))}
+                        <DosageFields
+                          value={editDraft.dosage}
+                          onChange={(value) => setEditDraft((prev) => ({ ...prev, dosage: value }))}
                         />
                       </label>
                       <label>
                         복용 횟수
-                        <input
-                          value={String(editDraft.frequency ?? "")}
-                          onChange={(e) =>
-                            setEditDraft((prev) => ({ ...prev, frequency: e.target.value }))
-                          }
+                        <FrequencyField
+                          value={editDraft.frequency}
+                          onChange={(value) => setEditDraft((prev) => ({ ...prev, frequency: value }))}
                         />
                       </label>
                       <label>
                         복용 시간
-                        <input
-                          placeholder="예: 22:00"
-                          value={String(editDraft.reminder_time ?? "")}
-                          onChange={(e) =>
-                            setEditDraft((prev) => ({ ...prev, reminder_time: e.target.value }))
-                          }
+                        <ReminderTimeSelect
+                          value={editDraft.reminder_time}
+                          onChange={(value) => setEditDraft((prev) => ({ ...prev, reminder_time: value }))}
                         />
                         {editErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.reminder_time}</span>}
                       </label>
