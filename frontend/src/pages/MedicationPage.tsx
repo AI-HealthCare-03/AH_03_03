@@ -23,8 +23,6 @@ const DOSAGE_AMOUNTS = ["0.5", "1", "2", "5", "10", "50", "100", "250", "500", "
 const DOSAGE_UNITS = ["mg", "g", "mL", "정", "캡슐", "포"];
 const FREQUENCY_OPTIONS = ["매일 1회", "매일 2회", "매일 3회", "아침 1회", "점심 1회", "저녁 1회", "필요 시"];
 const CUSTOM_VALUE = "__CUSTOM__";
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
-const MINUTE_OPTIONS = ["00", "10", "20", "30", "40", "50"];
 
 const MEDICATION_TYPE_LABEL: Record<string, string> = {
   MEDICATION: "경구약",
@@ -94,18 +92,6 @@ function formatMedicationDateTime(value: unknown): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
-}
-
-function parseReminderTimeParts(value: unknown): { hour: string; minute: string } {
-  const normalized = cleanReminderTime(value);
-  if (!normalized) {
-    return { hour: "", minute: "" };
-  }
-  const [hour, minute] = normalized.split(":");
-  return {
-    hour: HOUR_OPTIONS.includes(hour) ? hour : "",
-    minute: MINUTE_OPTIONS.includes(minute) ? minute : "00",
-  };
 }
 
 function parseDosageValue(value: unknown): { amount: string; unit: string; custom: string; isCustom: boolean } {
@@ -256,39 +242,16 @@ function FrequencyField({ value, onChange }: { value: unknown; onChange: (value:
 }
 
 function ReminderTimeSelect({ value, onChange }: { value: unknown; onChange: (value: string | null) => void }) {
-  const { hour, minute } = parseReminderTimeParts(value);
+  const normalized = cleanReminderTime(value) ?? "";
 
   return (
-    <div className="form two-col">
-      <select
-        aria-label="복용 시간 시"
-        value={hour}
-        onChange={(event) => {
-          const nextHour = event.target.value;
-          onChange(nextHour ? `${nextHour}:${minute || "00"}` : null);
-        }}
-      >
-        <option value="">시간 선택 안 함</option>
-        {HOUR_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {option}시
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="복용 시간 분"
-        disabled={!hour}
-        value={hour ? minute || "00" : ""}
-        onChange={(event) => onChange(hour ? `${hour}:${event.target.value}` : null)}
-      >
-        <option value="">분 선택</option>
-        {MINUTE_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {option}분
-          </option>
-        ))}
-      </select>
-    </div>
+    <input
+      aria-label="복용 알림 시간"
+      type="time"
+      step={600}
+      value={normalized}
+      onChange={(event) => onChange(cleanReminderTime(event.target.value))}
+    />
   );
 }
 
@@ -570,7 +533,7 @@ export default function MedicationPage() {
               />
             </label>
             <label>
-              복용 시간
+              복용 알림 시간
               <ReminderTimeSelect
                 value={registerDraft.reminder_time}
                 onChange={(value) =>
@@ -580,6 +543,9 @@ export default function MedicationPage() {
                   }))
                 }
               />
+              <span className="muted" style={{ fontSize: "13px" }}>
+                설정한 시간에 복약 알림 이메일을 받을 수 있어요.
+              </span>
               {registerErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{registerErrors.reminder_time}</span>}
             </label>
             <label>
@@ -735,11 +701,14 @@ export default function MedicationPage() {
                         />
                       </label>
                       <label>
-                        복용 시간
+                        복용 알림 시간
                         <ReminderTimeSelect
                           value={editDraft.reminder_time}
                           onChange={(value) => setEditDraft((prev) => ({ ...prev, reminder_time: value }))}
                         />
+                        <span className="muted" style={{ fontSize: "13px" }}>
+                          설정한 시간에 복약 알림 이메일을 받을 수 있어요.
+                        </span>
                         {editErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.reminder_time}</span>}
                       </label>
                       <label>

@@ -9,6 +9,7 @@ class UserSetting(models.Model):
     challenge_reminder_time = fields.TimeField(null=True)
     medication_reminder_enabled = fields.BooleanField(default=True)
     diet_reminder_enabled = fields.BooleanField(default=False)
+    diet_reminder_time = fields.TimeField(null=True)
     marketing_agreed = fields.BooleanField(default=False)
     sensitive_data_agreed = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)

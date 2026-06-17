@@ -78,6 +78,7 @@ def _settings(
     challenge_reminder_enabled: bool = True,
     challenge_reminder_time: time | None = None,
     diet_reminder_enabled: bool = False,
+    diet_reminder_time: time | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         notification_enabled=notification_enabled,
@@ -85,6 +86,7 @@ def _settings(
         challenge_reminder_enabled=challenge_reminder_enabled,
         challenge_reminder_time=challenge_reminder_time,
         diet_reminder_enabled=diet_reminder_enabled,
+        diet_reminder_time=diet_reminder_time,
     )
 
 
@@ -172,6 +174,16 @@ async def test_diet_reminder_schedule_follows_user_setting(monkeypatch) -> None:
     assert schedule.related_id is None
     assert schedule.schedule_time == "20:00"
     assert schedule.is_active is True
+
+    async def diet_custom_time_settings(user_id: int) -> SimpleNamespace:
+        return _settings(diet_reminder_enabled=True, diet_reminder_time=time(19, 30))
+
+    monkeypatch.setattr(notification_service, "_get_user_notification_settings", diet_custom_time_settings)
+    await notification_service.sync_diet_reminder_schedule_for_user(7)
+
+    assert len(repository.schedules) == 1
+    assert repository.schedules[0].schedule_time == "19:30"
+    assert repository.schedules[0].is_active is True
 
     monkeypatch.setattr(notification_service, "_get_user_notification_settings", _enabled_settings)
     await notification_service.sync_diet_reminder_schedule_for_user(7)

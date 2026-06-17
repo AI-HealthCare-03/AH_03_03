@@ -220,6 +220,7 @@ async def sync_challenge_reminder_schedule_for_user(user_id: int) -> ReminderSch
 async def sync_diet_reminder_schedule_for_user(user_id: int) -> ReminderSchedule | None:
     settings = await _get_user_notification_settings(user_id)
     enabled = bool(settings.notification_enabled and settings.diet_reminder_enabled)
+    schedule_time = settings.diet_reminder_time or time(20, 0)
     return await _upsert_email_reminder_schedule(
         user_id=user_id,
         reminder_type=ReminderType.SYSTEM,
@@ -227,7 +228,7 @@ async def sync_diet_reminder_schedule_for_user(user_id: int) -> ReminderSchedule
         related_id=None,
         title=DIET_REMINDER_TITLE,
         message=DIET_REMINDER_MESSAGE,
-        schedule_time=time(20, 0),
+        schedule_time=schedule_time,
         enabled=enabled,
     )
 

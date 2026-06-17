@@ -2197,6 +2197,21 @@ pre {
   gap: 12px;
 }
 
+.settings-time-row {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 12px 14px;
+}
+
+.settings-time-row input[type="time"] {
+  max-width: 160px;
+}
+
 .notification-list {
   display: grid;
   gap: 12px;

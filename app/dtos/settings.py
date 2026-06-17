@@ -9,6 +9,7 @@ class UserSettingCreateRequest(BaseModel):
     challenge_reminder_time: time | None = None
     medication_reminder_enabled: bool = True
     diet_reminder_enabled: bool = False
+    diet_reminder_time: time | None = None
     marketing_agreed: bool = False
     sensitive_data_agreed: bool = False
 
@@ -19,6 +20,7 @@ class UserSettingUpdateRequest(BaseModel):
     challenge_reminder_time: time | None = None
     medication_reminder_enabled: bool | None = None
     diet_reminder_enabled: bool | None = None
+    diet_reminder_time: time | None = None
     marketing_agreed: bool | None = None
     sensitive_data_agreed: bool | None = None
 
@@ -33,6 +35,7 @@ class UserSettingResponse(BaseModel):
     challenge_reminder_time: time | None
     medication_reminder_enabled: bool
     diet_reminder_enabled: bool
+    diet_reminder_time: time | None
     marketing_agreed: bool
     sensitive_data_agreed: bool
     created_at: datetime
