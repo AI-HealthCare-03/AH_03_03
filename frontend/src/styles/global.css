@@ -5016,7 +5016,7 @@ input:-webkit-autofill:focus {
 
 @media (max-width: 1200px) {
   .challenge-summary-card {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    grid-template-columns: 220px 220px;
   }
 
   .challenge-recommendation-panel {
@@ -5652,56 +5652,40 @@ input:-webkit-autofill:focus {
 
 .challenge-summary-card {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(220px, 0.8fr) minmax(420px, 1.6fr);
+  grid-template-columns: 220px 220px minmax(420px, 1fr);
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .challenge-status-panel {
   background: var(--color-muted-surface);
   border-radius: var(--radius-md);
   padding: 16px;
-  width: 100%;
+  width: 220px;
+  flex-shrink: 0;
 }
 
-.challenge-metric-card {
-  align-content: start;
+.challenge-rate-panel {
   display: grid;
   gap: 12px;
-  min-height: 300px;
 }
 
-.challenge-metric-header {
-  align-items: center;
+.challenge-status-ring-row {
+  align-items: flex-end;
   display: flex;
-  min-height: 22px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.challenge-metric-value {
-  align-items: baseline;
-  display: flex;
-  gap: 6px;
-  margin-top: 42px;
+.challenge-status-count {
+  display: block;
+  padding-bottom: 4px;
 }
 
-.challenge-metric-value strong {
-  color: var(--color-text);
-  font-size: 28px;
-  font-weight: 1000;
-  line-height: 1;
-}
-
-.challenge-metric-value span {
-  color: var(--color-muted);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.challenge-metric-button {
-  align-self: end;
+.challenge-status-button {
   display: block;
   font-size: 13px;
-  margin-top: auto;
+  margin-top: 12px;
   text-align: center;
 }
 

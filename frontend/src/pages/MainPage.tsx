@@ -732,31 +732,45 @@ export default function MainPage() {
 
           {/* 아래 큰 카드: 챌린지 현황 + 수행률 + 추천 챌린지 */}
           <div className="viz-card challenge-summary-card" style={{ marginTop: "14px" }}>
-            <div className="challenge-status-panel challenge-metric-card">
-              <div className="challenge-metric-header">
-                <span className="viz-card-label">챌린지 현황</span>
-              </div>
-              <div className="challenge-metric-value">
-                <strong>{challengeCount}개</strong>
-                <span>참여 중</span>
+            <div className="challenge-status-panel">
+              <span className="viz-card-label">챌린지 현황</span>
+              <div className="challenge-status-ring-row">
+                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                  <circle
+                    cx="55"
+                    cy="55"
+                    r="44"
+                    fill="none"
+                    stroke="var(--color-primary)"
+                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
+                    strokeLinecap="round"
+                    strokeWidth="10"
+                    transform="rotate(-90 55 55)"
+                  />
+                </svg>
+                <div className="challenge-status-count">
+                  <div className="viz-ring-value">{challengeCount}개</div>
+                  <div className="viz-ring-label">참여 중</div>
+                </div>
               </div>
               <p className="challenge-status-message">
                 {challengeCount === 0
-                  ? "아직 참여 중인 챌린지가 없어요."
-                  : `${challengeCount}개 챌린지를 실천 중이에요.`}
+                  ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
+                  : challengeCount < 3
+                  ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
+                  : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
               </p>
               <Link
-                className="button secondary challenge-metric-button"
+                className="button secondary challenge-status-button"
                 to="/challenges"
               >
                 챌린지 바로가기
               </Link>
             </div>
 
-            <div className="challenge-status-panel challenge-metric-card">
-              <div className="challenge-metric-header">
-                <span className="viz-card-label">챌린지 수행률</span>
-              </div>
+            <div className="challenge-status-panel challenge-rate-panel">
+              <span className="viz-card-label">챌린지 수행률</span>
               <div className="challenge-ring-block challenge-rate-ring">
                 <div className="challenge-ring-figure" aria-label={`평균 진행률 ${challengeRate}%`}>
                   <svg width="116" height="116" viewBox="0 0 116 116">
