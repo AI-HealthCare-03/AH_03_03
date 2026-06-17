@@ -22,6 +22,26 @@ import { isHeicFile } from "../utils/files";
 // 스텝 인디케이터
 type Step = 1 | 2 | 3 | 4;
 
+const precisionMeasurementLabels: Record<string, string> = {
+  ast: "AST",
+  alt: "ALT",
+  gamma_gtp: "감마GTP",
+  ggt: "감마GTP",
+  creatinine: "크레아티닌",
+  egfr: "eGFR",
+  hb: "혈색소",
+  hemoglobin: "혈색소",
+};
+
+function getPrecisionMeasurementLabel(measurement: ExamMeasurement): string | null {
+  const key = String(measurement.measurement_key ?? "").trim().toLowerCase();
+  return precisionMeasurementLabels[key] ?? null;
+}
+
+function isPrecisionMeasurement(measurement: ExamMeasurement): boolean {
+  return getPrecisionMeasurementLabel(measurement) !== null;
+}
+
 function StepIndicator({ current }: { current: Step }) {
   const steps: { label: string; num: Step }[] = [
     { num: 1, label: "파일 업로드 및 인식" },
@@ -81,6 +101,7 @@ export default function ExamOcrPage() {
 
   // 현재 스텝 계산
   const currentStep: Step = isAppliedToHealth ? 4 : measurements.length > 0 ? 3 : selectedFile ? 2 : 1;
+  const precisionMeasurements = measurements.filter(isPrecisionMeasurement);
 
   useEffect(() => {
     return () => {
@@ -464,6 +485,23 @@ export default function ExamOcrPage() {
           </h2>
         </div>
         <p className="muted" style={{ marginBottom: "12px", fontSize: "16px" }}>인식된 결과는 반드시 직접 확인해 주세요.</p>
+        {precisionMeasurements.length > 0 && (
+          <div className="state-box" style={{ marginBottom: 12 }}>
+            <strong>정밀검사 항목</strong>
+            <p style={{ margin: "4px 0 8px" }}>
+              AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소 등은 정밀분석 입력으로 활용될 수 있습니다.
+            </p>
+            <div className="chip-list">
+              {precisionMeasurements.map((measurement) => (
+                <span className="badge badge-reference" key={measurement.id}>
+                  {getPrecisionMeasurementLabel(measurement) ?? measurement.measurement_name}
+                  {measurement.value ? ` ${measurement.value}` : ""}
+                  {measurement.unit ? ` ${formatUnit(measurement.unit)}` : ""}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="ocr-result-table">
           {measurements.length === 0 ? (
             <div className="state-box">
@@ -476,6 +514,11 @@ export default function ExamOcrPage() {
               <label className="ocr-result-row" key={m.id}>
                 <span>
                   {m.measurement_name}
+                  {isPrecisionMeasurement(m) && (
+                    <em className="badge badge-reference" style={{ marginLeft: 8 }}>
+                      정밀검사
+                    </em>
+                  )}
                 </span>
                 <input
                   onChange={(e) => updateLocalMeasurement(m.id, e.target.value)}

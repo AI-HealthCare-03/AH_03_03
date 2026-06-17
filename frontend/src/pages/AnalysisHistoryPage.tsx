@@ -42,6 +42,12 @@ type AnalysisDetail = {
   explanation?: AnalysisExplanation | null;
 };
 
+type PrecisionMeasurementItem = {
+  key: string;
+  label: string;
+  unit?: string;
+};
+
 const analysisTypeOptions: Record<string, string | null> = {
   "전체": null,
   "고혈압": "HYPERTENSION",
@@ -56,6 +62,15 @@ const analysisTypeOptions: Record<string, string | null> = {
   "만성콩팥병": "CHRONIC_KIDNEY_DISEASE",
 };
 
+const precisionMeasurementItems: PrecisionMeasurementItem[] = [
+  { key: "ast", label: "AST", unit: "U/L" },
+  { key: "alt", label: "ALT", unit: "U/L" },
+  { key: "gamma_gtp", label: "감마GTP", unit: "U/L" },
+  { key: "creatinine", label: "크레아티닌", unit: "mg/dL" },
+  { key: "egfr", label: "eGFR", unit: "mL/min/1.73m²" },
+  { key: "hemoglobin", label: "혈색소", unit: "g/dL" },
+];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -68,11 +83,42 @@ function getSnapshotInputFeatures(snapshot: AnalysisResult | null | undefined): 
   return isRecord(inputPayload.input_features) ? inputPayload.input_features : inputPayload;
 }
 
+function getSnapshotX2InputPayload(snapshot: AnalysisResult | null | undefined): Record<string, unknown> {
+  if (!isRecord(snapshot?.input_payload)) {
+    return {};
+  }
+  const inputPayload = snapshot.input_payload;
+  return isRecord(inputPayload.x2_input_payload) ? inputPayload.x2_input_payload : {};
+}
+
+function getSnapshotX2FieldSources(snapshot: AnalysisResult | null | undefined): Record<string, unknown> {
+  if (!isRecord(snapshot?.input_payload)) {
+    return {};
+  }
+  const inputPayload = snapshot.input_payload;
+  return isRecord(inputPayload.x2_field_sources) ? inputPayload.x2_field_sources : {};
+}
+
+function getSnapshotStringValue(snapshot: AnalysisResult | null | undefined, key: string): string | null {
+  if (!isRecord(snapshot?.input_payload)) {
+    return null;
+  }
+  const value = snapshot.input_payload[key];
+  return value === undefined || value === null || value === "" ? null : String(value);
+}
+
 function formatSummaryValue(value: unknown, unit = ""): string {
   if (value === undefined || value === null || value === "") {
     return "-";
   }
   return `${String(value)}${unit}`;
+}
+
+function formatPrecisionMeasurementValue(value: unknown, unit = ""): string {
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  return `${String(value)}${unit ? ` ${unit}` : ""}`;
 }
 
 function formatBloodPressure(input: Record<string, unknown>): string {
@@ -178,7 +224,15 @@ export default function AnalysisHistoryPage() {
     }));
 
   const snapshotInput = getSnapshotInputFeatures(detail?.snapshot);
+  const snapshotX2Input = getSnapshotX2InputPayload(detail?.snapshot);
+  const snapshotX2Sources = getSnapshotX2FieldSources(detail?.snapshot);
   const referenceSources = detail?.explanation?.reference_sources ?? [];
+  const visiblePrecisionMeasurements = precisionMeasurementItems.filter((item) => {
+    const value = snapshotX2Input[item.key];
+    return value !== undefined && value !== null && value !== "";
+  });
+  const x2MeasurementSource = getSnapshotStringValue(detail?.snapshot, "x2_measurement_source");
+  const selectedExamReportId = getSnapshotStringValue(detail?.snapshot, "selected_exam_report_id");
 
   useEffect(() => {
     const load = async () => {
@@ -241,6 +295,41 @@ export default function AnalysisHistoryPage() {
                 {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
                 {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
                 {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
+              </div>
+            </div>
+          )}
+          {visiblePrecisionMeasurements.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 8, marginTop: 16 }}>분석에 사용된 검진 수치</h3>
+              <div className="state-box">
+                <p style={{ margin: "0 0 8px" }}>
+                  정밀분석에 반영된 검진표 기반 수치입니다. 건강정보 수기 입력 항목에 저장되지 않은 값도 검진표 확정 결과에서 보강될 수 있습니다.
+                </p>
+                <div className="chip-list">
+                  {x2MeasurementSource && (
+                    <span className="badge badge-reference">
+                      출처 {x2MeasurementSource === "exam_measurements" ? "검진표 OCR" : x2MeasurementSource}
+                    </span>
+                  )}
+                  {selectedExamReportId && (
+                    <span className="badge badge-reference">검진표 #{selectedExamReportId}</span>
+                  )}
+                </div>
+              </div>
+              <div className="readonly-health-grid" style={{ marginTop: 12 }}>
+                {visiblePrecisionMeasurements.map((item) => (
+                  <div className="readonly-health-item" key={item.key}>
+                    <div className="item-header">
+                      <span>{item.label}</span>
+                      {snapshotX2Sources[item.key] === "exam_measurements" && (
+                        <em className="badge badge-reference">OCR</em>
+                      )}
+                    </div>
+                    <div className="item-value-row">
+                      <strong>{formatPrecisionMeasurementValue(snapshotX2Input[item.key], item.unit)}</strong>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

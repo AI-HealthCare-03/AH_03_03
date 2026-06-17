@@ -626,6 +626,11 @@ export default function HealthRecordPage() {
             <div style={{ lineHeight: "1.4" }}>
               <p style={{ margin: 0 }}>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 간편 분석을 진행할 수 있습니다.</p>
               <p style={{ margin: "2px 0 0" }}>정밀 분석 정보를 추가로 입력하시면 예측 정확도가 높아집니다.</p>
+              {activeStep === 1 && (
+                <p style={{ margin: "2px 0 0" }}>
+                  AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소 같은 확장 정밀검사 수치는 검진표 OCR 결과와 분석 상세에서 확인할 수 있습니다.
+                </p>
+              )}
             </div>
             {activeStep === 1 && (
               <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">
