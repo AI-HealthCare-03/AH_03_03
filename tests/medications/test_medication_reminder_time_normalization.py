@@ -54,7 +54,15 @@ async def test_create_medication_strips_timezone_before_repository(monkeypatch) 
         captured.update(user_id=user_id, data=data)
         return SimpleNamespace(id=1, user_id=user_id, **data)
 
+    async def fake_sync_medication_reminder_schedule(**kwargs):
+        return None
+
     monkeypatch.setattr(medication_service.medication_repository, "create_medication", fake_create_medication)
+    monkeypatch.setattr(
+        medication_service.notification_service,
+        "sync_medication_reminder_schedule",
+        fake_sync_medication_reminder_schedule,
+    )
 
     request = MedicationCreateRequest(
         name="비타민D",
@@ -76,9 +84,17 @@ async def test_update_medication_strips_timezone_before_repository(monkeypatch) 
 
     async def fake_update_medication(medication_id: int, data: dict):
         captured.update(medication_id=medication_id, data=data)
-        return SimpleNamespace(id=medication_id, **data)
+        return SimpleNamespace(id=medication_id, user_id=7, is_active=True, **data)
+
+    async def fake_sync_medication_reminder_schedule(**kwargs):
+        return None
 
     monkeypatch.setattr(medication_service.medication_repository, "update_medication", fake_update_medication)
+    monkeypatch.setattr(
+        medication_service.notification_service,
+        "sync_medication_reminder_schedule",
+        fake_sync_medication_reminder_schedule,
+    )
 
     request = MedicationUpdateRequest(reminder_time=time(4, 30, tzinfo=timezone(timedelta(hours=9))))
 

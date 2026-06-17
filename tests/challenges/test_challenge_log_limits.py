@@ -137,6 +137,9 @@ async def test_join_challenge_reactivates_canceled_challenge(monkeypatch) -> Non
     async def fake_with_progress(user_challenge):
         return user_challenge
 
+    async def fake_sync_challenge_reminders_for_user(user_id: int):
+        return None
+
     monkeypatch.setattr(challenge_service, "_now", lambda: fixed_now)
     monkeypatch.setattr(
         challenge_service.challenge_repository,
@@ -146,6 +149,7 @@ async def test_join_challenge_reactivates_canceled_challenge(monkeypatch) -> Non
     monkeypatch.setattr(challenge_service.challenge_repository, "update_user_challenge", fake_update_user_challenge)
     monkeypatch.setattr(challenge_service.challenge_repository, "create_user_challenge", fake_create_user_challenge)
     monkeypatch.setattr(challenge_service, "_with_user_challenge_progress", fake_with_progress)
+    monkeypatch.setattr(challenge_service, "_sync_challenge_reminders_for_user", fake_sync_challenge_reminders_for_user)
 
     rejoined = await challenge_service.join_challenge(user_id=42, challenge_id=3)
 

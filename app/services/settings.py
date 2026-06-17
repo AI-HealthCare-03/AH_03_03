@@ -15,4 +15,9 @@ async def get_or_create_user_settings(user_id: int) -> UserSetting:
 
 
 async def update_user_settings(user_id: int, request: UserSettingUpdateRequest) -> UserSetting | None:
-    return await setting_repository.update_user_setting(user_id, request.model_dump(exclude_unset=True))
+    setting = await setting_repository.update_user_setting(user_id, request.model_dump(exclude_unset=True))
+    if setting is not None:
+        from app.services import notifications as notification_service
+
+        await notification_service.sync_all_user_reminder_schedules(user_id)
+    return setting
