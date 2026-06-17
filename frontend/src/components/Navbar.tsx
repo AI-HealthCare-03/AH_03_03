@@ -57,6 +57,9 @@ export default function Navbar({ isMobileMenuOpen = false, onMobileMenuOpen, sho
             <NavLink className="icon-button desktop-nav-action" to="/about">
               서비스 소개
             </NavLink>
+            <button className="nav-logout-btn" onClick={logout} type="button">
+              로그아웃
+            </button>
             {showMobileMenuButton && (
               <button
                 aria-controls="mobile-navigation-drawer"
