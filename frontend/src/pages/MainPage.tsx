@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { getLatestAnalysisResults } from "../api/analysis";
 import { getChallenge, listChallengeRecommendations, listChallenges, listMyChallenges } from "../api/challenges";
+import { listDietRecords } from "../api/diets";
 import { listExams, listMeasurements } from "../api/exams";
 import { getAnalysisReadiness, getLatestHealthRecord } from "../api/health";
 import { getMainSummary } from "../api/main";
@@ -287,6 +288,44 @@ function isActiveUserChallenge(challenge: AnyRecord): boolean {
   return ["JOINED", "ACTIVE", "IN_PROGRESS"].includes(status) && !challenge.canceled_at && !challenge.completed_at;
 }
 
+function getDietFoodName(food: AnyRecord): string {
+  return String(
+    food.matched_food_name ??
+      food.display_name ??
+      food.name ??
+      food.food_name ??
+      food.original_name ??
+      food.raw_food_name ??
+      food.vision_food_name ??
+      "",
+  ).trim();
+}
+
+function summarizeDietFoods(value: unknown, fallback = "분석한 식단"): string {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const names = value
+    .map((item) => (item && typeof item === "object" ? getDietFoodName(item as AnyRecord) : ""))
+    .filter(Boolean);
+  if (names.length === 0) {
+    return fallback;
+  }
+  return names.length === 1 ? names[0] : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` 외 ${names.length - 2}개` : ""}`;
+}
+
+function getDietRecordTitle(record: AnyRecord | undefined): string {
+  if (!record) {
+    return "분석한 식단";
+  }
+  const foodSummary = summarizeDietFoods(record.detected_foods, "");
+  if (foodSummary) {
+    return foodSummary;
+  }
+  const description = String(record.description ?? record.meal_name ?? "").trim();
+  return description && description !== "사진으로 선택한 식단" ? description : "분석한 식단";
+}
+
 function getAveragePercent(values: number[]): number {
   const valid = values.filter((value) => Number.isFinite(value));
   if (valid.length === 0) {
@@ -307,6 +346,7 @@ export default function MainPage() {
   const [challengeRecommendationsLoading, setChallengeRecommendationsLoading] = useState(false);
   const [myChallenges, setMyChallenges] = useState<AnyRecord[]>([]);
   const [medications, setMedications] = useState<AnyRecord[]>([]);
+  const [dietRecords, setDietRecords] = useState<AnyRecord[]>([]);
   const [sectionError, setSectionError] = useState("");
   const [latestExam, setLatestExam] = useState<AnyRecord | null>(null);
   const [examMeasurements, setExamMeasurements] = useState<AnyRecord[]>([]);
@@ -323,6 +363,7 @@ export default function MainPage() {
           recommendationList,
           myChallengeList,
           medicationList,
+          dietRecordList,
           examList,
         ] = await Promise.allSettled([
             getMainSummary<MainData>(),
@@ -333,6 +374,7 @@ export default function MainPage() {
             listChallengeRecommendations<AnyRecord[]>({ limit: 3 }),
             listMyChallenges<AnyRecord[]>({ limit: 100 }),
             listMedications<AnyRecord[]>(),
+            listDietRecords<AnyRecord[]>(),
             listExams<AnyRecord[]>({ limit: 1 }),
           ]);
 
@@ -379,6 +421,7 @@ export default function MainPage() {
           myChallengeList.status === "fulfilled" && Array.isArray(myChallengeList.value) ? myChallengeList.value : [],
         );
         setMedications(medicationList.status === "fulfilled" && Array.isArray(medicationList.value) ? medicationList.value : []);
+        setDietRecords(dietRecordList.status === "fulfilled" && Array.isArray(dietRecordList.value) ? dietRecordList.value : []);
         setSectionError(summary.status === "rejected" ? "일부 요약 정보를 불러오지 못했습니다. 각 기능은 바로 이용할 수 있습니다." : "");
 
         const examRecords = examList.status === "fulfilled" && Array.isArray(examList.value) ? examList.value : [];
@@ -405,6 +448,7 @@ export default function MainPage() {
         setChallengeRecommendationsLoading(false);
         setMyChallenges([]);
         setMedications([]);
+        setDietRecords([]);
         setSectionError("");
       } catch {
         setData(publicFallback);
@@ -482,9 +526,9 @@ export default function MainPage() {
     const challengeRate = getAveragePercent(activeMyChallenges.map(getChallengeProgress));
     const medicationActiveCount = medications.filter((item) => item.is_active !== false).length;
     const medicationRate = medications.length > 0 ? clampPercent((medicationActiveCount / medications.length) * 100) : 0;
-    const RING_R = 28;
-    const RING_C = 2 * Math.PI * RING_R;
-    const ringOffset = RING_C * (1 - challengeRate / 100);
+    const latestDietRecord = dietRecords[0];
+    const latestDietTitle = getDietRecordTitle(latestDietRecord);
+    const latestDietPoint = String(latestDietRecord?.diet_feedback ?? latestDietRecord?.summary ?? "").trim();
 
     const recommendationChallengeIds = challengeRecommendations
       .map((recommendation) => Number(recommendation.challenge_id))
@@ -653,6 +697,19 @@ export default function MainPage() {
                   <span className="viz-card-label">식단 분석</span>
                   <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
                 </div>
+                <div className="viz-stat-row">
+                  <span>{dietRecords.length > 0 ? latestDietTitle : "최근 분석 없음"}</span>
+                  <strong>
+                    {dietRecords.length > 0 ? (
+                      <Link to={`/diets/${String(latestDietRecord?.id ?? "")}`} style={{ color: "var(--color-primary)", fontSize: 13 }}>
+                        보기
+                      </Link>
+                    ) : (
+                      <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13 }}>분석하기</Link>
+                    )}
+                  </strong>
+                </div>
+                {latestDietPoint && <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>{latestDietPoint}</p>}
               </div>
 
               {/* 복약/영양제 작은 카드 */}
@@ -677,20 +734,33 @@ export default function MainPage() {
           <div className="viz-card challenge-summary-card" style={{ marginTop: "14px" }}>
             {/* 챌린지 현황 작은 카드 */}
             <div className="challenge-status-panel">
-              <span className="viz-card-label">챌린지 현황</span>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
-                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
-                  <circle cx="55" cy="55" r="44" fill="none" stroke="#e0e0e0" strokeWidth="10"/>
-                  <circle cx="55" cy="55" r="44" fill="none" stroke="#1D9E75" strokeWidth="10"
-                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
-                    strokeLinecap="round" transform="rotate(-90 55 55)"/>
-                </svg>
-                <div style={{ paddingBottom: "4px" }}>
-                  <div className="viz-ring-value">{challengeCount}개</div>
-                  <div className="viz-ring-label">참여 중</div>
+              <div className="challenge-status-header">
+                <span className="viz-card-label">챌린지 현황</span>
+                <span className="challenge-count-badge">{challengeCount}개 참여 중</span>
+              </div>
+              <div className="challenge-ring-block">
+                <div className="challenge-ring-figure" aria-label={`평균 진행률 ${challengeRate}%`}>
+                  <svg width="116" height="116" viewBox="0 0 116 116">
+                    <circle cx="58" cy="58" r="46" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                    <circle
+                      cx="58"
+                      cy="58"
+                      r="46"
+                      fill="none"
+                      stroke="var(--color-primary)"
+                      strokeDasharray={`${challengeCount > 0 ? Math.min((challengeRate / 100) * 289, 289) : 0} 289`}
+                      strokeLinecap="round"
+                      strokeWidth="10"
+                      transform="rotate(-90 58 58)"
+                    />
+                  </svg>
+                  <div className="challenge-ring-center">
+                    <strong>{challengeRate}%</strong>
+                    <span>평균 진행률</span>
+                  </div>
                 </div>
               </div>
-              <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: "1.6", borderTop: "0.5px solid var(--color-border)", paddingTop: "10px", wordBreak: "keep-all" }}>
+              <div className="challenge-status-message">
                 {challengeCount === 0
                   ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
                   : challengeCount < 3

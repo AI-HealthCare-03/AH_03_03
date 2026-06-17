@@ -188,6 +188,8 @@ export default function AnalysisHistoryPage() {
   const [detail, setDetail] = useState<AnalysisDetail | null>(null);
   const [activeTab, setActiveTab] = useState("전체");
   const [activeMode, setActiveMode] = useState("전체");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -211,8 +213,16 @@ export default function AnalysisHistoryPage() {
     } else if (activeMode === "정밀") {
       filtered = filtered.filter((result) => result.analysis_mode === "PRECISION");
     }
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00`);
+      filtered = filtered.filter((result) => getResultTimestamp(result) >= start.getTime());
+    }
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59`);
+      filtered = filtered.filter((result) => getResultTimestamp(result) <= end.getTime());
+    }
     return filtered;
-  }, [activeTab, activeMode, results]);
+  }, [activeTab, activeMode, endDate, results, startDate]);
 
   const totalPages = Math.ceil(displayResults.length / itemsPerPage);
   const pagedResults = displayResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -440,25 +450,58 @@ export default function AnalysisHistoryPage() {
     >
       {error && <ErrorMessage message={error} />}
 
-      <div style={{ display: "flex", justifyContent: "flex-start", gap: 8, marginBottom: 8 }}>
-        <select
-          onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
-          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 200, cursor: "pointer", outline: "none"  }}
-          value={activeTab}
-        >
-          {Object.keys(analysisTypeOptions).map((key) => (
-            <option key={key} value={key}>{key}</option>
-          ))}
-        </select>
-        <select
-          onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
-          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 100, cursor: "pointer", outline: "none"  }}
-          value={activeMode}
-        >
-          <option>전체</option>
-          <option>간편</option>
-          <option>정밀</option>
-        </select>
+      <div className="history-filter-row">
+        <label>
+          질병
+          <select
+            onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
+            value={activeTab}
+          >
+            {Object.keys(analysisTypeOptions).map((key) => (
+              <option key={key} value={key}>{key}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          분석 종류
+          <select
+            onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
+            value={activeMode}
+          >
+            <option>전체</option>
+            <option>간편</option>
+            <option>정밀</option>
+          </select>
+        </label>
+        <label>
+          시작일
+          <input
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+            type="date"
+            value={startDate}
+          />
+        </label>
+        <label>
+          종료일
+          <input
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+            type="date"
+            value={endDate}
+          />
+        </label>
+        {(startDate || endDate) && (
+          <button
+            className="secondary compact-button"
+            onClick={() => {
+              setStartDate("");
+              setEndDate("");
+              setCurrentPage(1);
+            }}
+            type="button"
+          >
+            날짜 초기화
+          </button>
+        )}
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
 
@@ -468,8 +511,9 @@ export default function AnalysisHistoryPage() {
             <>
               <div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                   <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
                   <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
                 </div>
                 <p className="muted">{mainFactorLabel(result)}</p>
@@ -478,7 +522,6 @@ export default function AnalysisHistoryPage() {
                 <span style={{ color: "var(--color-muted)", fontSize: 13 }}>상세보기 →</span>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span className="muted" style={{ fontSize: 13 }}>{formatDate(result.analyzed_at ?? result.created_at)}</span>
-                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
                 </div>
               </div>
             </>

@@ -2565,6 +2565,38 @@ a:hover .mini-card {
   transform: translateY(-2px);
 }
 
+.history-filter-row {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.history-filter-row label {
+  color: var(--color-muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.history-filter-row input,
+.history-filter-row select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 14px;
+  height: 38px;
+  padding: 6px 10px;
+}
+
+.history-filter-row button {
+  height: 38px;
+}
+
 .record-row {
   align-items: flex-start;
   display: flex;
@@ -5619,8 +5651,79 @@ input:-webkit-autofill:focus {
   background: var(--color-muted-surface);
   border-radius: var(--radius-md);
   padding: 16px;
-  width: 220px;
-  flex-shrink: 0;
+  width: 100%;
+}
+
+.challenge-status-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.challenge-count-badge {
+  background: var(--color-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+  border-radius: 999px;
+  color: var(--color-primary-dark);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.challenge-ring-block {
+  display: grid;
+  justify-items: center;
+  margin-top: 14px;
+}
+
+.challenge-ring-figure {
+  display: grid;
+  height: 116px;
+  place-items: center;
+  position: relative;
+  width: 116px;
+}
+
+.challenge-ring-figure svg {
+  display: block;
+}
+
+.challenge-ring-center {
+  align-items: center;
+  display: grid;
+  gap: 2px;
+  inset: 0;
+  justify-items: center;
+  line-height: 1.1;
+  position: absolute;
+  text-align: center;
+}
+
+.challenge-ring-center strong {
+  color: var(--color-text);
+  font-size: 24px;
+  font-weight: 1000;
+}
+
+.challenge-ring-center span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.challenge-status-message {
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 12px;
+  padding-top: 10px;
+  text-align: center;
+  word-break: keep-all;
 }
 
 .viz-card-grid {

@@ -49,6 +49,44 @@ type ChartSeries = {
   points: ChartPoint[];
 };
 
+function getDietFoodName(food: AnyRecord): string {
+  return String(
+    food.matched_food_name ??
+      food.display_name ??
+      food.name ??
+      food.food_name ??
+      food.original_name ??
+      food.raw_food_name ??
+      food.vision_food_name ??
+      "",
+  ).trim();
+}
+
+function summarizeDietFoods(value: unknown): string {
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  const names = value
+    .map((item) => (item && typeof item === "object" ? getDietFoodName(item as AnyRecord) : ""))
+    .filter(Boolean);
+  if (names.length === 0) {
+    return "";
+  }
+  return names.length === 1 ? names[0] : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` 외 ${names.length - 2}개` : ""}`;
+}
+
+function getDietDisplayTitle(record: AnyRecord | undefined): string {
+  if (!record) {
+    return "";
+  }
+  const foodSummary = summarizeDietFoods(record.detected_foods);
+  if (foodSummary) {
+    return foodSummary;
+  }
+  const description = String(record.description ?? record.meal_name ?? "").trim();
+  return description && description !== "사진으로 선택한 식단" ? description : "분석한 식단";
+}
+
 type ChartAxisTick = {
   value: number;
   label: string;
@@ -893,11 +931,13 @@ export default function DashboardPage() {
     (latestAnalysisResults.length > 0
       ? "최근 분석 결과와 건강 지표 변화를 함께 보면서 생활습관을 꾸준히 조정해보세요."
       : "아직 분석 결과가 없습니다. 건강정보를 입력하고 간편 분석을 실행하면 맞춤 코멘트를 확인할 수 있습니다.");
+  const dietDisplayTitle = getDietDisplayTitle(latestDiet);
   const dietSummary = String(
-    latestDiet?.summary ??
-      latestDiet?.analysis_summary ??
-      latestDiet?.recommendation ??
-      latestDiet?.description ??
+    dietDisplayTitle ||
+      latestDiet?.summary ||
+      latestDiet?.analysis_summary ||
+      latestDiet?.recommendation ||
+      latestDiet?.description ||
       "",
   ).trim();
   const dietPoints = [

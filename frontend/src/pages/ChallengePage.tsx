@@ -619,6 +619,9 @@ export default function ChallengePage() {
     const completedCountByChallengeId = new Map<number, number>();
     Object.entries(logsByUserChallengeId).forEach(([rawId, logs]) => {
       const id = Number(rawId);
+      if (!activeUserChallengeIds.has(id)) {
+        return;
+      }
       const count = logs.filter((log) => Boolean(log.is_completed) && getCompletedDate(log) === key).length;
       if (Number.isFinite(id) && count > 0) {
         completedCountByChallengeId.set(id, count);
@@ -787,11 +790,7 @@ export default function ChallengePage() {
                           </div>
                         </div>
                       </>
-                    ) : (
-                      <p className="muted" style={{ overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                        {getCleanDescription(challenge.description) || "상세 버튼을 눌러 챌린지 내용을 확인하세요."}
-                      </p>
-                    )}
+                    ) : null}
                     <div className="challenge-card-actions">
                       <Link className="button secondary" to={{ pathname: `/challenges/${String(challenge.id)}`, search: detailSearch }}>
                         상세
@@ -896,7 +895,10 @@ export default function ChallengePage() {
                       <span className={isTodayCompleted(challenge) ? "badge risk-low" : "badge badge-missing"}>
                         오늘 수행: {getTodayCompletedCount(challenge)}/{getDailyGoalCount(challenge, challenges)}
                       </span>
-                      <Link className="button secondary compact-button" to={`/challenges/${String(getChallengeId(challenge) ?? "")}`}>
+                      <Link
+                        className="button secondary compact-button"
+                        to={{ pathname: `/challenges/${String(getChallengeId(challenge) ?? "")}`, search: detailSearch }}
+                      >
                         상세
                       </Link>
                     </div>
