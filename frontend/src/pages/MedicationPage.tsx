@@ -18,12 +18,6 @@ import ErrorMessage from "../components/ErrorMessage";
 
 type Item = Record<string, unknown>;
 type MedicationFormErrors = Partial<Record<"name" | "medication_type" | "reminder_time", string>>;
-type DailyMedicationSummary = {
-  dateKey: string;
-  totalCount: number;
-  completed: Item[];
-  pending: Item[];
-};
 
 const DOSAGE_AMOUNTS = ["0.5", "1", "2", "5", "10", "50", "100", "250", "500", "1000"];
 const DOSAGE_UNITS = ["mg", "g", "mL", "정", "캡슐", "포"];
@@ -31,8 +25,6 @@ const FREQUENCY_OPTIONS = ["매일 1회", "매일 2회", "매일 3회", "아침 
 const CUSTOM_VALUE = "__CUSTOM__";
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
 const MINUTE_OPTIONS = ["00", "10", "20", "30", "40", "50"];
-const MEDICATION_SUMMARY_DAYS = 7;
-const MEDICATION_RECORD_FETCH_LIMIT = 100;
 
 const MEDICATION_TYPE_LABEL: Record<string, string> = {
   MEDICATION: "경구약",
@@ -102,94 +94,6 @@ function formatMedicationDateTime(value: unknown): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
-}
-
-function formatMedicationDateKey(dateKey: string): string {
-  const [year, month, day] = dateKey.split("-");
-  return year && month && day ? `${year}.${month}.${day}` : dateKey;
-}
-
-function toLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getRecentDateKeys(): string[] {
-  return Array.from({ length: MEDICATION_SUMMARY_DAYS }, (_, index) => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - index);
-    return toLocalDateKey(date);
-  });
-}
-
-function getRecordDateKey(record: Item): string | null {
-  const rawDate = record.scheduled_at ?? record.taken_at ?? record.created_at;
-  if (!rawDate) {
-    return null;
-  }
-  const date = new Date(String(rawDate));
-  return Number.isNaN(date.getTime()) ? null : toLocalDateKey(date);
-}
-
-function isMedicationActive(medication: Item): boolean {
-  return medication.is_active === true;
-}
-
-function isTakenRecord(record: Item): boolean {
-  const status = String(record.status ?? "").toUpperCase();
-  return Boolean(record.is_taken) || ["TAKEN", "COMPLETED", "COMPLETE", "DONE"].includes(status);
-}
-
-function getMedicationNameText(medication: Item): string {
-  return String(medication.name ?? "복약/영양제");
-}
-
-function buildDailyMedicationSummaries(
-  medications: Item[],
-  recordsByMedication: Record<string, Item[]>,
-): DailyMedicationSummary[] {
-  const activeMedications = medications.filter(isMedicationActive);
-  const dateKeys = getRecentDateKeys();
-  const dateKeySet = new Set(dateKeys);
-  const completedMedicationIdsByDate = new Map<string, Set<number>>();
-
-  for (const medication of activeMedications) {
-    const medicationId = Number(medication.id);
-    if (!medicationId) {
-      continue;
-    }
-    for (const record of recordsByMedication[String(medicationId)] ?? []) {
-      const dateKey = getRecordDateKey(record);
-      if (!dateKey || !dateKeySet.has(dateKey) || !isTakenRecord(record)) {
-        continue;
-      }
-      const completedIds = completedMedicationIdsByDate.get(dateKey) ?? new Set<number>();
-      completedIds.add(medicationId);
-      completedMedicationIdsByDate.set(dateKey, completedIds);
-    }
-  }
-
-  return dateKeys.map((dateKey) => {
-    const completedIds = completedMedicationIdsByDate.get(dateKey) ?? new Set<number>();
-    const completed = activeMedications.filter((medication) => completedIds.has(Number(medication.id)));
-    const pending = activeMedications.filter((medication) => !completedIds.has(Number(medication.id)));
-    return {
-      dateKey,
-      totalCount: activeMedications.length,
-      completed,
-      pending,
-    };
-  });
-}
-
-function formatMedicationNames(medications: Item[]): string {
-  if (medications.length === 0) {
-    return "-";
-  }
-  return medications.map(getMedicationNameText).join(", ");
 }
 
 function parseReminderTimeParts(value: unknown): { hour: string; minute: string } {
@@ -400,7 +304,6 @@ export default function MedicationPage() {
   });
   const [items, setItems] = useState<Item[]>([]);
   const [records, setRecords] = useState<Item[]>([]);
-  const [recordsByMedication, setRecordsByMedication] = useState<Record<string, Item[]>>({});
   const [error, setError] = useState("");
   const [registerErrors, setRegisterErrors] = useState<MedicationFormErrors>({});
   const [editErrors, setEditErrors] = useState<MedicationFormErrors>({});
@@ -418,31 +321,14 @@ export default function MedicationPage() {
     try {
       const medications = await listMedications<Item[]>();
       setItems(medications);
-      const activeMedications = medications.filter(isMedicationActive);
-      const recordEntries = await Promise.all(
-        activeMedications
-          .filter((medication) => Number(medication.id))
-          .map(async (medication) => {
-            const medicationId = Number(medication.id);
-            const medicationRecords = await listMedicationRecords<Item[]>(medicationId, {
-              limit: MEDICATION_RECORD_FETCH_LIMIT,
-            });
-            return [String(medicationId), medicationRecords] as const;
-          }),
-      );
-      const nextRecordsByMedication = Object.fromEntries(recordEntries);
       const fallbackId = medications[0]?.id ? Number(medications[0].id) : null;
       const requestedId = nextRecordMedicationId ?? recordMedicationId ?? fallbackId;
       const targetId = medications.some((medication) => Number(medication.id) === requestedId)
         ? requestedId
         : fallbackId;
       setRecordMedicationId(targetId);
-      setRecordsByMedication(nextRecordsByMedication);
       if (targetId) {
-        const targetRecords =
-          nextRecordsByMedication[String(targetId)] ??
-          (await listMedicationRecords<Item[]>(targetId, { limit: MEDICATION_RECORD_FETCH_LIMIT }));
-        setRecords(targetRecords);
+        setRecords(await listMedicationRecords<Item[]>(targetId));
       } else {
         setRecords([]);
       }
@@ -507,14 +393,7 @@ export default function MedicationPage() {
     setError("");
     setRecordMedicationId(medicationId);
     try {
-      const medicationRecords = await listMedicationRecords<Item[]>(medicationId, {
-        limit: MEDICATION_RECORD_FETCH_LIMIT,
-      });
-      setRecords(medicationRecords);
-      setRecordsByMedication((prev) => ({
-        ...prev,
-        [String(medicationId)]: medicationRecords,
-      }));
+      setRecords(await listMedicationRecords<Item[]>(medicationId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약 기록을 불러오지 못했습니다.");
     }
@@ -613,9 +492,6 @@ export default function MedicationPage() {
       setIsMutating(false);
     }
   };
-
-  const activeMedicationCount = items.filter(isMedicationActive).length;
-  const dailyMedicationSummaries = buildDailyMedicationSummaries(items, recordsByMedication);
 
   return (
     <div className="page-stack">
@@ -898,49 +774,16 @@ export default function MedicationPage() {
       {/* ── 복약 기록 ── */}
       <Card title="복약 수행 기록">
         <div className="state-box">
-          최근 7일 동안 복용 중인 약과 영양제를 날짜별로 요약합니다. 완료 기록이 없는 active 약은 해당 날짜의 대기로 표시됩니다.
+          {recordMedicationName
+            ? `${String(recordMedicationName)}의 복용 완료/대기 기록입니다.`
+            : "약이나 영양제를 등록한 뒤 복용 완료를 기록하면 여기에 표시됩니다."}
         </div>
         <div className="card-list">
-          {activeMedicationCount === 0 && (
+          {records.length === 0 && (
             <div className="state-box">
-              복용 중인 약이나 영양제가 없습니다. 복약 목록에서 약을 등록하면 날짜별 현황을 볼 수 있습니다.
+              아직 복약 수행 기록이 없습니다. 복약 목록에서 “오늘 복용 완료”를 누르면 복용 기록이 생성됩니다.
             </div>
           )}
-          {activeMedicationCount > 0 &&
-            dailyMedicationSummaries.map((summary) => (
-              <div className="mini-card" key={summary.dateKey}>
-                <div className="record-row">
-                  <div>
-                    <strong>{formatMedicationDateKey(summary.dateKey)}</strong>
-                    <p className="muted">
-                      총 {summary.totalCount}개 약 중 {summary.completed.length}개 복약 완료
-                    </p>
-                  </div>
-                  <span className={summary.pending.length === 0 ? "badge badge-saved" : "badge badge-missing"}>
-                    {summary.pending.length === 0 ? "모두 완료" : `${summary.pending.length}개 대기`}
-                  </span>
-                </div>
-                <div className="record-meta-grid">
-                  <span>완료 {formatMedicationNames(summary.completed)}</span>
-                  <span>대기 {formatMedicationNames(summary.pending)}</span>
-                </div>
-              </div>
-            ))}
-        </div>
-
-        <div style={{ marginTop: 18 }}>
-          <h3 style={{ fontSize: "1rem", marginBottom: 8 }}>약별 기록 보기</h3>
-          <div className="state-box">
-            {recordMedicationName
-              ? `${String(recordMedicationName)}의 복용 완료/대기 기록입니다.`
-              : "약이나 영양제를 등록한 뒤 복용 완료를 기록하면 여기에 표시됩니다."}
-          </div>
-          <div className="card-list" style={{ marginTop: 10 }}>
-            {records.length === 0 && (
-              <div className="state-box">
-                아직 복약 수행 기록이 없습니다. 복약 목록에서 “오늘 복용 완료”를 누르면 복용 기록이 생성됩니다.
-              </div>
-            )}
           {records.map((record) => (
             <div className="mini-card" key={String(record.id)}>
               <div className="record-row">
@@ -966,7 +809,6 @@ export default function MedicationPage() {
               </button>
             </div>
           ))}
-          </div>
         </div>
       </Card>
 
