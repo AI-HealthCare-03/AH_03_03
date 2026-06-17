@@ -730,15 +730,34 @@ export default function MainPage() {
             </div>
           </div>
 
-          {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
+          {/* 아래 큰 카드: 챌린지 현황 + 수행률 + 추천 챌린지 */}
           <div className="viz-card challenge-summary-card" style={{ marginTop: "14px" }}>
-            {/* 챌린지 현황 작은 카드 */}
-            <div className="challenge-status-panel">
-              <div className="challenge-status-header">
+            <div className="challenge-status-panel challenge-metric-card">
+              <div className="challenge-metric-header">
                 <span className="viz-card-label">챌린지 현황</span>
-                <span className="challenge-count-badge">{challengeCount}개 참여 중</span>
               </div>
-              <div className="challenge-ring-block">
+              <div className="challenge-metric-value">
+                <strong>{challengeCount}개</strong>
+                <span>참여 중</span>
+              </div>
+              <p className="challenge-status-message">
+                {challengeCount === 0
+                  ? "아직 참여 중인 챌린지가 없어요."
+                  : `${challengeCount}개 챌린지를 실천 중이에요.`}
+              </p>
+              <Link
+                className="button secondary challenge-metric-button"
+                to="/challenges"
+              >
+                챌린지 바로가기
+              </Link>
+            </div>
+
+            <div className="challenge-status-panel challenge-metric-card">
+              <div className="challenge-metric-header">
+                <span className="viz-card-label">챌린지 수행률</span>
+              </div>
+              <div className="challenge-ring-block challenge-rate-ring">
                 <div className="challenge-ring-figure" aria-label={`평균 진행률 ${challengeRate}%`}>
                   <svg width="116" height="116" viewBox="0 0 116 116">
                     <circle cx="58" cy="58" r="46" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
@@ -760,24 +779,15 @@ export default function MainPage() {
                   </div>
                 </div>
               </div>
-              <div className="challenge-status-message">
+              <p className="challenge-status-message">
                 {challengeCount === 0
-                  ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
-                  : challengeCount < 3
-                  ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
-                  : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
-              </div>
-              <Link
-                className="button secondary"
-                to="/challenges"
-                style={{ display: "block", textAlign: "center", marginTop: "12px", fontSize: "13px" }}
-              >
-                챌린지 바로가기
-              </Link>
+                  ? "챌린지를 시작하면 수행률을 확인할 수 있어요."
+                  : "참여 중인 챌린지의 평균 수행률이에요."}
+              </p>
             </div>
 
             {/* 추천 챌린지 */}
-            <div>
+            <div className="challenge-recommendation-panel">
               <span className="viz-card-label">추천 챌린지</span>
               <div className="compact-list" style={{ marginTop: "10px" }}>
                 {challengeRecommendationsLoading ? (
