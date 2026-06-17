@@ -771,26 +771,24 @@ export default function MainPage() {
 
             <div className="challenge-status-panel challenge-rate-panel">
               <span className="viz-card-label">챌린지 수행률</span>
-              <div className="challenge-ring-block challenge-rate-ring">
-                <div className="challenge-ring-figure" aria-label={`평균 진행률 ${challengeRate}%`}>
-                  <svg width="116" height="116" viewBox="0 0 116 116">
-                    <circle cx="58" cy="58" r="46" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
-                    <circle
-                      cx="58"
-                      cy="58"
-                      r="46"
-                      fill="none"
-                      stroke="var(--color-primary)"
-                      strokeDasharray={`${challengeCount > 0 ? Math.min((challengeRate / 100) * 289, 289) : 0} 289`}
-                      strokeLinecap="round"
-                      strokeWidth="10"
-                      transform="rotate(-90 58 58)"
-                    />
-                  </svg>
-                  <div className="challenge-ring-center">
-                    <strong>{challengeRate}%</strong>
-                    <span>평균 진행률</span>
-                  </div>
+              <div className="challenge-status-ring-row">
+                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                  <circle
+                    cx="55"
+                    cy="55"
+                    r="44"
+                    fill="none"
+                    stroke="var(--color-primary)"
+                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeRate / 100) * 276, 276) : 0} 276`}
+                    strokeLinecap="round"
+                    strokeWidth="10"
+                    transform="rotate(-90 55 55)"
+                  />
+                </svg>
+                <div className="challenge-status-count">
+                  <div className="viz-ring-value">{challengeRate}%</div>
+                  <div className="viz-ring-label">평균 진행률</div>
                 </div>
               </div>
               <p className="challenge-status-message">

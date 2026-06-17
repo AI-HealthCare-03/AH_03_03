@@ -5667,7 +5667,7 @@ input:-webkit-autofill:focus {
 
 .challenge-rate-panel {
   display: grid;
-  gap: 12px;
+  gap: 0;
 }
 
 .challenge-status-ring-row {
