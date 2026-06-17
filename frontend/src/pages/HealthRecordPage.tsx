@@ -320,7 +320,15 @@ function formatDateTime(value: unknown): string {
     return "-";
   }
   const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ko-KR");
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }
 
 function getValue(record: HealthRecord, key: string, unit = ""): string {
@@ -354,23 +362,68 @@ function getSourceLabel(value: unknown): string {
   }
 }
 
-function getRecordSummary(record: HealthRecord): string {
-  const items: string[] = [];
-  const systolic = record.systolic_bp;
-  const diastolic = record.diastolic_bp;
-  if (systolic !== undefined && systolic !== null && diastolic !== undefined && diastolic !== null) {
-    items.push(`혈압 ${systolic}/${diastolic} mmHg`);
+function valueText(record: HealthRecord | null | undefined, key: string): string | null {
+  const value = record?.[key];
+  if (value === undefined || value === null || value === "") {
+    return null;
   }
-  if (record.weight_kg !== undefined && record.weight_kg !== null) {
-    items.push(`체중 ${record.weight_kg}kg`);
+  return String(value);
+}
+
+function getBloodPressureText(record: HealthRecord | null | undefined): string | null {
+  const systolic = valueText(record, "systolic_bp");
+  const diastolic = valueText(record, "diastolic_bp");
+  if (!systolic && !diastolic) {
+    return null;
   }
-  if (record.fasting_glucose !== undefined && record.fasting_glucose !== null) {
-    items.push(`공복혈당 ${record.fasting_glucose}mg/dL`);
+  return `${systolic ?? "-"}/${diastolic ?? "-"}`;
+}
+
+type RecordChangeSummary = {
+  extraCount: number;
+  labels: string[];
+  state: "changes" | "initial" | "none";
+};
+
+function getRecordChangeSummary(record: HealthRecord, previousRecord: HealthRecord | null | undefined): RecordChangeSummary {
+  if (!previousRecord) {
+    return { extraCount: 0, labels: ["초기 기록"], state: "initial" };
   }
-  if (record.ast !== undefined && record.ast !== null) {
-    items.push(`AST ${record.ast}U/L`);
+  const labels: string[] = [];
+  const bloodPressure = getBloodPressureText(record);
+  const previousBloodPressure = getBloodPressureText(previousRecord);
+  if (bloodPressure !== previousBloodPressure) {
+    labels.push("혈압");
   }
-  return items.length > 0 ? items.slice(0, 3).join(" · ") : "주요 수치 미입력";
+  const fields = [
+    { key: "height_cm", label: "키" },
+    { key: "weight_kg", label: "체중" },
+    { key: "bmi", label: "BMI" },
+    { key: "fasting_glucose", label: "공복혈당" },
+    { key: "hba1c", label: "당화혈색소" },
+    { key: "total_cholesterol", label: "총콜레스테롤" },
+    { key: "hdl_cholesterol", label: "HDL" },
+    { key: "ldl_cholesterol", label: "LDL" },
+    { key: "triglyceride", label: "중성지방" },
+    { key: "waist_cm", label: "허리둘레" },
+    { key: "ast", label: "AST" },
+    { key: "alt", label: "ALT" },
+    { key: "gamma_gtp", label: "감마GTP" },
+    { key: "creatinine", label: "크레아티닌" },
+    { key: "egfr", label: "eGFR" },
+    { key: "hemoglobin", label: "혈색소" },
+  ];
+  fields.forEach((field) => {
+    const current = valueText(record, field.key);
+    const previous = valueText(previousRecord, field.key);
+    if (current !== previous) {
+      labels.push(field.label);
+    }
+  });
+  if (labels.length === 0) {
+    return { extraCount: 0, labels: ["변화 없음"], state: "none" };
+  }
+  return { extraCount: Math.max(labels.length - 4, 0), labels: labels.slice(0, 4), state: "changes" };
 }
 
 function formatBmiForDisplay(record: HealthRecord | null): string {
@@ -456,8 +509,11 @@ export default function HealthRecordPage() {
     onSuccess: async () => {
       setRunningMode(null);
       setAnalysisJobId(null);
-      showSuccess({ message: "결과 화면에서 건강 관리 단계를 확인해 주세요." });
-      window.setTimeout(() => navigate("/analysis"), 900);
+      showSuccess({
+        message: "분석이 완료되었습니다.",
+        title: "분석 완료",
+        onConfirm: () => navigate("/analysis"),
+      });
     },
     onFailure: () => {
       setError("분석에 실패했습니다. 다시 시도해주세요.");
@@ -590,6 +646,7 @@ export default function HealthRecordPage() {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
       showFailure();
       setRunningMode(null);
+      setAnalysisJobId(null);
     }
   };
 
@@ -706,14 +763,6 @@ export default function HealthRecordPage() {
             <div style={{ lineHeight: "1.4" }}>
               <p style={{ margin: 0 }}>직업군, 가족력, 신장, 체중, 흡연/음주/운동 정보를 입력하면 간편 분석을 진행할 수 있습니다.</p>
               <p style={{ margin: "2px 0 0" }}>정밀 분석 정보를 추가로 입력하시면 예측 정확도가 높아집니다.</p>
-              {activeStep === 1 && (
-                <p style={{ margin: "2px 0 0" }}>
-                  AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소는 검진표 OCR 확정 시 비어 있는 건강정보에 보충되며 직접 입력도 가능합니다.
-                </p>
-              )}
-              <p style={{ margin: "2px 0 0" }}>
-                검진표 값은 기존 건강정보를 자동으로 덮어쓰지 않으며, 비어 있는 항목만 보충될 수 있습니다.
-              </p>
             </div>
             {activeStep === 1 && (
               <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">
@@ -767,45 +816,62 @@ export default function HealthRecordPage() {
           <div className="state-box">아직 저장된 건강정보 기록이 없습니다.</div>
         ) : (
           <div className="page-stack">
-            <div className="state-box">
-              저장하거나 검진표 OCR 결과를 반영할 때마다 새 기록으로 남습니다. 분석에는 가장 최근에 저장된 기록이 기본으로 사용됩니다.
+            <div className="state-box health-record-history-note">
+              건강정보 수정 시 새 기록이 남습니다. 분석에는 가장 최근에 저장된 기록이 기본으로 사용됩니다.
             </div>
-            <div className="table-wrap">
-              <table>
+            <div className="health-record-history-wrap">
+              <table className="health-record-history-table">
                 <thead>
                   <tr>
                     <th>저장일</th>
                     <th>기록일</th>
                     <th>입력 방식</th>
-                    <th>요약</th>
+                    <th>변경항목</th>
                     <th>상세</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((record) => (
-                    <tr key={String(record.id)}>
-                      <td>{formatDateTime(record.created_at)}</td>
-                      <td>{formatDate(record.measured_at)}</td>
-                      <td>
-                        <span className="badge badge-saved">{getSourceLabel(record.source)}</span>
-                      </td>
-                      <td>{getRecordSummary(record)}</td>
-                      <td>
-                        <button
-                          className="btn-secondary"
-                          onClick={() =>
-                            setSelectedRecord((current) =>
-                              Number(current?.id) === Number(record.id) ? null : record,
-                            )
-                          }
-                          style={{ fontSize: "13px", padding: "4px 12px" }}
-                          type="button"
-                        >
-                          {Number(selectedRecord?.id) === Number(record.id) ? "닫기" : "상세보기"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {records.map((record, index) => {
+                    const changeSummary = getRecordChangeSummary(record, records[index + 1]);
+                    return (
+                      <tr key={String(record.id)}>
+                        <td data-label="저장일">
+                          <span className="history-date-primary">{formatDateTime(record.created_at)}</span>
+                        </td>
+                        <td data-label="기록일">
+                          <span className="history-date-secondary">{formatDate(record.measured_at)}</span>
+                        </td>
+                        <td data-label="입력 방식">
+                          <span className="health-source-badge">{getSourceLabel(record.source)}</span>
+                        </td>
+                        <td data-label="변경항목">
+                          <div className="history-change-chip-list">
+                            {changeSummary.labels.map((label) => (
+                              <span className={`history-change-chip ${changeSummary.state}`} key={label}>
+                                {label}
+                              </span>
+                            ))}
+                            {changeSummary.extraCount > 0 && (
+                              <span className="history-change-chip more">외 {changeSummary.extraCount}개</span>
+                            )}
+                          </div>
+                        </td>
+                        <td data-label="상세">
+                          <button
+                            className="btn-secondary health-history-detail-button"
+                            onClick={() =>
+                              setSelectedRecord((current) =>
+                                Number(current?.id) === Number(record.id) ? null : record,
+                              )
+                            }
+                            type="button"
+                          >
+                            {Number(selectedRecord?.id) === Number(record.id) ? "닫기" : "상세보기"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

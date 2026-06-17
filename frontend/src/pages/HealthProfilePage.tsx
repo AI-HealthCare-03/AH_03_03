@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnalysisMode, runAnalysisAsync } from "../api/analysis";
+import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 import {
@@ -465,6 +466,13 @@ export default function HealthProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
+  const {
+    clearFeedback,
+    feedbackDialog: analysisFeedbackDialog,
+    showFailure,
+    showProcessing,
+    showSuccess,
+  } = useAnalysisFeedbackDialog();
 
   const bmi = useMemo(() => {
     const height = parseNumber(form.height_cm);
@@ -480,15 +488,21 @@ export default function HealthProfilePage() {
     onSuccess: async () => {
       setRunningMode(null);
       setAnalysisJobId(null);
-      navigate("/analysis");
+      showSuccess({
+        message: "분석이 완료되었습니다.",
+        title: "분석 완료",
+        onConfirm: () => navigate("/analysis"),
+      });
     },
     onFailure: () => {
       setError("분석에 실패했습니다. 다시 시도해주세요.");
+      showFailure();
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
       setError("분석 시간이 초과됐습니다. 다시 시도해주세요.");
+      showFailure({ message: "분석 시간이 초과됐습니다. 다시 시도해주세요." });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
@@ -500,13 +514,6 @@ export default function HealthProfilePage() {
     .map(({ label }) => label);
   const completedX2Count = x2Fields.filter(({ key }) => form[key] !== "").length;
   const displayBmi = getDisplayBmi(latestRecord, bmi);
-  const backendMissingLabels = (readiness?.missing_basic_fields ?? readiness?.missing_fields ?? []).map(
-    (field) => backendMissingLabelMap[field] ?? field,
-  );
-  const precisionMissingLabels = (readiness?.missing_precision_fields ?? []).map(
-    (field) => backendMissingLabelMap[field] ?? field,
-  ).filter((label) => label !== "당화혈색소");
-
   const load = async () => {
     setError("");
     const [recordResult, readinessResult] = await Promise.allSettled([
@@ -563,6 +570,7 @@ export default function HealthProfilePage() {
     setError("");
     setNotice("");
     setMissingInfoDialog(null);
+    clearFeedback();
     try {
       if (editing) {
         const saved = await save();
@@ -607,11 +615,14 @@ export default function HealthProfilePage() {
         return;
       }
       setRunningMode(mode);
+      showProcessing();
       const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, mode);
       setAnalysisJobId(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      showFailure();
       setRunningMode(null);
+      setAnalysisJobId(null);
     }
   };
 
@@ -702,19 +713,7 @@ export default function HealthProfilePage() {
             </div>
             <div className="state-box">
               정밀 건강 정보 입력 현황 {completedX2Count} / {x2Fields.length}
-              {backendMissingLabels.length > 0 && (
-                <p>간편 분석 필요 항목: {backendMissingLabels.join(", ")}</p>
-              )}
-              {precisionMissingLabels.length > 0 && (
-                <p>기본 정보만으로도 간편 분석이 가능하며, 혈액검사 및 검진 수치를 추가 입력하시면 예측 정확도가 더 높은 '정밀 분석'을 받아보실 수 있습니다.</p>
-              )}
               <p>(※ 선택 입력 항목: 총콜레스테롤, LDL, HDL, 중성지방, 당화혈색소)</p>
-              <p>
-                AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소는 검진표 OCR 확정 시 비어 있는 건강정보에 보충되며 직접 입력도 가능합니다.
-              </p>
-              <p>
-                검진표 값은 기존 건강정보를 자동으로 덮어쓰지 않습니다. 비어 있는 항목만 보충될 수 있으며, 검진표 기반 수치는 분석 상세에서 확인할 수 있습니다.
-              </p>
             </div>
           </div>
         </Card>
@@ -871,6 +870,7 @@ export default function HealthProfilePage() {
           tone={dialog.type.includes("reset") ? "danger" : "default"}
         />
       )}
+      {analysisFeedbackDialog}
     </div>
   );
 }

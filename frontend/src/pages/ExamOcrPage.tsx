@@ -22,26 +22,6 @@ import { isHeicFile } from "../utils/files";
 // 스텝 인디케이터
 type Step = 1 | 2 | 3 | 4;
 
-const precisionMeasurementLabels: Record<string, string> = {
-  ast: "AST",
-  alt: "ALT",
-  gamma_gtp: "감마GTP",
-  ggt: "감마GTP",
-  creatinine: "크레아티닌",
-  egfr: "eGFR",
-  hb: "혈색소",
-  hemoglobin: "혈색소",
-};
-
-function getPrecisionMeasurementLabel(measurement: ExamMeasurement): string | null {
-  const key = String(measurement.measurement_key ?? "").trim().toLowerCase();
-  return precisionMeasurementLabels[key] ?? null;
-}
-
-function isPrecisionMeasurement(measurement: ExamMeasurement): boolean {
-  return getPrecisionMeasurementLabel(measurement) !== null;
-}
-
 function StepIndicator({ current }: { current: Step }) {
   const steps: { label: string; num: Step }[] = [
     { num: 1, label: "파일 업로드 및 인식" },
@@ -101,7 +81,6 @@ export default function ExamOcrPage() {
 
   // 현재 스텝 계산
   const currentStep: Step = isAppliedToHealth ? 4 : measurements.length > 0 ? 3 : selectedFile ? 2 : 1;
-  const precisionMeasurements = measurements.filter(isPrecisionMeasurement);
 
   useEffect(() => {
     return () => {
@@ -505,23 +484,6 @@ export default function ExamOcrPage() {
             ))
           )}
         </div>
-        {precisionMeasurements.length > 0 && (
-          <details className="ocr-precision-summary">
-            <summary>정밀검사 수치 {precisionMeasurements.length}개</summary>
-            <div className="precision-measurement-grid compact">
-              {precisionMeasurements.map((measurement) => (
-                <div className="precision-measurement-item" key={measurement.id}>
-                  <span>{getPrecisionMeasurementLabel(measurement) ?? measurement.measurement_name}</span>
-                  <strong>
-                    {measurement.value ? String(measurement.value) : "-"}
-                    {measurement.unit ? ` ${formatUnit(measurement.unit)}` : ""}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-
         {/* 하단 액션 영역 */}
         <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap", gap: 8 }}>
           {isAppliedToHealth && (

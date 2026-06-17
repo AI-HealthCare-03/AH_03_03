@@ -6,7 +6,6 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import {
-  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
   getExpectedAnalysisTypesByMode,
@@ -70,6 +69,21 @@ const precisionMeasurementItems: PrecisionMeasurementItem[] = [
   { key: "egfr", label: "eGFR", unit: "mL/min/1.73m²" },
   { key: "hemoglobin", label: "혈색소", unit: "g/dL" },
 ];
+
+const COMMON_ANALYSIS_NOTICE =
+  "이 결과는 입력된 건강정보와 검진 수치를 바탕으로 생활관리 방향을 안내하는 참고 자료입니다. 정확한 진단과 치료는 의료진 상담을 통해 확인해 주세요.";
+
+function cleanAnalysisText(value: unknown, fallback = ""): string {
+  const cleaned = String(value ?? "")
+    .replace(/이 결과는\s*(간편|정밀)?\s*분석 참고용 판정이며 의료 진단이 아닙니다\.?/g, "")
+    .replace(/이 설명은 진단이 아니며[^.。]*[.。]?/g, "")
+    .replace(/정확한 진단과 치료는 의료진 상담이 필요합니다\.?/g, "")
+    .replace(/참고 정보:\s*/g, "")
+    .replace(/출처:\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || fallback;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -258,7 +272,6 @@ export default function AnalysisHistoryPage() {
   if (analysisId) {
     const result = detail?.result;
     const detailRiskClassName = getRiskClassName(result);
-    const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
     const x2StageSummary = getX2StageSummary(result);
     const relatedResults = getRelatedAnalysisRunResults(result, results);
     const detailSlots = result
@@ -281,20 +294,58 @@ export default function AnalysisHistoryPage() {
             <strong>{getDisplayRiskLabel(result)}</strong>
             <div className="button-row">
               <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
             </div>
-            <p>{String(result?.summary ?? "")}</p>
+            <p>{cleanAnalysisText(result?.summary)}</p>
             {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
+          <div className="state-box analysis-common-notice">{COMMON_ANALYSIS_NOTICE}</div>
           {detail?.explanation && (
             <div style={{ marginTop: 16 }}>
               <h3 style={{ marginBottom: 8, marginTop: 16 }}>분석 설명</h3>
               <div className="mini-card">
-                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
-                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
-                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
-                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
-                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
+                <strong>현재 상태 요약</strong>
+                <p>{cleanAnalysisText(detail.explanation.summary, cleanAnalysisText(result?.summary, "현재 입력된 건강정보를 기준으로 관리 필요도를 확인했습니다."))}</p>
+                {detail.factors && detail.factors.length > 0 && (
+                  <>
+                    <strong>주요 확인 항목</strong>
+                    <div className="chip-list">
+                      {detail.factors.slice(0, 4).map((factor) => (
+                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_name)}>
+                          {String(factor.factor_name ?? factor.factor_key ?? "확인 항목")}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {detail.explanation.recommended_action && (
+                  <>
+                    <strong>생활관리 제안</strong>
+                    <p>{cleanAnalysisText(detail.explanation.recommended_action)}</p>
+                  </>
+                )}
+                {detail.explanation.caution && (
+                  <>
+                    <strong>의료진 상담 권고</strong>
+                    <p className="muted">{cleanAnalysisText(detail.explanation.caution)}</p>
+                  </>
+                )}
+                {(detail.explanation.reference_summary || referenceSources.length > 0) && (
+                  <details className="analysis-reference-details">
+                    <summary>참고한 자료 보기</summary>
+                    {detail.explanation.reference_summary && (
+                      <p className="muted">{cleanAnalysisText(detail.explanation.reference_summary)}</p>
+                    )}
+                    {referenceSources.length > 0 && (
+                      <div className="chip-list">
+                        {referenceSources.map((source) => (
+                          <span className="badge badge-reference" key={String(source.id ?? source.title)}>
+                            {String(source.source_org ?? source.title ?? "참고 출처")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+                )}
               </div>
             </div>
           )}
@@ -355,7 +406,6 @@ export default function AnalysisHistoryPage() {
                   );
                 }
                 const slotRiskClassName = getRiskClassName(slot.result);
-                const slotSourceBadgeLabel = getAnalysisSourceBadgeLabel(slot.result);
                 const slotX2StageSummary = getX2StageSummary(slot.result);
                 return (
                   <Link to={`/analysis/${String(slot.result.id)}`} style={{ textDecoration: "none" }}>
@@ -364,7 +414,6 @@ export default function AnalysisHistoryPage() {
                       <div className="button-row">
                         <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
                         <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                        {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
                       </div>
                     </div>
                   </Link>
@@ -415,7 +464,6 @@ export default function AnalysisHistoryPage() {
 
       <div className="table-list" style={{ marginTop: 16 }}>
         {pagedResults.map((result) => {
-          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
               <div>
@@ -431,7 +479,6 @@ export default function AnalysisHistoryPage() {
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span className="muted" style={{ fontSize: 13 }}>{formatDate(result.analyzed_at ?? result.created_at)}</span>
                   <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
                 </div>
               </div>
             </>

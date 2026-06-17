@@ -2627,6 +2627,160 @@ a:hover .mini-card {
   font-weight: 800;
 }
 
+.health-record-history-note {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.health-record-history-wrap {
+  overflow-x: auto;
+}
+
+.health-record-history-table {
+  border-collapse: separate;
+  border-spacing: 0 10px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.health-record-history-table th {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 14px 2px;
+  text-align: left;
+}
+
+.health-record-history-table th:nth-child(1) {
+  width: 24%;
+}
+
+.health-record-history-table th:nth-child(2) {
+  width: 14%;
+}
+
+.health-record-history-table th:nth-child(3) {
+  width: 16%;
+}
+
+.health-record-history-table th:nth-child(4) {
+  width: auto;
+}
+
+.health-record-history-table th:nth-child(5) {
+  text-align: right;
+  width: 110px;
+}
+
+.health-record-history-table td {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+  padding: 16px 14px;
+  vertical-align: middle;
+}
+
+.health-record-history-table td:first-child {
+  border-left: 1px solid var(--color-border);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.health-record-history-table td:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-right: 1px solid var(--color-border);
+  text-align: right;
+}
+
+.health-record-history-table tbody tr {
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.health-record-history-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+}
+
+.history-date-primary {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.history-date-secondary {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.health-source-badge {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 999px;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.history-change-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.history-change-chip {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  border-radius: 999px;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.history-change-chip.initial,
+.history-change-chip.none,
+.history-change-chip.more {
+  background: var(--color-muted-surface);
+  border-color: var(--color-border);
+  color: var(--color-muted);
+}
+
+.health-history-detail-button {
+  border-radius: 999px;
+  font-size: 13px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.analysis-common-notice {
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.analysis-reference-details {
+  border-top: 1px solid var(--color-border);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.analysis-reference-details summary {
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .form {
   display: grid;
   gap: 14px;
@@ -4114,8 +4268,12 @@ input:-webkit-autofill:focus {
 
 .ocr-result-table {
   display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ocr-result-table > .state-box {
+  grid-column: 1 / -1;
 }
 
 .ocr-result-row {
@@ -4123,8 +4281,8 @@ input:-webkit-autofill:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   display: grid;
-  gap: 12px;
-  grid-template-columns: 220px minmax(0, 1fr) 100px;
+  gap: 10px;
+  grid-template-columns: minmax(92px, 0.9fr) minmax(88px, 1fr) minmax(48px, max-content);
   min-width: 0;
   padding: 12px;
 }
@@ -4135,6 +4293,20 @@ input:-webkit-autofill:focus {
   flex-wrap: wrap;
   gap: 8px;
   font-weight: 800;
+  min-width: 0;
+}
+
+.ocr-result-row input {
+  min-width: 0;
+  width: 100%;
+}
+
+.ocr-result-row strong {
+  justify-self: end;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  white-space: normal;
 }
 
 .ocr-medication-card {
@@ -4342,11 +4514,6 @@ input:-webkit-autofill:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.precision-measurement-grid.compact {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin-top: 10px;
-}
-
 .precision-measurement-item {
   background: var(--color-muted-surface);
   border: 1px solid var(--color-border);
@@ -4374,19 +4541,6 @@ input:-webkit-autofill:focus {
 .precision-measurement-item strong {
   color: var(--color-text);
   font-size: 14px;
-}
-
-.ocr-precision-summary {
-  border-top: 1px solid var(--color-border);
-  color: var(--color-muted);
-  margin-top: 12px;
-  padding-top: 10px;
-}
-
-.ocr-precision-summary summary {
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .readonly-calculated-field {
@@ -4891,7 +5045,6 @@ input:-webkit-autofill:focus {
   .manual-food-row,
   .nutrition-input-grid,
   .precision-measurement-grid,
-  .precision-measurement-grid.compact,
   .metric-grid {
     grid-template-columns: 1fr;
   }
@@ -4943,6 +5096,7 @@ input:-webkit-autofill:focus {
 
   .analysis-history-row,
   .ocr-medication-card,
+  .ocr-result-table,
   .ocr-result-row,
   .table-row {
     grid-template-columns: 1fr;
@@ -4954,6 +5108,57 @@ input:-webkit-autofill:focus {
 
   .ocr-result-row strong {
     justify-self: start;
+  }
+
+  .health-record-history-wrap {
+    overflow-x: visible;
+  }
+
+  .health-record-history-table,
+  .health-record-history-table tbody,
+  .health-record-history-table tr,
+  .health-record-history-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .health-record-history-table {
+    border-spacing: 0;
+  }
+
+  .health-record-history-table thead {
+    display: none;
+  }
+
+  .health-record-history-table tr {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+
+  .health-record-history-table td,
+  .health-record-history-table td:first-child,
+  .health-record-history-table td:last-child {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 7px 0;
+    text-align: left;
+  }
+
+  .health-record-history-table td::before {
+    color: var(--color-muted);
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 900;
+    margin-bottom: 3px;
+  }
+
+  .health-record-history-table td:last-child {
+    padding-top: 10px;
   }
 
   .quick-action-section {

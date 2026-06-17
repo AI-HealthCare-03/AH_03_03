@@ -187,7 +187,7 @@ const sections: Array<{
   },
   {
     title: "간·신장·혈액 검사",
-    description: "검진표 OCR로 불러온 정밀검사 값은 비어 있는 항목에 보충되며, 직접 확인하거나 수정할 수 있습니다.",
+    description: "선택 입력 항목입니다. 검진표 OCR 값이 있으면 확인 후 수정할 수 있습니다.",
     fields: [
       { key: "ast", label: "AST", type: "number", placeholder: "U/L" },
       { key: "alt", label: "ALT", type: "number", placeholder: "U/L" },
