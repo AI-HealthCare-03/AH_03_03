@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import {
   completeToday,
@@ -483,6 +483,7 @@ function buildExpectedEffects(challenge: Challenge | null): string[] {
 
 export default function ChallengeDetailPage() {
   const { challengeId } = useParams();
+  const location = useLocation();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [userChallenge, setUserChallenge] = useState<Challenge | null>(null);
   const [hasRejoinableChallenge, setHasRejoinableChallenge] = useState(false);
@@ -623,13 +624,14 @@ export default function ChallengeDetailPage() {
   const expectedDoneLabel = formatDateLabel(userChallenge?.end_date ?? userChallenge?.expected_done_date ?? userChallenge?.expected_done_at);
   const challengeTitle = String(challenge?.title ?? "챌린지");
   const challengeImageSrc = challengeImageMap[challengeTitle] ?? getChallengeImagePath(challengeTitle);
+  const listLink = { pathname: "/challenges", search: location.search };
 
   return (
     <div className="page-stack">
       <Card
         title="챌린지 상세"
         actions={
-          <Link className="button secondary" to="/challenges">
+          <Link className="button secondary" to={listLink}>
             목록
           </Link>
         }

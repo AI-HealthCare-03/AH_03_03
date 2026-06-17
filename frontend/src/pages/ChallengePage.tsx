@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import {
   completeToday,
@@ -19,6 +19,8 @@ type ChallengeLog = Record<string, unknown>;
 
 const PAGE_SIZE = 4;
 
+const challengeTabs = ["전체", "식단", "운동", "수면", "복약", "수분섭취", "혈압", "혈당", "생활습관"];
+
 const tabToCategory: Record<string, string | null> = {
   전체: null,
   식단: "DIET",
@@ -30,6 +32,14 @@ const tabToCategory: Record<string, string | null> = {
   혈당: "BLOOD_GLUCOSE",
   생활습관: "HABIT",
 };
+
+const categoryToTab: Record<string, string> = Object.fromEntries(
+  Object.entries(tabToCategory)
+    .filter(([, category]) => Boolean(category))
+    .map(([tab, category]) => [String(category), tab]),
+);
+
+const difficultyQueryValues = new Set(["EASY", "NORMAL", "HARD"]);
 
 export const categoryIcon: Record<string, ReactNode> = {
   DIET: <Salad size={20} />,
@@ -417,18 +427,60 @@ function isActiveChallengeStatus(item: Challenge | undefined): boolean {
   return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status));
 }
 
+function getTabFromQuery(value: string | null): string {
+  const category = String(value ?? "").toUpperCase();
+  if (category === "WEIGHT") {
+    return "생활습관";
+  }
+  return categoryToTab[category] ?? "전체";
+}
+
+function getDifficultyFromQuery(value: string | null): string {
+  const difficulty = String(value ?? "").toUpperCase();
+  if (difficulty === "MEDIUM") {
+    return "NORMAL";
+  }
+  return difficultyQueryValues.has(difficulty) ? difficulty : "전체";
+}
+
+function getPageFromQuery(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export default function ChallengePage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [myChallenges, setMyChallenges] = useState<Challenge[]>([]);
   const [logsByUserChallengeId, setLogsByUserChallengeId] = useState<Record<number, ChallengeLog[]>>({});
-  const [activeTab, setActiveTab] = useState("전체");
-  const [activeDifficulty, setActiveDifficulty] = useState("전체");
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const activeTab = getTabFromQuery(searchParams.get("category"));
+  const activeDifficulty = getDifficultyFromQuery(searchParams.get("difficulty"));
+  const page = getPageFromQuery(searchParams.get("page"));
+  const listSearch = searchParams.toString();
+  const detailSearch = listSearch ? `?${listSearch}` : "";
+
+  const updateListQuery = (next: { tab?: string; difficulty?: string; page?: number }) => {
+    const nextTab = next.tab ?? activeTab;
+    const nextDifficulty = next.difficulty ?? activeDifficulty;
+    const nextPage = next.page ?? page;
+    const nextParams = new URLSearchParams();
+    const category = tabToCategory[nextTab];
+    if (category) {
+      nextParams.set("category", category);
+    }
+    if (nextDifficulty !== "전체") {
+      nextParams.set("difficulty", nextDifficulty);
+    }
+    if (nextPage > 1) {
+      nextParams.set("page", String(nextPage));
+    }
+    setSearchParams(nextParams);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -519,11 +571,8 @@ export default function ChallengePage() {
   }, [myChallenges]);
 
   const pageCount = Math.max(1, Math.ceil(filteredChallenges.length / PAGE_SIZE));
-  const pagedChallenges = filteredChallenges.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab]);
+  const currentPage = Math.min(page, pageCount);
+  const pagedChallenges = filteredChallenges.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const activeMyChallenges = myChallenges.filter(isActiveChallengeStatus);
   const todayDoneCount = activeMyChallenges.filter((item) => getTodayCompletedCount(item) >= getDailyGoalCount(item, challenges)).length;
@@ -652,13 +701,12 @@ export default function ChallengePage() {
         </div>
       </div>
       <div className="filter-tabs">
-        {["전체", "식단", "운동", "수면", "복약", "수분섭취", "혈압", "혈당", "생활습관"].map((tab) => (
+        {challengeTabs.map((tab) => (
           <button
             className={activeTab === tab ? "filter-tab active" : "filter-tab"}
             key={tab}
             onClick={() => {
-              setActiveTab(tab);
-              setPage(1);
+              updateListQuery({ tab, page: 1 });
             }}
           >
             {tab}
@@ -675,8 +723,7 @@ export default function ChallengePage() {
               <select
                 value={activeDifficulty}
                 onChange={(e) => {
-                  setActiveDifficulty(e.target.value);
-                  setPage(1);
+                  updateListQuery({ difficulty: e.target.value, page: 1 });
                 }}
                 style={{ padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--color-border)", background: "var(--color-surface)", cursor: "pointer", fontSize: "14px", width: "fit-content" }}
               >
@@ -740,7 +787,7 @@ export default function ChallengePage() {
                       </p>
                     )}
                     <div className="challenge-card-actions">
-                      <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
+                      <Link className="button secondary" to={{ pathname: `/challenges/${String(challenge.id)}`, search: detailSearch }}>
                         상세
                       </Link>
                       {activeJoined && joinedChallenge ? (
@@ -766,13 +813,27 @@ export default function ChallengePage() {
               })}
             </div>
             <div className="pagination-row">
-              <button className="secondary compact-button" disabled={page <= 1} onClick={() => { setPage((prev) => Math.max(1, prev - 1)); window.scrollTo(0, 0); }}>
+              <button
+                className="secondary compact-button"
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  updateListQuery({ page: Math.max(1, currentPage - 1) });
+                  window.scrollTo(0, 0);
+                }}
+              >
                 이전
               </button>
               <span>
-                {page} / {pageCount}
+                {currentPage} / {pageCount}
               </span>
-              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => { setPage((prev) => Math.min(pageCount, prev + 1)); window.scrollTo(0, 0); }}>
+              <button
+                className="secondary compact-button"
+                disabled={currentPage >= pageCount}
+                onClick={() => {
+                  updateListQuery({ page: Math.min(pageCount, currentPage + 1) });
+                  window.scrollTo(0, 0);
+                }}
+              >
                 다음
               </button>
             </div>
