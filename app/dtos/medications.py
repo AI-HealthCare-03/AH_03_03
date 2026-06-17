@@ -12,6 +12,8 @@ def _normalize_optional_text(value: object) -> object:
 
 
 def _normalize_optional_time(value: object) -> object:
+    if isinstance(value, time):
+        return value.replace(tzinfo=None)
     if isinstance(value, str):
         text = value.strip()
         if not text:

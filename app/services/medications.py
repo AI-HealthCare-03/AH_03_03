@@ -1,3 +1,5 @@
+from datetime import time
+
 from fastapi import HTTPException
 from starlette import status
 
@@ -15,8 +17,15 @@ MEDICATION_RECORD_NOT_FOUND_MESSAGE = "복약 기록을 찾을 수 없습니다.
 MEDICATION_RECORD_ACCESS_DENIED_MESSAGE = "복약 기록에 접근할 수 없습니다."
 
 
+def _medication_payload(data: dict) -> dict:
+    reminder_time = data.get("reminder_time")
+    if isinstance(reminder_time, time):
+        data["reminder_time"] = reminder_time.replace(tzinfo=None)
+    return data
+
+
 async def create_medication(user_id: int, request: MedicationCreateRequest) -> Medication:
-    return await medication_repository.create_medication(user_id, request.model_dump())
+    return await medication_repository.create_medication(user_id, _medication_payload(request.model_dump()))
 
 
 async def get_medication(medication_id: int) -> Medication | None:
@@ -40,7 +49,10 @@ async def list_medications(
 
 
 async def update_medication(medication_id: int, request: MedicationUpdateRequest) -> Medication | None:
-    return await medication_repository.update_medication(medication_id, request.model_dump(exclude_unset=True))
+    return await medication_repository.update_medication(
+        medication_id,
+        _medication_payload(request.model_dump(exclude_unset=True)),
+    )
 
 
 async def deactivate_medication(medication_id: int) -> Medication | None:
