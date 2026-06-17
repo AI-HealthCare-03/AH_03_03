@@ -47,6 +47,7 @@ export function useAnalysisFeedbackDialog() {
   const showSuccess = useCallback((options: AnalysisFeedbackOptions = {}) => {
     showFeedback("success", {
       message: options.message ?? DEFAULT_SUCCESS_MESSAGE,
+      onConfirm: options.onConfirm,
       title: options.title ?? "분석 완료되었습니다.",
     });
   }, [showFeedback]);
@@ -54,6 +55,7 @@ export function useAnalysisFeedbackDialog() {
   const showFailure = useCallback((options: AnalysisFeedbackOptions = {}) => {
     showFeedback("error", {
       message: options.message ?? DEFAULT_FAILURE_MESSAGE,
+      onConfirm: options.onConfirm,
       title: options.title ?? "분석에 실패했습니다.",
     });
   }, [showFeedback]);
