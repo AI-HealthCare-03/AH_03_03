@@ -1,17 +1,29 @@
-import { FormEvent, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { confirmPasswordReset } from "../api/auth";
 import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
 export default function PasswordResetConfirmPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const token = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
+  const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get("token") ?? "";
+    if (!tokenFromUrl) {
+      return;
+    }
+
+    setToken(tokenFromUrl);
+    navigate({ pathname: location.pathname, hash: location.hash }, { replace: true });
+  }, [location.hash, location.pathname, navigate, searchParams]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
