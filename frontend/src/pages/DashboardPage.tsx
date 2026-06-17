@@ -173,14 +173,16 @@ function isNewerRiskTrendPoint(
 }
 
 const periodOptions = [
+  { label: "오늘", value: "today" },
   { label: "1주일", value: "week" },
   { label: "1개월", value: "month" },
   { label: "3개월", value: "quarter" },
-  { label: "6개월", value: "year" },
+  { label: "1년", value: "year" },
   { label: "전체", value: "all" },
 ];
 
 const periodDays: Record<string, number | null> = {
+  today: 1,
   week: 7,
   month: 30,
   quarter: 90,
@@ -354,6 +356,9 @@ function formatPeriodRangeDate(value: unknown): string {
 }
 
 function getPeriodLabel(value: string): string {
+  if (value === "today") {
+    return "오늘";
+  }
   return `최근 ${periodOptions.find((period) => period.value === value)?.label ?? "기간"}`;
 }
 
@@ -384,6 +389,12 @@ function getPeriodAxisLabels(
     return {
       axisEndLabel: formatAxisDate(end),
       periodLabel: "전체 기간",
+    };
+  }
+  if (period === "today" || start.toDateString() === end.toDateString()) {
+    return {
+      axisMiddleLabel: period === "today" ? "오늘" : formatAxisDate(end),
+      periodLabel: period === "today" ? `오늘 · ${formatPeriodRangeDate(end)}` : formatPeriodRangeDate(end),
     };
   }
   const middle = new Date((start.getTime() + end.getTime()) / 2);
@@ -490,6 +501,7 @@ function LineChart({
   const yFor = (value: number) => padding.top + (1 - (value - min) / Math.max(max - min, 1)) * innerHeight;
   const gridValues = axisTicks?.length ? axisTicks.map((tick) => tick.value) : [max, (max + min) / 2, min];
   const axisLabelFor = (value: number) => axisTicks?.find((tick) => tick.value === value)?.label ?? String(Math.round(value));
+  const useSingleXAxisLabel = Boolean(axisMiddleLabel) && !axisStartLabel && !axisEndLabel;
 
   return (
     <div className="line-chart-card">
@@ -515,17 +527,25 @@ function LineChart({
           })}
           {uniqueDates.length > 0 && (
             <>
-              <text className="line-chart-axis" x={padding.left} y={height - 8}>
-                {axisStartLabel ?? axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
-              </text>
-              {axisMiddleLabel ? (
+              {useSingleXAxisLabel ? (
                 <text className="line-chart-axis" textAnchor="middle" x={padding.left + innerWidth / 2} y={height - 8}>
                   {axisMiddleLabel}
                 </text>
-              ) : null}
-              <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
-                {axisEndLabel ?? axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
-              </text>
+              ) : (
+                <>
+                  <text className="line-chart-axis" x={padding.left} y={height - 8}>
+                    {axisStartLabel ?? axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
+                  </text>
+                  {axisMiddleLabel ? (
+                    <text className="line-chart-axis" textAnchor="middle" x={padding.left + innerWidth / 2} y={height - 8}>
+                      {axisMiddleLabel}
+                    </text>
+                  ) : null}
+                  <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
+                    {axisEndLabel ?? axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
+                  </text>
+                </>
+              )}
             </>
           )}
           {visibleSeries.map((item) => {

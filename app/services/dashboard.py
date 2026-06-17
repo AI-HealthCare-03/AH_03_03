@@ -13,6 +13,7 @@ from app.services import medications as medication_service
 from app.services import notifications as notification_service
 
 TREND_PERIOD_DAYS: dict[str, int | None] = {
+    "today": 1,
     "week": 7,
     "month": 30,
     "quarter": 90,

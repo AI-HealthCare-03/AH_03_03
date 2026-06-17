@@ -139,6 +139,23 @@ async def test_dashboard_health_trends_are_oldest_first_with_same_day_records(mo
     assert all(point["created_at"] for point in result["glucose"])
 
 
+def test_dashboard_today_period_uses_current_day(monkeypatch) -> None:
+    today = datetime(2026, 6, 18, tzinfo=UTC)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return today.astimezone(tz) if tz is not None else today.replace(tzinfo=None)
+
+    monkeypatch.setattr(dashboard_service, "datetime", FixedDateTime)
+
+    normalized_period, date_from, date_to = dashboard_service.normalize_period("today")
+
+    assert normalized_period == "today"
+    assert date_from == today.date()
+    assert date_to == today.date()
+
+
 @pytest.mark.asyncio
 async def test_dashboard_summary_includes_x2_source_detail_fields(monkeypatch) -> None:
     now = datetime.now(UTC)
