@@ -631,6 +631,9 @@ export default function HealthRecordPage() {
                   AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소 같은 확장 정밀검사 수치는 검진표 OCR 결과와 분석 상세에서 확인할 수 있습니다.
                 </p>
               )}
+              <p style={{ margin: "2px 0 0" }}>
+                검진표 값은 기존 건강정보를 자동으로 덮어쓰지 않으며, 비어 있는 항목만 보충될 수 있습니다.
+              </p>
             </div>
             {activeStep === 1 && (
               <Link className="button secondary" style={{ whiteSpace: "nowrap" }} to="/ocr/exam">

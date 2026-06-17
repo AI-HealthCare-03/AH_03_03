@@ -639,6 +639,9 @@ export default function HealthProfilePage() {
               <p>
                 AST, ALT, 감마GTP, 크레아티닌, eGFR, 혈색소는 검진표 OCR 결과와 분석 상세의 “분석에 사용된 검진 수치”에서 확인할 수 있습니다.
               </p>
+              <p>
+                검진표 값은 기존 건강정보를 자동으로 덮어쓰지 않습니다. 비어 있는 항목만 보충될 수 있으며, 검진표 기반 수치는 분석 상세에서 확인할 수 있습니다.
+              </p>
             </div>
           </div>
         </Card>
