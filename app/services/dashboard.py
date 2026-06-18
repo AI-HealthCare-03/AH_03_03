@@ -200,8 +200,7 @@ async def get_dashboard_medications(user_id: int) -> dict[str, Any]:
     recent_medication_records = await medication_service.list_medication_records(user_id=user_id, limit=10)
     return {
         "active_medications": [
-            MedicationResponse.model_validate(medication).model_dump(mode="json")
-            for medication in active_medications
+            MedicationResponse.model_validate(medication).model_dump(mode="json") for medication in active_medications
         ],
         "recent_medication_records": [
             MedicationRecordResponse.model_validate(record).model_dump(mode="json")

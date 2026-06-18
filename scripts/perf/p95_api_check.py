@@ -195,8 +195,7 @@ def summarize_results(endpoint: Endpoint, results: list[RequestResult]) -> dict[
 def print_summary(summaries: list[dict[str, Any]]) -> None:
     print("\n================ SUMMARY ================")
     print(
-        f"{'endpoint':<30} {'ok':>9} {'err':>6} {'avg':>10} {'p50':>10} "
-        f"{'p95':>10} {'p99':>10} {'min':>10} {'max':>10}"
+        f"{'endpoint':<30} {'ok':>9} {'err':>6} {'avg':>10} {'p50':>10} {'p95':>10} {'p99':>10} {'min':>10} {'max':>10}"
     )
     for summary in summaries:
         ok_text = f"{summary['success_count']}/{summary['count']}"

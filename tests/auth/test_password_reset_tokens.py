@@ -104,7 +104,9 @@ async def test_password_reset_reissue_invalidates_previous_token(monkeypatch) ->
             PasswordResetConfirmRequest(token=first_token, new_password="NewPassword123!")
         )
 
-    await service.confirm_password_reset(PasswordResetConfirmRequest(token=second_token, new_password="NewPassword123!"))
+    await service.confirm_password_reset(
+        PasswordResetConfirmRequest(token=second_token, new_password="NewPassword123!")
+    )
 
     assert repository.updated_passwords
 
