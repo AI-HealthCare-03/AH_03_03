@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from types import SimpleNamespace
 from typing import Any
 
@@ -245,9 +245,13 @@ async def test_settings_update_syncs_automatic_reminder_schedules(monkeypatch) -
     async def fake_update_user_setting(user_id: int, data: dict[str, Any]):
         return SimpleNamespace(user_id=user_id, **data)
 
+    async def fake_get_user_setting_by_user(user_id: int):
+        return SimpleNamespace(user_id=user_id)
+
     async def fake_sync_all_user_reminder_schedules(user_id: int) -> None:
         synced_user_ids.append(user_id)
 
+    monkeypatch.setattr(setting_service.setting_repository, "get_user_setting_by_user", fake_get_user_setting_by_user)
     monkeypatch.setattr(setting_service.setting_repository, "update_user_setting", fake_update_user_setting)
     monkeypatch.setattr(
         notification_service,
@@ -260,4 +264,57 @@ async def test_settings_update_syncs_automatic_reminder_schedules(monkeypatch) -
     updated = await setting_service.update_user_settings(7, UserSettingUpdateRequest(medication_reminder_enabled=False))
 
     assert updated is not None
+    assert synced_user_ids == [7]
+
+
+@pytest.mark.asyncio
+async def test_settings_update_creates_missing_row_and_normalizes_time(monkeypatch) -> None:
+    created_payloads: list[tuple[int, dict[str, Any]]] = []
+    updated_payloads: list[tuple[int, dict[str, Any]]] = []
+    synced_user_ids: list[int] = []
+
+    async def fake_get_user_setting_by_user(user_id: int):
+        return None
+
+    async def fake_create_user_setting(user_id: int, data: dict[str, Any]):
+        created_payloads.append((user_id, data))
+        return SimpleNamespace(user_id=user_id, **data)
+
+    async def fake_update_user_setting(user_id: int, data: dict[str, Any]):
+        updated_payloads.append((user_id, data))
+        return SimpleNamespace(user_id=user_id, **data)
+
+    async def fake_sync_all_user_reminder_schedules(user_id: int) -> None:
+        synced_user_ids.append(user_id)
+
+    monkeypatch.setattr(setting_service.setting_repository, "get_user_setting_by_user", fake_get_user_setting_by_user)
+    monkeypatch.setattr(setting_service.setting_repository, "create_user_setting", fake_create_user_setting)
+    monkeypatch.setattr(setting_service.setting_repository, "update_user_setting", fake_update_user_setting)
+    monkeypatch.setattr(
+        notification_service,
+        "sync_all_user_reminder_schedules",
+        fake_sync_all_user_reminder_schedules,
+    )
+
+    from app.dtos.settings import UserSettingUpdateRequest
+
+    updated = await setting_service.update_user_settings(
+        7,
+        UserSettingUpdateRequest(
+            challenge_reminder_time=time(21, 30, tzinfo=UTC),
+            diet_reminder_time=time(20, 0, tzinfo=UTC),
+        ),
+    )
+
+    assert updated is not None
+    assert created_payloads
+    assert updated_payloads == [
+        (
+            7,
+            {
+                "challenge_reminder_time": time(21, 30),
+                "diet_reminder_time": time(20, 0),
+            },
+        )
+    ]
     assert synced_user_ids == [7]
