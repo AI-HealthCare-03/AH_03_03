@@ -33,6 +33,18 @@ type HealthRecord = Record<string, unknown>;
 type TrendItem = Record<string, unknown>;
 type AnyRecord = Record<string, unknown>;
 
+type DashboardTrendsData = {
+  period?: string;
+  date_from?: string | null;
+  date_to?: string | null;
+  glucose?: TrendItem[];
+  blood_pressure?: TrendItem[];
+  weight?: TrendItem[];
+  bmi?: TrendItem[];
+  challenge_completion_rate?: TrendItem[];
+  diet_score?: TrendItem[];
+};
+
 type ChartPoint = {
   date: string;
   label: string;
@@ -48,6 +60,44 @@ type ChartSeries = {
   color: string;
   points: ChartPoint[];
 };
+
+function getDietFoodName(food: AnyRecord): string {
+  return String(
+    food.matched_food_name ??
+      food.display_name ??
+      food.name ??
+      food.food_name ??
+      food.original_name ??
+      food.raw_food_name ??
+      food.vision_food_name ??
+      "",
+  ).trim();
+}
+
+function summarizeDietFoods(value: unknown): string {
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  const names = value
+    .map((item) => (item && typeof item === "object" ? getDietFoodName(item as AnyRecord) : ""))
+    .filter(Boolean);
+  if (names.length === 0) {
+    return "";
+  }
+  return names.length === 1 ? names[0] : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` 외 ${names.length - 2}개` : ""}`;
+}
+
+function getDietDisplayTitle(record: AnyRecord | undefined): string {
+  if (!record) {
+    return "";
+  }
+  const foodSummary = summarizeDietFoods(record.detected_foods);
+  if (foodSummary) {
+    return foodSummary;
+  }
+  const description = String(record.description ?? record.meal_name ?? "").trim();
+  return description && description !== "사진으로 선택한 식단" ? description : "분석한 식단";
+}
 
 type ChartAxisTick = {
   value: number;
@@ -123,12 +173,23 @@ function isNewerRiskTrendPoint(
 }
 
 const periodOptions = [
+  { label: "오늘", value: "today" },
   { label: "1주일", value: "week" },
   { label: "1개월", value: "month" },
   { label: "3개월", value: "quarter" },
-  { label: "6개월", value: "year" },
+  { label: "1년", value: "year" },
   { label: "전체", value: "all" },
 ];
+
+const periodDays: Record<string, number | null> = {
+  today: 1,
+  week: 7,
+  month: 30,
+  quarter: 90,
+  three_months: 90,
+  year: 365,
+  all: null,
+};
 
 function averageValue(items: Record<string, unknown>[] | undefined): string {
   const values = (items ?? []).map((item) => Number(item.value)).filter((value) => Number.isFinite(value));
@@ -230,6 +291,31 @@ function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
   };
 }
 
+function makeDietRecordCountSeries(records: AnyRecord[]): ChartSeries {
+  const grouped = new Map<string, number>();
+  records.forEach((record) => {
+    const rawDate = String(record.meal_time ?? record.created_at ?? "");
+    if (!rawDate) return;
+    const date = rawDate.slice(0, 10);
+    if (!date) return;
+    grouped.set(date, (grouped.get(date) ?? 0) + 1);
+  });
+  const points = Array.from(grouped.entries())
+    .map(([date, count]) => ({
+      date,
+      label: formatDate(date),
+      value: count,
+      displayValue: `${count}건`,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return {
+    key: "식단 기록",
+    label: "식단 기록",
+    color: "var(--chart-diabetes)",
+    points: points.length >= 2 ? points : [],
+  };
+}
+
 function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
   return items
     .map((item) => {
@@ -280,6 +366,71 @@ function formatDateTime(value: unknown): string {
   return `${mo}.${day} ${hour}:${minute}`;
 }
 
+function formatAxisDate(value: unknown): string {
+  if (!value) return "-";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return formatDate(value);
+  return `${d.getMonth() + 1}.${d.getDate()}`;
+}
+
+function formatPeriodRangeDate(value: unknown): string {
+  if (!value) return "-";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return formatDate(value);
+  return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
+}
+
+function getPeriodLabel(value: string): string {
+  if (value === "today") {
+    return "오늘";
+  }
+  return `최근 ${periodOptions.find((period) => period.value === value)?.label ?? "기간"}`;
+}
+
+function getFallbackPeriodRange(period: string): { start: Date | null; end: Date } {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const days = periodDays[period];
+  if (!days) {
+    return { start: null, end };
+  }
+  const start = new Date(end);
+  start.setDate(start.getDate() - days + 1);
+  return { start, end };
+}
+
+function getPeriodAxisLabels(
+  period: string,
+  dateFrom?: string | null,
+  dateTo?: string | null,
+): { axisStartLabel?: string; axisMiddleLabel?: string; axisEndLabel?: string; periodLabel: string } {
+  if (period === "all" && !dateFrom) {
+    return { periodLabel: "전체 기간" };
+  }
+  const fallback = getFallbackPeriodRange(period);
+  const start = dateFrom ? new Date(dateFrom) : fallback.start;
+  const end = dateTo ? new Date(dateTo) : fallback.end;
+  if (start === null) {
+    return {
+      axisEndLabel: formatAxisDate(end),
+      periodLabel: "전체 기간",
+    };
+  }
+  if (period === "today" || start.toDateString() === end.toDateString()) {
+    return {
+      axisMiddleLabel: period === "today" ? "오늘" : formatAxisDate(end),
+      periodLabel: period === "today" ? `오늘 · ${formatPeriodRangeDate(end)}` : formatPeriodRangeDate(end),
+    };
+  }
+  const middle = new Date((start.getTime() + end.getTime()) / 2);
+  return {
+    axisStartLabel: formatAxisDate(start),
+    axisMiddleLabel: formatAxisDate(middle),
+    axisEndLabel: formatAxisDate(end),
+    periodLabel: `${formatPeriodRangeDate(start)} ~ ${formatPeriodRangeDate(end)}`,
+  };
+}
+
 function EmptyChartState() {
   return (
     <div className="empty-state chart-empty-state">
@@ -297,7 +448,23 @@ function EmptyChartState() {
   );
 }
 
-function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?: ChartAxisTick[]; series: ChartSeries[]; clampTo100?: boolean; connectPairs?: boolean }) {
+function LineChart({
+  axisEndLabel,
+  axisMiddleLabel,
+  axisStartLabel,
+  axisTicks,
+  series,
+  clampTo100,
+  connectPairs,
+}: {
+  axisEndLabel?: string;
+  axisMiddleLabel?: string;
+  axisStartLabel?: string;
+  axisTicks?: ChartAxisTick[];
+  series: ChartSeries[];
+  clampTo100?: boolean;
+  connectPairs?: boolean;
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(640);
 
@@ -359,6 +526,7 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
   const yFor = (value: number) => padding.top + (1 - (value - min) / Math.max(max - min, 1)) * innerHeight;
   const gridValues = axisTicks?.length ? axisTicks.map((tick) => tick.value) : [max, (max + min) / 2, min];
   const axisLabelFor = (value: number) => axisTicks?.find((tick) => tick.value === value)?.label ?? String(Math.round(value));
+  const useSingleXAxisLabel = Boolean(axisMiddleLabel) && !axisStartLabel && !axisEndLabel;
 
   return (
     <div className="line-chart-card">
@@ -384,12 +552,25 @@ function LineChart({ axisTicks, series, clampTo100, connectPairs }: { axisTicks?
           })}
           {uniqueDates.length > 0 && (
             <>
-              <text className="line-chart-axis" x={padding.left} y={height - 8}>
-                {axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
-              </text>
-              <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
-                {axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
-              </text>
+              {useSingleXAxisLabel ? (
+                <text className="line-chart-axis" textAnchor="middle" x={padding.left + innerWidth / 2} y={height - 8}>
+                  {axisMiddleLabel}
+                </text>
+              ) : (
+                <>
+                  <text className="line-chart-axis" x={padding.left} y={height - 8}>
+                    {axisStartLabel ?? axisLabelByDate.get(uniqueDates[0]) ?? formatDate(uniqueDates[0])}
+                  </text>
+                  {axisMiddleLabel ? (
+                    <text className="line-chart-axis" textAnchor="middle" x={padding.left + innerWidth / 2} y={height - 8}>
+                      {axisMiddleLabel}
+                    </text>
+                  ) : null}
+                  <text className="line-chart-axis" textAnchor="end" x={width - padding.right} y={height - 8}>
+                    {axisEndLabel ?? axisLabelByDate.get(uniqueDates[uniqueDates.length - 1]) ?? formatDate(uniqueDates[uniqueDates.length - 1])}
+                  </text>
+                </>
+              )}
             </>
           )}
           {visibleSeries.map((item) => {
@@ -652,7 +833,7 @@ export default function DashboardPage() {
   const [challengeSection, setChallengeSection] = useState<DashboardData>({});
   const [dietSection, setDietSection] = useState<DashboardData>({});
   const [medicationSection, setMedicationSection] = useState<DashboardData>({});
-  const [trends, setTrends] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [trends, setTrends] = useState<DashboardTrendsData>({});
   const [riskTrend, setRiskTrend] = useState<DashboardRiskTrend>({ period: "all", series: [] });
   const [todayRecommendations, setTodayRecommendations] = useState<TodayRecommendations>({ date: "", items: [] });
   const [activeMetricKey, setActiveMetricKey] = useState<(typeof analysisMetrics)[number]["key"]>("blood");
@@ -671,7 +852,7 @@ export default function DashboardPage() {
         medicationResult,
       ] = await Promise.allSettled([
           getDashboardSummary<DashboardSummary>(),
-          getDashboardTrends<Record<string, Record<string, unknown>[]>>(selectedPeriod),
+          getDashboardTrends<DashboardTrendsData>(selectedPeriod),
           getDashboardRiskTrend<DashboardRiskTrend>(selectedPeriod),
           getTodayRecommendations(),
           getDashboardHealth<DashboardData>(),
@@ -734,6 +915,12 @@ export default function DashboardPage() {
       )
     : [];
   const challengeRate = averageValue(trends.challenge_completion_rate);
+  const trendPeriodLabels = getPeriodAxisLabels(
+    selectedPeriod,
+    typeof trends.date_from === "string" ? trends.date_from : null,
+    typeof trends.date_to === "string" ? trends.date_to : null,
+  );
+  const chartPeriodDisplay = trendPeriodLabels.periodLabel || getPeriodLabel(selectedPeriod);
   const latestDiet = dashboardDiets[0];
   const bloodPressureSeries = [
     makeValueSeries(trends.blood_pressure, "수축기 혈압", diseaseChartColors.HYPERTENSION, {
@@ -755,6 +942,7 @@ export default function DashboardPage() {
   const lifestyleSeries = [
     makeValueSeries(trends.challenge_completion_rate, "챌린지 수행률", diseaseChartColors.OBESITY, { suffix: "%" }),
   ];
+  const dietRecordCountSeries = makeDietRecordCountSeries(dashboardDiets);
   const medicationAdherenceSeries = makeMedicationAdherenceSeries(dashboardMedicationRecords);
   const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
   const hasRiskTrendEnoughData = riskTrendSeries.some((item) => item.points.length >= 2);
@@ -812,7 +1000,7 @@ export default function DashboardPage() {
       : activeMetricKey === "weight"
         ? weightSeries
         : activeMetricKey === "diet"
-          ? []
+          ? [dietRecordCountSeries]
           : activeMetricKey === "exercise"
             ? [lifestyleSeries[0]]
             : activeMetricKey === "medication"
@@ -855,8 +1043,8 @@ export default function DashboardPage() {
                 title: "식단 기록",
                 unit: "건",
                 value: dietRecordCount === 0 ? "-" : String(dietRecordCount),
-                delta: null,
-                series: [],
+                delta: getSeriesDelta([dietRecordCountSeries]),
+                series: [dietRecordCountSeries],
               },
             ]
           : activeMetricKey === "exercise"
@@ -893,11 +1081,13 @@ export default function DashboardPage() {
     (latestAnalysisResults.length > 0
       ? "최근 분석 결과와 건강 지표 변화를 함께 보면서 생활습관을 꾸준히 조정해보세요."
       : "아직 분석 결과가 없습니다. 건강정보를 입력하고 간편 분석을 실행하면 맞춤 코멘트를 확인할 수 있습니다.");
+  const dietDisplayTitle = getDietDisplayTitle(latestDiet);
   const dietSummary = String(
-    latestDiet?.summary ??
-      latestDiet?.analysis_summary ??
-      latestDiet?.recommendation ??
-      latestDiet?.description ??
+    dietDisplayTitle ||
+      latestDiet?.summary ||
+      latestDiet?.analysis_summary ||
+      latestDiet?.recommendation ||
+      latestDiet?.description ||
       "",
   ).trim();
   const dietPoints = [
@@ -977,7 +1167,7 @@ export default function DashboardPage() {
                 <h2>{activeMetric.label} 요약</h2>
                 <p>{activeMetric.description}</p>
               </div>
-              <span>{formatDate(new Date())}</span>
+              <span>{chartPeriodDisplay}</span>
             </div>
             <div className={`dashboard-chart-panels${activeChartCards.length === 1 ? " single-panel" : ""}`}>
               {activeChartCards.map((item) => (
@@ -986,7 +1176,14 @@ export default function DashboardPage() {
                     <strong>{item.title}</strong>
                     <span>{item.unit}</span>
                   </div>
-                  <LineChart series={item.series} clampTo100={activeMetricKey === "exercise"} connectPairs={activeMetricKey === "blood"} />
+                  <LineChart
+                    axisEndLabel={trendPeriodLabels.axisEndLabel}
+                    axisMiddleLabel={trendPeriodLabels.axisMiddleLabel}
+                    axisStartLabel={trendPeriodLabels.axisStartLabel}
+                    series={item.series}
+                    clampTo100={activeMetricKey === "exercise"}
+                    connectPairs={activeMetricKey === "blood"}
+                  />
                   <div className="dashboard-chart-stat">
                     <span>현재</span>
                     <strong>
@@ -1046,7 +1243,13 @@ export default function DashboardPage() {
             {riskTrendSeries.map((series) => (
               <div key={series.key} className="risk-trend-chart-item">
                 <span className="risk-trend-chart-label" style={{ color: series.color }}>{series.label}</span>
-                <LineChart axisTicks={riskStageAxisTicks} series={[series]} />
+                <LineChart
+                  axisEndLabel={trendPeriodLabels.axisEndLabel}
+                  axisMiddleLabel={trendPeriodLabels.axisMiddleLabel}
+                  axisStartLabel={trendPeriodLabels.axisStartLabel}
+                  axisTicks={riskStageAxisTicks}
+                  series={[series]}
+                />
               </div>
             ))}
           </div>

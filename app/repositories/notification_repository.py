@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.models.notifications import Notification, NotificationLog, ReminderSchedule
+from app.models.notifications import Notification, NotificationChannel, NotificationLog, ReminderSchedule, ReminderType
 
 
 async def create_notification(user_id: int, data: dict[str, Any]) -> Notification:
@@ -51,6 +51,27 @@ async def get_reminder_schedule_by_id(schedule_id: int) -> ReminderSchedule | No
     return await ReminderSchedule.get_or_none(id=schedule_id)
 
 
+async def get_reminder_schedule_by_related(
+    *,
+    user_id: int,
+    reminder_type: ReminderType,
+    channel: NotificationChannel,
+    related_type: str,
+    related_id: int | None,
+) -> ReminderSchedule | None:
+    query = ReminderSchedule.filter(
+        user_id=user_id,
+        reminder_type=reminder_type,
+        channel=channel,
+        related_type=related_type,
+    )
+    if related_id is None:
+        query = query.filter(related_id__isnull=True)
+    else:
+        query = query.filter(related_id=related_id)
+    return await query.order_by("-created_at").first()
+
+
 async def list_reminder_schedules_by_user(
     user_id: int,
     is_active: bool | None = None,
@@ -71,6 +92,22 @@ async def update_reminder_schedule(schedule_id: int, data: dict[str, Any]) -> Re
         setattr(schedule, key, value)
     await schedule.save(update_fields=list(data.keys()) if data else None)
     return schedule
+
+
+async def update_reminder_schedules_by_related_type(
+    *,
+    user_id: int,
+    reminder_type: ReminderType,
+    channel: NotificationChannel,
+    related_type: str,
+    data: dict[str, Any],
+) -> int:
+    return await ReminderSchedule.filter(
+        user_id=user_id,
+        reminder_type=reminder_type,
+        channel=channel,
+        related_type=related_type,
+    ).update(**data)
 
 
 async def delete_reminder_schedule(schedule_id: int) -> int:

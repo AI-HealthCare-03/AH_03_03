@@ -46,11 +46,12 @@ export default function FAQPage() {
             )
             .filter((faq) => faqCategory === "전체" || String(faq.category) === faqCategory)
             .map((faq) => (
-              <details className="mini-card" key={String(faq.id)}>
-                <summary>
+              <details className="mini-card faq-item" key={String(faq.id)}>
+                <summary className="faq-summary">
                   <strong>{String(faq.question)}</strong>
+                  <span className="faq-summary-hint">펼치기</span>
                 </summary>
-                <p>{String(faq.answer)}</p>
+                <p className="faq-answer">{String(faq.answer)}</p>
               </details>
             ))}
           {faqs.length === 0 && <div className="state-box">등록된 FAQ가 없습니다.</div>}

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.dtos.challenges import ChallengeResponse, UserChallengeResponse
 from app.dtos.diets import DietRecordResponse
 from app.dtos.health import HealthRecordResponse
+from app.dtos.medications import MedicationRecordResponse, MedicationResponse
 from app.models.analysis import AnalysisMode, AnalysisType, RiskLevel
 
 
@@ -69,8 +70,8 @@ class DashboardDietsResponse(BaseModel):
 
 
 class DashboardMedicationsResponse(BaseModel):
-    active_medications: list[Any]
-    recent_medication_records: list[Any]
+    active_medications: list[MedicationResponse]
+    recent_medication_records: list[MedicationRecordResponse]
 
 
 class DashboardTrendsResponse(BaseModel):

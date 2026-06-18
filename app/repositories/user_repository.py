@@ -200,6 +200,9 @@ class UserRepository:
     async def get_password_reset_token(self, token_hash: str) -> PasswordResetToken | None:
         return await PasswordResetToken.get_or_none(token_hash=token_hash, is_used=False)
 
+    async def mark_active_password_reset_tokens_used(self, user_id: int, used_at: datetime) -> int:
+        return await PasswordResetToken.filter(user_id=user_id, is_used=False).update(is_used=True, used_at=used_at)
+
     async def mark_password_reset_token_used(self, token: PasswordResetToken, used_at: datetime) -> PasswordResetToken:
         token.is_used = True
         token.used_at = used_at

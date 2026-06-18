@@ -71,6 +71,14 @@ EXAM_MEASUREMENT_TO_HEALTH_FIELD = {
     "hdl_cholesterol": "hdl_cholesterol",
     "ldl": "ldl_cholesterol",
     "ldl_cholesterol": "ldl_cholesterol",
+    "ast": "ast",
+    "alt": "alt",
+    "gamma_gtp": "gamma_gtp",
+    "ggt": "gamma_gtp",
+    "creatinine": "creatinine",
+    "egfr": "egfr",
+    "hb": "hemoglobin",
+    "hemoglobin": "hemoglobin",
 }
 
 HEALTH_INT_FIELDS = {
@@ -81,6 +89,9 @@ HEALTH_INT_FIELDS = {
     "ldl_cholesterol",
     "hdl_cholesterol",
     "triglyceride",
+    "ast",
+    "alt",
+    "gamma_gtp",
 }
 
 NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:\.\d+)?")

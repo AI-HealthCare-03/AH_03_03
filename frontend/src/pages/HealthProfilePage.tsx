@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnalysisMode, runAnalysisAsync } from "../api/analysis";
+import { useAnalysisFeedbackDialog } from "../hooks/useAnalysisFeedbackDialog";
 import { useAsyncJobPolling } from "../hooks/useAsyncJobPolling";
 
 import {
@@ -63,6 +64,12 @@ const emptyForm: HealthProfileFormState = {
   triglyceride: "",
   hdl_cholesterol: "",
   ldl_cholesterol: "",
+  ast: "",
+  alt: "",
+  gamma_gtp: "",
+  creatinine: "",
+  egfr: "",
+  hemoglobin: "",
   waist_cm: "",
   education_level: "",
   income_level: "",
@@ -94,6 +101,12 @@ const x2Fields: Array<{ key: keyof HealthProfileFormState; label: string }> = [
   { key: "hdl_cholesterol", label: "HDL 콜레스테롤" },
   { key: "ldl_cholesterol", label: "LDL 콜레스테롤" },
   { key: "waist_cm", label: "허리둘레" },
+  { key: "ast", label: "AST" },
+  { key: "alt", label: "ALT" },
+  { key: "gamma_gtp", label: "감마GTP" },
+  { key: "creatinine", label: "크레아티닌" },
+  { key: "egfr", label: "eGFR" },
+  { key: "hemoglobin", label: "혈색소" },
 ];
 
 const backendMissingLabelMap: Record<string, string> = {
@@ -108,6 +121,12 @@ const backendMissingLabelMap: Record<string, string> = {
   triglyceride: "중성지방",
   hdl_cholesterol: "HDL 콜레스테롤",
   ldl_cholesterol: "LDL 콜레스테롤",
+  ast: "AST",
+  alt: "ALT",
+  gamma_gtp: "감마GTP",
+  creatinine: "크레아티닌",
+  egfr: "eGFR",
+  hemoglobin: "혈색소",
   occupation_code: "직업군",
   family_htn: "고혈압 가족력 여부",
   family_dm: "당뇨병 가족력 여부",
@@ -164,7 +183,7 @@ const readOnlySections: Array<{
     ],
   },
   {
-    title: "정밀 분석 정보",
+    title: "혈액/검진 정보",
     items: [
       { key: "systolic_bp", label: "수축기 혈압", unit: "mmHg" },
       { key: "diastolic_bp", label: "이완기 혈압", unit: "mmHg" },
@@ -175,6 +194,17 @@ const readOnlySections: Array<{
       { key: "hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL", referenceOnly: true },
       { key: "waist_cm", label: "허리둘레", unit: "cm" },
+    ],
+  },
+  {
+    title: "간·신장·혈액 검사",
+    items: [
+      { key: "ast", label: "AST", unit: "U/L", referenceOnly: true },
+      { key: "alt", label: "ALT", unit: "U/L", referenceOnly: true },
+      { key: "gamma_gtp", label: "감마GTP", unit: "U/L", referenceOnly: true },
+      { key: "creatinine", label: "크레아티닌", unit: "mg/dL", referenceOnly: true },
+      { key: "egfr", label: "eGFR", unit: "mL/min/1.73m²", referenceOnly: true },
+      { key: "hemoglobin", label: "혈색소", unit: "g/dL", referenceOnly: true },
     ],
   },
 ];
@@ -218,6 +248,15 @@ function getReadOnlyValue(form: HealthProfileFormState, key: keyof HealthProfile
   return displayValueMap[key]?.[raw] ?? raw;
 }
 
+function formatBmiValue(value: unknown): string {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed.toFixed(1) : "";
+}
+
+function getDisplayBmi(record: HealthRecord | null, fallbackBmi: number | null): string {
+  return formatBmiValue(record?.bmi) || (fallbackBmi ? fallbackBmi.toFixed(1) : "");
+}
+
 function formFromRecord(record: HealthRecord | null, userGender?: string | null, userBirth?: string | null): HealthProfileFormState {
   const walkingDays = toStringValue(record?.walking_days_per_week);
   const strengthDays = toStringValue(record?.strength_days_per_week);
@@ -243,6 +282,12 @@ function formFromRecord(record: HealthRecord | null, userGender?: string | null,
     triglyceride: toStringValue(record?.triglyceride),
     hdl_cholesterol: toStringValue(record?.hdl_cholesterol),
     ldl_cholesterol: toStringValue(record?.ldl_cholesterol),
+    ast: toStringValue(record?.ast),
+    alt: toStringValue(record?.alt),
+    gamma_gtp: toStringValue(record?.gamma_gtp),
+    creatinine: toStringValue(record?.creatinine),
+    egfr: toStringValue(record?.egfr),
+    hemoglobin: toStringValue(record?.hemoglobin),
     smoking_status: normalizeCode(
       record?.smoking_status,
       ["NON_SMOKER", "PAST_SMOKER", "CURRENT_SMOKER"],
@@ -275,6 +320,12 @@ function hasMeaningfulHealthData(form: HealthProfileFormState): boolean {
     form.triglyceride,
     form.hdl_cholesterol,
     form.ldl_cholesterol,
+    form.ast,
+    form.alt,
+    form.gamma_gtp,
+    form.creatinine,
+    form.egfr,
+    form.hemoglobin,
     form.waist_cm,
   ];
   return values.some((value) => value !== "") || [form.family_htn, form.family_dm, form.family_dyslipidemia].some((value) => value !== "UNKNOWN");
@@ -320,6 +371,12 @@ function buildHealthPayload(
     "triglyceride",
     "hdl_cholesterol",
     "ldl_cholesterol",
+    "ast",
+    "alt",
+    "gamma_gtp",
+    "creatinine",
+    "egfr",
+    "hemoglobin",
   ];
   numericFields.forEach((field) => {
     const value = parseNumber(form[field]);
@@ -345,6 +402,12 @@ function validateForm(form: HealthProfileFormState): string | null {
     ["triglyceride", "중성지방", 20, 1000],
     ["hdl_cholesterol", "HDL 콜레스테롤", 10, 150],
     ["ldl_cholesterol", "LDL 콜레스테롤", 10, 400],
+    ["ast", "AST", 0, 1000],
+    ["alt", "ALT", 0, 1000],
+    ["gamma_gtp", "감마GTP", 0, 2000],
+    ["creatinine", "크레아티닌", 0, 20],
+    ["egfr", "eGFR", 0, 200],
+    ["hemoglobin", "혈색소", 0, 30],
     ["walking_days", "1주일간 걷기 일수", 0, 7],
     ["strength_days", "1주일간 근력운동 일수", 0, 7],
   ];
@@ -403,6 +466,13 @@ export default function HealthProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [runningMode, setRunningMode] = useState<AnalysisMode | null>(null);
   const [analysisJobId, setAnalysisJobId] = useState<number | null>(null);
+  const {
+    clearFeedback,
+    feedbackDialog: analysisFeedbackDialog,
+    showFailure,
+    showProcessing,
+    showSuccess,
+  } = useAnalysisFeedbackDialog();
 
   const bmi = useMemo(() => {
     const height = parseNumber(form.height_cm);
@@ -418,15 +488,21 @@ export default function HealthProfilePage() {
     onSuccess: async () => {
       setRunningMode(null);
       setAnalysisJobId(null);
-      navigate("/analysis");
+      showSuccess({
+        message: "분석이 완료되었습니다.",
+        title: "분석 완료",
+        onConfirm: () => navigate("/analysis"),
+      });
     },
     onFailure: () => {
       setError("분석에 실패했습니다. 다시 시도해주세요.");
+      showFailure();
       setRunningMode(null);
       setAnalysisJobId(null);
     },
     onTimeout: () => {
       setError("분석 시간이 초과됐습니다. 다시 시도해주세요.");
+      showFailure({ message: "분석 시간이 초과됐습니다. 다시 시도해주세요." });
       setRunningMode(null);
       setAnalysisJobId(null);
     },
@@ -437,25 +513,29 @@ export default function HealthProfilePage() {
     .filter(({ key }) => !isRequiredFilled(form, key, bmi))
     .map(({ label }) => label);
   const completedX2Count = x2Fields.filter(({ key }) => form[key] !== "").length;
-  const backendMissingLabels = (readiness?.missing_basic_fields ?? readiness?.missing_fields ?? []).map(
-    (field) => backendMissingLabelMap[field] ?? field,
-  );
-  const precisionMissingLabels = (readiness?.missing_precision_fields ?? []).map(
-    (field) => backendMissingLabelMap[field] ?? field,
-  ).filter((label) => label !== "당화혈색소");
-
+  const displayBmi = getDisplayBmi(latestRecord, bmi);
   const load = async () => {
-    const [record, readinessResult] = await Promise.all([
+    setError("");
+    const [recordResult, readinessResult] = await Promise.allSettled([
       getLatestHealthRecord<HealthRecord | null>(),
       getAnalysisReadiness<Readiness>(),
     ]);
+    const record = recordResult.status === "fulfilled" ? recordResult.value : null;
     setLatestRecord(record);
     setForm(formFromRecord(record, backendUser?.gender, backendUser?.birthday));
-    setReadiness(readinessResult);
+    setReadiness(readinessResult.status === "fulfilled" ? readinessResult.value : null);
+    if (recordResult.status === "rejected" || readinessResult.status === "rejected") {
+      setError("일부 건강정보를 불러오지 못했습니다. 입력값을 확인한 뒤 다시 저장해 주세요.");
+    }
   };
 
   useEffect(() => {
-    void load().catch(() => setError("건강정보를 불러오지 못했습니다."));
+    void load().catch(() => {
+      setLatestRecord(null);
+      setForm(formFromRecord(null, backendUser?.gender, backendUser?.birthday));
+      setReadiness(null);
+      setError("건강정보를 불러오지 못했습니다. 기본 입력은 계속 사용할 수 있습니다.");
+    });
   }, [backendUser?.id]);
 
   const save = async (): Promise<boolean> => {
@@ -490,6 +570,7 @@ export default function HealthProfilePage() {
     setError("");
     setNotice("");
     setMissingInfoDialog(null);
+    clearFeedback();
     try {
       if (editing) {
         const saved = await save();
@@ -534,11 +615,14 @@ export default function HealthProfilePage() {
         return;
       }
       setRunningMode(mode);
+      showProcessing();
       const job = await runAnalysisAsync(latestReadiness.latest_health_record_id, mode);
       setAnalysisJobId(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 실행에 실패했습니다.");
+      showFailure();
       setRunningMode(null);
+      setAnalysisJobId(null);
     }
   };
 
@@ -629,12 +713,6 @@ export default function HealthProfilePage() {
             </div>
             <div className="state-box">
               정밀 건강 정보 입력 현황 {completedX2Count} / {x2Fields.length}
-              {backendMissingLabels.length > 0 && (
-                <p>간편 분석 필요 항목: {backendMissingLabels.join(", ")}</p>
-              )}
-              {precisionMissingLabels.length > 0 && (
-                <p>기본 정보만으로도 간편 분석이 가능하며, 혈액검사 및 검진 수치를 추가 입력하시면 예측 정확도가 더 높은 '정밀 분석'을 받아보실 수 있습니다.</p>
-              )}
               <p>(※ 선택 입력 항목: 총콜레스테롤, LDL, HDL, 중성지방, 당화혈색소)</p>
             </div>
           </div>
@@ -644,7 +722,7 @@ export default function HealthProfilePage() {
             {[
               ["키(cm)", form.height_cm],
               ["몸무게(kg)", form.weight_kg],
-              ["BMI", bmi ? bmi.toFixed(1) : ""],
+              ["BMI", displayBmi],
               ["직업군", displayValueMap.occupation?.[form.occupation] ?? ""],
               [
                 "가족력",
@@ -654,6 +732,9 @@ export default function HealthProfilePage() {
               ["공복혈당(mg/dL)", form.fasting_glucose],
               ["HDL(mg/dL)", form.hdl_cholesterol],
               ["LDL(mg/dL)", form.ldl_cholesterol],
+              ["AST(U/L)", form.ast],
+              ["ALT(U/L)", form.alt],
+              ["eGFR", form.egfr],
             ].map(([label, value]) => (
               <div className="profile-summary-item" key={label}>
                 <span>{label}</span>
@@ -733,11 +814,11 @@ export default function HealthProfilePage() {
               <section className="profile-section" key={section.title}>
                 <div className="section-heading">
                   <h3>{section.title}</h3>
-                  {section.title === "정밀 검진값" && <p>당화혈색소는 선택값이며, 입력되어 있으면 분석에 함께 반영됩니다.</p>}
+                  {section.title === "간·신장·혈액 검사" && <p>선택 입력값이며, 검진표 OCR 확정값을 확인하거나 직접 수정할 수 있습니다.</p>}
                 </div>
                 <div className="readonly-health-grid">
                   {section.items.map((item) => {
-                    const value = getReadOnlyValue(form, item.key, bmi);
+                    const value = item.key === "bmi" ? displayBmi : getReadOnlyValue(form, item.key, bmi);
                     return (
                       <div className="readonly-health-item" key={`${section.title}-${item.key}`}>
                         <div className="item-header">
@@ -789,6 +870,7 @@ export default function HealthProfilePage() {
           tone={dialog.type.includes("reset") ? "danger" : "default"}
         />
       )}
+      {analysisFeedbackDialog}
     </div>
   );
 }

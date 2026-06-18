@@ -17,11 +17,23 @@ from app.models.notifications import (
     NotificationLog,
     NotificationLogStatus,
     ReminderSchedule,
+    ReminderType,
 )
 from app.repositories import notification_repository
 from app.services.notification_email import NotificationEmailDeliveryResult, deliver_notification_email_to_user
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_REMINDER_TIMEZONE = "Asia/Seoul"
+MEDICATION_REMINDER_RELATED_TYPE = "medication"
+CHALLENGE_REMINDER_RELATED_TYPE = "challenge_daily_reminder"
+DIET_REMINDER_RELATED_TYPE = "diet_record_reminder"
+MEDICATION_REMINDER_TITLE = "오늘 복약 시간이에요"
+MEDICATION_REMINDER_MESSAGE = "복용 예정인 약·영양제가 있습니다. 복용 후 기록을 남기면 복약 패턴을 확인할 수 있어요."
+CHALLENGE_REMINDER_TITLE = "오늘의 챌린지를 확인해 주세요"
+CHALLENGE_REMINDER_MESSAGE = "작은 실천도 건강 습관을 만드는 데 도움이 됩니다. 오늘 수행 여부를 기록해 주세요."
+DIET_REMINDER_TITLE = "오늘 식단을 기록해 보세요"
+DIET_REMINDER_MESSAGE = "사진 한 장이나 간단한 메모로 식단을 남기면 식습관을 돌아보는 데 도움이 됩니다."
 
 
 async def create_notification(user_id: int, request: NotificationCreateRequest) -> Notification:
@@ -121,6 +133,106 @@ async def delete_reminder_schedule(user_id: int, schedule_id: int) -> int:
     return await notification_repository.delete_reminder_schedule(schedule_id)
 
 
+async def sync_all_user_reminder_schedules(user_id: int) -> None:
+    await sync_medication_reminder_schedules_for_user(user_id)
+    await sync_challenge_reminder_schedule_for_user(user_id)
+    await sync_diet_reminder_schedule_for_user(user_id)
+
+
+async def sync_medication_reminder_schedules_for_user(user_id: int) -> None:
+    settings = await _get_user_notification_settings(user_id)
+    enabled = bool(settings.notification_enabled and settings.medication_reminder_enabled)
+    if not enabled:
+        await _deactivate_email_reminder_schedules_by_type(
+            user_id=user_id,
+            reminder_type=ReminderType.MEDICATION,
+            related_type=MEDICATION_REMINDER_RELATED_TYPE,
+        )
+        return
+
+    from app.services import medications as medication_service
+
+    medications = await medication_service.list_medications(user_id=user_id, is_active=True, limit=1000)
+    for medication in medications:
+        await sync_medication_reminder_schedule(
+            user_id=user_id,
+            medication_id=int(medication.id),
+            reminder_time=medication.reminder_time,
+            medication_is_active=bool(medication.is_active),
+            settings_enabled=enabled,
+        )
+
+
+async def sync_medication_reminder_schedule(
+    *,
+    user_id: int,
+    medication_id: int,
+    reminder_time: time | str | None,
+    medication_is_active: bool = True,
+    settings_enabled: bool | None = None,
+) -> ReminderSchedule | None:
+    if settings_enabled is None:
+        settings = await _get_user_notification_settings(user_id)
+        settings_enabled = bool(settings.notification_enabled and settings.medication_reminder_enabled)
+    enabled = bool(settings_enabled and medication_is_active and reminder_time)
+    return await _upsert_email_reminder_schedule(
+        user_id=user_id,
+        reminder_type=ReminderType.MEDICATION,
+        related_type=MEDICATION_REMINDER_RELATED_TYPE,
+        related_id=medication_id,
+        title=MEDICATION_REMINDER_TITLE,
+        message=MEDICATION_REMINDER_MESSAGE,
+        schedule_time=reminder_time,
+        enabled=enabled,
+    )
+
+
+async def deactivate_medication_reminder_schedule(user_id: int, medication_id: int) -> ReminderSchedule | None:
+    return await _upsert_email_reminder_schedule(
+        user_id=user_id,
+        reminder_type=ReminderType.MEDICATION,
+        related_type=MEDICATION_REMINDER_RELATED_TYPE,
+        related_id=medication_id,
+        title=MEDICATION_REMINDER_TITLE,
+        message=MEDICATION_REMINDER_MESSAGE,
+        schedule_time=None,
+        enabled=False,
+    )
+
+
+async def sync_challenge_reminder_schedule_for_user(user_id: int) -> ReminderSchedule | None:
+    settings = await _get_user_notification_settings(user_id)
+    active_challenge_count = await _count_active_user_challenges_for_reminder(user_id)
+    schedule_time = settings.challenge_reminder_time or time(21, 0)
+    enabled = bool(settings.notification_enabled and settings.challenge_reminder_enabled and active_challenge_count > 0)
+    return await _upsert_email_reminder_schedule(
+        user_id=user_id,
+        reminder_type=ReminderType.CHALLENGE,
+        related_type=CHALLENGE_REMINDER_RELATED_TYPE,
+        related_id=None,
+        title=CHALLENGE_REMINDER_TITLE,
+        message=CHALLENGE_REMINDER_MESSAGE,
+        schedule_time=schedule_time,
+        enabled=enabled,
+    )
+
+
+async def sync_diet_reminder_schedule_for_user(user_id: int) -> ReminderSchedule | None:
+    settings = await _get_user_notification_settings(user_id)
+    enabled = bool(settings.notification_enabled and settings.diet_reminder_enabled)
+    schedule_time = settings.diet_reminder_time or time(20, 0)
+    return await _upsert_email_reminder_schedule(
+        user_id=user_id,
+        reminder_type=ReminderType.SYSTEM,
+        related_type=DIET_REMINDER_RELATED_TYPE,
+        related_id=None,
+        title=DIET_REMINDER_TITLE,
+        message=DIET_REMINDER_MESSAGE,
+        schedule_time=schedule_time,
+        enabled=enabled,
+    )
+
+
 async def list_my_notification_logs(user_id: int, limit: int = 50, offset: int = 0) -> list[NotificationLog]:
     return await notification_repository.list_notification_logs_by_user(user_id=user_id, limit=limit, offset=offset)
 
@@ -213,6 +325,27 @@ def _calculate_next_trigger(schedule: ReminderSchedule, now: datetime) -> dateti
     return candidate
 
 
+def calculate_next_trigger_at(
+    schedule_time: time | str | None,
+    *,
+    now: datetime | None = None,
+    timezone: str = DEFAULT_REMINDER_TIMEZONE,
+) -> datetime | None:
+    formatted_time = _format_schedule_time(schedule_time)
+    if formatted_time is None:
+        return None
+    parsed_time = _parse_schedule_time(formatted_time)
+    if parsed_time is None:
+        return None
+
+    tz = _schedule_timezone(timezone)
+    local_now = _aware_datetime(now or datetime.now(tz)).astimezone(tz)
+    candidate = datetime.combine(local_now.date(), parsed_time, tzinfo=tz)
+    if candidate <= local_now:
+        candidate += timedelta(days=1)
+    return candidate
+
+
 def _parse_schedule_time(value: str | None) -> time | None:
     if not value:
         return None
@@ -226,6 +359,17 @@ def _parse_schedule_time(value: str | None) -> time | None:
         return None
 
 
+def _format_schedule_time(value: time | str | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, time):
+        return f"{value.hour:02d}:{value.minute:02d}"
+    parsed_time = _parse_schedule_time(str(value))
+    if parsed_time is None:
+        return None
+    return f"{parsed_time.hour:02d}:{parsed_time.minute:02d}"
+
+
 def _schedule_timezone(value: str | None) -> zoneinfo.ZoneInfo:
     try:
         return zoneinfo.ZoneInfo(value or "Asia/Seoul")
@@ -237,6 +381,85 @@ def _aware_datetime(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=config.TIMEZONE)
     return value
+
+
+async def _upsert_email_reminder_schedule(
+    *,
+    user_id: int,
+    reminder_type: ReminderType,
+    related_type: str,
+    related_id: int | None,
+    title: str,
+    message: str,
+    schedule_time: time | str | None,
+    enabled: bool,
+) -> ReminderSchedule | None:
+    existing = await notification_repository.get_reminder_schedule_by_related(
+        user_id=user_id,
+        reminder_type=reminder_type,
+        channel=NotificationChannel.EMAIL,
+        related_type=related_type,
+        related_id=related_id,
+    )
+    formatted_time = _format_schedule_time(schedule_time)
+    if not enabled or formatted_time is None:
+        if existing is None:
+            return None
+        return await notification_repository.update_reminder_schedule(
+            int(existing.id),
+            {
+                "is_active": False,
+                "next_trigger_at": None,
+            },
+        )
+
+    data = {
+        "reminder_type": reminder_type,
+        "channel": NotificationChannel.EMAIL,
+        "title": title,
+        "message": message,
+        "related_type": related_type,
+        "related_id": related_id,
+        "schedule_time": formatted_time,
+        "timezone": DEFAULT_REMINDER_TIMEZONE,
+        "is_active": True,
+        "next_trigger_at": calculate_next_trigger_at(formatted_time),
+    }
+    if existing is not None:
+        return await notification_repository.update_reminder_schedule(int(existing.id), data)
+    return await notification_repository.create_reminder_schedule(user_id, data)
+
+
+async def _deactivate_email_reminder_schedules_by_type(
+    *,
+    user_id: int,
+    reminder_type: ReminderType,
+    related_type: str,
+) -> int:
+    return await notification_repository.update_reminder_schedules_by_related_type(
+        user_id=user_id,
+        reminder_type=reminder_type,
+        channel=NotificationChannel.EMAIL,
+        related_type=related_type,
+        data={"is_active": False, "next_trigger_at": None},
+    )
+
+
+async def _get_user_notification_settings(user_id: int):
+    from app.services import settings as setting_service
+
+    return await setting_service.get_or_create_user_settings(user_id)
+
+
+async def _count_active_user_challenges_for_reminder(user_id: int) -> int:
+    from app.models.challenges import UserChallenge, UserChallengeStatus
+
+    return await UserChallenge.filter(
+        user_id=user_id,
+        status=UserChallengeStatus.JOINED,
+        canceled_at__isnull=True,
+        completed_at__isnull=True,
+    ).count()
 
 
 def _notification_channel(value: NotificationChannel | str) -> NotificationChannel:

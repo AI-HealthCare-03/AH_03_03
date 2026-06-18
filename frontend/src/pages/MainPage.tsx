@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { getLatestAnalysisResults } from "../api/analysis";
 import { getChallenge, listChallengeRecommendations, listChallenges, listMyChallenges } from "../api/challenges";
+import { listDietRecords } from "../api/diets";
 import { listExams, listMeasurements } from "../api/exams";
 import { getAnalysisReadiness, getLatestHealthRecord } from "../api/health";
 import { getMainSummary } from "../api/main";
@@ -208,6 +209,33 @@ function formatBloodPressure(record: AnyRecord): string {
   return `${String(record.systolic_bp ?? "-")}/${String(record.diastolic_bp ?? "-")} mmHg`;
 }
 
+function formatBmiFromHealth(record: AnyRecord): string {
+  const explicit = Number(record.bmi);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit.toFixed(1);
+  }
+  const heightCm = Number(record.height_cm);
+  const weightKg = Number(record.weight_kg);
+  if (Number.isFinite(heightCm) && heightCm > 0 && Number.isFinite(weightKg) && weightKg > 0) {
+    const heightM = heightCm / 100;
+    return (weightKg / (heightM * heightM)).toFixed(1);
+  }
+  return "-";
+}
+
+function formatBmiValue(value: unknown): string {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric.toFixed(1) : "-";
+}
+
+function formatHealthValue(record: AnyRecord, key: string, suffix = ""): string {
+  const value = record[key];
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  return `${String(value)}${suffix}`;
+}
+
 function getCategoryLabel(value: unknown): string {
   const category = String(value ?? "COMMON").toUpperCase();
   return categoryLabel[category] ?? "공통";
@@ -255,6 +283,49 @@ function getChallengeProgress(challenge: AnyRecord): number {
   return 0;
 }
 
+function isActiveUserChallenge(challenge: AnyRecord): boolean {
+  const status = String(challenge.status ?? "").toUpperCase();
+  return ["JOINED", "ACTIVE", "IN_PROGRESS"].includes(status) && !challenge.canceled_at && !challenge.completed_at;
+}
+
+function getDietFoodName(food: AnyRecord): string {
+  return String(
+    food.matched_food_name ??
+      food.display_name ??
+      food.name ??
+      food.food_name ??
+      food.original_name ??
+      food.raw_food_name ??
+      food.vision_food_name ??
+      "",
+  ).trim();
+}
+
+function summarizeDietFoods(value: unknown, fallback = "분석한 식단"): string {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const names = value
+    .map((item) => (item && typeof item === "object" ? getDietFoodName(item as AnyRecord) : ""))
+    .filter(Boolean);
+  if (names.length === 0) {
+    return fallback;
+  }
+  return names.length === 1 ? names[0] : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` 외 ${names.length - 2}개` : ""}`;
+}
+
+function getDietRecordTitle(record: AnyRecord | undefined): string {
+  if (!record) {
+    return "분석한 식단";
+  }
+  const foodSummary = summarizeDietFoods(record.detected_foods, "");
+  if (foodSummary) {
+    return foodSummary;
+  }
+  const description = String(record.description ?? record.meal_name ?? "").trim();
+  return description && description !== "사진으로 선택한 식단" ? description : "분석한 식단";
+}
+
 function getAveragePercent(values: number[]): number {
   const valid = values.filter((value) => Number.isFinite(value));
   if (valid.length === 0) {
@@ -275,6 +346,7 @@ export default function MainPage() {
   const [challengeRecommendationsLoading, setChallengeRecommendationsLoading] = useState(false);
   const [myChallenges, setMyChallenges] = useState<AnyRecord[]>([]);
   const [medications, setMedications] = useState<AnyRecord[]>([]);
+  const [dietRecords, setDietRecords] = useState<AnyRecord[]>([]);
   const [sectionError, setSectionError] = useState("");
   const [latestExam, setLatestExam] = useState<AnyRecord | null>(null);
   const [examMeasurements, setExamMeasurements] = useState<AnyRecord[]>([]);
@@ -291,6 +363,7 @@ export default function MainPage() {
           recommendationList,
           myChallengeList,
           medicationList,
+          dietRecordList,
           examList,
         ] = await Promise.allSettled([
             getMainSummary<MainData>(),
@@ -299,8 +372,9 @@ export default function MainPage() {
             getAnalysisReadiness<AnyRecord>(),
             listChallenges<AnyRecord[]>({ limit: 20 }),
             listChallengeRecommendations<AnyRecord[]>({ limit: 3 }),
-            listMyChallenges<AnyRecord[]>({ limit: 3 }),
+            listMyChallenges<AnyRecord[]>({ limit: 100 }),
             listMedications<AnyRecord[]>(),
+            listDietRecords<AnyRecord[]>(),
             listExams<AnyRecord[]>({ limit: 1 }),
           ]);
 
@@ -347,6 +421,7 @@ export default function MainPage() {
           myChallengeList.status === "fulfilled" && Array.isArray(myChallengeList.value) ? myChallengeList.value : [],
         );
         setMedications(medicationList.status === "fulfilled" && Array.isArray(medicationList.value) ? medicationList.value : []);
+        setDietRecords(dietRecordList.status === "fulfilled" && Array.isArray(dietRecordList.value) ? dietRecordList.value : []);
         setSectionError(summary.status === "rejected" ? "일부 요약 정보를 불러오지 못했습니다. 각 기능은 바로 이용할 수 있습니다." : "");
 
         const examRecords = examList.status === "fulfilled" && Array.isArray(examList.value) ? examList.value : [];
@@ -373,6 +448,7 @@ export default function MainPage() {
         setChallengeRecommendationsLoading(false);
         setMyChallenges([]);
         setMedications([]);
+        setDietRecords([]);
         setSectionError("");
       } catch {
         setData(publicFallback);
@@ -407,6 +483,7 @@ export default function MainPage() {
       service_band_label: result.service_band_label,
     }));
     const basicReady = readiness.basic_ready ?? readiness.is_ready;
+    const activeMyChallenges = myChallenges.filter(isActiveUserChallenge);
     const todayCards = [
       {
         title: basicReady === false ? "기본 건강정보 입력" : "건강정보 확인",
@@ -415,7 +492,7 @@ export default function MainPage() {
             ? "기본 건강정보를 입력하면 건강 관리 단계 확인을 실행할 수 있습니다."
             : "저장된 건강정보를 확인하고 필요한 항목을 보완해보세요.",
         buttonLabel: "건강정보 입력하기",
-        to: "/health",
+        to: "/health?step=basic",
       },
       {
         title: effectiveAnalysisResults.length > 0 ? "최근 분석 결과 확인" : "만성질환 위험도 예측 결과 확인",
@@ -427,9 +504,9 @@ export default function MainPage() {
         to: effectiveAnalysisResults.length > 0 ? "/analysis/history" : "/analysis",
       },
       {
-        title: challenges.length > 0 || myChallenges.length > 0 ? "추천 챌린지 시작" : "챌린지 둘러보기",
+        title: challenges.length > 0 || activeMyChallenges.length > 0 ? "추천 챌린지 시작" : "챌린지 둘러보기",
         description:
-          myChallenges.length > 0
+          activeMyChallenges.length > 0
             ? "진행 중인 챌린지를 이어가고 오늘 실천을 기록해보세요."
             : "추천 챌린지를 시작하고 작은 건강 습관을 만들어보세요.",
         buttonLabel: "챌린지 보기",
@@ -445,20 +522,13 @@ export default function MainPage() {
         to: "/medications",
       },
     ];
-    // Extract safe numeric values from health records
-    const glucoseVal = latestHealthRecord.fasting_glucose != null ? Number(latestHealthRecord.fasting_glucose) : null;
-    const systolicVal = latestHealthRecord.systolic_bp != null ? Number(latestHealthRecord.systolic_bp) : null;
-    const diastolicVal = latestHealthRecord.diastolic_bp != null ? Number(latestHealthRecord.diastolic_bp) : null;
-    const weightVal = latestHealthRecord.weight_kg != null ? Number(latestHealthRecord.weight_kg) : null;
-    const bmiVal = latestHealthRecord.bmi != null ? Number(latestHealthRecord.bmi) : null;
-
-    const challengeCount = myChallenges.length;
-    const challengeRate = getAveragePercent(myChallenges.map(getChallengeProgress));
+    const challengeCount = activeMyChallenges.length;
+    const challengeRate = getAveragePercent(activeMyChallenges.map(getChallengeProgress));
     const medicationActiveCount = medications.filter((item) => item.is_active !== false).length;
     const medicationRate = medications.length > 0 ? clampPercent((medicationActiveCount / medications.length) * 100) : 0;
-    const RING_R = 28;
-    const RING_C = 2 * Math.PI * RING_R;
-    const ringOffset = RING_C * (1 - challengeRate / 100);
+    const latestDietRecord = dietRecords[0];
+    const latestDietTitle = getDietRecordTitle(latestDietRecord);
+    const latestDietPoint = String(latestDietRecord?.diet_feedback ?? latestDietRecord?.summary ?? "").trim();
 
     const recommendationChallengeIds = challengeRecommendations
       .map((recommendation) => Number(recommendation.challenge_id))
@@ -498,7 +568,7 @@ export default function MainPage() {
               </span>
             </Link>
             <div className="home-action-links">
-              <Link to="/health">건강정보 입력</Link>
+              <Link to="/health?step=basic">건강정보 입력</Link>
               <Link to="/ocr/exam">검진표 등록</Link>
             </div>
           </div>
@@ -584,15 +654,35 @@ export default function MainPage() {
                       </div>
                     );
                   })()}
+                  <div className="viz-stat-row">
+                    <span>현재 건강정보 BMI</span>
+                    <strong>{formatBmiFromHealth(latestHealth)}</strong>
+                  </div>
                   {(() => {
                     const bmi = getExamMeasurement(examMeasurements, "bmi");
                     return (
                       <div className="viz-stat-row">
-                        <span>BMI</span>
-                        <strong>{bmi?.value ? String(bmi.value) : "-"}</strong>
+                        <span>최근 검진표 BMI</span>
+                        <strong>{formatBmiValue(bmi?.value)}</strong>
                       </div>
                     );
                   })()}
+                  <div className="viz-stat-row">
+                    <span>AST / ALT</span>
+                    <strong>
+                      {latestHealth.ast != null || latestHealth.alt != null
+                        ? `${formatHealthValue(latestHealth, "ast")} / ${formatHealthValue(latestHealth, "alt")} U/L`
+                        : "-"}
+                    </strong>
+                  </div>
+                  <div className="viz-stat-row">
+                    <span>eGFR / 혈색소</span>
+                    <strong>
+                      {latestHealth.egfr != null || latestHealth.hemoglobin != null
+                        ? `${formatHealthValue(latestHealth, "egfr")} / ${formatHealthValue(latestHealth, "hemoglobin")}`
+                        : "-"}
+                    </strong>
+                  </div>
                 </>
               ) : (
                 <div className="viz-empty">
@@ -607,6 +697,19 @@ export default function MainPage() {
                   <span className="viz-card-label">식단 분석</span>
                   <Link className="muted" style={{ fontSize: 12 }} to="/diets">식단 분석 →</Link>
                 </div>
+                <div className="viz-stat-row">
+                  <span>{dietRecords.length > 0 ? latestDietTitle : "최근 분석 없음"}</span>
+                  <strong>
+                    {dietRecords.length > 0 ? (
+                      <Link to={`/diets/${String(latestDietRecord?.id ?? "")}`} style={{ color: "var(--color-primary)", fontSize: 13 }}>
+                        보기
+                      </Link>
+                    ) : (
+                      <Link to="/diets" style={{ color: "var(--color-primary)", fontSize: 13 }}>분석하기</Link>
+                    )}
+                  </strong>
+                </div>
+                {latestDietPoint && <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>{latestDietPoint}</p>}
               </div>
 
               {/* 복약/영양제 작은 카드 */}
@@ -627,41 +730,76 @@ export default function MainPage() {
             </div>
           </div>
 
-          {/* 아래 큰 카드: 챌린지 현황 + 추천 챌린지 */}
+          {/* 아래 큰 카드: 챌린지 현황 + 수행률 + 추천 챌린지 */}
           <div className="viz-card challenge-summary-card" style={{ marginTop: "14px" }}>
-            {/* 챌린지 현황 작은 카드 */}
             <div className="challenge-status-panel">
               <span className="viz-card-label">챌린지 현황</span>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginTop: "12px" }}>
+              <div className="challenge-status-ring-row">
                 <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
-                  <circle cx="55" cy="55" r="44" fill="none" stroke="#e0e0e0" strokeWidth="10"/>
-                  <circle cx="55" cy="55" r="44" fill="none" stroke="#1D9E75" strokeWidth="10"
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                  <circle
+                    cx="55"
+                    cy="55"
+                    r="44"
+                    fill="none"
+                    stroke="var(--color-primary)"
                     strokeDasharray={`${challengeCount > 0 ? Math.min((challengeCount / 10) * 276, 276) : 0} 276`}
-                    strokeLinecap="round" transform="rotate(-90 55 55)"/>
+                    strokeLinecap="round"
+                    strokeWidth="10"
+                    transform="rotate(-90 55 55)"
+                  />
                 </svg>
-                <div style={{ paddingBottom: "4px" }}>
+                <div className="challenge-status-count">
                   <div className="viz-ring-value">{challengeCount}개</div>
                   <div className="viz-ring-label">참여 중</div>
                 </div>
               </div>
-              <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: "1.6", borderTop: "0.5px solid var(--color-border)", paddingTop: "10px", wordBreak: "keep-all" }}>
+              <p className="challenge-status-message">
                 {challengeCount === 0
                   ? "아직 참여 중인 챌린지가 없어요. 추천 챌린지를 시작해보세요!"
                   : challengeCount < 3
                   ? `${challengeCount}개 챌린지에 참여 중이에요. 꾸준히 유지해보세요!`
                   : `${challengeCount}개 챌린지를 실천 중이에요. 훌륭한 건강 습관이에요!`}
-              </div>
+              </p>
               <Link
-                className="button secondary"
+                className="button secondary challenge-status-button"
                 to="/challenges"
-                style={{ display: "block", textAlign: "center", marginTop: "12px", fontSize: "13px" }}
               >
                 챌린지 바로가기
               </Link>
             </div>
 
+            <div className="challenge-status-panel challenge-rate-panel">
+              <span className="viz-card-label">챌린지 수행률</span>
+              <div className="challenge-status-ring-row">
+                <svg width="110" height="110" viewBox="0 0 110 110" style={{ flexShrink: 0 }}>
+                  <circle cx="55" cy="55" r="44" fill="none" stroke="var(--color-border)" strokeWidth="10"/>
+                  <circle
+                    cx="55"
+                    cy="55"
+                    r="44"
+                    fill="none"
+                    stroke="var(--color-primary)"
+                    strokeDasharray={`${challengeCount > 0 ? Math.min((challengeRate / 100) * 276, 276) : 0} 276`}
+                    strokeLinecap="round"
+                    strokeWidth="10"
+                    transform="rotate(-90 55 55)"
+                  />
+                </svg>
+                <div className="challenge-status-count">
+                  <div className="viz-ring-value">{challengeRate}%</div>
+                  <div className="viz-ring-label">평균 진행률</div>
+                </div>
+              </div>
+              <p className="challenge-status-message">
+                {challengeCount === 0
+                  ? "챌린지를 시작하면 수행률을 확인할 수 있어요."
+                  : "참여 중인 챌린지의 평균 수행률이에요."}
+              </p>
+            </div>
+
             {/* 추천 챌린지 */}
-            <div>
+            <div className="challenge-recommendation-panel">
               <span className="viz-card-label">추천 챌린지</span>
               <div className="compact-list" style={{ marginTop: "10px" }}>
                 {challengeRecommendationsLoading ? (

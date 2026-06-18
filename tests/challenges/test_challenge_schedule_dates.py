@@ -50,6 +50,9 @@ async def test_join_challenge_stores_started_and_expected_done_at(monkeypatch) -
     async def fake_with_progress(user_challenge):
         return user_challenge
 
+    async def fake_sync_challenge_reminders_for_user(user_id: int):
+        return None
+
     monkeypatch.setattr(
         challenge_service.challenge_repository,
         "get_user_challenge_by_user_and_challenge",
@@ -58,6 +61,7 @@ async def test_join_challenge_stores_started_and_expected_done_at(monkeypatch) -
     monkeypatch.setattr(challenge_service.challenge_repository, "create_user_challenge", fake_create_user_challenge)
     monkeypatch.setattr(challenge_service, "_now", lambda: started_at)
     monkeypatch.setattr(challenge_service, "_with_user_challenge_progress", fake_with_progress)
+    monkeypatch.setattr(challenge_service, "_sync_challenge_reminders_for_user", fake_sync_challenge_reminders_for_user)
 
     joined = await challenge_service.join_challenge(user_id=10, challenge_id=20)
 

@@ -13,6 +13,12 @@ export type HealthRecordPayload = Record<string, ApiValue> & {
   ldl_cholesterol?: number;
   hdl_cholesterol?: number;
   triglyceride?: number;
+  ast?: number;
+  alt?: number;
+  gamma_gtp?: number;
+  creatinine?: number;
+  egfr?: number;
+  hemoglobin?: number;
   has_diabetes?: boolean;
   has_obesity?: boolean;
   has_dyslipidemia?: boolean;

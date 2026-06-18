@@ -80,7 +80,7 @@ def test_x2_only_numeric_exam_values_are_measurement_candidates() -> None:
     assert ("hba1c", "당화혈색소", "5.8 %", "%") in measurements
 
 
-def test_x2_only_measurements_are_not_synced_to_health_record() -> None:
+def test_x2_precision_measurements_are_synced_to_health_record() -> None:
     data = build_health_record_update_from_exam_measurements(
         [
             _measurement("hemoglobin", "13.2 g/dL"),
@@ -92,7 +92,14 @@ def test_x2_only_measurements_are_not_synced_to_health_record() -> None:
         ]
     )
 
-    assert data == {}
+    assert data == {
+        "hemoglobin": Decimal("13.2"),
+        "ast": 30,
+        "alt": 25,
+        "gamma_gtp": 44,
+        "creatinine": Decimal("0.9"),
+        "egfr": Decimal("82"),
+    }
 
 
 def test_urine_protein_exam_value_can_be_preserved_as_measurement_candidate() -> None:
@@ -682,6 +689,67 @@ async def test_confirm_preserves_existing_health_record_values_and_fills_missing
     assert created_payload["diastolic_bp"] == 90
     assert created_payload["ldl_cholesterol"] == 150
     assert created_payload["hdl_cholesterol"] == 47
+    assert created_payload["source"] == "OCR"
+
+
+@pytest.mark.asyncio
+async def test_confirm_preserves_existing_precision_extension_values_and_fills_missing_fields(monkeypatch) -> None:
+    report = SimpleNamespace(id=1, user_id=10, exam_date=None)
+    created_payload: dict[str, object] = {}
+
+    async def fake_get_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    async def fake_list_exam_measurements(exam_report_id: int):
+        assert exam_report_id == 1
+        return [
+            _measurement("ast", "30 U/L"),
+            _measurement("alt", "25 U/L"),
+            _measurement("gamma_gtp", "44 U/L"),
+            _measurement("creatinine", "0.9 mg/dL"),
+            _measurement("egfr", "82 mL/min/1.73m2"),
+            _measurement("hemoglobin", "13.2 g/dL"),
+        ]
+
+    async def fake_get_latest_health_record_by_user(user_id: int):
+        assert user_id == 10
+        return SimpleNamespace(
+            id=99,
+            ast=40,
+            alt=None,
+            gamma_gtp=None,
+            creatinine=Decimal("1.1"),
+            egfr=None,
+            hemoglobin=None,
+        )
+
+    async def fake_create_health_record(user_id: int, data: dict):
+        assert user_id == 10
+        created_payload.update(data)
+        return SimpleNamespace(id=101, user_id=user_id, **data)
+
+    async def fake_confirm_exam_report(exam_report_id: int):
+        assert exam_report_id == 1
+        return report
+
+    monkeypatch.setattr(exam_service, "get_exam_report", fake_get_exam_report)
+    monkeypatch.setattr(exam_service, "list_exam_measurements", fake_list_exam_measurements)
+    monkeypatch.setattr(
+        exam_service.health_repository, "get_latest_health_record_by_user", fake_get_latest_health_record_by_user
+    )
+    monkeypatch.setattr(exam_service.health_repository, "create_health_record", fake_create_health_record)
+    monkeypatch.setattr(exam_service.exam_repository, "confirm_exam_report", fake_confirm_exam_report)
+
+    confirmed = await exam_service.confirm_exam_report(1)
+
+    assert confirmed is report
+    assert created_payload["ast"] == 40
+    assert created_payload["alt"] == 25
+    assert created_payload["gamma_gtp"] == 44
+    assert created_payload["creatinine"] == Decimal("1.1")
+    assert created_payload["egfr"] == Decimal("82")
+    assert created_payload["hemoglobin"] == Decimal("13.2")
     assert created_payload["source"] == "OCR"
 
 

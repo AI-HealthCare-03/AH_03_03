@@ -4,6 +4,7 @@ from typing import Any
 from app.core import config
 from app.dtos.challenges import ChallengeResponse, UserChallengeResponse
 from app.dtos.diets import DietRecordResponse
+from app.dtos.medications import MedicationRecordResponse, MedicationResponse
 from app.models.analysis import AnalysisResult, AnalysisType, RiskLevel
 from app.services import analysis as analysis_service
 from app.services import challenges as challenge_service
@@ -13,6 +14,7 @@ from app.services import medications as medication_service
 from app.services import notifications as notification_service
 
 TREND_PERIOD_DAYS: dict[str, int | None] = {
+    "today": 1,
     "week": 7,
     "month": 30,
     "quarter": 90,
@@ -194,9 +196,16 @@ async def get_dashboard_diets(user_id: int) -> dict[str, Any]:
 
 
 async def get_dashboard_medications(user_id: int) -> dict[str, Any]:
+    active_medications = await medication_service.list_medications(user_id, is_active=True, limit=10)
+    recent_medication_records = await medication_service.list_medication_records(user_id=user_id, limit=10)
     return {
-        "active_medications": await medication_service.list_medications(user_id, is_active=True, limit=10),
-        "recent_medication_records": await medication_service.list_medication_records(user_id=user_id, limit=10),
+        "active_medications": [
+            MedicationResponse.model_validate(medication).model_dump(mode="json") for medication in active_medications
+        ],
+        "recent_medication_records": [
+            MedicationRecordResponse.model_validate(record).model_dump(mode="json")
+            for record in recent_medication_records
+        ],
     }
 
 

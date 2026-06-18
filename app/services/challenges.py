@@ -223,6 +223,12 @@ async def _with_user_challenges_progress(user_challenges: list[UserChallenge]) -
     ]
 
 
+async def _sync_challenge_reminders_for_user(user_id: int) -> None:
+    from app.services import notifications as notification_service
+
+    await notification_service.sync_challenge_reminder_schedule_for_user(user_id)
+
+
 async def list_active_challenges(
     *,
     category: str | None = None,
@@ -257,7 +263,7 @@ async def join_challenge(
     data.setdefault("expected_done_at", _default_expected_done_at(data["started_at"]))
     if existing is not None:
         if _is_rejoinable_user_challenge(existing):
-            return await _with_user_challenge_progress(
+            rejoined = await _with_user_challenge_progress(
                 await challenge_repository.update_user_challenge(
                     existing.id,
                     {
@@ -269,11 +275,15 @@ async def join_challenge(
                     },
                 )
             )
+            await _sync_challenge_reminders_for_user(user_id)
+            return rejoined
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 참여한 챌린지입니다.")
 
-    return await _with_user_challenge_progress(
+    joined = await _with_user_challenge_progress(
         await challenge_repository.create_user_challenge(user_id, challenge_id, data)
     )
+    await _sync_challenge_reminders_for_user(user_id)
+    return joined
 
 
 async def get_user_challenge(user_challenge_id: int) -> UserChallenge | None:
@@ -501,7 +511,7 @@ async def get_challenge_calendar(user_id: int, target_date: date) -> dict:
 
 
 async def give_up_challenge(user_challenge_id: int) -> UserChallenge | None:
-    return await _with_user_challenge_progress(
+    updated = await _with_user_challenge_progress(
         await challenge_repository.update_user_challenge(
             user_challenge_id,
             {
@@ -510,6 +520,9 @@ async def give_up_challenge(user_challenge_id: int) -> UserChallenge | None:
             },
         )
     )
+    if updated is not None:
+        await _sync_challenge_reminders_for_user(int(updated.user_id))
+    return updated
 
 
 async def create_challenge_recommendation(

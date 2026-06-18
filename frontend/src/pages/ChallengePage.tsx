@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import {
   completeToday,
@@ -17,7 +17,10 @@ import { Salad, Dumbbell, Moon, Pill, Droplets, Droplet, Activity, Medal, Leaf, 
 type Challenge = Record<string, unknown>;
 type ChallengeLog = Record<string, unknown>;
 
-const PAGE_SIZE = 4;
+const PAGE_SIZE = 10;
+const MY_CHALLENGE_PAGE_SIZE = 2;
+
+const challengeTabs = ["전체", "식단", "운동", "수면", "복약", "수분섭취", "혈압", "혈당", "생활습관"];
 
 const tabToCategory: Record<string, string | null> = {
   전체: null,
@@ -30,6 +33,14 @@ const tabToCategory: Record<string, string | null> = {
   혈당: "BLOOD_GLUCOSE",
   생활습관: "HABIT",
 };
+
+const categoryToTab: Record<string, string> = Object.fromEntries(
+  Object.entries(tabToCategory)
+    .filter(([, category]) => Boolean(category))
+    .map(([tab, category]) => [String(category), tab]),
+);
+
+const difficultyQueryValues = new Set(["EASY", "NORMAL", "HARD"]);
 
 export const categoryIcon: Record<string, ReactNode> = {
   DIET: <Salad size={20} />,
@@ -417,18 +428,61 @@ function isActiveChallengeStatus(item: Challenge | undefined): boolean {
   return ["ACTIVE", "IN_PROGRESS", "JOINED"].includes(normalizeStatus(item.status));
 }
 
+function getTabFromQuery(value: string | null): string {
+  const category = String(value ?? "").toUpperCase();
+  if (category === "WEIGHT") {
+    return "생활습관";
+  }
+  return categoryToTab[category] ?? "전체";
+}
+
+function getDifficultyFromQuery(value: string | null): string {
+  const difficulty = String(value ?? "").toUpperCase();
+  if (difficulty === "MEDIUM") {
+    return "NORMAL";
+  }
+  return difficultyQueryValues.has(difficulty) ? difficulty : "전체";
+}
+
+function getPageFromQuery(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export default function ChallengePage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [myChallenges, setMyChallenges] = useState<Challenge[]>([]);
   const [logsByUserChallengeId, setLogsByUserChallengeId] = useState<Record<number, ChallengeLog[]>>({});
-  const [activeTab, setActiveTab] = useState("전체");
-  const [activeDifficulty, setActiveDifficulty] = useState("전체");
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [myChallengePage, setMyChallengePage] = useState(1);
+  const activeTab = getTabFromQuery(searchParams.get("category"));
+  const activeDifficulty = getDifficultyFromQuery(searchParams.get("difficulty"));
+  const page = getPageFromQuery(searchParams.get("page"));
+  const listSearch = searchParams.toString();
+  const detailSearch = listSearch ? `?${listSearch}` : "";
+
+  const updateListQuery = (next: { tab?: string; difficulty?: string; page?: number }) => {
+    const nextTab = next.tab ?? activeTab;
+    const nextDifficulty = next.difficulty ?? activeDifficulty;
+    const nextPage = next.page ?? page;
+    const nextParams = new URLSearchParams();
+    const category = tabToCategory[nextTab];
+    if (category) {
+      nextParams.set("category", category);
+    }
+    if (nextDifficulty !== "전체") {
+      nextParams.set("difficulty", nextDifficulty);
+    }
+    if (nextPage > 1) {
+      nextParams.set("page", String(nextPage));
+    }
+    setSearchParams(nextParams);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -519,13 +573,28 @@ export default function ChallengePage() {
   }, [myChallenges]);
 
   const pageCount = Math.max(1, Math.ceil(filteredChallenges.length / PAGE_SIZE));
-  const pagedChallenges = filteredChallenges.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab]);
+  const currentPage = Math.min(page, pageCount);
+  const pagedChallenges = filteredChallenges.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const activeMyChallenges = myChallenges.filter(isActiveChallengeStatus);
+  const myChallengePageCount = Math.max(1, Math.ceil(activeMyChallenges.length / MY_CHALLENGE_PAGE_SIZE));
+  const currentMyChallengePage = Math.min(myChallengePage, myChallengePageCount);
+  const pagedMyChallenges = activeMyChallenges.slice(
+    (currentMyChallengePage - 1) * MY_CHALLENGE_PAGE_SIZE,
+    currentMyChallengePage * MY_CHALLENGE_PAGE_SIZE,
+  );
+  const activeUserChallengeIds = new Set(
+    activeMyChallenges
+      .map((item) => Number(item.id))
+      .filter((id) => Number.isFinite(id)),
+  );
+
+  useEffect(() => {
+    if (myChallengePage > myChallengePageCount) {
+      setMyChallengePage(myChallengePageCount);
+    }
+  }, [myChallengePage, myChallengePageCount]);
+
   const todayDoneCount = activeMyChallenges.filter((item) => getTodayCompletedCount(item) >= getDailyGoalCount(item, challenges)).length;
   const averageProgress =
     activeMyChallenges.length > 0
@@ -534,8 +603,9 @@ export default function ChallengePage() {
   const weekStart = new Date();
   weekStart.setHours(0, 0, 0, 0);
   weekStart.setDate(weekStart.getDate() - 6);
-  const weeklyLogCount = Object.values(logsByUserChallengeId)
-    .flat()
+  const weeklyLogCount = Object.entries(logsByUserChallengeId)
+    .filter(([rawId]) => activeUserChallengeIds.has(Number(rawId)))
+    .flatMap(([, logs]) => logs)
     .filter((log) => {
       const rawDate = String(log.log_date ?? "");
       const parsed = rawDate ? new Date(`${rawDate.slice(0, 10)}T00:00:00`) : null;
@@ -564,6 +634,9 @@ export default function ChallengePage() {
     const completedCountByChallengeId = new Map<number, number>();
     Object.entries(logsByUserChallengeId).forEach(([rawId, logs]) => {
       const id = Number(rawId);
+      if (!activeUserChallengeIds.has(id)) {
+        return;
+      }
       const count = logs.filter((log) => Boolean(log.is_completed) && getCompletedDate(log) === key).length;
       if (Number.isFinite(id) && count > 0) {
         completedCountByChallengeId.set(id, count);
@@ -652,13 +725,12 @@ export default function ChallengePage() {
         </div>
       </div>
       <div className="filter-tabs">
-        {["전체", "식단", "운동", "수면", "복약", "수분섭취", "혈압", "혈당", "생활습관"].map((tab) => (
+        {challengeTabs.map((tab) => (
           <button
             className={activeTab === tab ? "filter-tab active" : "filter-tab"}
             key={tab}
             onClick={() => {
-              setActiveTab(tab);
-              setPage(1);
+              updateListQuery({ tab, page: 1 });
             }}
           >
             {tab}
@@ -675,8 +747,7 @@ export default function ChallengePage() {
               <select
                 value={activeDifficulty}
                 onChange={(e) => {
-                  setActiveDifficulty(e.target.value);
-                  setPage(1);
+                  updateListQuery({ difficulty: e.target.value, page: 1 });
                 }}
                 style={{ padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--color-border)", background: "var(--color-surface)", cursor: "pointer", fontSize: "14px", width: "fit-content" }}
               >
@@ -734,13 +805,9 @@ export default function ChallengePage() {
                           </div>
                         </div>
                       </>
-                    ) : (
-                      <p className="muted" style={{ overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                        {getCleanDescription(challenge.description) || "상세 버튼을 눌러 챌린지 내용을 확인하세요."}
-                      </p>
-                    )}
+                    ) : null}
                     <div className="challenge-card-actions">
-                      <Link className="button secondary" to={`/challenges/${String(challenge.id)}`}>
+                      <Link className="button secondary" to={{ pathname: `/challenges/${String(challenge.id)}`, search: detailSearch }}>
                         상세
                       </Link>
                       {activeJoined && joinedChallenge ? (
@@ -766,13 +833,27 @@ export default function ChallengePage() {
               })}
             </div>
             <div className="pagination-row">
-              <button className="secondary compact-button" disabled={page <= 1} onClick={() => { setPage((prev) => Math.max(1, prev - 1)); window.scrollTo(0, 0); }}>
+              <button
+                className="secondary compact-button"
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  updateListQuery({ page: Math.max(1, currentPage - 1) });
+                  window.scrollTo(0, 0);
+                }}
+              >
                 이전
               </button>
               <span>
-                {page} / {pageCount}
+                {currentPage} / {pageCount}
               </span>
-              <button className="secondary compact-button" disabled={page >= pageCount} onClick={() => { setPage((prev) => Math.min(pageCount, prev + 1)); window.scrollTo(0, 0); }}>
+              <button
+                className="secondary compact-button"
+                disabled={currentPage >= pageCount}
+                onClick={() => {
+                  updateListQuery({ page: Math.min(pageCount, currentPage + 1) });
+                  window.scrollTo(0, 0);
+                }}
+              >
                 다음
               </button>
             </div>
@@ -802,7 +883,7 @@ export default function ChallengePage() {
               {!loading && activeMyChallenges.length === 0 && (
                 <div className="compact-empty-state">아직 참여 중인 챌린지가 없습니다. 관심 있는 챌린지를 시작해보세요.</div>
               )}
-              {activeMyChallenges.slice(0, 4).map((challenge) => {
+              {pagedMyChallenges.map((challenge) => {
                 const master = findMasterChallenge(challenge, challenges);
                 const category = getCategory(master ?? challenge);
                 const progress = getProgress(challenge, challenges);
@@ -829,7 +910,10 @@ export default function ChallengePage() {
                       <span className={isTodayCompleted(challenge) ? "badge risk-low" : "badge badge-missing"}>
                         오늘 수행: {getTodayCompletedCount(challenge)}/{getDailyGoalCount(challenge, challenges)}
                       </span>
-                      <Link className="button secondary compact-button" to={`/challenges/${String(getChallengeId(challenge) ?? "")}`}>
+                      <Link
+                        className="button secondary compact-button"
+                        to={{ pathname: `/challenges/${String(getChallengeId(challenge) ?? "")}`, search: detailSearch }}
+                      >
                         상세
                       </Link>
                     </div>
@@ -861,6 +945,29 @@ export default function ChallengePage() {
                 );
               })}
             </div>
+            {activeMyChallenges.length > MY_CHALLENGE_PAGE_SIZE ? (
+              <div className="pagination-row my-challenge-pagination">
+                <button
+                  className="secondary compact-button"
+                  disabled={currentMyChallengePage <= 1}
+                  onClick={() => setMyChallengePage((prev) => Math.max(1, prev - 1))}
+                  type="button"
+                >
+                  이전
+                </button>
+                <span>
+                  {currentMyChallengePage} / {myChallengePageCount}
+                </span>
+                <button
+                  className="secondary compact-button"
+                  disabled={currentMyChallengePage >= myChallengePageCount}
+                  onClick={() => setMyChallengePage((prev) => Math.min(myChallengePageCount, prev + 1))}
+                  type="button"
+                >
+                  다음
+                </button>
+              </div>
+            ) : null}
           </Card>
           <Card title="챌린지 달력">
             <div className="challenge-calendar-header">

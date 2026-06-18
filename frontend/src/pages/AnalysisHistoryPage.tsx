@@ -6,7 +6,6 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import {
-  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
   getExpectedAnalysisTypesByMode,
@@ -42,6 +41,12 @@ type AnalysisDetail = {
   explanation?: AnalysisExplanation | null;
 };
 
+type PrecisionMeasurementItem = {
+  key: string;
+  label: string;
+  unit?: string;
+};
+
 const analysisTypeOptions: Record<string, string | null> = {
   "전체": null,
   "고혈압": "HYPERTENSION",
@@ -56,6 +61,30 @@ const analysisTypeOptions: Record<string, string | null> = {
   "만성콩팥병": "CHRONIC_KIDNEY_DISEASE",
 };
 
+const precisionMeasurementItems: PrecisionMeasurementItem[] = [
+  { key: "ast", label: "AST", unit: "U/L" },
+  { key: "alt", label: "ALT", unit: "U/L" },
+  { key: "gamma_gtp", label: "감마GTP", unit: "U/L" },
+  { key: "creatinine", label: "크레아티닌", unit: "mg/dL" },
+  { key: "egfr", label: "eGFR", unit: "mL/min/1.73m²" },
+  { key: "hemoglobin", label: "혈색소", unit: "g/dL" },
+];
+
+const COMMON_ANALYSIS_NOTICE =
+  "이 결과는 입력된 건강정보와 검진 수치를 바탕으로 생활관리 방향을 안내하는 참고 자료입니다. 정확한 진단과 치료는 의료진 상담을 통해 확인해 주세요.";
+
+function cleanAnalysisText(value: unknown, fallback = ""): string {
+  const cleaned = String(value ?? "")
+    .replace(/이 결과는\s*(간편|정밀)?\s*분석 참고용 판정이며 의료 진단이 아닙니다\.?/g, "")
+    .replace(/이 설명은 진단이 아니며[^.。]*[.。]?/g, "")
+    .replace(/정확한 진단과 치료는 의료진 상담이 필요합니다\.?/g, "")
+    .replace(/참고 정보:\s*/g, "")
+    .replace(/출처:\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || fallback;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -68,11 +97,42 @@ function getSnapshotInputFeatures(snapshot: AnalysisResult | null | undefined): 
   return isRecord(inputPayload.input_features) ? inputPayload.input_features : inputPayload;
 }
 
+function getSnapshotX2InputPayload(snapshot: AnalysisResult | null | undefined): Record<string, unknown> {
+  if (!isRecord(snapshot?.input_payload)) {
+    return {};
+  }
+  const inputPayload = snapshot.input_payload;
+  return isRecord(inputPayload.x2_input_payload) ? inputPayload.x2_input_payload : {};
+}
+
+function getSnapshotX2FieldSources(snapshot: AnalysisResult | null | undefined): Record<string, unknown> {
+  if (!isRecord(snapshot?.input_payload)) {
+    return {};
+  }
+  const inputPayload = snapshot.input_payload;
+  return isRecord(inputPayload.x2_field_sources) ? inputPayload.x2_field_sources : {};
+}
+
+function getSnapshotStringValue(snapshot: AnalysisResult | null | undefined, key: string): string | null {
+  if (!isRecord(snapshot?.input_payload)) {
+    return null;
+  }
+  const value = snapshot.input_payload[key];
+  return value === undefined || value === null || value === "" ? null : String(value);
+}
+
 function formatSummaryValue(value: unknown, unit = ""): string {
   if (value === undefined || value === null || value === "") {
     return "-";
   }
   return `${String(value)}${unit}`;
+}
+
+function formatPrecisionMeasurementValue(value: unknown, unit = ""): string {
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  return `${String(value)}${unit ? ` ${unit}` : ""}`;
 }
 
 function formatBloodPressure(input: Record<string, unknown>): string {
@@ -128,6 +188,8 @@ export default function AnalysisHistoryPage() {
   const [detail, setDetail] = useState<AnalysisDetail | null>(null);
   const [activeTab, setActiveTab] = useState("전체");
   const [activeMode, setActiveMode] = useState("전체");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -151,8 +213,16 @@ export default function AnalysisHistoryPage() {
     } else if (activeMode === "정밀") {
       filtered = filtered.filter((result) => result.analysis_mode === "PRECISION");
     }
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00`);
+      filtered = filtered.filter((result) => getResultTimestamp(result) >= start.getTime());
+    }
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59`);
+      filtered = filtered.filter((result) => getResultTimestamp(result) <= end.getTime());
+    }
     return filtered;
-  }, [activeTab, activeMode, results]);
+  }, [activeTab, activeMode, endDate, results, startDate]);
 
   const totalPages = Math.ceil(displayResults.length / itemsPerPage);
   const pagedResults = displayResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -178,7 +248,15 @@ export default function AnalysisHistoryPage() {
     }));
 
   const snapshotInput = getSnapshotInputFeatures(detail?.snapshot);
+  const snapshotX2Input = getSnapshotX2InputPayload(detail?.snapshot);
+  const snapshotX2Sources = getSnapshotX2FieldSources(detail?.snapshot);
   const referenceSources = detail?.explanation?.reference_sources ?? [];
+  const visiblePrecisionMeasurements = precisionMeasurementItems.filter((item) => {
+    const value = snapshotX2Input[item.key];
+    return value !== undefined && value !== null && value !== "";
+  });
+  const x2MeasurementSource = getSnapshotStringValue(detail?.snapshot, "x2_measurement_source");
+  const selectedExamReportId = getSnapshotStringValue(detail?.snapshot, "selected_exam_report_id");
 
   useEffect(() => {
     const load = async () => {
@@ -204,7 +282,6 @@ export default function AnalysisHistoryPage() {
   if (analysisId) {
     const result = detail?.result;
     const detailRiskClassName = getRiskClassName(result);
-    const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
     const x2StageSummary = getX2StageSummary(result);
     const relatedResults = getRelatedAnalysisRunResults(result, results);
     const detailSlots = result
@@ -227,22 +304,93 @@ export default function AnalysisHistoryPage() {
             <strong>{getDisplayRiskLabel(result)}</strong>
             <div className="button-row">
               <span className="badge badge-reference">{result?.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-              {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
             </div>
-            <p>{String(result?.summary ?? "")}</p>
+            <p>{cleanAnalysisText(result?.summary)}</p>
             {x2StageSummary && <p className="muted">{x2StageSummary}</p>}
           </div>
+          <div className="state-box analysis-common-notice">{COMMON_ANALYSIS_NOTICE}</div>
           {detail?.explanation && (
             <div style={{ marginTop: 16 }}>
               <h3 style={{ marginBottom: 8, marginTop: 16 }}>분석 설명</h3>
               <div className="mini-card">
-                <strong>{detail.explanation.summary ?? "분석 설명"}</strong>
-                {detail.explanation.caution && <p className="muted">{detail.explanation.caution}</p>}
-                {detail.explanation.recommended_action && <p>{detail.explanation.recommended_action}</p>}
-                {detail.explanation.reference_summary && <p className="muted">{detail.explanation.reference_summary}</p>}
-                {detail.explanation.safety_notice && <p className="muted">{detail.explanation.safety_notice}</p>}
+                <strong>현재 상태 요약</strong>
+                <p>{cleanAnalysisText(detail.explanation.summary, cleanAnalysisText(result?.summary, "현재 입력된 건강정보를 기준으로 관리 필요도를 확인했습니다."))}</p>
+                {detail.factors && detail.factors.length > 0 && (
+                  <>
+                    <strong>주요 확인 항목</strong>
+                    <div className="chip-list">
+                      {detail.factors.slice(0, 4).map((factor) => (
+                        <span className="badge badge-reference" key={String(factor.id ?? factor.factor_name)}>
+                          {String(factor.factor_name ?? factor.factor_key ?? "확인 항목")}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {detail.explanation.recommended_action && (
+                  <>
+                    <strong>생활관리 제안</strong>
+                    <p>{cleanAnalysisText(detail.explanation.recommended_action)}</p>
+                  </>
+                )}
+                {detail.explanation.caution && (
+                  <>
+                    <strong>의료진 상담 권고</strong>
+                    <p className="muted">{cleanAnalysisText(detail.explanation.caution)}</p>
+                  </>
+                )}
+                {(detail.explanation.reference_summary || referenceSources.length > 0) && (
+                  <details className="analysis-reference-details">
+                    <summary>참고한 자료 보기</summary>
+                    {detail.explanation.reference_summary && (
+                      <p className="muted">{cleanAnalysisText(detail.explanation.reference_summary)}</p>
+                    )}
+                    {referenceSources.length > 0 && (
+                      <div className="chip-list">
+                        {referenceSources.map((source) => (
+                          <span className="badge badge-reference" key={String(source.id ?? source.title)}>
+                            {String(source.source_org ?? source.title ?? "참고 출처")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+                )}
               </div>
             </div>
+          )}
+          {visiblePrecisionMeasurements.length > 0 && (
+            <section className="precision-measurement-section">
+              <div className="section-heading compact">
+                <h3>분석에 사용된 검진 수치</h3>
+                <p>정밀분석에 반영된 검진표 기반 수치입니다.</p>
+              </div>
+              <div className="chip-list" style={{ marginBottom: 10 }}>
+                {x2MeasurementSource && (
+                  <span className="badge badge-reference">
+                    출처 {x2MeasurementSource === "exam_measurements" ? "검진표 OCR" : x2MeasurementSource}
+                  </span>
+                )}
+                {selectedExamReportId && (
+                  <span className="badge badge-reference">검진표 #{selectedExamReportId}</span>
+                )}
+              </div>
+              <div className="precision-measurement-grid">
+                {visiblePrecisionMeasurements.map((item) => (
+                  <div className="precision-measurement-item" key={item.key}>
+                    <div className="item-header">
+                      <span>{item.label}</span>
+                      {snapshotX2Sources[item.key] === "exam_measurements" && (
+                        <em className="badge badge-reference">OCR</em>
+                      )}
+                    </div>
+                    <div className="item-value-row">
+                      <strong>{formatPrecisionMeasurementValue(snapshotX2Input[item.key], item.unit)}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
         </Card>
         {detailSlots.length > 0 && (
@@ -268,7 +416,6 @@ export default function AnalysisHistoryPage() {
                   );
                 }
                 const slotRiskClassName = getRiskClassName(slot.result);
-                const slotSourceBadgeLabel = getAnalysisSourceBadgeLabel(slot.result);
                 const slotX2StageSummary = getX2StageSummary(slot.result);
                 return (
                   <Link to={`/analysis/${String(slot.result.id)}`} style={{ textDecoration: "none" }}>
@@ -277,7 +424,6 @@ export default function AnalysisHistoryPage() {
                       <div className="button-row">
                         <span className={`badge ${slotRiskClassName}`}>{getDisplayRiskLabel(slot.result)}</span>
                         <span className="badge badge-reference">{slot.result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                        {slotSourceBadgeLabel && <span className="badge badge-reference">{slotSourceBadgeLabel}</span>}
                       </div>
                     </div>
                   </Link>
@@ -304,37 +450,70 @@ export default function AnalysisHistoryPage() {
     >
       {error && <ErrorMessage message={error} />}
 
-      <div style={{ display: "flex", justifyContent: "flex-start", gap: 8, marginBottom: 8 }}>
-        <select
-          onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
-          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 200, cursor: "pointer", outline: "none"  }}
-          value={activeTab}
-        >
-          {Object.keys(analysisTypeOptions).map((key) => (
-            <option key={key} value={key}>{key}</option>
-          ))}
-        </select>
-        <select
-          onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
-          style={{ fontSize: 13, padding: "6px 4px", border: "none", borderBottom: "1.5px solid var(--color-border-secondary)", background: "transparent", color: "var(--color-text-primary)", width: 100, cursor: "pointer", outline: "none"  }}
-          value={activeMode}
-        >
-          <option>전체</option>
-          <option>간편</option>
-          <option>정밀</option>
-        </select>
+      <div className="history-filter-row">
+        <label>
+          질병
+          <select
+            onChange={(e) => { setActiveTab(e.target.value); setCurrentPage(1); }}
+            value={activeTab}
+          >
+            {Object.keys(analysisTypeOptions).map((key) => (
+              <option key={key} value={key}>{key}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          분석 종류
+          <select
+            onChange={(e) => { setActiveMode(e.target.value); setCurrentPage(1); }}
+            value={activeMode}
+          >
+            <option>전체</option>
+            <option>간편</option>
+            <option>정밀</option>
+          </select>
+        </label>
+        <label>
+          시작일
+          <input
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+            type="date"
+            value={startDate}
+          />
+        </label>
+        <label>
+          종료일
+          <input
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+            type="date"
+            value={endDate}
+          />
+        </label>
+        {(startDate || endDate) && (
+          <button
+            className="secondary compact-button"
+            onClick={() => {
+              setStartDate("");
+              setEndDate("");
+              setCurrentPage(1);
+            }}
+            type="button"
+          >
+            날짜 초기화
+          </button>
+        )}
       </div>
       {diseaseRiskItems.length > 0 && <RiskStageBoard items={diseaseRiskItems} />}
 
       <div className="table-list" style={{ marginTop: 16 }}>
         {pagedResults.map((result) => {
-          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           const content = (
             <>
               <div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                   <span className={`badge ${getRiskClassName(result)}`}>{getDisplayRiskLabel(result)}</span>
+                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
                   <strong>{getAnalysisTypeLabel(result.analysis_type)}</strong>
                 </div>
                 <p className="muted">{mainFactorLabel(result)}</p>
@@ -343,8 +522,6 @@ export default function AnalysisHistoryPage() {
                 <span style={{ color: "var(--color-muted)", fontSize: 13 }}>상세보기 →</span>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span className="muted" style={{ fontSize: 13 }}>{formatDate(result.analyzed_at ?? result.created_at)}</span>
-                  <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
                 </div>
               </div>
             </>

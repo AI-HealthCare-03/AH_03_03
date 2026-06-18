@@ -55,6 +55,7 @@ export default function App() {
             <Route path="/auth/find-login-id" element={<FindLoginIdPage />} />
             <Route path="/auth/password-reset" element={<PasswordResetRequestPage />} />
             <Route path="/auth/password-reset/confirm" element={<PasswordResetConfirmPage />} />
+            <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
             <Route path="/faqs" element={<FAQPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route element={<ProtectedRoute />}>

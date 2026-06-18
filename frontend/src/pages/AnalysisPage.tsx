@@ -7,7 +7,6 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 import RiskStageBoard, { type DiseaseRiskItem } from "../components/RiskStageBoard";
 import {
-  getAnalysisSourceBadgeLabel,
   getAnalysisTypeLabel,
   getDisplayRiskLabel,
   getLatestAnalysisMode,
@@ -53,6 +52,21 @@ function getChallengeCardDescription(value: unknown): string {
   return fallback.length > 140 ? `${fallback.slice(0, 139).trim()}…` : fallback;
 }
 
+const COMMON_ANALYSIS_NOTICE =
+  "이 결과는 입력된 건강정보를 바탕으로 생활관리 방향을 안내하는 참고 자료입니다. 정확한 진단과 치료는 의료진 상담을 통해 확인해 주세요.";
+
+function cleanAnalysisText(value: unknown, fallback = "상세보기에서 주요 요인을 확인할 수 있습니다."): string {
+  const cleaned = String(value ?? "")
+    .replace(/이 결과는\s*(간편|정밀)?\s*분석 참고용 판정이며 의료 진단이 아닙니다\.?/g, "")
+    .replace(/이 설명은 진단이 아니며[^.。]*[.。]?/g, "")
+    .replace(/정확한 진단과 치료는 의료진 상담이 필요합니다\.?/g, "")
+    .replace(/참고 정보:\s*/g, "")
+    .replace(/출처:\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || fallback;
+}
+
 const factorValueLabels: Record<string, Record<string, string>> = {
   family_htn: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
   family_dm: { YES: "있음", NO: "없음", UNKNOWN: "모름" },
@@ -90,10 +104,10 @@ function buildAnalysisComment(results: AnalysisResult[], explanationsByResultId:
   }
   const explanation = explanationsByResultId[String(firstResult.id)];
   if (explanation?.recommended_action) {
-    return explanation.recommended_action;
+    return cleanAnalysisText(explanation.recommended_action);
   }
   if (explanation?.summary) {
-    return explanation.summary;
+    return cleanAnalysisText(explanation.summary);
   }
   return "분석 결과는 입력된 건강정보 기준의 참고 신호입니다. 상세 화면에서 주요 요인을 확인해보세요.";
 }
@@ -256,6 +270,7 @@ export default function AnalysisPage() {
       <Card title="질환별 위험도">
         <RiskStageBoard items={diseaseRiskItems} />
       </Card>
+      <div className="state-box analysis-common-notice">{COMMON_ANALYSIS_NOTICE}</div>
       <div className="metric-grid">
         {analysisSlots.map((slot) => {
           if (slot.isUnavailable || !slot.result) {
@@ -271,9 +286,6 @@ export default function AnalysisPage() {
             );
           }
           const result = slot.result;
-          const explanation = explanationsByResultId[String(result.id)];
-          const referenceSources = explanation?.reference_sources ?? [];
-          const sourceBadgeLabel = getAnalysisSourceBadgeLabel(result);
           return (
             <div className="metric-card card" key={String(result.id)}>
               <span>{slot.diseaseName} 위험도 예측 결과</span>
@@ -281,20 +293,9 @@ export default function AnalysisPage() {
                 <strong style={{ color: getRiskColor(result) }}>{getDisplayRiskLabel(result)}</strong>
                 <div style={{ display: "flex", gap: 6 }}>
                   <span className="badge badge-reference">{result.analysis_mode === "PRECISION" ? "정밀" : "간편"}</span>
-                  {sourceBadgeLabel && <span className="badge badge-reference">{sourceBadgeLabel}</span>}
                 </div>
               </div>
-              <p>{String(result.summary ?? "상세보기에서 주요 요인을 확인할 수 있습니다.")}</p>
-              {explanation?.reference_summary && <p className="muted">{explanation.reference_summary}</p>}
-              {referenceSources.length > 0 && (
-                <div className="chip-list">
-                  {referenceSources.slice(0, 2).map((source) => (
-                    <span className="badge badge-reference" key={String(source.id ?? source.title)}>
-                      {String(source.source_org ?? source.title ?? "참고 출처")}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <p>{cleanAnalysisText(result.summary)}</p>
               <Link className="button secondary" style={{ marginTop: 8, textAlign: "center", display: "block" }} to={`/analysis/${String(result.id)}`}>
                 상세보기
               </Link>

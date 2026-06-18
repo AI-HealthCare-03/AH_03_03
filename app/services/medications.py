@@ -1,3 +1,5 @@
+from datetime import time
+
 from fastapi import HTTPException
 from starlette import status
 
@@ -9,14 +11,29 @@ from app.dtos.medications import (
 )
 from app.models.medications import Medication, MedicationRecord
 from app.repositories import medication_repository
+from app.services import notifications as notification_service
 
 MEDICATION_NOT_FOUND_MESSAGE = "복약/영양제 정보를 찾을 수 없습니다."
 MEDICATION_RECORD_NOT_FOUND_MESSAGE = "복약 기록을 찾을 수 없습니다."
 MEDICATION_RECORD_ACCESS_DENIED_MESSAGE = "복약 기록에 접근할 수 없습니다."
 
 
+def _medication_payload(data: dict) -> dict:
+    reminder_time = data.get("reminder_time")
+    if isinstance(reminder_time, time):
+        data["reminder_time"] = reminder_time.replace(tzinfo=None)
+    return data
+
+
 async def create_medication(user_id: int, request: MedicationCreateRequest) -> Medication:
-    return await medication_repository.create_medication(user_id, request.model_dump())
+    medication = await medication_repository.create_medication(user_id, _medication_payload(request.model_dump()))
+    await notification_service.sync_medication_reminder_schedule(
+        user_id=int(medication.user_id),
+        medication_id=int(medication.id),
+        reminder_time=medication.reminder_time,
+        medication_is_active=bool(medication.is_active),
+    )
+    return medication
 
 
 async def get_medication(medication_id: int) -> Medication | None:
@@ -40,15 +57,39 @@ async def list_medications(
 
 
 async def update_medication(medication_id: int, request: MedicationUpdateRequest) -> Medication | None:
-    return await medication_repository.update_medication(medication_id, request.model_dump(exclude_unset=True))
+    medication = await medication_repository.update_medication(
+        medication_id,
+        _medication_payload(request.model_dump(exclude_unset=True)),
+    )
+    if medication is not None:
+        await notification_service.sync_medication_reminder_schedule(
+            user_id=int(medication.user_id),
+            medication_id=int(medication.id),
+            reminder_time=medication.reminder_time,
+            medication_is_active=bool(medication.is_active),
+        )
+    return medication
 
 
 async def deactivate_medication(medication_id: int) -> Medication | None:
-    return await medication_repository.update_medication(medication_id, {"is_active": False})
+    medication = await medication_repository.update_medication(medication_id, {"is_active": False})
+    if medication is not None:
+        await notification_service.deactivate_medication_reminder_schedule(
+            user_id=int(medication.user_id),
+            medication_id=int(medication.id),
+        )
+    return medication
 
 
 async def delete_medication(medication_id: int) -> int:
-    return await medication_repository.delete_medication(medication_id)
+    medication = await medication_repository.get_medication_by_id(medication_id)
+    deleted_count = await medication_repository.delete_medication(medication_id)
+    if deleted_count and medication is not None:
+        await notification_service.deactivate_medication_reminder_schedule(
+            user_id=int(medication.user_id),
+            medication_id=int(medication.id),
+        )
+    return deleted_count
 
 
 async def create_medication_record(

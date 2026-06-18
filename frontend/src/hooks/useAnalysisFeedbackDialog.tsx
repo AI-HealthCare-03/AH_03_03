@@ -6,11 +6,13 @@ type AnalysisFeedbackStatus = "processing" | "success" | "error" | "info";
 
 type AnalysisFeedbackOptions = {
   message?: string;
+  onConfirm?: () => void;
   title?: string;
 };
 
 type AnalysisFeedbackState = {
   message: string;
+  onConfirm?: () => void;
   status: AnalysisFeedbackStatus;
   title: string;
 };
@@ -29,6 +31,7 @@ export function useAnalysisFeedbackDialog() {
   const showFeedback = useCallback((status: AnalysisFeedbackStatus, options: AnalysisFeedbackOptions) => {
     setFeedback({
       message: options.message ?? "",
+      onConfirm: options.onConfirm,
       status,
       title: options.title ?? "",
     });
@@ -44,6 +47,7 @@ export function useAnalysisFeedbackDialog() {
   const showSuccess = useCallback((options: AnalysisFeedbackOptions = {}) => {
     showFeedback("success", {
       message: options.message ?? DEFAULT_SUCCESS_MESSAGE,
+      onConfirm: options.onConfirm,
       title: options.title ?? "분석 완료되었습니다.",
     });
   }, [showFeedback]);
@@ -51,6 +55,7 @@ export function useAnalysisFeedbackDialog() {
   const showFailure = useCallback((options: AnalysisFeedbackOptions = {}) => {
     showFeedback("error", {
       message: options.message ?? DEFAULT_FAILURE_MESSAGE,
+      onConfirm: options.onConfirm,
       title: options.title ?? "분석에 실패했습니다.",
     });
   }, [showFeedback]);
@@ -59,11 +64,15 @@ export function useAnalysisFeedbackDialog() {
     if (!feedback) {
       return null;
     }
+    const confirm = () => {
+      clearFeedback();
+      feedback.onConfirm?.();
+    };
     return (
       <ConfirmDialog
         confirmLabel="확인"
         message={feedback.message}
-        onConfirm={clearFeedback}
+        onConfirm={confirm}
         showActions={feedback.status !== "processing"}
         showCancel={false}
         title={feedback.title}

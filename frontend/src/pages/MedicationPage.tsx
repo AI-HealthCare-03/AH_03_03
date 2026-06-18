@@ -19,6 +19,11 @@ import ErrorMessage from "../components/ErrorMessage";
 type Item = Record<string, unknown>;
 type MedicationFormErrors = Partial<Record<"name" | "medication_type" | "reminder_time", string>>;
 
+const DOSAGE_AMOUNTS = ["0.5", "1", "2", "5", "10", "50", "100", "250", "500", "1000"];
+const DOSAGE_UNITS = ["mg", "g", "mL", "정", "캡슐", "포"];
+const FREQUENCY_OPTIONS = ["매일 1회", "매일 2회", "매일 3회", "아침 1회", "점심 1회", "저녁 1회", "필요 시"];
+const CUSTOM_VALUE = "__CUSTOM__";
+
 const MEDICATION_TYPE_LABEL: Record<string, string> = {
   MEDICATION: "경구약",
   SUPPLEMENT: "영양제",
@@ -32,6 +37,15 @@ function getMedicationTypeLabel(type: unknown): string {
 function cleanOptionalText(value: unknown): string | null {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
+}
+
+function cleanReminderTime(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(text);
+  return match ? `${match[1]}:${match[2]}` : null;
 }
 
 function validateMedicationDraft(draft: MedicationPayload): MedicationFormErrors {
@@ -53,15 +67,20 @@ function validateMedicationDraft(draft: MedicationPayload): MedicationFormErrors
   return errors;
 }
 
-function buildMedicationPayload(draft: MedicationPayload): MedicationPayload {
-  return {
+function buildMedicationPayload(draft: MedicationPayload, options: { defaultActive?: boolean } = {}): MedicationPayload {
+  const payload: MedicationPayload = {
     name: String(draft.name ?? "").trim(),
     medication_type: String(draft.medication_type ?? "SUPPLEMENT").trim(),
     dosage: cleanOptionalText(draft.dosage),
     frequency: cleanOptionalText(draft.frequency),
-    reminder_time: cleanOptionalText(draft.reminder_time),
+    reminder_time: cleanReminderTime(draft.reminder_time),
     memo: cleanOptionalText(draft.memo),
-    is_active: draft.is_active !== false,
+  };
+  if (draft.is_active !== undefined || options.defaultActive) {
+    payload.is_active = draft.is_active !== false;
+  }
+  return {
+    ...payload,
   };
 }
 
@@ -73,6 +92,167 @@ function formatMedicationDateTime(value: unknown): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function parseDosageValue(value: unknown): { amount: string; unit: string; custom: string; isCustom: boolean } {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return { amount: "", unit: "mg", custom: "", isCustom: false };
+  }
+  const unitPattern = DOSAGE_UNITS.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const match = new RegExp(`^(${DOSAGE_AMOUNTS.join("|")})\\s*(${unitPattern})$`, "u").exec(text);
+  if (match) {
+    return { amount: match[1], unit: match[2], custom: "", isCustom: false };
+  }
+  return { amount: CUSTOM_VALUE, unit: CUSTOM_VALUE, custom: text, isCustom: true };
+}
+
+function buildDosageValue(amount: string, unit: string, custom: string): string {
+  if (amount === CUSTOM_VALUE || unit === CUSTOM_VALUE) {
+    return custom.trim();
+  }
+  if (!amount) {
+    return "";
+  }
+  return `${amount}${unit || ""}`;
+}
+
+function DosageFields({ value, onChange }: { value: unknown; onChange: (value: string) => void }) {
+  const parsed = parseDosageValue(value);
+  const [amount, setAmount] = useState(parsed.amount);
+  const [unit, setUnit] = useState(parsed.unit);
+  const [custom, setCustom] = useState(parsed.custom);
+
+  useEffect(() => {
+    const next = parseDosageValue(value);
+    setAmount(next.amount);
+    setUnit(next.unit);
+    setCustom(next.custom);
+  }, [value]);
+
+  const commit = (nextAmount: string, nextUnit: string, nextCustom: string) => {
+    onChange(buildDosageValue(nextAmount, nextUnit, nextCustom));
+  };
+  const customMode = amount === CUSTOM_VALUE || unit === CUSTOM_VALUE;
+
+  return (
+    <div className="form two-col">
+      <select
+        aria-label="용량 숫자"
+        value={amount}
+        onChange={(event) => {
+          const nextAmount = event.target.value;
+          const nextUnit = nextAmount === CUSTOM_VALUE ? CUSTOM_VALUE : unit === CUSTOM_VALUE ? "mg" : unit;
+          setAmount(nextAmount);
+          setUnit(nextUnit);
+          commit(nextAmount, nextUnit, custom);
+        }}
+      >
+        <option value="">용량 선택</option>
+        {DOSAGE_AMOUNTS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value={CUSTOM_VALUE}>직접입력</option>
+      </select>
+      <select
+        aria-label="용량 단위"
+        value={unit}
+        onChange={(event) => {
+          const nextUnit = event.target.value;
+          const nextAmount = nextUnit === CUSTOM_VALUE ? CUSTOM_VALUE : amount === CUSTOM_VALUE ? "" : amount;
+          setAmount(nextAmount);
+          setUnit(nextUnit);
+          commit(nextAmount, nextUnit, custom);
+        }}
+      >
+        {DOSAGE_UNITS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value={CUSTOM_VALUE}>직접입력</option>
+      </select>
+      {customMode && (
+        <input
+          aria-label="용량 직접입력"
+          className="span-2"
+          placeholder="예: 1스푼, 2방울"
+          value={custom}
+          onChange={(event) => {
+            setCustom(event.target.value);
+            commit(amount, unit, event.target.value);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FrequencyField({ value, onChange }: { value: unknown; onChange: (value: string) => void }) {
+  const text = String(value ?? "").trim();
+  const isPreset = !text || FREQUENCY_OPTIONS.includes(text);
+  const [selected, setSelected] = useState(isPreset ? text : CUSTOM_VALUE);
+  const [custom, setCustom] = useState(isPreset ? "" : text);
+
+  useEffect(() => {
+    const next = String(value ?? "").trim();
+    if (!next || FREQUENCY_OPTIONS.includes(next)) {
+      setSelected(next);
+      setCustom("");
+      return;
+    }
+    setSelected(CUSTOM_VALUE);
+    setCustom(next);
+  }, [value]);
+
+  return (
+    <div className="form">
+      <select
+        aria-label="복용 횟수"
+        value={selected}
+        onChange={(event) => {
+          const next = event.target.value;
+          setSelected(next);
+          onChange(next === CUSTOM_VALUE ? custom : next);
+        }}
+      >
+        <option value="">복용 횟수 선택</option>
+        {FREQUENCY_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+        <option value={CUSTOM_VALUE}>직접입력</option>
+      </select>
+      {selected === CUSTOM_VALUE && (
+        <input
+          aria-label="복용 횟수 직접입력"
+          placeholder="예: 격일 1회"
+          value={custom}
+          onChange={(event) => {
+            setCustom(event.target.value);
+            onChange(event.target.value);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReminderTimeSelect({ value, onChange }: { value: unknown; onChange: (value: string | null) => void }) {
+  const normalized = cleanReminderTime(value) ?? "";
+
+  return (
+    <input
+      aria-label="복용 알림 시간"
+      type="time"
+      step={600}
+      value={normalized}
+      onChange={(event) => onChange(cleanReminderTime(event.target.value))}
+    />
+  );
 }
 
 export default function MedicationPage() {
@@ -89,6 +269,7 @@ export default function MedicationPage() {
   const [records, setRecords] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [registerErrors, setRegisterErrors] = useState<MedicationFormErrors>({});
+  const [editErrors, setEditErrors] = useState<MedicationFormErrors>({});
   const [selectedMedicationId, setSelectedMedicationId] = useState<number | null>(null);
   const [recordMedicationId, setRecordMedicationId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<MedicationPayload>({});
@@ -138,7 +319,7 @@ export default function MedicationPage() {
       return;
     }
 
-    const payload = buildMedicationPayload(registerDraft);
+    const payload = buildMedicationPayload(registerDraft, { defaultActive: true });
     try {
       setIsMutating(true);
       const created = await createMedication<Item>(payload);
@@ -207,12 +388,13 @@ export default function MedicationPage() {
     try {
       const medication = await getMedication<Item>(medicationId);
       setSelectedMedicationId(medicationId);
+      setEditErrors({});
       setEditDraft({
         name: String(medication.name ?? ""),
         medication_type: String(medication.medication_type ?? "SUPPLEMENT"),
         dosage: medication.dosage ? String(medication.dosage) : "",
         frequency: medication.frequency ? String(medication.frequency) : "",
-        reminder_time: medication.reminder_time ? String(medication.reminder_time) : null,
+        reminder_time: cleanReminderTime(medication.reminder_time),
         memo: medication.memo ? String(medication.memo) : "",
       });
     } catch (err) {
@@ -223,12 +405,20 @@ export default function MedicationPage() {
   const saveEdit = async () => {
     if (!selectedMedicationId || isMutating) return;
     setError("");
+    const validationErrors = validateMedicationDraft(editDraft);
+    setEditErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      setError("수정할 입력값을 확인해 주세요.");
+      return;
+    }
+    const payload = buildMedicationPayload(editDraft);
     try {
       setIsMutating(true);
-      await updateMedication(selectedMedicationId, editDraft);
+      await updateMedication(selectedMedicationId, payload);
       setSelectedMedicationId(null);
       setEditDraft({});
-      await load();
+      setEditErrors({});
+      await load(selectedMedicationId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "복약/영양제 수정에 실패했습니다.");
     } finally {
@@ -249,6 +439,7 @@ export default function MedicationPage() {
       if (selectedMedicationId === pendingAction.medicationId) {
         setSelectedMedicationId(null);
         setEditDraft({});
+        setEditErrors({});
       }
       setPendingAction(null);
       await load();
@@ -329,32 +520,32 @@ export default function MedicationPage() {
             </label>
             <label>
               용량
-              <input
-                placeholder="예: 500mg"
-                value={String(registerDraft.dosage ?? "")}
-                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, dosage: e.target.value }))}
+              <DosageFields
+                value={registerDraft.dosage}
+                onChange={(value) => setRegisterDraft((prev) => ({ ...prev, dosage: value }))}
               />
             </label>
             <label>
               복용 횟수
-              <input
-                placeholder="예: 매일 1회"
-                value={String(registerDraft.frequency ?? "")}
-                onChange={(e) => setRegisterDraft((prev) => ({ ...prev, frequency: e.target.value }))}
+              <FrequencyField
+                value={registerDraft.frequency}
+                onChange={(value) => setRegisterDraft((prev) => ({ ...prev, frequency: value }))}
               />
             </label>
             <label>
-              복용 시간
-              <input
-                placeholder="예: 22:00"
-                value={String(registerDraft.reminder_time ?? "")}
-                onChange={(e) =>
+              복용 알림 시간
+              <ReminderTimeSelect
+                value={registerDraft.reminder_time}
+                onChange={(value) =>
                   setRegisterDraft((prev) => ({
                     ...prev,
-                    reminder_time: e.target.value || null,
+                    reminder_time: value,
                   }))
                 }
               />
+              <span className="muted" style={{ fontSize: "13px" }}>
+                설정한 시간에 복약 알림 이메일을 받을 수 있어요.
+              </span>
               {registerErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{registerErrors.reminder_time}</span>}
             </label>
             <label>
@@ -479,6 +670,7 @@ export default function MedicationPage() {
                           value={String(editDraft.name ?? "")}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, name: e.target.value }))}
                         />
+                        {editErrors.name && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.name}</span>}
                       </label>
                       <label>
                         구분
@@ -492,22 +684,32 @@ export default function MedicationPage() {
                           <option value="SUPPLEMENT">영양제</option>
                           <option value="PRESCRIPTION">처방약</option>
                         </select>
+                        {editErrors.medication_type && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.medication_type}</span>}
                       </label>
                       <label>
                         용량
-                        <input
-                          value={String(editDraft.dosage ?? "")}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, dosage: e.target.value }))}
+                        <DosageFields
+                          value={editDraft.dosage}
+                          onChange={(value) => setEditDraft((prev) => ({ ...prev, dosage: value }))}
                         />
                       </label>
                       <label>
                         복용 횟수
-                        <input
-                          value={String(editDraft.frequency ?? "")}
-                          onChange={(e) =>
-                            setEditDraft((prev) => ({ ...prev, frequency: e.target.value }))
-                          }
+                        <FrequencyField
+                          value={editDraft.frequency}
+                          onChange={(value) => setEditDraft((prev) => ({ ...prev, frequency: value }))}
                         />
+                      </label>
+                      <label>
+                        복용 알림 시간
+                        <ReminderTimeSelect
+                          value={editDraft.reminder_time}
+                          onChange={(value) => setEditDraft((prev) => ({ ...prev, reminder_time: value }))}
+                        />
+                        <span className="muted" style={{ fontSize: "13px" }}>
+                          설정한 시간에 복약 알림 이메일을 받을 수 있어요.
+                        </span>
+                        {editErrors.reminder_time && <span className="muted" style={{ color: "var(--color-danger, #e53e3e)" }}>{editErrors.reminder_time}</span>}
                       </label>
                       <label>
                         메모
@@ -524,7 +726,7 @@ export default function MedicationPage() {
                       <button
                         className="secondary"
                         disabled={isMutating}
-                        onClick={() => { setSelectedMedicationId(null); setEditDraft({}); }}
+                        onClick={() => { setSelectedMedicationId(null); setEditDraft({}); setEditErrors({}); }}
                         type="button"
                       >
                         취소

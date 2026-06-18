@@ -474,9 +474,7 @@ export default function ExamOcrPage() {
           ) : (
             measurements.map((m) => (
               <label className="ocr-result-row" key={m.id}>
-                <span>
-                  {m.measurement_name}
-                </span>
+                <span>{m.measurement_name}</span>
                 <input
                   onChange={(e) => updateLocalMeasurement(m.id, e.target.value)}
                   value={m.value ?? ""}
@@ -486,7 +484,6 @@ export default function ExamOcrPage() {
             ))
           )}
         </div>
-
         {/* 하단 액션 영역 */}
         <div className="button-row" style={{ marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap", gap: 8 }}>
           {isAppliedToHealth && (

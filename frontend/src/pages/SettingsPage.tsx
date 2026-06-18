@@ -7,6 +7,7 @@ import Card from "../components/Card";
 import ErrorMessage from "../components/ErrorMessage";
 
 type Settings = Record<string, unknown>;
+type TimeSettingKey = "challenge_reminder_time" | "diet_reminder_time";
 
 const settingLabels: Record<string, string> = {
   notification_enabled: "기본 알림",
@@ -65,6 +66,30 @@ export default function SettingsPage() {
     }
   };
 
+  const getTimeValue = (key: TimeSettingKey, fallback: string): string => {
+    const value = String(settings[key] ?? "").trim();
+    if (!value) {
+      return fallback;
+    }
+    const match = /^([01]\d|2[0-3]):([0-5]\d)/.exec(value);
+    return match ? `${match[1]}:${match[2]}` : fallback;
+  };
+
+  const updateTimeSetting = async (key: TimeSettingKey, value: string) => {
+    const nextValue = value || null;
+    const previousValue = settings[key];
+    setSettings((prev) => ({ ...prev, [key]: nextValue }));
+    setNotice("");
+    try {
+      await updateMySettings({ [key]: nextValue });
+      await load();
+      setNotice("설정이 저장되었습니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "설정 저장에 실패했습니다.");
+      setSettings((prev) => ({ ...prev, [key]: previousValue }));
+    }
+  };
+
   return (
     <div className="page-stack">
       <header className="dashboard-header">
@@ -79,13 +104,45 @@ export default function SettingsPage() {
       <div className="settings-list">
         {["notification_enabled", "challenge_reminder_enabled", "medication_reminder_enabled", "diet_reminder_enabled"].map(
           (key) => (
-            <label key={key} className="toggle-row">
-              <span>
-                <span>{settingLabels[key]}</span>
-                <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>{settingDescriptions[key]}</p>
-              </span>
-              <input checked={Boolean(settings[key])} onChange={() => void toggle(key)} type="checkbox" />
-            </label>
+            <div key={key}>
+              <label className="toggle-row">
+                <span>
+                  <span>{settingLabels[key]}</span>
+                  <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>{settingDescriptions[key]}</p>
+                </span>
+                <input checked={Boolean(settings[key])} onChange={() => void toggle(key)} type="checkbox" />
+              </label>
+              {key === "challenge_reminder_enabled" && Boolean(settings.challenge_reminder_enabled) && (
+                <label className="settings-time-row">
+                  <span>
+                    챌린지 알림 시간
+                    <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>
+                      매일 선택한 시간에 챌린지 리마인더를 보내드려요.
+                    </p>
+                  </span>
+                  <input
+                    type="time"
+                    value={getTimeValue("challenge_reminder_time", "21:00")}
+                    onChange={(event) => void updateTimeSetting("challenge_reminder_time", event.target.value)}
+                  />
+                </label>
+              )}
+              {key === "diet_reminder_enabled" && Boolean(settings.diet_reminder_enabled) && (
+                <label className="settings-time-row">
+                  <span>
+                    식단 기록 알림 시간
+                    <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>
+                      선택한 시간에 식단 기록 리마인더를 보내드려요.
+                    </p>
+                  </span>
+                  <input
+                    type="time"
+                    value={getTimeValue("diet_reminder_time", "20:00")}
+                    onChange={(event) => void updateTimeSetting("diet_reminder_time", event.target.value)}
+                  />
+                </label>
+              )}
+            </div>
           ),
         )}
         <div className="state-box">
