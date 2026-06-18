@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
@@ -154,6 +154,95 @@ def test_dashboard_today_period_uses_current_day(monkeypatch) -> None:
     assert normalized_period == "today"
     assert date_from == today.date()
     assert date_to == today.date()
+
+
+@pytest.mark.asyncio
+async def test_dashboard_medications_returns_json_safe_payload(monkeypatch) -> None:
+    now = datetime(2026, 6, 18, 9, 30, tzinfo=UTC)
+    medication = SimpleNamespace(
+        id=10,
+        user_id=42,
+        name="비타민 D",
+        medication_type="SUPPLEMENT",
+        dosage=None,
+        frequency="매일 1회",
+        reminder_time=time(9, 0),
+        is_active=True,
+        memo=None,
+        created_at=now,
+        updated_at=now,
+    )
+    medication_record = SimpleNamespace(
+        id=20,
+        medication_id=10,
+        user_id=42,
+        scheduled_at=None,
+        taken_at=now,
+        is_taken=True,
+        status="TAKEN",
+        memo=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+    async def fake_list_medications(user_id: int, is_active: bool, limit: int) -> list[Any]:
+        assert user_id == 42
+        assert is_active is True
+        assert limit == 10
+        return [medication]
+
+    async def fake_list_medication_records(user_id: int, limit: int) -> list[Any]:
+        assert user_id == 42
+        assert limit == 10
+        return [medication_record]
+
+    monkeypatch.setattr(dashboard_service.medication_service, "list_medications", fake_list_medications)
+    monkeypatch.setattr(
+        dashboard_service.medication_service,
+        "list_medication_records",
+        fake_list_medication_records,
+    )
+
+    result = await dashboard_service.get_dashboard_medications(user_id=42)
+
+    medication_payload = result["active_medications"][0]
+    assert medication_payload["id"] == 10
+    assert medication_payload["name"] == "비타민 D"
+    assert medication_payload["dosage"] is None
+    assert medication_payload["reminder_time"] == "09:00:00"
+    assert isinstance(medication_payload["created_at"], str)
+
+    record_payload = result["recent_medication_records"][0]
+    assert record_payload["id"] == 20
+    assert record_payload["medication_id"] == 10
+    assert record_payload["scheduled_at"] is None
+    assert isinstance(record_payload["taken_at"], str)
+    assert record_payload["is_taken"] is True
+
+
+@pytest.mark.asyncio
+async def test_dashboard_medications_allows_empty_lists(monkeypatch) -> None:
+    async def fake_list_medications(user_id: int, is_active: bool, limit: int) -> list[Any]:
+        assert user_id == 42
+        assert is_active is True
+        assert limit == 10
+        return []
+
+    async def fake_list_medication_records(user_id: int, limit: int) -> list[Any]:
+        assert user_id == 42
+        assert limit == 10
+        return []
+
+    monkeypatch.setattr(dashboard_service.medication_service, "list_medications", fake_list_medications)
+    monkeypatch.setattr(
+        dashboard_service.medication_service,
+        "list_medication_records",
+        fake_list_medication_records,
+    )
+
+    result = await dashboard_service.get_dashboard_medications(user_id=42)
+
+    assert result == {"active_medications": [], "recent_medication_records": []}
 
 
 @pytest.mark.asyncio

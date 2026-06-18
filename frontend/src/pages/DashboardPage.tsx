@@ -291,6 +291,31 @@ function makeMedicationAdherenceSeries(records: AnyRecord[]): ChartSeries {
   };
 }
 
+function makeDietRecordCountSeries(records: AnyRecord[]): ChartSeries {
+  const grouped = new Map<string, number>();
+  records.forEach((record) => {
+    const rawDate = String(record.meal_time ?? record.created_at ?? "");
+    if (!rawDate) return;
+    const date = rawDate.slice(0, 10);
+    if (!date) return;
+    grouped.set(date, (grouped.get(date) ?? 0) + 1);
+  });
+  const points = Array.from(grouped.entries())
+    .map(([date, count]) => ({
+      date,
+      label: formatDate(date),
+      value: count,
+      displayValue: `${count}건`,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return {
+    key: "식단 기록",
+    label: "식단 기록",
+    color: "var(--chart-diabetes)",
+    points: points.length >= 2 ? points : [],
+  };
+}
+
 function makeDiseaseRiskTrendSeries(items: DashboardRiskTrendSeries[]): ChartSeries[] {
   return items
     .map((item) => {
@@ -917,6 +942,7 @@ export default function DashboardPage() {
   const lifestyleSeries = [
     makeValueSeries(trends.challenge_completion_rate, "챌린지 수행률", diseaseChartColors.OBESITY, { suffix: "%" }),
   ];
+  const dietRecordCountSeries = makeDietRecordCountSeries(dashboardDiets);
   const medicationAdherenceSeries = makeMedicationAdherenceSeries(dashboardMedicationRecords);
   const riskTrendSeries = makeDiseaseRiskTrendSeries(riskTrend.series ?? []);
   const hasRiskTrendEnoughData = riskTrendSeries.some((item) => item.points.length >= 2);
@@ -974,7 +1000,7 @@ export default function DashboardPage() {
       : activeMetricKey === "weight"
         ? weightSeries
         : activeMetricKey === "diet"
-          ? []
+          ? [dietRecordCountSeries]
           : activeMetricKey === "exercise"
             ? [lifestyleSeries[0]]
             : activeMetricKey === "medication"
@@ -1017,8 +1043,8 @@ export default function DashboardPage() {
                 title: "식단 기록",
                 unit: "건",
                 value: dietRecordCount === 0 ? "-" : String(dietRecordCount),
-                delta: null,
-                series: [],
+                delta: getSeriesDelta([dietRecordCountSeries]),
+                series: [dietRecordCountSeries],
               },
             ]
           : activeMetricKey === "exercise"
