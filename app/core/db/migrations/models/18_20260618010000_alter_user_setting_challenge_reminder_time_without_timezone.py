@@ -18,6 +18,7 @@ async def downgrade(db: BaseDBAsyncClient) -> str:
         USING "challenge_reminder_time"::TIMETZ;
     """
 
+
 MODELS_STATE = (
     "eJztXVl3q7iW/issP9Vdy7eqkpOcIW+Ow8lxlYe07dTQ171YxFZiOgwuwMnJ7Vv/vSUmgy"
     "QwYAzI2S8xAbZsPglp728P+r+OYa2Q7vzYQ7a2XHeupP/rmKqB8AF1pSt11M1md56ccNUH"

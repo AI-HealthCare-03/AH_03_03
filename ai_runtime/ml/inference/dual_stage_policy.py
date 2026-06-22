@@ -64,6 +64,37 @@ def resolve_dual_stage_result(base_risk_level: ServiceBand | str, screening_high
     )
 
 
+def apply_strict_screening_policy_v2(
+    *,
+    base_risk_level: ServiceBand | str,
+    screening_high: bool,
+    strict_high: bool,
+) -> DualStagePolicyResult:
+    """Resolve BASIC rule, screening, and strict model signals into v2 band.
+
+    The strict model is an auxiliary signal only. It can promote CAUTION to
+    HIGH_CAUTION, but must not promote LOW/ATTENTION directly to HIGH_CAUTION.
+    Screening remains capped at CAUTION.
+    """
+    base_band = coerce_service_band(base_risk_level)
+    if base_band == ServiceBand.HIGH_CAUTION:
+        service_band = ServiceBand.HIGH_CAUTION
+    elif base_band == ServiceBand.CAUTION and strict_high:
+        service_band = ServiceBand.HIGH_CAUTION
+    else:
+        service_band = resolve_dual_stage_band(
+            base_risk_level=base_band,
+            screening_high=screening_high,
+        )
+    return DualStagePolicyResult(
+        risk_level=service_band.value,
+        service_band=service_band,
+        service_band_label=get_service_band_label(service_band),
+        service_band_percent=get_service_band_percent(service_band),
+        legacy_risk_level=to_legacy_risk_level(service_band),
+    )
+
+
 def coerce_service_band(base_risk_level: ServiceBand | str) -> ServiceBand:
     normalized = str(base_risk_level).upper()
     if normalized == "MEDIUM":

@@ -12,6 +12,7 @@ from ai_runtime.llm.explanation_service import (
     retrieve_health_context,
 )
 from ai_runtime.llm.schemas import AnalysisExplanationInput, HealthRiskFactor
+from ai_runtime.ml.inference.dual_stage_policy import apply_strict_screening_policy_v2
 from ai_runtime.ml.inference.feature_mapper import map_service_features
 from ai_runtime.ml.inference.screening_predictor import load_screening_artifact
 from ai_runtime.ml.inference.screening_risk_service import predict_screening_dual_stage_risk
@@ -418,13 +419,15 @@ def _predict_basic_screening_dual_stage(
             "note": "screening dual-stage 실패로 기존 BASIC rule 결과를 유지합니다.",
         }
 
-    return {
+    payload = {
         "status": "applied",
         "disease_code": result.disease_code,
+        "policy_version": "v1",
         "base_risk_level": result.base_risk_level,
         "base_high": result.base_high,
         "base_caution_or_above": result.base_caution_or_above,
         "screening_high": result.screening_high,
+        "strict_high": None,
         "risk_level": result.risk_level,
         "service_band": result.service_band.value,
         "service_band_label": result.service_band_label,
@@ -436,8 +439,108 @@ def _predict_basic_screening_dual_stage(
         "feature_mapping_missing_sources": mapping.missing_required_sources,
         "feature_mapping_defaulted_features": mapping.defaulted_features,
         "feature_mapping_warnings": mapping.warnings,
-        "note": "raw screening probability는 사용자 응답에 직접 노출하지 않습니다.",
+        "note": "raw screening 모델 점수는 사용자 응답에 직접 노출하지 않습니다.",
     }
+    if _strict_dual_stage_v2_enabled():
+        return _apply_basic_strict_dual_stage_v2(
+            payload=payload,
+            user=user,
+            health_record=health_record,
+            disease_code=disease_code,
+            base_risk_level=base_risk_level,
+        )
+    return payload
+
+
+def _apply_basic_strict_dual_stage_v2(
+    *,
+    payload: dict[str, Any],
+    user: User,
+    health_record: HealthRecord,
+    disease_code: str,
+    base_risk_level: RiskLevel,
+) -> dict[str, Any]:
+    strict_signal = _predict_basic_strict_signal(
+        user=user,
+        health_record=health_record,
+        disease_code=disease_code,
+    )
+    if strict_signal.get("status") != "applied":
+        return {
+            **payload,
+            "policy_version": "v2_strict_fallback_v1",
+            "strict_high": None,
+            "strict_model_count": strict_signal.get("strict_model_count", 0),
+            "strict_fallback_reason": strict_signal.get("fallback_reason"),
+            "strict_status": strict_signal.get("status"),
+            "note": "strict 모델 실패로 screening v1 정책 결과를 유지합니다.",
+        }
+
+    policy_result = apply_strict_screening_policy_v2(
+        base_risk_level=base_risk_level.value,
+        screening_high=bool(payload.get("screening_high")),
+        strict_high=bool(strict_signal.get("strict_high")),
+    )
+    return {
+        **payload,
+        "policy_version": "v2",
+        "strict_status": "applied",
+        "strict_high": bool(strict_signal["strict_high"]),
+        "strict_model_count": int(strict_signal.get("strict_model_count") or 0),
+        "strict_model_name": strict_signal.get("strict_model_name"),
+        "strict_model_version": strict_signal.get("strict_model_version"),
+        "risk_level": policy_result.risk_level,
+        "service_band": policy_result.service_band.value,
+        "service_band_label": policy_result.service_band_label,
+        "service_band_percent": policy_result.service_band_percent,
+        "legacy_risk_level": None,
+        "note": "raw screening/strict 모델 점수는 사용자 응답에 직접 노출하지 않습니다.",
+    }
+
+
+def _predict_basic_strict_signal(
+    *,
+    user: User,
+    health_record: HealthRecord,
+    disease_code: str,
+) -> dict[str, Any]:
+    try:
+        from ai_runtime.ml.inference.disease_risk_service import predict_chronic_disease_risks
+
+        predictions = predict_chronic_disease_risks(user, health_record, diseases=[disease_code])
+        prediction = predictions.get(disease_code)
+    except Exception as exc:
+        logger.exception(
+            "BASIC strict dual-stage prediction failed; falling back to screening v1",
+            extra={
+                "disease_code": disease_code,
+                "health_record_id": health_record.id,
+            },
+        )
+        return {
+            "status": "fallback_screening_v1",
+            "fallback_reason": exc.__class__.__name__,
+            "strict_model_count": 0,
+        }
+
+    if prediction is None:
+        return {
+            "status": "fallback_screening_v1",
+            "fallback_reason": "strict_prediction_unavailable",
+            "strict_model_count": 0,
+        }
+
+    return {
+        "status": "applied",
+        "strict_high": prediction.risk_level == RiskLevel.HIGH_CAUTION.value,
+        "strict_model_count": prediction.model_count,
+        "strict_model_name": prediction.model_name,
+        "strict_model_version": prediction.model_version,
+    }
+
+
+def _strict_dual_stage_v2_enabled() -> bool:
+    return bool(config.ENABLE_STRICT_DUAL_STAGE) or config.ML_DUAL_STAGE_POLICY_VERSION.strip().lower() == "v2"
 
 
 def _calculate_analysis_scores(
@@ -1214,6 +1317,11 @@ def _screening_dual_stage_final_outputs(screening_dual_stage: dict[str, Any] | N
 
     return {
         "screening_dual_stage_status": status,
+        "dual_stage_policy_version": screening_dual_stage.get("policy_version"),
+        "screening_high": screening_dual_stage.get("screening_high"),
+        "strict_high": screening_dual_stage.get("strict_high"),
+        "screening_model_count": screening_dual_stage.get("screening_model_count"),
+        "strict_model_count": screening_dual_stage.get("strict_model_count"),
     }
 
 

@@ -82,6 +82,7 @@ class CatBoostDiseasePredictor:
             model_name="catboost",
             model_version=_model_version(self.config_path, self.disease),
             artifact_dir=str(self.artifact_dir),
+            model_count=len(probabilities),
             factors=_top_factors(self.metrics_path),
         )
 
