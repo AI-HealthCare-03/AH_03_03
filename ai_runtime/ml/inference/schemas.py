@@ -18,6 +18,7 @@ class DiseasePrediction:
     model_name: str
     model_version: str
     artifact_dir: str
+    model_count: int = 0
     factors: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -29,5 +30,6 @@ class DiseasePrediction:
             "model_name": self.model_name,
             "model_version": self.model_version,
             "artifact_dir": self.artifact_dir,
+            "model_count": self.model_count,
             "factors": self.factors,
         }

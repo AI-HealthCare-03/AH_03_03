@@ -259,6 +259,177 @@ def test_caution_base_score_with_screening_high_keeps_caution(monkeypatch: pytes
     assert "screening_probability" not in result
 
 
+def test_strict_dual_stage_v2_promotes_caution_to_high_caution(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(analysis_service.config, "ML_DUAL_STAGE_POLICY_VERSION", "v2")
+    monkeypatch.setattr(analysis_service.config, "ENABLE_STRICT_DUAL_STAGE", False)
+    monkeypatch.setattr(
+        analysis_service,
+        "load_screening_artifact",
+        lambda disease_code: SimpleNamespace(feature_columns=["나이", "BMI"]),
+    )
+
+    def fake_screening_dual_stage(**kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            disease_code=kwargs["disease_code"],
+            base_risk_level=kwargs["base_risk_level"],
+            base_high=True,
+            base_caution_or_above=True,
+            screening_high=False,
+            risk_level=RiskLevel.CAUTION.value,
+            service_band=SimpleNamespace(value=RiskLevel.CAUTION.value),
+            service_band_label="주의",
+            service_band_percent=65,
+            legacy_risk_level=RiskLevel.CAUTION.value,
+            screening_missing_features=[],
+            screening_neutralized_features=[],
+            screening_model_count=5,
+        )
+
+    monkeypatch.setattr(analysis_service, "predict_screening_dual_stage_risk", fake_screening_dual_stage)
+    monkeypatch.setattr(
+        analysis_service,
+        "_predict_basic_strict_signal",
+        lambda **kwargs: {
+            "status": "applied",
+            "strict_high": True,
+            "strict_model_count": 5,
+            "strict_model_name": "catboost",
+            "strict_model_version": "htn_catboost_final",
+        },
+    )
+
+    result = analysis_service._predict_basic_screening_dual_stage(
+        user=SimpleNamespace(id=7, birthday=date(1975, 1, 1), gender="MALE"),
+        health_record=_health_record(),
+        analysis_type=AnalysisType.HYPERTENSION,
+        base_risk_level=RiskLevel.CAUTION,
+        analysis_mode=AnalysisMode.BASIC,
+    )
+
+    assert result is not None
+    assert result["policy_version"] == "v2"
+    assert result["screening_high"] is False
+    assert result["strict_high"] is True
+    assert result["screening_model_count"] == 5
+    assert result["strict_model_count"] == 5
+    assert result["risk_level"] == RiskLevel.HIGH_CAUTION.value
+    assert result["service_band"] == RiskLevel.HIGH_CAUTION.value
+    assert result["service_band_label"] == "높은 주의"
+    assert result["service_band_percent"] == 80
+    assert "probability" not in str(result)
+
+
+def test_strict_dual_stage_v2_low_with_two_model_signals_is_capped_at_caution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(analysis_service.config, "ML_DUAL_STAGE_POLICY_VERSION", "v2")
+    monkeypatch.setattr(
+        analysis_service,
+        "load_screening_artifact",
+        lambda disease_code: SimpleNamespace(feature_columns=["나이", "BMI"]),
+    )
+
+    def fake_screening_dual_stage(**kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            disease_code=kwargs["disease_code"],
+            base_risk_level=kwargs["base_risk_level"],
+            base_high=False,
+            base_caution_or_above=False,
+            screening_high=True,
+            risk_level=RiskLevel.CAUTION.value,
+            service_band=SimpleNamespace(value=RiskLevel.CAUTION.value),
+            service_band_label="주의",
+            service_band_percent=65,
+            legacy_risk_level=RiskLevel.CAUTION.value,
+            screening_missing_features=[],
+            screening_neutralized_features=[],
+            screening_model_count=5,
+        )
+
+    monkeypatch.setattr(analysis_service, "predict_screening_dual_stage_risk", fake_screening_dual_stage)
+    monkeypatch.setattr(
+        analysis_service,
+        "_predict_basic_strict_signal",
+        lambda **kwargs: {
+            "status": "applied",
+            "strict_high": True,
+            "strict_model_count": 5,
+            "strict_model_name": "catboost",
+            "strict_model_version": "dm_catboost_final",
+        },
+    )
+
+    result = analysis_service._predict_basic_screening_dual_stage(
+        user=SimpleNamespace(id=7, birthday=date(1975, 1, 1), gender="MALE"),
+        health_record=_health_record(),
+        analysis_type=AnalysisType.DIABETES,
+        base_risk_level=RiskLevel.LOW,
+        analysis_mode=AnalysisMode.BASIC,
+    )
+
+    assert result is not None
+    assert result["policy_version"] == "v2"
+    assert result["screening_high"] is True
+    assert result["strict_high"] is True
+    assert result["risk_level"] == RiskLevel.CAUTION.value
+    assert result["service_band"] == RiskLevel.CAUTION.value
+    assert result["service_band_percent"] == 65
+
+
+def test_strict_dual_stage_v2_strict_failure_falls_back_to_screening_v1(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(analysis_service.config, "ML_DUAL_STAGE_POLICY_VERSION", "v2")
+    monkeypatch.setattr(
+        analysis_service,
+        "load_screening_artifact",
+        lambda disease_code: SimpleNamespace(feature_columns=["나이", "BMI"]),
+    )
+
+    def fake_screening_dual_stage(**kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            disease_code=kwargs["disease_code"],
+            base_risk_level=kwargs["base_risk_level"],
+            base_high=True,
+            base_caution_or_above=True,
+            screening_high=False,
+            risk_level=RiskLevel.CAUTION.value,
+            service_band=SimpleNamespace(value=RiskLevel.CAUTION.value),
+            service_band_label="주의",
+            service_band_percent=65,
+            legacy_risk_level=RiskLevel.CAUTION.value,
+            screening_missing_features=[],
+            screening_neutralized_features=[],
+            screening_model_count=5,
+        )
+
+    monkeypatch.setattr(analysis_service, "predict_screening_dual_stage_risk", fake_screening_dual_stage)
+    monkeypatch.setattr(
+        analysis_service,
+        "_predict_basic_strict_signal",
+        lambda **kwargs: {
+            "status": "fallback_screening_v1",
+            "fallback_reason": "RuntimeError",
+            "strict_model_count": 0,
+        },
+    )
+
+    result = analysis_service._predict_basic_screening_dual_stage(
+        user=SimpleNamespace(id=7, birthday=date(1975, 1, 1), gender="MALE"),
+        health_record=_health_record(),
+        analysis_type=AnalysisType.HYPERTENSION,
+        base_risk_level=RiskLevel.CAUTION,
+        analysis_mode=AnalysisMode.BASIC,
+    )
+
+    assert result is not None
+    assert result["policy_version"] == "v2_strict_fallback_v1"
+    assert result["strict_status"] == "fallback_screening_v1"
+    assert result["strict_fallback_reason"] == "RuntimeError"
+    assert result["risk_level"] == RiskLevel.CAUTION.value
+    assert result["service_band"] == RiskLevel.CAUTION.value
+
+
 def test_screening_fallback_snapshot_metadata_does_not_change_risk_level() -> None:
     snapshot = analysis_service._analysis_snapshot_request(
         analysis_type=AnalysisType.HYPERTENSION,
@@ -283,6 +454,41 @@ def test_screening_fallback_snapshot_metadata_does_not_change_risk_level() -> No
     assert final_outputs["service_band"] == RiskLevel.CAUTION.value
     assert final_outputs["service_band_label"] == "주의"
     assert final_outputs["service_band_percent"] == 65
+
+
+def test_strict_dual_stage_snapshot_metadata_excludes_raw_probability() -> None:
+    snapshot = analysis_service._analysis_snapshot_request(
+        analysis_type=AnalysisType.HYPERTENSION,
+        analysis_mode=AnalysisMode.BASIC,
+        health_record=_health_record(),
+        score=Decimal("0.52"),
+        risk_level=RiskLevel.HIGH_CAUTION,
+        guide_message="간편 분석 참고용입니다.",
+        factors=[],
+        screening_dual_stage={
+            "status": "applied",
+            "disease_code": "HTN",
+            "policy_version": "v2",
+            "base_risk_level": "CAUTION",
+            "screening_high": False,
+            "strict_high": True,
+            "screening_model_count": 5,
+            "strict_model_count": 5,
+            "risk_level": "HIGH_CAUTION",
+            "service_band": "HIGH_CAUTION",
+            "service_band_label": "높은 주의",
+            "service_band_percent": 80,
+        },
+    )
+
+    final_outputs = snapshot.output_payload["final_outputs"]
+    assert final_outputs["dual_stage_policy_version"] == "v2"
+    assert final_outputs["screening_high"] is False
+    assert final_outputs["strict_high"] is True
+    assert final_outputs["screening_model_count"] == 5
+    assert final_outputs["strict_model_count"] == 5
+    assert "probability" not in str(snapshot.output_payload)
+    assert "probability" not in str(snapshot.model_payload)
 
 
 async def _empty_recommendations(user_id: int, result: Any) -> list[int]:

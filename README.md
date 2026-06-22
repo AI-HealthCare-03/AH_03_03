@@ -85,6 +85,7 @@ EMAIL_VERIFICATION_DEBUG=true
 PASSWORD_RESET_DEBUG=false
 
 OPENAI_API_KEY=<OPENAI_API_KEY>
+OPENAI_TEMPERATURE=0
 CHATBOT_USE_REAL_LLM=false
 RAG_ENABLED=false
 RAG_RETRIEVAL_STRATEGY=keyword_only
@@ -344,7 +345,7 @@ QA/smoke 스크립트는 로컬 검증용입니다. `scripts/qa/smoke_notificati
 
 | 기능 | 주요 flag | 기본 방향 |
 |---|---|---|
-| 챗봇 LLM | `CHATBOT_USE_REAL_LLM`, `OPENAI_API_KEY` | 기본 mock/rule, 필요 시 OpenAI |
+| 챗봇 LLM | `CHATBOT_USE_REAL_LLM`, `OPENAI_API_KEY`, `OPENAI_TEMPERATURE` | 기본 mock/rule, 필요 시 OpenAI |
 | RAG | `RAG_ENABLED`, `RAG_RETRIEVAL_STRATEGY` | 기본 keyword-only, 필요 시 vector fallback/hybrid |
 | 식단 이미지 | `DIET_VISION_PROVIDER`, `DIET_GPT_VISION_ENABLED` | 기본 rule/fallback |
 | 건강검진 OCR | `EXAM_OCR_PROVIDER`, `EXAM_GPT_VISION_ENABLED`, `PADDLE_OCR_ENABLED` | 기본 auto |

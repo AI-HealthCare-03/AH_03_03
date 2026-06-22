@@ -65,6 +65,7 @@ class Config(BaseSettings):
     FOOD_CV_CONFIDENCE_THRESHOLD: float = 0.75
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_TEMPERATURE: float = 0.0
     DIET_GPT_VISION_ENABLED: bool = False
     DIET_GPT_VISION_MODEL: str = "gpt-4o"
     DIET_VISION_PROVIDER: str = "rule_based"
@@ -80,6 +81,8 @@ class Config(BaseSettings):
     EXAM_GPT_VISION_MODEL: str = "gpt-4o"
     PADDLE_OCR_ENABLED: bool = False
     CHATBOT_USE_REAL_LLM: bool = False
+    ENABLE_STRICT_DUAL_STAGE: bool = False
+    ML_DUAL_STAGE_POLICY_VERSION: str = "v1"
     RAG_RETRIEVAL_STRATEGY: str = "keyword_only"
     MAIN_CHATBOT_RAG_STRATEGY: str = "keyword_only"
     RAG_ENABLED: bool = False

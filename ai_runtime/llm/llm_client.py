@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 from time import perf_counter
 from typing import Any
@@ -92,7 +93,7 @@ def create_openai_response(
         observation_context = langfuse.start_as_current_observation(
             name=build_langfuse_observation_name(metadata),
             as_type="generation",
-            input=prompt,
+            input=redact_llm_prompt(prompt),
             metadata=metadata,
             model=model,
         )
@@ -185,6 +186,69 @@ def record_langfuse_event(
             pass
 
 
+def redact_llm_prompt(prompt: str | None) -> str:
+    text = str(prompt or "")
+    if not text:
+        return text
+
+    text = re.sub(r"[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}", "[email]", text)
+    text = re.sub(r"\b(?:\+?82[-.\s]?)?0?1[016789][-\s.]?\d{3,4}[-\s.]?\d{4}\b", "[phone]", text)
+    text = re.sub(r"\b\d{6}[-\s]?[1-4]\d{6}\b", "[rrn]", text)
+    text = re.sub(
+        r"((?:이름|성명|name)\s*[:=]\s*)([가-힣A-Za-z][가-힣A-Za-z\s]{1,30})",
+        r"\1[name]",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    health_terms = (
+        "혈압",
+        "수축기",
+        "이완기",
+        "SBP",
+        "DBP",
+        "공복혈당",
+        "혈당",
+        "glucose",
+        "HbA1c",
+        "당화혈색소",
+        "총콜레스테롤",
+        "콜레스테롤",
+        "LDL",
+        "HDL",
+        "TG",
+        "중성지방",
+        "triglyceride",
+        "BMI",
+        "체질량지수",
+        "키",
+        "신장",
+        "몸무게",
+        "체중",
+        "허리둘레",
+        "waist",
+    )
+    health_pattern = (
+        r"((?:"
+        + "|".join(re.escape(term) for term in health_terms)
+        + r")\s*[:=]?\s*)(\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s*(?:mg/dl|mmhg|%|kg|cm)?)"
+    )
+    text = re.sub(health_pattern, r"\1[health_value]", text, flags=re.IGNORECASE)
+
+    medication_pattern = (
+        r"((?:복용약|복약|처방약|약물|약 이름|medication|medicine)\s*[:=]\s*)"
+        r"([^\n,.;]{1,80})"
+    )
+    text = re.sub(medication_pattern, r"\1[medication]", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"\b([A-Za-z가-힣]{2,30})\s+\d+(?:\.\d+)?\s*(?:mg|㎎|정|tablet|tab)\b",
+        r"[medication] [dose]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text
+
+
 def build_openai_client():
     if not has_openai_config(config):
         raise RuntimeError("OPENAI_API_KEY is not set. Set the environment variable before using real LLM mode.")
@@ -242,11 +306,13 @@ def _create_openai_response_with_observability(
     **kwargs,
 ):
     started_at = perf_counter()
+    request_kwargs = _with_default_temperature(kwargs)
     try:
-        response = client.responses.create(
+        response = _create_response_with_temperature_fallback(
+            client=client,
             model=model,
-            input=prompt,
-            **kwargs,
+            prompt=prompt,
+            request_kwargs=request_kwargs,
         )
     except Exception as exc:
         _log_openai_runtime_call(
@@ -268,6 +334,69 @@ def _create_openai_response_with_observability(
         usage=_extract_token_usage(response),
     )
     return response
+
+
+def _with_default_temperature(kwargs: dict[str, Any]) -> dict[str, Any]:
+    request_kwargs = dict(kwargs)
+    if "temperature" not in request_kwargs:
+        request_kwargs["temperature"] = config.OPENAI_TEMPERATURE
+    return request_kwargs
+
+
+def _create_response_with_temperature_fallback(
+    *,
+    client,
+    model: str,
+    prompt: str,
+    request_kwargs: dict[str, Any],
+):
+    try:
+        return client.responses.create(
+            model=model,
+            input=prompt,
+            **request_kwargs,
+        )
+    except Exception as exc:
+        if "temperature" not in request_kwargs or not _is_temperature_unsupported_error(exc):
+            raise
+
+        fallback_kwargs = dict(request_kwargs)
+        fallback_kwargs.pop("temperature", None)
+        logger.info(
+            "OpenAI Responses API temperature unsupported; retrying without temperature",
+            extra={
+                "llm_runtime": {
+                    "llm_provider": "openai",
+                    "llm_model": model,
+                    "fallback_reason": type(exc).__name__,
+                    "temperature_retry_without_parameter": True,
+                }
+            },
+        )
+        return client.responses.create(
+            model=model,
+            input=prompt,
+            **fallback_kwargs,
+        )
+
+
+def _is_temperature_unsupported_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    if "temperature" not in message:
+        return isinstance(exc, TypeError)
+    if isinstance(exc, TypeError):
+        return True
+    return any(
+        marker in message
+        for marker in (
+            "unsupported",
+            "not supported",
+            "unknown parameter",
+            "unrecognized",
+            "unexpected keyword",
+            "invalid parameter",
+        )
+    )
 
 
 def _log_openai_runtime_call(

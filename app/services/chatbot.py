@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from ai_runtime.llm.graph import run_chatbot_graph_async
+from ai_runtime.llm.static_intents import match_static_intent
 from app.core import config
 from app.core.providers import has_openai_config
 from app.dtos.chatbot import ChatbotAskRequest, ChatbotAskResponse
@@ -25,6 +26,22 @@ async def ask_chatbot(request: ChatbotAskRequest, user_id: int | None = None) ->
 async def ask_chatbot_with_runtime_trace(
     request: ChatbotAskRequest, user_id: int | None = None
 ) -> tuple[ChatbotAskResponse, dict]:
+    static_response = match_static_intent(request.message)
+    if static_response is not None:
+        return (
+            ChatbotAskResponse(
+                answer=static_response.answer,
+                source=static_response.source,
+                context_type=request.context_type,
+                recommended_actions=static_response.recommended_actions,
+                safety_notice=SAFETY_NOTICE,
+            ),
+            {
+                "static_intent": static_response.intent,
+                "source": static_response.source,
+            },
+        )
+
     use_real_llm = config.CHATBOT_USE_REAL_LLM and has_openai_config(config)
     domain_context = await load_chatbot_domain_context(
         user_id=user_id,
