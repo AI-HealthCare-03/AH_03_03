@@ -6090,3 +6090,229 @@ input:-webkit-autofill:focus {
 .pagination-row > button {
   flex: 0 0 auto;
 }
+
+@media (max-width: 768px) {
+  .auth-page,
+  .landing-page,
+  .page-stack,
+  .dashboard-shell,
+  .main-dashboard-section,
+  .dashboard-analysis-main,
+  .analysis-chart-card,
+  .dashboard-chart-card,
+  .dashboard-chart-panel,
+  .line-chart-card,
+  .line-chart-wrap,
+  .landing-preview-dashboard,
+  .main-dashboard-hero,
+  .home-action-panel,
+  .challenge-summary-card,
+  .challenge-recommendation-panel {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .auth-page {
+    margin: 24px auto;
+    padding-inline: 12px;
+  }
+
+  .dashboard-header,
+  .dashboard-chart-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-period-tabs {
+    flex-wrap: nowrap;
+    margin-inline: -2px;
+    overflow-x: auto;
+    padding: 0 2px 4px;
+    scrollbar-width: none;
+  }
+
+  .dashboard-period-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dashboard-period-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .dashboard-chart-panels.single-panel .dashboard-chart-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-chart-panels.single-panel .dashboard-chart-stat {
+    align-self: stretch;
+    min-height: 0;
+  }
+
+  .dashboard-diet-summary,
+  .dashboard-primary-grid .dashboard-diet-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-preview-dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .card {
+    padding: 16px;
+  }
+
+  .auth-page .page-header h1,
+  .dashboard-header h1,
+  .main-dashboard-hero h1 {
+    font-size: 26px;
+    line-height: 1.18;
+  }
+
+  .hero-panel {
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .hero-panel h1 {
+    font-size: 28px;
+    line-height: 1.18;
+  }
+
+  .hero-panel p {
+    font-size: 15px;
+  }
+
+  .main-dashboard-hero {
+    padding: 20px;
+  }
+
+  .home-action-panel {
+    width: 100%;
+  }
+
+  .home-action-card {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .main-report-grid,
+  .challenge-summary-card {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-status-panel,
+  .challenge-rate-panel {
+    width: 100%;
+  }
+
+  .challenge-status-ring-row {
+    align-items: center;
+  }
+
+  .challenge-recommendation-panel .compact-list-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .challenge-recommendation-panel .compact-list-item .button {
+    align-self: stretch;
+  }
+
+  .dashboard-chart-card,
+  .analysis-chart-card {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .dashboard-chart-panel {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .dashboard-chart-stat {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-chart-stat strong {
+    font-size: 20px;
+  }
+
+  .line-chart,
+  .dashboard-chart-panel .line-chart {
+    height: 170px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .landing-preview-risk-panel,
+  .landing-preview-vitals-panel {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-helper-links,
+  .button-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-helper-links {
+    display: grid;
+  }
+
+  .button-row {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .auth-page {
+    margin-block: 16px;
+    padding-inline: 8px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .dashboard-header h1,
+  .main-dashboard-hero h1,
+  .hero-panel h1 {
+    font-size: 24px;
+  }
+
+  .dashboard-period-tabs button {
+    font-size: 11px;
+    padding: 7px 9px;
+  }
+
+  .dashboard-chart-heading > span {
+    white-space: normal;
+  }
+
+  .challenge-status-ring-row {
+    gap: 10px;
+  }
+
+  .challenge-status-ring-row svg {
+    height: 96px;
+    width: 96px;
+  }
+
+  .viz-ring-value {
+    font-size: 17px;
+  }
+
+  .home-action-card__icon {
+    flex-basis: 38px;
+    height: 38px;
+    width: 38px;
+  }
+}
