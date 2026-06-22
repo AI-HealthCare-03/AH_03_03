@@ -1,0 +1,4 @@
+image_path,expected_foods
+samples/rice.jpg,쌀밥
+samples/rice_cake.jpg,가래떡
+samples/salad.jpg,샐러드
