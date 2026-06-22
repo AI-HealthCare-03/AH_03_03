@@ -4,6 +4,7 @@ import pytest
 
 from ai_runtime.ml.inference.dual_stage_policy import (
     ServiceBand,
+    apply_strict_screening_policy_v2,
     coerce_service_band,
     get_service_band_label,
     get_service_band_percent,
@@ -81,6 +82,32 @@ def test_resolve_dual_stage_result_includes_display_and_legacy_values() -> None:
     assert result.service_band_label == "주의"
     assert result.service_band_percent == 65
     assert result.legacy_risk_level == "CAUTION"
+
+
+@pytest.mark.parametrize(
+    ("base_risk_level", "screening_high", "strict_high", "expected_band"),
+    [
+        (ServiceBand.LOW, True, True, ServiceBand.CAUTION),
+        (ServiceBand.ATTENTION, True, True, ServiceBand.CAUTION),
+        (ServiceBand.CAUTION, False, True, ServiceBand.HIGH_CAUTION),
+        (ServiceBand.CAUTION, True, False, ServiceBand.CAUTION),
+        (ServiceBand.HIGH_CAUTION, False, False, ServiceBand.HIGH_CAUTION),
+    ],
+)
+def test_apply_strict_screening_policy_v2_promotion_limits(
+    base_risk_level: ServiceBand,
+    screening_high: bool,
+    strict_high: bool,
+    expected_band: ServiceBand,
+) -> None:
+    result = apply_strict_screening_policy_v2(
+        base_risk_level=base_risk_level,
+        screening_high=screening_high,
+        strict_high=strict_high,
+    )
+
+    assert result.service_band == expected_band
+    assert result.risk_level == expected_band.value
 
 
 @pytest.mark.parametrize(
