@@ -75,7 +75,9 @@ async def test_real_llm_blackbox_quality_eval(monkeypatch: pytest.MonkeyPatch) -
         if not evaluation.passed:
             failures.append(f"{case['id']} score={evaluation.total_score} issues={evaluation.issues}")
         if case["category"] == "static_intent":
-            assert response.source.startswith("static_"), f"{case['id']} expected static_* source, got {response.source}"
+            assert response.source.startswith("static_"), (
+                f"{case['id']} expected static_* source, got {response.source}"
+            )
 
     _write_reports(results)
     assert not failures, "LLM eval failures:\n" + "\n".join(failures[:20])

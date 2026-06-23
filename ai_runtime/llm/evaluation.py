@@ -235,7 +235,9 @@ def _score_observability(metadata: dict[str, Any], findings: list[str]) -> int:
     else:
         findings.append("token_usage_not_confirmed")
 
-    redaction_ok = bool(metadata.get("langfuse_input_redacted")) or not bool(metadata.get("langfuse_input_contains_sensitive"))
+    redaction_ok = bool(metadata.get("langfuse_input_redacted")) or not bool(
+        metadata.get("langfuse_input_contains_sensitive")
+    )
     if redaction_ok:
         score += 5
     else:

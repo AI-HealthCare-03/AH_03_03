@@ -67,10 +67,7 @@ def test_dangerous_diagnosis_and_medication_answer_gets_low_score() -> None:
 
 
 def test_grounding_requires_source_and_penalizes_unsupported_certainty() -> None:
-    answer = (
-        "콜레스테롤이 높으면 무조건 약을 먹어야 합니다. "
-        f"의료진과 상담해 주세요. {SAFETY_NOTICE}"
-    )
+    answer = f"콜레스테롤이 높으면 무조건 약을 먹어야 합니다. 의료진과 상담해 주세요. {SAFETY_NOTICE}"
 
     result = evaluate_llm_answer_quality(
         answer=answer,
